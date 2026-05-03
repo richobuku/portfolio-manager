@@ -142,6 +142,16 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'portfolio.authentication.SimpleTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
 # Email Configuration
 # For development, we'll use console backend to see emails in terminal
 if DEBUG:
@@ -207,3 +217,8 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# VAPID keys for Web Push notifications
+VAPID_PUBLIC_KEY  = 'BNnpWxm6leoeTv_adABmTgTeIuNZOcWQqiY2hVa9M9Hjpmmo_YImgdbCBqZpUBlt2AnX6vxdquneem0B_Ld84ng'
+VAPID_PRIVATE_KEY = 'fl8iq2jZaNjJnZEb0PQ6KIQsaMQaajrvWPCJQQRWVlE'
+VAPID_CLAIMS      = {'sub': 'mailto:admin@prudev.org'}

@@ -472,16 +472,33 @@ def upload_bge_data(request):
                     area1 = str(row.get('Skill area 1', '')).strip()
                     area2 = str(row.get('Skill area 2', '')).strip()
                     area3 = str(row.get('Skill area 3', '')).strip()
-                    # Filter out NaN values and empty strings
                     areas = [a for a in [area1, area2, area3] if a and a != 'nan' and a != 'None']
                     top_skills = ', '.join(areas) if areas else ''
-                    
+
+                    # Phone: stored as float in Excel (e.g. 2.567810e+11) — convert cleanly
+                    raw_phone = row.get('Phone number', '')
+                    if pd.notna(raw_phone):
+                        try:
+                            phone = str(int(float(raw_phone)))
+                        except (ValueError, TypeError):
+                            phone = str(raw_phone).strip()
+                    else:
+                        phone = ''
+
+                    # BGE code
+                    raw_code = row.get('BGE code', row.get('BGE Code', ''))
+                    bge_code = str(raw_code).strip() if pd.notna(raw_code) else ''
+                    if bge_code == 'nan':
+                        bge_code = ''
+
                     bge_data = {
                         'name': str(row.get('Full name', '')).strip(),
-                        'email': str(row.get('Email address', '')).strip(),
-                        'phone': str(row.get('Phone number', '')).strip(),
-                        'location': str(row.get('Location', '')).strip(),
+                        'email': str(row.get('Email address', '')).strip() if pd.notna(row.get('Email address', '')) else '',
+                        'phone': phone,
+                        'location': str(row.get('Location', '')).strip() if pd.notna(row.get('Location', '')) else '',
+                        'bge_code': bge_code,
                         'top_skills': top_skills,
+                        'status': 'approved',
                     }
                     
                     bge_batch.append(BusinessGrowthExpert(**bge_data))

@@ -97,6 +97,19 @@ class Transaction(models.Model):
     class Meta:
         ordering = ['-transaction_date']
 
+
+class Cohort(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
+
 class MSME(models.Model):
     BUSINESS_TYPES = [
         ('MICRO', 'Micro Enterprise'),
@@ -146,12 +159,25 @@ class MSME(models.Model):
     challenges = models.TextField(blank=True)
     opportunities = models.TextField(blank=True)
     
+    # Grouping & Assignment
+    cohort = models.ForeignKey(
+        'Cohort', on_delete=models.SET_NULL, null=True, blank=True, related_name='msmes'
+    )
+    assigned_bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_msmes'
+    )
+    assignment_objectives = models.TextField(
+        blank=True,
+        help_text='Objectives and scope of this BGE deployment for the MSME'
+    )
+    assignment_date = models.DateField(null=True, blank=True, help_text='Date this MSME was assigned to the BGE')
+
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
-    source_file = models.CharField(max_length=255, blank=True)  # Track which Excel file this came from
-    
+    source_file = models.CharField(max_length=255, blank=True)
+
     gender_choices = [
         ('MALE', 'Male'),
         ('FEMALE', 'Female'),
@@ -193,9 +219,14 @@ class BusinessGrowthExpert(models.Model):
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
+    user = models.OneToOneField(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='bge_profile', help_text='Linked login account for this BGE'
+    )
     name = models.CharField(max_length=100)
+    bge_code = models.CharField(max_length=50, blank=True, unique=False, help_text='e.g. PRUDEV II-BGE-010T-7')
     email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
     location = models.CharField(max_length=100, blank=True)
     years_of_experience = models.PositiveIntegerField(null=True, blank=True)
     top_skills = models.CharField(max_length=200, blank=True)
@@ -204,11 +235,43 @@ class BusinessGrowthExpert(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    deployment_objectives = models.TextField(
+        blank=True,
+        help_text='Shared objectives for this BGE across all their assigned MSMEs'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+
+class PushSubscription(models.Model):
+    """Stores Web Push subscriptions for BGE users."""
+    user        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='push_subscriptions')
+    endpoint    = models.TextField(unique=True)
+    p256dh      = models.TextField()
+    auth        = models.TextField()
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} — {self.endpoint[:60]}"
+
+
+class BGEGroup(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    members = models.ManyToManyField('BusinessGrowthExpert', blank=True, related_name='bge_groups')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "BGE Group"
+        verbose_name_plural = "BGE Groups"
+
 
 class SupportRequest(models.Model):
     msme_name = models.CharField(max_length=200)
@@ -253,3 +316,42 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.msme} - {self.session}: {'Present' if self.present else 'Absent'}"
+
+
+class MSMEReport(models.Model):
+    VISIT_TYPES = [
+        ('initial', 'Initial Assessment'),
+        ('followup', 'Follow-up Visit'),
+        ('final', 'Final Assessment'),
+        ('training', 'Training Support'),
+        ('mentoring', 'Mentoring Session'),
+    ]
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('reviewed', 'Reviewed'),
+    ]
+
+    msme = models.ForeignKey('MSME', on_delete=models.CASCADE, related_name='reports')
+    bge = models.ForeignKey('BusinessGrowthExpert', on_delete=models.CASCADE, related_name='reports')
+    visit_type = models.CharField(max_length=20, choices=VISIT_TYPES, default='followup')
+    visit_date = models.DateField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+
+    # Template sections
+    business_overview = models.TextField(blank=True, help_text='Brief overview of the business current state')
+    challenges_identified = models.TextField(blank=True, help_text='Key challenges observed during the visit')
+    support_provided = models.TextField(blank=True, help_text='Support and guidance provided during this visit')
+    recommendations = models.TextField(blank=True, help_text='Recommendations for business improvement')
+    action_plan = models.TextField(blank=True, help_text='Agreed action plan with the MSME owner')
+    next_steps = models.TextField(blank=True, help_text='Next steps and follow-up actions')
+    additional_notes = models.TextField(blank=True, help_text='Any additional observations or notes')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.visit_type} report — {self.msme.business_name} by {self.bge.name} ({self.visit_date})"
+
+    class Meta:
+        ordering = ['-visit_date', '-created_at']
