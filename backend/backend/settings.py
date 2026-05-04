@@ -12,9 +12,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env file (if present) so env vars are available throughout settings
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -152,31 +156,26 @@ REST_FRAMEWORK = {
     ],
 }
 
-# ── Email Configuration (Microsoft Office 365 / Outlook) ─────────────────────
-# Sent from richard.obuku@gopa.eu via Office 365 SMTP.
-# Set EMAIL_HOST_PASSWORD in your environment (or .env) — never hard-code it.
-#
-# In DEBUG mode emails are printed to the console so you can test without
-# a real password.  Set DEBUG=False (or EMAIL_ALWAYS_SMTP=True) in .env
-# to actually deliver mail.
-EMAIL_BACKEND = (
-    'django.core.mail.backends.console.EmailBackend'
-    if DEBUG and not os.environ.get('EMAIL_ALWAYS_SMTP')
-    else 'django.core.mail.backends.smtp.EmailBackend'
+# ── Email Configuration (Gmail SMTP) ─────────────────────────────────────────
+# Sends via richobuku@gmail.com using a Google App Password.
+# Reply-To is set to richard.obuku@gopa.eu so replies land in the official inbox.
+GMAIL_HOST_USER   = os.environ.get('GMAIL_HOST_USER',   'richobuku@gmail.com')
+GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
+EMAIL_REPLY_TO    = os.environ.get('EMAIL_REPLY_TO',    'richard.obuku@gopa.eu')
+
+EMAIL_BACKEND     = (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if GMAIL_APP_PASSWORD
+    else 'django.core.mail.backends.console.EmailBackend'
 )
-EMAIL_HOST          = os.environ.get('EMAIL_HOST',     'smtp.office365.com')
-EMAIL_PORT          = int(os.environ.get('EMAIL_PORT', 587))
-EMAIL_USE_TLS       = True   # Office 365 requires STARTTLS on port 587
-EMAIL_USE_SSL       = False  # do NOT use SSL — TLS handles encryption
-EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER',     'richard.obuku@gopa.eu')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')  # set in .env
-DEFAULT_FROM_EMAIL  = os.environ.get('DEFAULT_FROM_EMAIL',
-                                     'PRUDEV II Programme <richard.obuku@gopa.eu>')
+EMAIL_HOST        = 'smtp.gmail.com'
+EMAIL_PORT        = 587
+EMAIL_USE_TLS     = True
+EMAIL_HOST_USER   = GMAIL_HOST_USER
+EMAIL_HOST_PASSWORD = GMAIL_APP_PASSWORD
+DEFAULT_FROM_EMAIL  = f'PRUDEV II Programme <{GMAIL_HOST_USER}>'
 
-# Email timeout settings
-EMAIL_TIMEOUT = 30  # seconds
-
-# Log email failures
+EMAIL_TIMEOUT      = 30
 EMAIL_FAIL_SILENTLY = False
 
 # CORS Configuration for Frontend Integration

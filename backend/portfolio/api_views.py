@@ -608,13 +608,15 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
         body_text = request.data.get('body', '').strip()    or email_data['body']
         body_html = email_data['body_html']  # always use generated HTML
 
-        from_addr = getattr(settings, 'DEFAULT_FROM_EMAIL', 'PRUDEV II Programme <richard.obuku@gopa.eu>')
+        from_addr  = getattr(settings, 'DEFAULT_FROM_EMAIL', 'PRUDEV II Programme <richobuku@gmail.com>')
+        reply_to   = getattr(settings, 'EMAIL_REPLY_TO', 'richard.obuku@gopa.eu')
         try:
             msg = EmailMultiAlternatives(
                 subject=subject,
                 body=body_text,
                 from_email=from_addr,
                 to=[bge.email],
+                reply_to=[reply_to],
             )
             msg.attach_alternative(body_html, "text/html")
             msg.send(fail_silently=False)
