@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic
+from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport
 
 @admin.register(Portfolio)
 class PortfolioAdmin(admin.ModelAdmin):
@@ -33,8 +33,8 @@ class TransactionAdmin(admin.ModelAdmin):
 
 @admin.register(MSME)
 class MSMEAdmin(admin.ModelAdmin):
-    list_display = ('business_name', 'business_type', 'sector', 'owner_name', 'city', 'annual_revenue_display', 'employee_count')
-    list_filter = ('business_type', 'sector', 'city', 'state', 'is_active', 'created_at')
+    list_display = ('business_name', 'business_type', 'sector', 'owner_name', 'city', 'cohort', 'assigned_bge', 'employee_count')
+    list_filter = ('business_type', 'sector', 'cohort', 'is_active', 'created_at')
     search_fields = ('business_name', 'owner_name', 'email', 'phone', 'address')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
@@ -64,10 +64,11 @@ class MSMEAdmin(admin.ModelAdmin):
 
 @admin.register(BusinessGrowthExpert)
 class BusinessGrowthExpertAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'phone', 'location', 'years_of_experience', 'created_at')
-    search_fields = ('name', 'email', 'location')
-    list_filter = ('location',)
+    list_display = ('name', 'user', 'email', 'phone', 'location', 'status', 'years_of_experience', 'created_at')
+    search_fields = ('name', 'email', 'location', 'user__username')
+    list_filter = ('status', 'location')
     readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('user',)
 
 @admin.register(SupportRequest)
 class SupportRequestAdmin(admin.ModelAdmin):
@@ -80,5 +81,33 @@ admin.site.register(TrainingTopic)
 class TrainingSessionAdmin(admin.ModelAdmin):
     filter_horizontal = ('businesses',)
 
-# admin.site.unregister(TrainingSession)
 admin.site.register(TrainingSession, TrainingSessionAdmin)
+
+
+@admin.register(Cohort)
+class CohortAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description', 'msme_count', 'created_at')
+    search_fields = ('name',)
+
+    def msme_count(self, obj):
+        return obj.msmes.filter(is_active=True).count()
+    msme_count.short_description = 'MSMEs'
+
+
+@admin.register(BGEGroup)
+class BGEGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description', 'member_count', 'created_at')
+    search_fields = ('name',)
+    filter_horizontal = ('members',)
+
+    def member_count(self, obj):
+        return obj.members.count()
+    member_count.short_description = 'Members'
+
+
+@admin.register(MSMEReport)
+class MSMEReportAdmin(admin.ModelAdmin):
+    list_display = ('msme', 'bge', 'visit_type', 'visit_date', 'status', 'created_at')
+    list_filter = ('status', 'visit_type', 'visit_date')
+    search_fields = ('msme__business_name', 'bge__name')
+    readonly_fields = ('created_at', 'updated_at')

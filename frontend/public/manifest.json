@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "PRUDEV II",
+  "name": "PRUDEV II MSME Portfolio Management",
+  "description": "GIZ & GOPA AFC PRUDEV II Programme — MSME Portfolio Management System",
   "icons": [
     {
       "src": "favicon.ico",
@@ -18,8 +19,11 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait",
+  "theme_color": "#1A3A5C",
+  "background_color": "#F4F6F9",
+  "categories": ["business", "productivity"]
 }

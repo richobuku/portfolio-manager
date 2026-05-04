@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 110" width="440" height="110">
+  <!-- Large bold "giz" wordmark in GIZ red -->
+  <text
+    x="4" y="96"
+    font-family="Arial Black, Arial, Helvetica, sans-serif"
+    font-weight="900"
+    font-size="100"
+    fill="#C8102E"
+    letter-spacing="-3"
+  >giz</text>
+
+  <!-- Vertical separator -->
+  <line x1="215" y1="14" x2="215" y2="100" stroke="#C8102E" stroke-width="1.2" opacity="0.35"/>
+
+  <!-- Full organisation name -->
+  <text x="226" y="38" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#C8102E" font-weight="400">Deutsche Gesellschaft</text>
+  <text x="226" y="57" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#C8102E" font-weight="400">für Internationale</text>
+  <text x="226" y="76" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#C8102E" font-weight="400">Zusammenarbeit (GIZ) GmbH</text>
+</svg>

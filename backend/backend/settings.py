@@ -12,9 +12,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env file (if present) so env vars are available throughout settings
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -142,24 +146,36 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Email Configuration
-# For development, we'll use console backend to see emails in terminal
-if DEBUG:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:
-    # For production, use SMTP settings
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
-    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'PRUDEV II <noreply@prudev.org>')
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'portfolio.authentication.SimpleTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 
-# Email timeout settings
-EMAIL_TIMEOUT = 30  # seconds
+# ── Email Configuration (Gmail SMTP) ─────────────────────────────────────────
+# Sends via richobuku@gmail.com using a Google App Password.
+# Reply-To is set to richard.obuku@gopa.eu so replies land in the official inbox.
+GMAIL_HOST_USER   = os.environ.get('GMAIL_HOST_USER',   'richobuku@gmail.com')
+GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
+EMAIL_REPLY_TO    = os.environ.get('EMAIL_REPLY_TO',    'richard.obuku@gopa.eu')
 
-# Log email failures
+EMAIL_BACKEND     = (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if GMAIL_APP_PASSWORD
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST        = 'smtp.gmail.com'
+EMAIL_PORT        = 587
+EMAIL_USE_TLS     = True
+EMAIL_HOST_USER   = GMAIL_HOST_USER
+EMAIL_HOST_PASSWORD = GMAIL_APP_PASSWORD
+DEFAULT_FROM_EMAIL  = f'PRUDEV II Programme <{GMAIL_HOST_USER}>'
+
+EMAIL_TIMEOUT      = 30
 EMAIL_FAIL_SILENTLY = False
 
 # CORS Configuration for Frontend Integration
@@ -207,3 +223,8 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# VAPID keys for Web Push notifications
+VAPID_PUBLIC_KEY  = 'BNnpWxm6leoeTv_adABmTgTeIuNZOcWQqiY2hVa9M9Hjpmmo_YImgdbCBqZpUBlt2AnX6vxdquneem0B_Ld84ng'
+VAPID_PRIVATE_KEY = 'fl8iq2jZaNjJnZEb0PQ6KIQsaMQaajrvWPCJQQRWVlE'
+VAPID_CLAIMS      = {'sub': 'mailto:admin@prudev.org'}

@@ -1,62 +1,170 @@
 from django.contrib.auth import authenticate, login
-from django.http import JsonResponse
+from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.views.decorators.csrf import csrf_exempt
-import json
+from rest_framework.exceptions import PermissionDenied
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from .models import BusinessGrowthExpert
 
-@csrf_exempt
+GOOGLE_CLIENT_ID = '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com'
+
+
+def _build_user_response(user):
+    """Shared helper to build the login response payload."""
+    token = f"token_{user.id}_{user.username}"
+    bge_profile = None
+    role = 'admin' if (user.is_staff or user.is_superuser) else 'bge'
+    try:
+        profile = user.bge_profile
+        bge_profile = {'id': profile.id, 'name': profile.name, 'status': profile.status}
+        if not (user.is_staff or user.is_superuser):
+            role = 'bge'
+    except Exception:
+        if not (user.is_staff or user.is_superuser):
+            role = 'viewer'
+    return {
+        'token': token,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'is_staff': user.is_staff,
+            'is_superuser': user.is_superuser,
+            'role': role,
+            'bge_profile': bge_profile,
+        }
+    }
+
+
+def _try_auto_link_bge(user, google_name, google_email):
+    """
+    Try to auto-link a Google user to a BGE profile.
+    Matching priority:
+      1. BGE email == Google email (exact)
+      2. BGE name matches Google full name (case-insensitive)
+      3. BGE name contains Google given name (fallback)
+    Returns the linked BGE profile or None.
+    """
+    # Already linked — nothing to do
+    try:
+        return user.bge_profile
+    except Exception:
+        pass
+
+    # 1. Match by email
+    if google_email:
+        bge = BusinessGrowthExpert.objects.filter(email__iexact=google_email, user__isnull=True).first()
+        if bge:
+            bge.user = user
+            bge.save()
+            return bge
+
+    # 2. Match by full name (case-insensitive)
+    if google_name:
+        bge = BusinessGrowthExpert.objects.filter(name__iexact=google_name, user__isnull=True).first()
+        if bge:
+            bge.user = user
+            bge.save()
+            return bge
+
+        # 3. Partial name match (given name in BGE name)
+        parts = google_name.strip().split()
+        if parts:
+            first = parts[0]
+            bge = BusinessGrowthExpert.objects.filter(name__icontains=first, user__isnull=True).first()
+            if bge:
+                bge.user = user
+                bge.save()
+                return bge
+
+    return None
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    """Simple login view that returns a token"""
-    try:
-        data = json.loads(request.body)
-        username = data.get('username')
-        password = data.get('password')
-        
-        if not username or not password:
-            return Response({
-                'error': 'Username and password are required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        user = authenticate(username=username, password=password)
-        
-        if user is not None:
-            login(request, user)
-            # For now, we'll use a simple token approach
-            # In production, you should use JWT tokens
-            token = f"token_{user.id}_{user.username}"
-            
-            return Response({
-                'token': token,
-                'user': {
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email,
-                    'is_staff': user.is_staff,
-                }
-            })
-        else:
-            return Response({
-                'error': 'Invalid credentials'
-            }, status=status.HTTP_401_UNAUTHORIZED)
-            
-    except json.JSONDecodeError:
-        return Response({
-            'error': 'Invalid JSON data'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        return Response({
-            'error': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    username = request.data.get('username', '').strip()
+    password = request.data.get('password', '')
+
+    if not username or not password:
+        return Response({'message': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = authenticate(username=username, password=password)
+    if user is None:
+        return Response({'message': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if not user.is_active:
+        return Response({'message': 'This account has been disabled.'}, status=status.HTTP_403_FORBIDDEN)
+
+    login(request, user)
+    return Response(_build_user_response(user))
+
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def logout_view(request):
-    """Logout view"""
-    # In a real app, you'd invalidate the token here
-    return Response({
-        'message': 'Logged out successfully'
-    }) 
+    return Response({'message': 'Logged out successfully'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def google_login_view(request):
+    """
+    Verify a Google ID token, auto-link to a BGE profile by email/name,
+    and return an app session token.
+    """
+    google_token = request.data.get('token', '')
+    if not google_token:
+        return Response({'error': 'Google token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        id_info = id_token.verify_oauth2_token(
+            google_token, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
+    except ValueError as e:
+        return Response({'error': f'Invalid Google token: {str(e)}'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    email       = id_info.get('email', '')
+    given_name  = id_info.get('given_name', '')
+    family_name = id_info.get('family_name', '')
+    google_name = f"{given_name} {family_name}".strip()
+    google_id   = id_info.get('sub', '')
+
+    if not email:
+        return Response({'error': 'Google account has no email address.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Find or create the Django user
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={
+            'username': email.split('@')[0] + '_g' + google_id[-5:],
+            'first_name': given_name,
+            'last_name': family_name,
+            'is_active': True,
+        }
+    )
+
+    if created:
+        user.set_unusable_password()
+        user.save()
+
+    if not user.is_active:
+        return Response({'error': 'This account has been disabled. Contact your administrator.'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Try to auto-link to a BGE profile if not already linked and not admin
+    if not (user.is_staff or user.is_superuser):
+        _try_auto_link_bge(user, google_name, email)
+
+    login(request, user)
+    data = _build_user_response(user)
+
+    # If still no BGE profile and not admin, signal that linking is needed
+    if data['user']['role'] == 'viewer':
+        data['needs_linking'] = True
+        data['google_name'] = google_name
+        return Response(data, status=status.HTTP_200_OK)
+
+    return Response(data)
