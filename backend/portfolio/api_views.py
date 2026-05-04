@@ -143,6 +143,7 @@ class MSMEViewSet(viewsets.ModelViewSet):
         bge_id = request.data.get('bge_id')
         objectives = request.data.get('objectives', '').strip()
         assignment_date = request.data.get('assignment_date') or None
+        bge = None  # initialise so the notification block below is always safe
         if bge_id:
             try:
                 bge = BusinessGrowthExpert.objects.get(pk=bge_id)
@@ -608,7 +609,7 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
         body_text = request.data.get('body', '').strip()    or email_data['body']
         body_html = email_data['body_html']  # always use generated HTML
 
-        from_addr  = getattr(settings, 'DEFAULT_FROM_EMAIL', 'PRUDEV II Programme <richobuku@gmail.com>')
+        from_addr  = settings.DEFAULT_FROM_EMAIL
         reply_to   = getattr(settings, 'EMAIL_REPLY_TO', 'richard.obuku@gopa.eu')
         try:
             msg = EmailMultiAlternatives(

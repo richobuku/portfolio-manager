@@ -15,10 +15,8 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/service-worker.js')
-      .then((reg) => {
-        console.log('[SW] Registered', reg.scope);
-      })
-      .catch((err) => console.warn('[SW] Registration failed:', err));
+      .then(() => {})
+      .catch(() => {});
   });
 }
 
@@ -57,9 +55,8 @@ export async function subscribePush(authToken) {
         auth: sub.keys.auth,
       }),
     });
-    console.log('[Push] Subscribed successfully');
-  } catch (err) {
-    console.warn('[Push] Subscription error:', err);
+  } catch (_err) {
+    // Push subscription failed silently — non-critical
   }
 }
 
