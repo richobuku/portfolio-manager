@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Count, Sum
 from django.contrib.auth.models import User
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
 import pandas as pd
 import io
@@ -451,49 +451,121 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
         return Response(BusinessGrowthExpertSerializer(bges, many=True).data)
 
     def _build_assignment_email(self, bge):
-        """Build the subject and body for a BGE assignment email. Shared by preview and send."""
+        """Build plain-text + HTML email for a BGE assignment. Shared by preview and send."""
         msmes = bge.assigned_msmes.filter(is_active=True).order_by('business_name')
-        lines = [
-            f"Dear {bge.name},",
-            "",
-            "Please find below your assignment details under the PRUDEV II Programme:",
-            "",
-        ]
+        count = msmes.count()
+
+        # ── Plain-text version ────────────────────────────────────────────────
+        lines = [f"Dear {bge.name},", "", "Please find below your assignment details under the PRUDEV II Programme:", ""]
         if bge.deployment_objectives:
-            lines += [
-                "DEPLOYMENT OBJECTIVES",
-                "─" * 40,
-                bge.deployment_objectives,
-                "",
-            ]
-        lines += [
-            f"ASSIGNED MSMEs ({msmes.count()} businesses)",
-            "─" * 40,
-            "",
-        ]
+            lines += ["DEPLOYMENT OBJECTIVES", "─" * 40, bge.deployment_objectives, ""]
+        lines += [f"ASSIGNED MSMEs ({count} {'businesses' if count != 1 else 'business'})", "─" * 40, ""]
         for i, m in enumerate(msmes, 1):
             lines.append(f"  {i}. {m.business_name} ({m.msme_code or 'No code'})")
-            if m.owner_name:
-                lines.append(f"     Owner: {m.owner_name}")
-            if m.sector:
-                lines.append(f"     Sector: {m.sector}")
-            if m.city:
-                lines.append(f"     Location: {m.city}")
-            if m.phone:
-                lines.append(f"     Phone: {m.phone}")
+            if m.owner_name: lines.append(f"     Owner: {m.owner_name}")
+            if m.sector:     lines.append(f"     Sector: {m.sector}")
+            if m.city:       lines.append(f"     Location: {m.city}")
+            if m.phone:      lines.append(f"     Phone: {m.phone}")
             lines.append("")
         lines += [
             "Please log in to the PRUDEV II Portfolio Management System to view full details and submit visit reports.",
-            "",
-            "Best regards,",
-            "PRUDEV II Programme Management",
-            "GIZ · GOPA AFC",
+            "", "Best regards,", "PRUDEV II Programme Management", "GIZ · GOPA AFC",
         ]
+        body_text = "\n".join(lines)
+
+        # ── HTML version (renders beautifully in Outlook) ─────────────────────
+        objectives_html = ""
+        if bge.deployment_objectives:
+            objectives_html = f"""
+            <div style="background:#f8f9fa;border-left:4px solid #1A2E42;padding:12px 16px;margin:16px 0;border-radius:0 4px 4px 0;">
+              <p style="font-weight:700;color:#1A2E42;margin:0 0 6px 0;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">Deployment Objectives</p>
+              <p style="margin:0;color:#333;white-space:pre-line;">{bge.deployment_objectives}</p>
+            </div>"""
+
+        msme_rows_html = ""
+        for i, m in enumerate(msmes, 1):
+            details = []
+            if m.owner_name: details.append(f"<span style='color:#555;'>Owner:</span> {m.owner_name}")
+            if m.sector:     details.append(f"<span style='color:#555;'>Sector:</span> {m.sector}")
+            if m.city:       details.append(f"<span style='color:#555;'>Location:</span> {m.city}")
+            if m.phone:      details.append(f"<span style='color:#555;'>Phone:</span> {m.phone}")
+            details_html = " &nbsp;·&nbsp; ".join(details)
+            bg = "#ffffff" if i % 2 == 0 else "#f9fafb"
+            msme_rows_html += f"""
+            <tr style="background:{bg};">
+              <td style="padding:10px 14px;font-weight:600;color:#1A2E42;width:28px;vertical-align:top;">{i}.</td>
+              <td style="padding:10px 14px;">
+                <strong>{m.business_name}</strong>
+                <span style="color:#888;font-size:12px;margin-left:6px;">({m.msme_code or 'No code'})</span>
+                {'<br><span style="font-size:12px;color:#666;">' + details_html + '</span>' if details_html else ''}
+              </td>
+            </tr>"""
+
+        body_html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+
+        <!-- Header -->
+        <tr><td style="background:#1A2E42;padding:24px 32px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td><p style="margin:0;color:#fff;font-size:20px;font-weight:700;">PRUDEV II</p>
+                  <p style="margin:2px 0 0;color:rgba(255,255,255,.65);font-size:12px;">MSME Portfolio Management Programme</p></td>
+              <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;font-weight:700;letter-spacing:.05em;">GIZ · GOPA AFC</p></td>
+            </tr>
+          </table>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:28px 32px;">
+          <p style="margin:0 0 16px;color:#333;font-size:15px;">Dear <strong>{bge.name}</strong>,</p>
+          <p style="margin:0 0 20px;color:#555;line-height:1.6;">
+            Please find below your assignment details under the <strong>PRUDEV II Programme</strong>.
+          </p>
+
+          {objectives_html}
+
+          <!-- MSME Table -->
+          <p style="font-weight:700;color:#1A2E42;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin:24px 0 8px;">
+            Assigned MSMEs &nbsp;<span style="background:#1A2E42;color:#fff;border-radius:12px;padding:2px 8px;font-size:11px;">{count}</span>
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8edf2;border-radius:6px;overflow:hidden;">
+            <thead>
+              <tr style="background:#1A2E42;">
+                <th style="padding:8px 14px;color:rgba(255,255,255,.7);font-size:11px;text-align:left;font-weight:600;">#</th>
+                <th style="padding:8px 14px;color:rgba(255,255,255,.7);font-size:11px;text-align:left;font-weight:600;">Business / Details</th>
+              </tr>
+            </thead>
+            <tbody>{msme_rows_html}</tbody>
+          </table>
+
+          <p style="margin:24px 0 0;color:#555;font-size:13px;line-height:1.7;border-top:1px solid #e8edf2;padding-top:20px;">
+            Please log in to the <strong>PRUDEV II Portfolio Management System</strong> to view full details and submit visit reports.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #e8edf2;">
+          <p style="margin:0;color:#777;font-size:12px;">Best regards,<br><strong>PRUDEV II Programme Management</strong><br>GIZ · GOPA AFC</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
         return {
-            'subject': f"PRUDEV II — Assignment Brief: {msmes.count()} MSME{'s' if msmes.count() != 1 else ''}",
-            'body': "\n".join(lines),
-            'to': bge.email,
-            'msme_count': msmes.count(),
+            'subject':    f"PRUDEV II — Assignment Brief: {count} MSME{'s' if count != 1 else ''}",
+            'body':       body_text,
+            'body_html':  body_html,
+            'to':         bge.email,
+            'msme_count': count,
         }
 
     @action(detail=True, methods=['patch'], url_path='set-objectives')
@@ -520,7 +592,7 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='send-email')
     def send_assignment_email(self, request, pk=None):
-        """Send BGE their list of assigned MSMEs by email."""
+        """Send BGE their MSME assignment via Microsoft Office 365 (richard.obuku@gopa.eu)."""
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can send assignment emails.")
 
@@ -531,17 +603,21 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
             return Response({'error': 'This BGE expert has no assigned MSMEs.'}, status=status.HTTP_400_BAD_REQUEST)
 
         email_data = self._build_assignment_email(bge)
-        # Allow the frontend to override subject/body (from the editable preview)
-        subject = request.data.get('subject', '').strip() or email_data['subject']
-        body    = request.data.get('body', '').strip()    or email_data['body']
+        # Frontend editable preview may override subject/body
+        subject   = request.data.get('subject', '').strip() or email_data['subject']
+        body_text = request.data.get('body', '').strip()    or email_data['body']
+        body_html = email_data['body_html']  # always use generated HTML
+
+        from_addr = getattr(settings, 'DEFAULT_FROM_EMAIL', 'PRUDEV II Programme <richard.obuku@gopa.eu>')
         try:
-            send_mail(
+            msg = EmailMultiAlternatives(
                 subject=subject,
-                message=body,
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'PRUDEV II <noreply@prudev.org>'),
-                recipient_list=[bge.email],
-                fail_silently=False,
+                body=body_text,
+                from_email=from_addr,
+                to=[bge.email],
             )
+            msg.attach_alternative(body_html, "text/html")
+            msg.send(fail_silently=False)
             return Response({'message': f"Email sent to {bge.email} with {email_data['msme_count']} assigned MSMEs."})
         except Exception as e:
             return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

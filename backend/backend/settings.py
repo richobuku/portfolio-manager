@@ -152,19 +152,26 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Email Configuration
-# For development, we'll use console backend to see emails in terminal
-if DEBUG:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:
-    # For production, use SMTP settings
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
-    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'PRUDEV II <noreply@prudev.org>')
+# ── Email Configuration (Microsoft Office 365 / Outlook) ─────────────────────
+# Sent from richard.obuku@gopa.eu via Office 365 SMTP.
+# Set EMAIL_HOST_PASSWORD in your environment (or .env) — never hard-code it.
+#
+# In DEBUG mode emails are printed to the console so you can test without
+# a real password.  Set DEBUG=False (or EMAIL_ALWAYS_SMTP=True) in .env
+# to actually deliver mail.
+EMAIL_BACKEND = (
+    'django.core.mail.backends.console.EmailBackend'
+    if DEBUG and not os.environ.get('EMAIL_ALWAYS_SMTP')
+    else 'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_HOST          = os.environ.get('EMAIL_HOST',     'smtp.office365.com')
+EMAIL_PORT          = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS       = True   # Office 365 requires STARTTLS on port 587
+EMAIL_USE_SSL       = False  # do NOT use SSL — TLS handles encryption
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER',     'richard.obuku@gopa.eu')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')  # set in .env
+DEFAULT_FROM_EMAIL  = os.environ.get('DEFAULT_FROM_EMAIL',
+                                     'PRUDEV II Programme <richard.obuku@gopa.eu>')
 
 # Email timeout settings
 EMAIL_TIMEOUT = 30  # seconds
