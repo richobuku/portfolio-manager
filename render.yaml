@@ -9,13 +9,14 @@ services:
     name: portfolio-manager-backend
     runtime: python
     plan: free
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && python manage.py migrate && gunicorn backend.wsgi:application
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: DEBUG
-        value: False
+        value: false
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
@@ -24,5 +25,13 @@ services:
           property: connectionString
       - key: ALLOWED_HOSTS
         value: .onrender.com
-    healthCheckPath: /
-    autoDeploy: true 
+      - key: FRONTEND_URL
+        value: https://frontend-richard-obukus-projects.vercel.app
+      - key: GMAIL_HOST_USER
+        value: richobuku@gmail.com
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: EMAIL_REPLY_TO
+        value: richard.obuku@gopa.eu
+    healthCheckPath: /api/msmes/
+    autoDeploy: true
