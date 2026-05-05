@@ -5,10 +5,7 @@ import App from './App';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import API_BASE_URL from './config';
-
-const GOOGLE_CLIENT_ID = '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com';
 
 // ── Service Worker & Push Notifications ───────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -70,10 +67,8 @@ function urlBase64ToUint8Array(base64String) {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
-  </GoogleOAuthProvider>
+  <ThemeProvider theme={theme}>
+    <CssBaseline />
+    <App />
+  </ThemeProvider>
 );

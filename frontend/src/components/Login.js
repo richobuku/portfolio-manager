@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import {
   Box, TextField, Button, Typography, Alert, CircularProgress,
-  Paper, Divider, IconButton, InputAdornment,
+  Paper, IconButton, InputAdornment,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
-import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
 import { BRAND } from '../theme';
@@ -16,9 +15,7 @@ export default function Login({ onLogin }) {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
-  const [warning, setWarning] = useState('');
 
   const handleChange = (e) =>
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
@@ -27,7 +24,6 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setWarning('');
     try {
       const res = await axios.post(API_ENDPOINTS.LOGIN, credentials);
       if (res.data.token) {
@@ -42,33 +38,6 @@ export default function Login({ onLogin }) {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setGoogleLoading(true);
-    setError('');
-    setWarning('');
-    try {
-      const res = await axios.post(API_ENDPOINTS.GOOGLE_LOGIN, {
-        token: credentialResponse.credential,
-      });
-      if (res.data.token) {
-        if (res.data.needs_linking) {
-          // Signed in but no BGE profile matched — inform the user
-          setWarning(
-            `Your Google account (${res.data.google_name || res.data.user?.email}) is not yet linked to a BGE profile. ` +
-            `Please contact your administrator to link your account.`
-          );
-          return;
-        }
-        onLogin(res.data.token, res.data.user);
-      } else {
-        setError('Google sign-in failed. Please try again.');
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || 'Google sign-in failed. Your account may not be registered.');
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   return (
     <Box sx={{
@@ -128,29 +97,9 @@ export default function Login({ onLogin }) {
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #E0E7F0' }}>
             <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>Sign in</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Use your programme credentials or Google account
+              Use your programme credentials to sign in
             </Typography>
 
-            {/* Google Sign-In */}
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-              {googleLoading ? (
-                <CircularProgress size={24} />
-              ) : (
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setError('Google sign-in was cancelled or failed.')}
-                  theme="outline"
-                  size="large"
-                  width="340"
-                  text="signin_with"
-                  shape="rectangular"
-                />
-              )}
-            </Box>
-
-            <Divider sx={{ my: 2 }}>
-              <Typography variant="caption" color="text.secondary">or sign in with username</Typography>
-            </Divider>
 
             <Box component="form" onSubmit={handleSubmit}>
               <TextField
@@ -175,7 +124,6 @@ export default function Login({ onLogin }) {
                   ),
                 }}
               />
-              {warning && <Alert severity="warning" sx={{ mb: 2, py: 0.5 }}>{warning}</Alert>}
               {error && <Alert severity="error" sx={{ mb: 2, py: 0.5 }}>{error}</Alert>}
               <Button
                 type="submit" fullWidth variant="contained" size="large"
