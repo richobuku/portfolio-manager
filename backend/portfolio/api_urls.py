@@ -7,7 +7,7 @@ from .api_views import (
     CohortViewSet, BGEGroupViewSet, MSMEReportViewSet, BGEUserViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
 )
-from .auth_views import login_view, logout_view, google_login_view
+from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset
 from .blockchain.api_views import (
     BlockchainTransactionViewSet, SmartContractViewSet, TokenViewSet,
     MSMEFundingContractViewSet, InvestmentPoolViewSet, DecentralizedIdentityViewSet,
@@ -39,6 +39,8 @@ urlpatterns = [
     path('api/auth/login/', login_view, name='api_login'),
     path('api/auth/logout/', logout_view, name='api_logout'),
     path('api/auth/google/', google_login_view, name='api_google_login'),
+    path('api/auth/password-reset/', request_password_reset, name='api_password_reset'),
+    path('api/auth/password-reset/confirm/', confirm_password_reset, name='api_password_reset_confirm'),
     path('api/push/subscribe/', push_subscribe, name='push_subscribe'),
     path('api/push/unsubscribe/', push_unsubscribe, name='push_unsubscribe'),
     path('api/push/vapid-key/', push_vapid_key, name='push_vapid_key'),

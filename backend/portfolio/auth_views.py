@@ -1,13 +1,23 @@
+import secrets
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
+try:
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+    GOOGLE_AUTH_AVAILABLE = True
+except ImportError:
+    GOOGLE_AUTH_AVAILABLE = False
 from .models import BusinessGrowthExpert
+
+# In-memory reset tokens {token: user_id} — simple, no DB migration needed
+_reset_tokens = {}
 
 GOOGLE_CLIENT_ID = '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com'
 
@@ -111,11 +121,78 @@ def logout_view(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def request_password_reset(request):
+    email = request.data.get('email', '').strip().lower()
+    if not email:
+        return Response({'message': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.filter(email__iexact=email).first()
+    if user:
+        token = secrets.token_urlsafe(32)
+        _reset_tokens[token] = user.id
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        reset_link = f"{frontend_url}/reset-password?token={token}"
+        reply_to = getattr(settings, 'EMAIL_REPLY_TO', settings.DEFAULT_FROM_EMAIL)
+        html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px">
+          <h2 style="color:#1A2F4B">Password Reset — PRUDEV II</h2>
+          <p>Click the button below to reset your password. This link expires after use.</p>
+          <a href="{reset_link}" style="display:inline-block;margin:20px 0;padding:12px 28px;
+             background:#C8102E;color:#fff;border-radius:6px;text-decoration:none;font-weight:700">
+            Reset Password
+          </a>
+          <p style="color:#666;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
+        </div>"""
+        msg = EmailMultiAlternatives(
+            subject='PRUDEV II — Password Reset',
+            body=f'Reset your password: {reset_link}',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[user.email],
+            reply_to=[reply_to],
+        )
+        msg.attach_alternative(html, 'text/html')
+        try:
+            msg.send()
+        except Exception:
+            pass
+
+    # Always return success to avoid email enumeration
+    return Response({'message': 'If that email is registered, a reset link has been sent.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def confirm_password_reset(request):
+    token = request.data.get('token', '').strip()
+    password = request.data.get('password', '')
+    if not token or not password:
+        return Response({'message': 'Token and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(password) < 8:
+        return Response({'message': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user_id = _reset_tokens.pop(token, None)
+    if not user_id:
+        return Response({'message': 'Invalid or expired reset link.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.filter(id=user_id).first()
+    if not user:
+        return Response({'message': 'User not found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(password)
+    user.save()
+    return Response({'message': 'Password reset successfully. You can now sign in.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def google_login_view(request):
     """
     Verify a Google ID token, auto-link to a BGE profile by email/name,
     and return an app session token.
     """
+    if not GOOGLE_AUTH_AVAILABLE:
+        return Response({'error': 'Google login is not configured on this server.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
     google_token = request.data.get('token', '')
     if not google_token:
         return Response({'error': 'Google token is required.'}, status=status.HTTP_400_BAD_REQUEST)

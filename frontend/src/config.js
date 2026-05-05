@@ -4,6 +4,8 @@ export const API_ENDPOINTS = {
   LOGIN:              `${API_BASE_URL}/api/auth/login/`,
   LOGOUT:             `${API_BASE_URL}/api/auth/logout/`,
   GOOGLE_LOGIN:       `${API_BASE_URL}/api/auth/google/`,
+  PASSWORD_RESET:         `${API_BASE_URL}/api/auth/password-reset/`,
+  PASSWORD_RESET_CONFIRM: `${API_BASE_URL}/api/auth/password-reset/confirm/`,
   MSMES:              `${API_BASE_URL}/api/msmes/`,
   EXPERTS:            `${API_BASE_URL}/api/experts/`,
   COHORTS:            `${API_BASE_URL}/api/cohorts/`,
