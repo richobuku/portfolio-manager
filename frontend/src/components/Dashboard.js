@@ -18,11 +18,9 @@ import {
   Assignment, DragHandle, ExpandMore,
   Lock, LockOpen,
 } from '@mui/icons-material';
-import { PDFDownloadLink } from '@react-pdf/renderer';
 import axios from 'axios';
 import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL } from '../config';
 import { BRAND } from '../theme';
-import ReportPDF from './ReportPDF';
 
 const ROWS_PER_PAGE = 15;
 const DRAWER_WIDTH = 220;
@@ -1194,26 +1192,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <Visibility fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <PDFDownloadLink
-                        document={
-                          <ReportPDF
-                            report={r}
-                            msme={msme}
-                            bgeName={r.bge_name || bge.name}
-                          />
-                        }
-                        fileName={`report-${r.msme_name || r.id}-${r.visit_date}.pdf`}
-                      >
-                        {({ loading: pdfLoading }) => (
-                          <Tooltip title="Download PDF">
-                            <span>
-                              <IconButton size="small" color="error" disabled={pdfLoading}>
-                                {pdfLoading ? <CircularProgress size={16} /> : <PictureAsPdf fontSize="small" />}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
-                      </PDFDownloadLink>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -2245,21 +2223,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </DialogContent>
             <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1 }}>
               <Button onClick={() => setViewReport(null)}>Close</Button>
-              <PDFDownloadLink
-                document={<ReportPDF report={vr} msme={vr._msme} bgeName={vr._bgeName} />}
-                fileName={`report-${vr.msme_name || vr.id}-${vr.visit_date}.pdf`}
-              >
-                {({ loading: pdfLoading }) => (
-                  <Button
-                    variant="contained"
-                    color="error"
-                    startIcon={pdfLoading ? <CircularProgress size={14} color="inherit" /> : <PictureAsPdf />}
-                    disabled={pdfLoading}
-                  >
-                    {pdfLoading ? 'Preparing PDF…' : 'Download PDF'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
             </DialogActions>
           </>;
         })()}

@@ -12,11 +12,9 @@ import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
 } from '@mui/icons-material';
-import { PDFDownloadLink } from '@react-pdf/renderer';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
 import { BRAND } from '../theme';
-import ReportPDF from './ReportPDF';
 import { subscribePush } from '../index';
 
 const DRAWER_WIDTH = 220;
@@ -388,25 +386,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                 <span><IconButton size="small" disabled><Edit fontSize="small" /></IconButton></span>
                               </Tooltip>
                             )}
-                            <Tooltip title="Download PDF">
+                            <Tooltip title="Download PDF not available">
                               <span>
-                                <PDFDownloadLink
-                                  document={
-                                    <ReportPDF
-                                      report={r}
-                                      msme={msmes.find(m => m.id === r.msme)}
-                                      bgeName={bgeName}
-                                    />
-                                  }
-                                  fileName={`report_${r.msme_code || r.msme}_${r.visit_date}.pdf`}
-                                  style={{ textDecoration: 'none' }}
-                                >
-                                  {({ loading: pdfLoading }) => (
-                                    <IconButton size="small" color="error" disabled={pdfLoading}>
-                                      <PictureAsPdf fontSize="small" />
-                                    </IconButton>
-                                  )}
-                                </PDFDownloadLink>
+                                <IconButton size="small" color="error" disabled>
+                                  <PictureAsPdf fontSize="small" />
+                                </IconButton>
                               </span>
                             </Tooltip>
                           </Box>
@@ -628,18 +612,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </DialogContent>
             <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1 }}>
               <Button onClick={() => setViewReport(null)}>Close</Button>
-              <PDFDownloadLink
-                document={<ReportPDF report={vr} msme={vr._msme} bgeName={vr._bgeName} />}
-                fileName={`report-${vr.msme_name || vr.msme}-${vr.visit_date}.pdf`}
-              >
-                {({ loading: pdfLoading }) => (
-                  <Button variant="contained" color="error"
-                    startIcon={pdfLoading ? <CircularProgress size={14} color="inherit" /> : <PictureAsPdf />}
-                    disabled={pdfLoading}>
-                    {pdfLoading ? 'Preparing PDF…' : 'Download PDF'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
             </DialogActions>
           </>;
         })()}
