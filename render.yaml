@@ -32,7 +32,7 @@ services:
       - key: ADMIN_PASSWORD
         value: Admin@2024!
       - key: ADMIN_EMAIL
-        value: richard.obuku@gopa.eu
+        value: richobuku@gmail.com
       - key: GMAIL_HOST_USER
         value: richobuku@gmail.com
       - key: GMAIL_APP_PASSWORD
