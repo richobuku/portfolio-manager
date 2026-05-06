@@ -205,23 +205,42 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
         # Read file (CSV or Excel)
         try:
+            raw_bytes = file.read()
             if file.name.endswith('.csv'):
-                df = pd.read_csv(io.BytesIO(file.read()))
+                df = pd.read_csv(io.BytesIO(raw_bytes))
             elif file.name.endswith(('.xlsx', '.xls')):
-                df = pd.read_excel(io.BytesIO(file.read()))
+                df = pd.read_excel(io.BytesIO(raw_bytes))
+                # If the first row appears to be blank/unnamed, the real header may be in row 1
+                unnamed = sum(1 for c in df.columns if str(c).startswith('Unnamed:'))
+                if unnamed > len(df.columns) / 2:
+                    df = pd.read_excel(io.BytesIO(raw_bytes), header=1)
             else:
                 return Response({'error': 'Please upload a CSV or Excel file (.csv, .xlsx, .xls).'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': f'Could not read file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Detect format
+        # Normalise column names for detection (strip whitespace, keep original for lookup)
         cols = set(df.columns.tolist())
-        is_cohort2 = '1.1.  Business Name:' in cols or any('Business Name' in c for c in cols if '1.1' in c)
-        is_cohort1 = 'Name' in cols and 'Name of contact person' in cols
+        cols_stripped = {c.strip() for c in cols}
 
-        if not is_cohort1 and not is_cohort2:
+        # Cohort 2 — numbered survey format (1.1. Business Name: …)
+        is_cohort2 = '1.1.  Business Name:' in cols or any('Business Name' in c for c in cols if '1.1' in c)
+        # Cohort 1 — PRUDEV II Cohort1 format (Name, District, Town, Name of contact person …)
+        is_cohort1 = 'Name' in cols and 'Name of contact person' in cols
+        # Cohort 2 simple — survey export with plain headers (Business Name:, Name of Business Owner: …)
+        is_cohort2_simple = (
+            not is_cohort1 and not is_cohort2 and
+            any('Business Name' in c for c in cols_stripped) and
+            any('Business Owner' in c for c in cols_stripped)
+        )
+
+        if not is_cohort1 and not is_cohort2 and not is_cohort2_simple:
             return Response({
-                'error': 'Unrecognised file format. Expected Cohort 1 (columns: Name, District, Town, …) or Cohort 2 survey format (columns: 1.1. Business Name:, …).'
+                'error': (
+                    'Unrecognised file format. '
+                    'Expected Cohort 1 (columns: Name, District, Town, Name of contact person, …) '
+                    'or Cohort 2 format (columns: Business Name:, Name of Business Owner:, …).'
+                )
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Resolve or create cohort
@@ -292,7 +311,35 @@ class MSMEViewSet(viewsets.ModelViewSet):
                         return c
             return None
 
-        # Pre-compute Cohort 2 column mapping once (outside the row loop)
+        # Pre-compute Cohort 2 simple column mapping once (outside the row loop)
+        # Strip all column names to a lookup dict: stripped_name → original_name
+        col_map = {c.strip(): c for c in cols}
+
+        def get_col(*keywords):
+            """Return first column whose stripped name contains all keywords (case-insensitive)."""
+            for c_stripped, c_orig in col_map.items():
+                c_lower = c_stripped.lower()
+                if all(k.lower() in c_lower for k in keywords):
+                    return c_orig
+            return None
+
+        if is_cohort2_simple:
+            # Column names for Cohort 2 simple format (e.g. "Business Name:", "Name of Business Owner:", …)
+            # Use exact strip-match first, then fallback to keyword search
+            s2_bname    = col_map.get('Business Name:') or col_map.get('Business Name') or get_col('business name')
+            s2_owner    = col_map.get('Name of Business Owner:') or col_map.get('Name of Business Owner') or get_col('name of business owner')
+            # Phone: prefer dedicated business phone, fall back to owner contacts
+            s2_phone    = (col_map.get('Business Phone Number(s):') or col_map.get('Business Phone Number')
+                           or get_col('business phone') or get_col('business owner contact'))
+            s2_email    = col_map.get("Business Owners Email:") or col_map.get("Business Owner's Email") or get_col('owner', 'email')
+            s2_bemail   = col_map.get('Business email address') or col_map.get('Business email address ') or get_col('business email')
+            s2_sex      = col_map.get('Sex') or col_map.get('Sex ') or get_col('sex')
+            s2_type     = col_map.get('Type of Business: ') or col_map.get('Type of Business:') or col_map.get('Type of Business') or get_col('type of business')
+            s2_district = col_map.get('District') or col_map.get('district')
+            s2_town     = col_map.get('Town') or col_map.get('town')
+            s2_sector   = None  # not present in this format
+
+        # Pre-compute Cohort 2 numbered column mapping once (outside the row loop)
         if is_cohort2:
             c2_bname  = find_col(cols, '1.1',  'Business Name')
             c2_brn    = find_col(cols, '1.2',  'Registration')
@@ -307,7 +354,29 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
         for i, row in df.iterrows():
             try:
-                if is_cohort2:
+                if is_cohort2_simple:
+                    business_name = clean_str(row.get(s2_bname, '')) if s2_bname else ''
+                    if not business_name:
+                        continue
+
+                    record = {
+                        'business_name': business_name,
+                        'owner_name': clean_str(row.get(s2_owner, '')) if s2_owner else '',
+                        'phone': clean_phone(row.get(s2_phone, '')) if s2_phone else '',
+                        'email': clean_str(row.get(s2_email, '')) if s2_email else '',
+                        'business_email': clean_str(row.get(s2_bemail, '')) if s2_bemail else '',
+                        'gender': map_gender(row.get(s2_sex, '')) if s2_sex else '',
+                        'business_type': map_business_type(row.get(s2_type, '')) if s2_type else 'MICRO',
+                        'sector': 'OTHER',
+                        'state': clean_str(row.get(s2_district, '')) if s2_district else '',
+                        'city': clean_str(row.get(s2_town, '')) if s2_town else '',
+                        'country': 'Uganda',
+                        'source_file': file.name,
+                        'cohort': cohort_obj,
+                        'is_active': True,
+                    }
+
+                elif is_cohort2:
                     bname_col  = c2_bname
                     owner_col  = c2_owner
                     sex_col    = c2_sex
