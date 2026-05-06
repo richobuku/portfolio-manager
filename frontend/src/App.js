@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import BGEDashboard from './components/BGEDashboard';
+import ResetPassword from './components/ResetPassword';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -85,6 +86,7 @@ export default function App() {
               </ErrorBoundary>
             ) : <Navigate to="/login" replace />
           } />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<Navigate to={(token && (isAdmin || isBGE)) ? '/dashboard' : '/login'} replace />} />
         </Routes>
       </Router>
