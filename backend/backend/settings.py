@@ -87,10 +87,11 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # Use PostgreSQL if DATABASE_URL is available, otherwise use SQLite
-if os.environ.get('DATABASE_URL'):
+_db_url = os.environ.get('DATABASE_URL', '')
+if _db_url and _db_url.startswith(('postgres://', 'postgresql://')):
     import dj_database_url
     DATABASES = {
-        'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
+        'default': dj_database_url.parse(_db_url, conn_max_age=600)
     }
 else:
     DATABASES = {
