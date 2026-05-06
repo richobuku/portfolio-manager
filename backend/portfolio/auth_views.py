@@ -1,4 +1,5 @@
 import secrets
+import logging
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -8,6 +9,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
+
+logger = logging.getLogger(__name__)
 try:
     from google.oauth2 import id_token
     from google.auth.transport import requests as google_requests
@@ -126,6 +129,19 @@ def request_password_reset(request):
     if not email:
         return Response({'message': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Check that SMTP is actually configured — if not, tell the admin rather than silently failing
+    gmail_pw = getattr(settings, 'GMAIL_APP_PASSWORD', '')
+    if not gmail_pw:
+        logger.error(
+            "Password reset requested but GMAIL_APP_PASSWORD is not set. "
+            "Set it as an environment variable on your hosting platform."
+        )
+        return Response(
+            {'message': 'Email delivery is not configured on this server. '
+                        'Please contact the administrator to reset your password.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
     user = User.objects.filter(email__iexact=email).first()
     if user:
         token = secrets.token_urlsafe(32)
@@ -153,8 +169,13 @@ def request_password_reset(request):
         msg.attach_alternative(html, 'text/html')
         try:
             msg.send()
-        except Exception:
-            pass
+            logger.info("Password reset email sent to %s", user.email)
+        except Exception as exc:
+            logger.error("Failed to send password reset email to %s: %s", user.email, exc)
+            return Response(
+                {'message': 'Failed to send reset email. Please try again later or contact the administrator.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     # Always return success to avoid email enumeration
     return Response({'message': 'If that email is registered, a reset link has been sent.'})
