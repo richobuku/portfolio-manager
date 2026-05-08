@@ -103,6 +103,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [groupLoading, setGroupLoading] = useState(false);
   const [manageGroupItem, setManageGroupItem] = useState(null);
 
+  // ── group MSME assignment dialog ───────────────────────────────────────────
+  const [assignMsmeGroup, setAssignMsmeGroup] = useState(null);  // group object or null
+  const [assignedGroupMsmeIds, setAssignedGroupMsmeIds] = useState([]); // currently-assigned ids for the open group
+  const [groupMsmeSession, setGroupMsmeSession] = useState('');
+  const [groupMsmeSearch, setGroupMsmeSearch] = useState('');
+  const [groupMsmeSaving, setGroupMsmeSaving] = useState(false);
+
   // ── training dialogs ───────────────────────────────────────────────────────
   const [sessionDialog, setSessionDialog] = useState(false);
   const [sessionForm, setSessionForm] = useState({ title: '', date: '', location: '', description: '', topic: '' });
@@ -429,6 +436,47 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${groupId}/${action}/`, { bge_id: bgeId }, { headers });
       fetchAll();
     } catch { notify('Failed to update group', 'error'); }
+  };
+
+  // ── group MSME assignment ──────────────────────────────────────────────────
+  const openAssignMsmeDialog = async (group) => {
+    setAssignMsmeGroup(group);
+    setGroupMsmeSession('');
+    setGroupMsmeSearch('');
+    try {
+      const r = await axios.get(`${API_ENDPOINTS.BGE_GROUPS}${group.id}/msmes/`, { headers });
+      const ids = (Array.isArray(r.data) ? r.data : (r.data.results || [])).map(m => m.id);
+      setAssignedGroupMsmeIds(ids);
+    } catch {
+      setAssignedGroupMsmeIds([]);
+    }
+  };
+
+  const toggleGroupMsme = (msmeId) => {
+    setAssignedGroupMsmeIds(prev =>
+      prev.includes(msmeId) ? prev.filter(id => id !== msmeId) : [...prev, msmeId]
+    );
+  };
+
+  const saveGroupMsmeAssignments = async () => {
+    if (!assignMsmeGroup) return;
+    setGroupMsmeSaving(true);
+    try {
+      // Wipe current assignments for this group, then re-assign the selected set.
+      await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${assignMsmeGroup.id}/unassign-msmes/`, {}, { headers });
+      if (assignedGroupMsmeIds.length > 0) {
+        const payload = { msme_ids: assignedGroupMsmeIds };
+        if (groupMsmeSession) payload.session_number = parseInt(groupMsmeSession, 10);
+        await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${assignMsmeGroup.id}/assign-msmes/`, payload, { headers });
+      }
+      notify(`${assignedGroupMsmeIds.length} MSME${assignedGroupMsmeIds.length === 1 ? '' : 's'} assigned to ${assignMsmeGroup.name}`);
+      setAssignMsmeGroup(null);
+      fetchAll();
+    } catch (e) {
+      notify(e.response?.data?.error || 'Failed to assign MSMEs', 'error');
+    } finally {
+      setGroupMsmeSaving(false);
+    }
   };
 
   // ── training ───────────────────────────────────────────────────────────────
@@ -858,6 +906,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <IconButton size="small" onClick={() => setManageGroupItem(group)}><People fontSize="small" /></IconButton>
                     </Tooltip>
                     {isAdmin && (
+                      <Tooltip title="Assign MSMEs">
+                        <IconButton size="small" onClick={() => openAssignMsmeDialog(group)}>
+                          <Assignment fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {isAdmin && (
                       <Tooltip title="Delete group">
                         <IconButton size="small" color="error" onClick={() => { setDeleteItem(group); setDeleteType('group'); }}>
                           <Delete fontSize="small" />
@@ -867,9 +922,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Box>
                 </Box>
                 <Divider sx={{ my: 1 }} />
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                  {group.member_count} member{group.member_count !== 1 ? 's' : ''}
-                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                  <Chip size="small" icon={<People sx={{ fontSize: 14 }} />}
+                        label={`${group.member_count} member${group.member_count !== 1 ? 's' : ''}`} />
+                  <Chip size="small" icon={<Business sx={{ fontSize: 14 }} />}
+                        label={`${msmes.filter(m => m.assigned_group === group.id).length} MSMEs`}
+                        color="primary" variant="outlined" />
+                </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {group.members_detail?.slice(0, 5).map(m => (
                     <Chip key={m.id} avatar={<Avatar sx={{ fontSize: 10 }}>{m.name[0]}</Avatar>} label={m.name} size="small" />
@@ -1816,6 +1875,76 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Dialog>
 
       {/* ── Manage group members ──────────────────────────────────────────── */}
+      {/* ── Assign MSMEs to Group ─────────────────────────────────────────── */}
+      <Dialog open={!!assignMsmeGroup} onClose={() => setAssignMsmeGroup(null)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Assign MSMEs — {assignMsmeGroup?.name}
+          <Typography variant="caption" display="block" color="text.secondary">
+            Select MSMEs to assign to this BGE group. Every group member will see them in their dashboard.
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField
+              size="small" placeholder="Search MSMEs..." value={groupMsmeSearch}
+              onChange={e => setGroupMsmeSearch(e.target.value)}
+              InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} /> }}
+              sx={{ flex: 1, minWidth: 200 }}
+            />
+            <TextField
+              size="small" label="Session # (optional)" type="number"
+              value={groupMsmeSession} onChange={e => setGroupMsmeSession(e.target.value)}
+              sx={{ width: 160 }} inputProps={{ min: 1, max: 10 }}
+            />
+            <Chip label={`${assignedGroupMsmeIds.length} selected`} color="primary" />
+            <Button size="small" onClick={() => setAssignedGroupMsmeIds([])} disabled={assignedGroupMsmeIds.length === 0}>
+              Clear all
+            </Button>
+          </Box>
+          <Box sx={{ maxHeight: 480, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <List dense>
+              {msmes
+                .filter(m => {
+                  if (!groupMsmeSearch) return true;
+                  const q = groupMsmeSearch.toLowerCase();
+                  return (m.business_name || '').toLowerCase().includes(q)
+                      || (m.owner_name    || '').toLowerCase().includes(q)
+                      || (m.city          || '').toLowerCase().includes(q)
+                      || (m.state         || '').toLowerCase().includes(q);
+                })
+                .map(m => {
+                  const checked = assignedGroupMsmeIds.includes(m.id);
+                  const otherGroup = m.assigned_group && m.assigned_group !== assignMsmeGroup?.id;
+                  return (
+                    <ListItemButton key={m.id} onClick={() => toggleGroupMsme(m.id)} dense>
+                      <ListItemIcon>
+                        <Checkbox checked={checked} size="small" disableRipple />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={m.business_name}
+                        secondary={`${m.owner_name || '—'} · ${m.city || m.state || '—'}${otherGroup ? ` · already in ${m.assigned_group_name}` : ''}`}
+                      />
+                      {m.assigned_group_name && (
+                        <Chip label={m.assigned_group_name} size="small"
+                              color={m.assigned_group === assignMsmeGroup?.id ? 'success' : 'default'} />
+                      )}
+                    </ListItemButton>
+                  );
+                })}
+              {msmes.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>No MSMEs available</Box>
+              )}
+            </List>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignMsmeGroup(null)}>Cancel</Button>
+          <Button variant="contained" onClick={saveGroupMsmeAssignments} disabled={groupMsmeSaving}>
+            {groupMsmeSaving ? 'Saving…' : 'Save Assignments'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={!!manageGroupItem} onClose={() => setManageGroupItem(null)} maxWidth="sm" fullWidth>
         <DialogTitle>Manage Members — {manageGroupItem?.name}</DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
