@@ -226,23 +226,26 @@ class MSMEViewSet(viewsets.ModelViewSet):
         cols = set(df.columns.tolist())
         cols_stripped = {c.strip() for c in cols}
 
+        # Unified template — preferred format used by the cleaning script.
+        # Required: Business Name, Owner Name, Phone, Email, District, Town, Sex, Business Type
+        is_unified = ('Business Name' in cols_stripped and 'Owner Name' in cols_stripped)
         # Cohort 2 — numbered survey format (1.1. Business Name: …)
         is_cohort2 = '1.1.  Business Name:' in cols or any('Business Name' in c for c in cols if '1.1' in c)
         # Cohort 1 — PRUDEV II Cohort1 format (Name, District, Town, Name of contact person …)
-        is_cohort1 = 'Name' in cols and 'Name of contact person' in cols
+        is_cohort1 = (not is_unified) and ('Name' in cols and 'Name of contact person' in cols)
         # Cohort 2 simple — survey export with plain headers (Business Name:, Name of Business Owner: …)
         is_cohort2_simple = (
-            not is_cohort1 and not is_cohort2 and
+            not is_unified and not is_cohort1 and not is_cohort2 and
             any('Business Name' in c for c in cols_stripped) and
             any('Business Owner' in c for c in cols_stripped)
         )
 
-        if not is_cohort1 and not is_cohort2 and not is_cohort2_simple:
+        if not is_unified and not is_cohort1 and not is_cohort2 and not is_cohort2_simple:
             return Response({
                 'error': (
-                    'Unrecognised file format. '
-                    'Expected Cohort 1 (columns: Name, District, Town, Name of contact person, …) '
-                    'or Cohort 2 format (columns: Business Name:, Name of Business Owner:, …).'
+                    'Unrecognised file format. Use the unified upload template '
+                    '(columns: Business Name, Owner Name, Sex, Phone, Email, Business Email, '
+                    'Business Type, District, Town, Physical Location, Role).'
                 )
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -326,6 +329,18 @@ class MSMEViewSet(viewsets.ModelViewSet):
                     return c_orig
             return None
 
+        if is_unified:
+            u_bname    = col_map.get('Business Name')
+            u_owner    = col_map.get('Owner Name')
+            u_sex      = col_map.get('Sex')
+            u_phone    = col_map.get('Phone')
+            u_email    = col_map.get('Email')
+            u_bemail   = col_map.get('Business Email')
+            u_type     = col_map.get('Business Type')
+            u_district = col_map.get('District')
+            u_town     = col_map.get('Town')
+            u_address  = col_map.get('Physical Location') or col_map.get('Address')
+
         if is_cohort2_simple:
             # Column names for Cohort 2 simple format (e.g. "Business Name:", "Name of Business Owner:", …)
             # Use exact strip-match first, then fallback to keyword search
@@ -358,7 +373,32 @@ class MSMEViewSet(viewsets.ModelViewSet):
         blank_rows = 0  # track silently-blank rows so user knows why count differs
         for i, row in df.iterrows():
             try:
-                if is_cohort2_simple:
+                if is_unified:
+                    business_name = clean_str(row.get(u_bname, '')) if u_bname else ''
+                    if not business_name:
+                        if all((pd.isna(v) or str(v).strip() in ('', 'nan')) for v in row.values):
+                            blank_rows += 1
+                        else:
+                            skipped.append({'row': i + 2, 'error': 'Missing Business Name'})
+                        continue
+                    record = {
+                        'business_name': business_name,
+                        'owner_name':    clean_str(row.get(u_owner, '')) if u_owner else '',
+                        'gender':        map_gender(row.get(u_sex, '')) if u_sex else '',
+                        'phone':         clean_phone(row.get(u_phone, '')) if u_phone else '',
+                        'email':         clean_str(row.get(u_email, '')) if u_email else '',
+                        'business_email': clean_str(row.get(u_bemail, '')) if u_bemail else '',
+                        'business_type': map_business_type(row.get(u_type, '')) if u_type else 'MICRO',
+                        'sector':        'OTHER',
+                        'state':         clean_str(row.get(u_district, '')) if u_district else '',
+                        'city':          clean_str(row.get(u_town, '')) if u_town else '',
+                        'address':       clean_str(row.get(u_address, '')) if u_address else '',
+                        'country':       'Uganda',
+                        'source_file':   file.name,
+                        'cohort':        cohort_obj,
+                        'is_active':     True,
+                    }
+                elif is_cohort2_simple:
                     business_name = clean_str(row.get(s2_bname, '')) if s2_bname else ''
                     if not business_name:
                         # check if the whole row is blank vs just missing business name
