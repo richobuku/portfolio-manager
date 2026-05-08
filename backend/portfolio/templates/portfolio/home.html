@@ -1,232 +1,225 @@
 {% extends "portfolio/base.html" %}
+{% block title %}Dashboard — PRUDEV II{% endblock %}
 {% block content %}
-<div class="mb-8">
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-      <div class="text-3xl font-bold text-blue-900">{{ total_msmes }}</div>
-      <div class="text-gray-500 mt-2">Total MSMEs</div>
-    </div>
-    <div class="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-      <div class="text-3xl font-bold text-blue-900">{{ total_bges }}</div>
-      <div class="text-gray-500 mt-2">Total BGEs</div>
-    </div>
-    <div class="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-      <div class="text-3xl font-bold text-blue-900">{{ total_annual_revenue|floatformat:0 }}</div>
-      <div class="text-gray-500 mt-2">Total Annual Revenue</div>
-    </div>
-    <div class="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-      <div class="text-3xl font-bold text-blue-900">{{ total_employees }}</div>
-      <div class="text-gray-500 mt-2">Total Employees</div>
-    </div>
+
+<!-- Page heading -->
+<div class="mb-6 flex items-end justify-between">
+  <div>
+    <h1 class="text-2xl font-bold panel-title">Dashboard</h1>
+    <p class="text-sm" style="color:#6b7280;">Programme overview at a glance.</p>
   </div>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-white rounded-xl shadow p-6">
-      <div class="font-semibold text-blue-900 mb-2">BGE Status</div>
-      <ul class="text-gray-700 space-y-1">
-        <li>Approved: <span class="font-bold">{{ approved_bges }}</span></li>
-        <li>Pending: <span class="font-bold">{{ pending_bges }}</span></li>
-        <li>Rejected: <span class="font-bold">{{ rejected_bges }}</span></li>
-      </ul>
-    </div>
-    <div class="bg-white rounded-xl shadow p-6">
-      <div class="font-semibold text-blue-900 mb-2">By Business Type</div>
-      <ul class="text-gray-700 space-y-1">
-        {% for type, count in business_type_stats.items %}
-          <li>{{ type }}: <span class="font-bold">{{ count }}</span></li>
-        {% endfor %}
-      </ul>
-    </div>
-    <div class="bg-white rounded-xl shadow p-6">
-      <div class="font-semibold text-blue-900 mb-2">By Sector</div>
-      <ul class="text-gray-700 space-y-1">
-        {% for sector, count in sector_stats.items %}
-          <li>{{ sector }}: <span class="font-bold">{{ count }}</span></li>
-        {% endfor %}
-      </ul>
-    </div>
+  <div class="hidden md:block w-12 h-1 accent-bar rounded-full"></div>
+</div>
+
+<!-- KPI cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  {% with kpis=1 %}
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="text-xs uppercase tracking-wider" style="color:#6b7280;">Total MSMEs</div>
+    <div class="text-3xl mt-2 stat-num">{{ total_msmes }}</div>
   </div>
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-    <div class="bg-white rounded-xl shadow p-6">
-      <div class="font-semibold text-blue-900 mb-2">Suggestions</div>
-      <ul class="text-gray-700 space-y-1">
-        {% if total_msmes > 0 and total_bges > 0 %}
-          <li>MSME to BGE ratio: <span class="font-bold">{{ total_msmes|floatformat:0 }}:{{ total_bges|floatformat:0 }}</span></li>
-        {% endif %}
-        {% if total_annual_revenue > 0 and total_msmes > 0 %}
-          <li>Avg revenue per MSME: <span class="font-bold">{{ avg_revenue_per_msme|floatformat:0 }}</span></li>
-        {% endif %}
-        {% if total_employees > 0 and total_msmes > 0 %}
-          <li>Avg employees per MSME: <span class="font-bold">{{ avg_employees_per_msme|floatformat:1 }}</span></li>
-        {% endif %}
-        <li>Upload more data for better insights</li>
-      </ul>
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="text-xs uppercase tracking-wider" style="color:#6b7280;">Total BGEs</div>
+    <div class="text-3xl mt-2 stat-num">{{ total_bges }}</div>
+  </div>
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="text-xs uppercase tracking-wider" style="color:#6b7280;">Total Annual Revenue</div>
+    <div class="text-3xl mt-2 stat-num">{{ total_annual_revenue|floatformat:0 }}</div>
+  </div>
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="text-xs uppercase tracking-wider" style="color:#6b7280;">Total Employees</div>
+    <div class="text-3xl mt-2 stat-num">{{ total_employees }}</div>
+  </div>
+  {% endwith %}
+</div>
+
+<!-- Breakdown panels -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-1.5 h-5 rounded-sm accent-bar"></span>
+      <span class="panel-title">BGE Status</span>
     </div>
-    <div class="bg-white rounded-xl shadow p-6">
-      <div class="font-semibold text-blue-900 mb-2">MSME by Sector (Chart)</div>
-      <canvas id="sectorChart" class="w-full h-48"></canvas>
+    <ul class="text-sm space-y-1.5" style="color:#374151;">
+      <li class="flex justify-between"><span>Approved</span><span class="font-bold" style="color:var(--brand-navy);">{{ approved_bges }}</span></li>
+      <li class="flex justify-between"><span>Pending</span><span class="font-bold" style="color:var(--brand-navy);">{{ pending_bges }}</span></li>
+      <li class="flex justify-between"><span>Rejected</span><span class="font-bold" style="color:var(--brand-red);">{{ rejected_bges }}</span></li>
+    </ul>
+  </div>
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-1.5 h-5 rounded-sm accent-bar"></span>
+      <span class="panel-title">By Business Type</span>
     </div>
+    <ul class="text-sm space-y-1.5" style="color:#374151;">
+      {% for type, count in business_type_stats.items %}
+        <li class="flex justify-between"><span>{{ type }}</span><span class="font-bold" style="color:var(--brand-navy);">{{ count }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-1.5 h-5 rounded-sm accent-bar"></span>
+      <span class="panel-title">By Sector</span>
+    </div>
+    <ul class="text-sm space-y-1.5" style="color:#374151;">
+      {% for sector, count in sector_stats.items %}
+        <li class="flex justify-between"><span>{{ sector }}</span><span class="font-bold" style="color:var(--brand-navy);">{{ count }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<!-- Insights + chart -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-1.5 h-5 rounded-sm accent-bar"></span>
+      <span class="panel-title">Insights</span>
+    </div>
+    <ul class="text-sm space-y-1.5" style="color:#374151;">
+      {% if total_msmes > 0 and total_bges > 0 %}
+        <li class="flex justify-between"><span>MSME : BGE ratio</span><span class="font-bold" style="color:var(--brand-navy);">{{ total_msmes|floatformat:0 }} : {{ total_bges|floatformat:0 }}</span></li>
+      {% endif %}
+      {% if total_annual_revenue > 0 and total_msmes > 0 %}
+        <li class="flex justify-between"><span>Avg revenue / MSME</span><span class="font-bold" style="color:var(--brand-navy);">{{ avg_revenue_per_msme|floatformat:0 }}</span></li>
+      {% endif %}
+      {% if total_employees > 0 and total_msmes > 0 %}
+        <li class="flex justify-between"><span>Avg employees / MSME</span><span class="font-bold" style="color:var(--brand-navy);">{{ avg_employees_per_msme|floatformat:1 }}</span></li>
+      {% endif %}
+      <li style="color:#9ca3af;">Upload more data for richer insights.</li>
+    </ul>
+  </div>
+  <div class="bg-white rounded-xl card-shadow p-5">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-1.5 h-5 rounded-sm accent-bar"></span>
+      <span class="panel-title">MSMEs by Sector</span>
+    </div>
+    <canvas id="sectorChart" class="w-full h-48"></canvas>
   </div>
 </div>
 
 {% if recent_bge_signups %}
 <div class="mb-8">
-  <h2 class="text-xl font-bold text-blue-900 mb-4">Recent BGE Signups</h2>
+  <h2 class="text-xl mb-4 panel-title">Recent BGE Signups</h2>
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for bge in recent_bge_signups %}
-    <div class="bg-white rounded-xl shadow p-4 flex flex-col gap-2">
-      <div class="flex items-center gap-2">
-        <div class="font-semibold text-blue-900">{{ bge.name }}</div>
-        <span class="px-2 py-1 rounded text-xs font-bold {% if bge.status == 'approved' %}bg-green-100 text-green-700{% elif bge.status == 'pending' %}bg-yellow-100 text-yellow-700{% else %}bg-red-100 text-red-700{% endif %}">{{ bge.get_status_display }}</span>
+    <div class="bg-white rounded-xl card-shadow p-4 flex flex-col gap-1.5">
+      <div class="flex items-center justify-between gap-2">
+        <div class="font-semibold" style="color:var(--brand-navy);">{{ bge.name }}</div>
+        <span class="px-2 py-0.5 rounded text-xs font-bold
+          {% if bge.status == 'approved' %}bg-green-100 text-green-700
+          {% elif bge.status == 'pending' %}bg-amber-100 text-amber-700
+          {% else %}bg-red-100 text-red-700{% endif %}">{{ bge.get_status_display }}</span>
       </div>
-      <div class="text-gray-700 text-sm">{{ bge.email }}</div>
-      <div class="text-gray-500 text-xs">{{ bge.top_skills|truncatechars:100 }}</div>
-      <div class="text-gray-400 text-xs">{{ bge.location }} &middot; {{ bge.created_at|date:"M d, Y" }}</div>
+      <div class="text-sm" style="color:#374151;">{{ bge.email }}</div>
+      <div class="text-xs" style="color:#6b7280;">{{ bge.top_skills|truncatechars:80 }}</div>
+      <div class="text-xs" style="color:#9ca3af;">{{ bge.location }} · {{ bge.created_at|date:"M d, Y" }}</div>
     </div>
     {% endfor %}
   </div>
   <div class="mt-4 text-right">
-    <a href="{% url 'bge_signups_list' %}" class="inline-block px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold hover:bg-blue-700 transition">View All BGE Signups</a>
+    <a href="{% url 'bge_signups_list' %}" class="btn-primary inline-block">View all signups</a>
   </div>
 </div>
 {% endif %}
 
 <div class="mb-8">
-  <h2 class="text-xl font-bold text-blue-900 mb-4">Recent Activity</h2>
-  <div class="bg-white rounded-xl shadow p-6">
-    {% if recent_transactions %}
-      <ul class="divide-y divide-gray-200">
-        {% for transaction in recent_transactions %}
-        <li class="py-3 flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <span class="px-2 py-1 rounded text-xs font-bold {% if transaction.transaction_type|lower == 'buy' %}bg-green-100 text-green-700{% elif transaction.transaction_type|lower == 'sell' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ transaction.transaction_type }}</span>
-            <span class="font-semibold">{{ transaction.investment.name }}</span>
-          </div>
-          <div class="flex items-center gap-4">
-            <span class="text-blue-900 font-bold">${{ transaction.amount|floatformat:2 }}</span>
-            <span class="text-gray-400 text-xs">{{ transaction.transaction_date|date:"M d, Y" }}</span>
-          </div>
-        </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <div class="text-gray-400 text-center">No recent activity. Start by creating your first portfolio!</div>
-    {% endif %}
-  </div>
-</div>
-
-{% if portfolios %}
-<div class="mb-8">
-  <h2 class="text-xl font-bold text-blue-900 mb-4">Your Portfolios</h2>
+  <h2 class="text-xl mb-4 panel-title">Quick Actions</h2>
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    {% for portfolio in portfolios %}
-    <div class="bg-white rounded-xl shadow p-6 flex flex-col gap-2">
-      <div class="font-semibold text-blue-900">{{ portfolio.name }}</div>
-      <div class="text-gray-500 text-xs mb-2">{{ portfolio.description|default:"No description" }}</div>
-      <div class="flex gap-4">
-        <div>
-          <span class="text-xs text-gray-400">Value:</span>
-          <span class="font-bold text-blue-900">${{ portfolio.total_value|floatformat:2 }}</span>
-        </div>
-        <div>
-          <span class="text-xs text-gray-400">Return:</span>
-          <span class="font-bold {% if portfolio.total_return_percentage >= 0 %}text-green-600{% else %}text-red-600{% endif %}">{{ portfolio.total_return_percentage|floatformat:2 }}%</span>
-        </div>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-<div class="mb-8">
-  <h2 class="text-xl font-bold text-blue-900 mb-4">Quick Actions</h2>
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    <a href="{% url 'upload_msme_data' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">Upload MSME Data</div>
-      <div class="text-gray-500 text-sm">Import Excel files with MSME information</div>
+    {% for label, hint, url in quick_actions %}{% endfor %}
+    {% with actions=1 %}
+    <a href="{% url 'upload_msme_data' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">Upload MSME Data</div>
+      <div class="text-sm" style="color:#6b7280;">Import Excel files with MSME information.</div>
     </a>
-    <a href="{% url 'upload_bge_data' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">Upload BGE Data</div>
-      <div class="text-gray-500 text-sm">Import Excel files with Business Growth Expert information</div>
+    <a href="{% url 'upload_bge_data' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">Upload BGE Data</div>
+      <div class="text-sm" style="color:#6b7280;">Import Excel files with Business Growth Expert info.</div>
     </a>
-    <a href="{% url 'msme_list' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">View MSME Database</div>
-      <div class="text-gray-500 text-sm">Browse and search MSME records</div>
+    <a href="{% url 'msme_list' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">View MSME Database</div>
+      <div class="text-sm" style="color:#6b7280;">Browse and search MSME records.</div>
     </a>
-    <a href="{% url 'bge_signups_list' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">Manage BGE Signups</div>
-      <div class="text-gray-500 text-sm">Review and approve BGE applications</div>
+    <a href="{% url 'bge_signups_list' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">Manage BGE Signups</div>
+      <div class="text-sm" style="color:#6b7280;">Review and approve BGE applications.</div>
     </a>
-    <a href="{% url 'msme_analytics' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">MSME Analytics</div>
-      <div class="text-gray-500 text-sm">View insights and statistics</div>
+    <a href="{% url 'msme_analytics' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">MSME Analytics</div>
+      <div class="text-sm" style="color:#6b7280;">View insights and statistics.</div>
     </a>
-    <a href="{% url 'bge_list' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">View BGEs</div>
-      <div class="text-gray-500 text-sm">Browse and search Business Growth Experts</div>
+    <a href="{% url 'bge_list' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">View BGEs</div>
+      <div class="text-sm" style="color:#6b7280;">Browse and search Business Growth Experts.</div>
     </a>
-    <a href="{% url 'bge_leaderboard' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">BGE Leaderboard</div>
-      <div class="text-gray-500 text-sm">See top Business Growth Experts by MSMEs supported</div>
+    <a href="{% url 'bge_leaderboard' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">BGE Leaderboard</div>
+      <div class="text-sm" style="color:#6b7280;">Top BGEs by MSMEs supported.</div>
     </a>
-    <a href="{% url 'session_analytics' %}" class="bg-blue-50 hover:bg-blue-100 rounded-xl shadow p-6 flex flex-col items-start transition">
-      <div class="font-semibold text-blue-900 mb-1">Training Analytics</div>
-      <div class="text-gray-500 text-sm">View training session attendance stats and trends</div>
+    <a href="{% url 'session_analytics' %}" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">Training Analytics</div>
+      <div class="text-sm" style="color:#6b7280;">Session attendance trends.</div>
     </a>
+    <a href="/admin/" class="bg-white rounded-xl card-shadow p-5 hover:-translate-y-0.5 transition-transform" style="border-left: 4px solid var(--brand-red);">
+      <div class="font-semibold mb-1" style="color:var(--brand-navy);">Admin Console</div>
+      <div class="text-sm" style="color:#6b7280;">Direct database management.</div>
+    </a>
+    {% endwith %}
   </div>
 </div>
 
-<!-- Training Topics/Areas Section -->
-<div class="mt-10">
-  <h2 class="text-xl font-bold mb-4 text-black">Training Topics / Areas</h2>
+<!-- Training Topics -->
+<div class="mb-4">
+  <h2 class="text-xl mb-4 panel-title">Training Topics</h2>
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for topic in topics %}
-      <div class="bg-white rounded-xl shadow p-4 flex flex-col items-start border-l-4 border-yellow-500">
-        <div class="text-lg font-semibold text-black mb-1">{{ topic.name }}</div>
-        <div class="text-gray-600 text-sm mb-2">{{ topic.description|default:'No description' }}</div>
-        <div class="text-yellow-600 font-bold">Sessions: {{ topic.sessions.count }}</div>
+      <div class="bg-white rounded-xl card-shadow p-4" style="border-left: 4px solid var(--brand-red);">
+        <div class="text-base font-semibold mb-1" style="color:var(--brand-navy);">{{ topic.name }}</div>
+        <div class="text-sm mb-2" style="color:#6b7280;">{{ topic.description|default:'No description' }}</div>
+        <div class="text-xs font-bold" style="color:var(--brand-red);">Sessions: {{ topic.sessions.count }}</div>
       </div>
     {% empty %}
-      <div class="col-span-full text-gray-400">No topics added yet.</div>
+      <div class="col-span-full" style="color:#9ca3af;">No topics added yet.</div>
     {% endfor %}
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     const sectorLabels = [{% for sector, count in sector_stats.items %}"{{ sector }}"{% if not forloop.last %},{% endif %}{% endfor %}];
     const sectorCounts = [{% for sector, count in sector_stats.items %}{{ count|add:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
-    const sectorData = {
-      labels: sectorLabels,
-      datasets: [{
-        label: 'MSMEs by Sector',
-        data: sectorCounts,
-        backgroundColor: [
-          '#2563eb', '#f59e42', '#10b981', '#f43f5e', '#a21caf', '#fbbf24', '#0ea5e9', '#eab308', '#22d3ee', '#6366f1'
-        ],
-        borderRadius: 8
-      }]
-    };
     const ctx = document.getElementById('sectorChart').getContext('2d');
     new Chart(ctx, {
       type: 'bar',
-      data: sectorData,
+      data: {
+        labels: sectorLabels,
+        datasets: [{
+          label: 'MSMEs',
+          data: sectorCounts,
+          backgroundColor: '#1A2F4B',
+          borderRadius: 6,
+          hoverBackgroundColor: '#C8102E',
+        }]
+      },
       options: {
         responsive: true,
-        plugins: {
-          legend: { display: false },
-          title: { display: false }
-        },
+        plugins: { legend: { display: false } },
         scales: {
-          x: { grid: { display: false } },
-          y: { beginAtZero: true, grid: { color: '#e5e7eb' } }
+          x: { grid: { display: false }, ticks: { color: '#6b7280' } },
+          y: { beginAtZero: true, grid: { color: '#e5e7eb' }, ticks: { color: '#6b7280' } }
         }
       }
     });
+
+    // highlight active nav link
+    const path = window.location.pathname;
+    document.querySelectorAll('.nav-link').forEach(a => {
+      if (a.getAttribute('href') === path) a.classList.add('active');
+    });
   });
 </script>
-{% endblock %} 
+{% endblock %}

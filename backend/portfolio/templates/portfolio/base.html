@@ -2,41 +2,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio Manager</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-      body { font-family: 'Inter', Arial, sans-serif; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}PRUDEV II — Portfolio Manager{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-navy: #1A2F4B;
+      --brand-navy-soft: #243a5b;
+      --brand-red: #C8102E;
+      --brand-red-hover: #a00d24;
+      --brand-bg: #F5F5F5;
+    }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--brand-bg); color: var(--brand-navy); }
+    .nav-link {
+      color: rgba(255,255,255,0.85);
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.12); color: #FFFFFF; }
+    .nav-link.active { background: var(--brand-red); color: #FFFFFF; }
+    .card-shadow { box-shadow: 0 1px 3px rgba(26,47,75,0.08), 0 1px 2px rgba(26,47,75,0.04); }
+    .stat-num { color: var(--brand-navy); font-weight: 800; letter-spacing: -1px; }
+    .panel-title { color: var(--brand-navy); font-weight: 700; }
+    .accent-bar { background: var(--brand-red); }
+    .btn-primary {
+      background: var(--brand-navy); color: #FFFFFF; padding: 8px 16px;
+      border-radius: 8px; font-weight: 600; transition: all 0.15s;
+    }
+    .btn-primary:hover { background: var(--brand-navy-soft); }
+    .btn-accent {
+      background: var(--brand-red); color: #FFFFFF; padding: 8px 16px;
+      border-radius: 8px; font-weight: 600; transition: all 0.15s;
+    }
+    .btn-accent:hover { background: var(--brand-red-hover); }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="max-w-7xl mx-auto px-4">
-        <header class="flex flex-col md:flex-row items-center justify-between py-6 mb-8 border-b border-gray-200 bg-white rounded-b-xl shadow-sm">
-            <div class="flex items-center gap-4 flex-1 justify-start">
-                <img src="https://i.imgur.com/wqYqZqA.png" alt="Left Logo" class="h-14 md:h-16 -mb-2 md:-mb-4 rounded-lg shadow-none" style="margin-bottom: -0.75rem;" />
-            </div>
-            <div class="flex flex-col flex-1 items-center">
-                <h1 class="text-2xl md:text-3xl font-bold text-black tracking-tight text-center">PRUDEV II Portfolio Manager</h1>
-                <nav class="mt-2 flex flex-wrap justify-center gap-2 md:gap-4">
-                    <a href="/" class="text-yellow-500 font-semibold px-3 py-1 rounded hover:text-red-600 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-red-200 transition">Dashboard</a>
-                    <a href="/msme/" class="text-yellow-500 font-semibold px-3 py-1 rounded hover:text-red-600 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-red-200 transition">MSMEs</a>
-                    <a href="/bge/" class="text-yellow-500 font-semibold px-3 py-1 rounded hover:text-red-600 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-red-200 transition">BGEs</a>
-                    <a href="/bge-leaderboard/" class="text-yellow-500 font-semibold px-3 py-1 rounded hover:text-red-600 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-red-200 transition">Leaderboard</a>
-                    <a href="/msme/analytics/" class="text-yellow-500 font-semibold px-3 py-1 rounded hover:text-red-600 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-red-200 transition">Analytics</a>
-                </nav>
-            </div>
-            <div class="flex items-center gap-4 flex-1 justify-end">
-                <img src="https://i.imgur.com/XRMJQhd.png" alt="Right Logo" class="h-14 md:h-16 -mb-2 md:-mb-4 rounded-lg shadow-none" style="margin-bottom: -0.75rem;" />
-            </div>
-        </header>
-        <main class="py-6">
-            {% block content %}{% endblock %}
-        </main>
+<body class="min-h-screen">
+
+  <header style="background: var(--brand-navy); border-bottom: 3px solid var(--brand-red);">
+    <div class="max-w-7xl mx-auto px-6 py-5 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex flex-col">
+        <span class="text-white text-2xl md:text-3xl font-extrabold tracking-tight leading-none">PRUDEV II</span>
+        <span class="text-xs md:text-sm uppercase tracking-wider" style="color: rgba(255,255,255,0.7);">MSME Portfolio Management</span>
+      </div>
+      <nav class="flex flex-wrap justify-center gap-1 md:gap-2">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/msme/" class="nav-link">MSMEs</a>
+        <a href="/bge/" class="nav-link">BGEs</a>
+        <a href="/bge-leaderboard/" class="nav-link">Leaderboard</a>
+        <a href="/msme/analytics/" class="nav-link">Analytics</a>
+        <a href="/admin/" class="nav-link" style="background: var(--brand-red);">Admin</a>
+      </nav>
     </div>
-    {% block extra_js %}{% endblock %}
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-6 py-6 mt-8 border-t border-gray-200">
+    <div class="flex flex-col md:flex-row items-center justify-between text-sm" style="color: #6b7280;">
+      <span>&copy; 2026 PRUDEV II Programme · GIZ · GOPA AFC</span>
+      <span>Implemented by GIZ on behalf of the German Federal Government</span>
+    </div>
+  </footer>
+
+  {% block extra_js %}{% endblock %}
 </body>
-</html> 
+</html>
