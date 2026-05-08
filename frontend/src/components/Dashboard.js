@@ -454,7 +454,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const toggleGroupMember = async (groupId, bgeId, isMember) => {
     const action = isMember ? 'remove_member' : 'add_member';
     try {
-      await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${groupId}/${action}/`, { bge_id: bgeId }, { headers });
+      const res = await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${groupId}/${action}/`, { bge_id: bgeId }, { headers });
+      // The endpoint returns the freshly-serialised group — push it into the open
+      // dialog so the checkbox flips instantly instead of waiting for fetchAll().
+      if (res.data && manageGroupItem?.id === groupId) setManageGroupItem(res.data);
       fetchAll();
     } catch { notify('Failed to update group', 'error'); }
   };
