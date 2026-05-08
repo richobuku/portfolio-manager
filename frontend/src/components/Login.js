@@ -154,9 +154,9 @@ export default function Login({ onLogin }) {
           {/* Logos footer */}
           <Box sx={{ mt: 4, textAlign: 'center' }}>
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, mb: 1.5 }}>
-              <Box component="img" src={gizLogo} alt="GIZ" sx={{ height: 24, width: 'auto', display: 'block', opacity: 0.75 }} />
-              <Box sx={{ width: 1, height: 20, bgcolor: '#E0E7F0' }} />
-              <Box component="img" src={gopaLogo} alt="GOPA AFC" sx={{ height: 20, width: 'auto', display: 'block', opacity: 0.75 }} />
+              <Box component="img" src={gizLogo} alt="German Cooperation · Implemented by GIZ" sx={{ height: 38, width: 'auto', display: 'block', opacity: 0.9 }} />
+              <Box sx={{ width: 1, height: 28, bgcolor: '#E0E7F0' }} />
+              <Box component="img" src={gopaLogo} alt="GOPA AFC" sx={{ height: 22, width: 'auto', display: 'block', opacity: 0.9 }} />
             </Box>
             <Typography variant="caption" color="text.disabled">
               © {new Date().getFullYear()} PRUDEV II Programme · GIZ · GOPA AFC
