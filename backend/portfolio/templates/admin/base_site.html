@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | PRUDEV II Admin{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" type="text/css" href="{% static 'admin/css/prudev_branding.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div id="site-name">
+  <a href="{% url 'admin:index' %}" style="color:#FFFFFF;text-decoration:none;font-weight:800;letter-spacing:-0.3px;font-size:20px;">
+    PRUDEV II — Portfolio Manager
+  </a>
+  <div style="font-size:12px;opacity:0.75;margin-top:2px;color:#d8e0ee;">MSME Portfolio Management Admin</div>
+</div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

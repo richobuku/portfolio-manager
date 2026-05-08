@@ -1,6 +1,11 @@
 from django.contrib import admin
 from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport
 
+# ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
+admin.site.site_header = "PRUDEV II — Portfolio Manager"
+admin.site.site_title  = "PRUDEV II Admin"
+admin.site.index_title = "MSME Portfolio Management"
+
 @admin.register(Portfolio)
 class PortfolioAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'created_at', 'is_active', 'total_value_display')

@@ -1,0 +1,181 @@
+/* PRUDEV II admin theme — overrides Django admin to match the React frontend.
+   Brand palette: navy #1A2F4B (sidebar/header), GIZ red #C8102E (accent),
+   off-white surface #F5F5F5, dark text #1A2F4B.
+   Loaded automatically via portfolio/static/admin/css/base.css (collectstatic). */
+
+:root {
+  --primary:        #1A2F4B;        /* navy header / sidebar */
+  --primary-fg:     #FFFFFF;
+  --secondary:      #243a5b;        /* hover/lighter navy */
+  --accent:         #C8102E;        /* GIZ red */
+  --link-fg:        #1A2F4B;
+  --link-hover-color: #C8102E;
+  --link-selected-fg: #FFFFFF;
+  --header-bg:      #1A2F4B;
+  --header-color:   #FFFFFF;
+  --header-link-color: #FFFFFF;
+  --breadcrumbs-bg: #243a5b;
+  --breadcrumbs-fg: #d8e0ee;
+  --breadcrumbs-link-fg: #FFFFFF;
+  --button-bg:      #1A2F4B;
+  --button-fg:      #FFFFFF;
+  --button-hover-bg: #243a5b;
+  --default-button-bg: #1A2F4B;
+  --default-button-hover-bg: #243a5b;
+  --close-button-bg: #6c757d;
+  --close-button-hover-bg: #495057;
+  --delete-button-bg: #C8102E;
+  --delete-button-hover-bg: #a00d24;
+  --object-tools-bg: #C8102E;
+  --object-tools-fg: #FFFFFF;
+  --object-tools-hover-bg: #a00d24;
+  --body-bg:        #F5F5F5;
+  --body-fg:        #1A2F4B;
+  --body-quiet-color: #6b7280;
+  --darkened-bg:    #ECECEC;
+  --selected-bg:    #fff5f5;
+  --selected-row:   #fff0f0;
+  --message-success-bg: #e6f4ea;
+  --message-warning-bg: #fff8e1;
+  --message-error-bg:   #fdecea;
+  --border-color:   #E0E0E0;
+}
+
+/* Header bar — bigger, branded */
+#header {
+  background: var(--header-bg);
+  color: var(--header-color);
+  padding: 14px 30px;
+  border-bottom: 3px solid var(--accent);
+}
+#header a:link, #header a:visited { color: var(--header-link-color); }
+#branding h1 {
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+#branding h1 a:link, #branding h1 a:visited { color: var(--primary-fg); }
+
+/* Module / app cards on the home page */
+.module h2, .module caption, .inline-group h2 {
+  background: var(--primary);
+  color: var(--primary-fg);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* Action buttons (primary) */
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  background: var(--button-bg);
+  color: var(--button-fg);
+  border-radius: 6px;
+  border: 0;
+  font-weight: 600;
+}
+.button:hover, .button:focus,
+input[type=submit]:hover, input[type=button]:hover,
+.submit-row input:hover, a.button:hover {
+  background: var(--button-hover-bg);
+  color: var(--primary-fg);
+}
+
+/* Default save button */
+.submit-row input.default {
+  background: var(--accent);
+}
+.submit-row input.default:hover {
+  background: var(--delete-button-hover-bg);
+}
+
+/* Delete buttons */
+.deletelink, .deletelink:hover {
+  background: var(--delete-button-bg);
+  color: #FFFFFF;
+  border-radius: 6px;
+}
+.deletelink:hover { background: var(--delete-button-hover-bg); }
+
+/* "Add" + "History" object-tools (top-right of detail pages) */
+.object-tools a {
+  background: var(--object-tools-bg);
+  color: var(--object-tools-fg);
+  border-radius: 6px;
+  font-weight: 600;
+}
+.object-tools a:hover {
+  background: var(--object-tools-hover-bg);
+}
+
+/* Links across the app */
+a:link, a:visited { color: var(--link-fg); }
+a:hover { color: var(--link-hover-color); }
+
+/* Breadcrumbs */
+div.breadcrumbs {
+  background: var(--breadcrumbs-bg);
+  color: var(--breadcrumbs-fg);
+  padding: 10px 30px;
+  border-bottom: 1px solid #11203A;
+}
+div.breadcrumbs a { color: var(--breadcrumbs-link-fg); }
+
+/* Selected row highlight in change-list */
+.row1, .row2 {
+  background: #FFFFFF;
+}
+tr.selected td, tr:hover td {
+  background: var(--selected-row) !important;
+}
+table thead th {
+  background: var(--primary);
+  color: var(--primary-fg);
+  font-weight: 600;
+}
+table thead th a:link, table thead th a:visited { color: var(--primary-fg); }
+table thead th.sorted { background: var(--secondary); }
+
+/* Sidebar (Django 4+) */
+#nav-sidebar {
+  background: #FAFBFD;
+  border-right: 1px solid var(--border-color);
+}
+#nav-sidebar .module th, #nav-sidebar .module caption {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+/* Inputs */
+input, select, textarea {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  outline: 2px solid rgba(200, 16, 46, 0.15);
+}
+
+/* Login page */
+.login #header {
+  background: var(--primary);
+  border-bottom: 3px solid var(--accent);
+}
+.login .submit-row input {
+  background: var(--accent);
+  color: #FFFFFF;
+  font-weight: 700;
+}
+.login .submit-row input:hover {
+  background: var(--delete-button-hover-bg);
+}
+
+/* Body & general spacing */
+body { background: var(--body-bg); color: var(--body-fg); }
+#content { padding: 24px 30px; }
+#content-main { max-width: 1400px; }
+
+/* Messages (success / warning / error toasts at top of page) */
+ul.messagelist li.success { background: var(--message-success-bg); color: #1e6f2f; border-left: 4px solid #2e7d32; }
+ul.messagelist li.warning { background: var(--message-warning-bg); color: #8a6d00; border-left: 4px solid #f9a825; }
+ul.messagelist li.error   { background: var(--message-error-bg);   color: #b71c1c; border-left: 4px solid var(--accent); }
+
+/* Footer */
+#footer { background: #FFFFFF; border-top: 1px solid var(--border-color); padding: 12px 30px; color: var(--body-quiet-color); }
