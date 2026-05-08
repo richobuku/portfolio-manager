@@ -53,6 +53,7 @@ class CohortSerializer(serializers.ModelSerializer):
 class MSMESerializer(serializers.ModelSerializer):
     cohort_name = serializers.CharField(source='cohort.name', read_only=True)
     assigned_bge_name = serializers.CharField(source='assigned_bge.name', read_only=True)
+    assigned_group_name = serializers.CharField(source='assigned_group.name', read_only=True)
 
     class Meta:
         model = MSME

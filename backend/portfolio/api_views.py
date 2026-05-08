@@ -96,12 +96,15 @@ class MSMEViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = MSME.objects.filter(is_active=True)
 
-        # BGE users only see their own assigned MSMEs
+        # BGE users only see their own assigned MSMEs — directly OR via any group they belong to
         user = self.request.user
         if not (user.is_staff or user.is_superuser):
             try:
                 bge = user.bge_profile
-                qs = qs.filter(assigned_bge=bge)
+                from django.db.models import Q
+                qs = qs.filter(
+                    Q(assigned_bge=bge) | Q(assigned_group__members=bge)
+                ).distinct()
             except Exception:
                 qs = qs.none()
 
@@ -352,11 +355,17 @@ class MSMEViewSet(viewsets.ModelViewSet):
             c2_bemail = find_col(cols, '1.13')
             c2_sector = find_col(cols, '2.1',  'core business')
 
+        blank_rows = 0  # track silently-blank rows so user knows why count differs
         for i, row in df.iterrows():
             try:
                 if is_cohort2_simple:
                     business_name = clean_str(row.get(s2_bname, '')) if s2_bname else ''
                     if not business_name:
+                        # check if the whole row is blank vs just missing business name
+                        if all((pd.isna(v) or str(v).strip() in ('', 'nan')) for v in row.values):
+                            blank_rows += 1
+                        else:
+                            skipped.append({'row': i + 2, 'error': 'Missing Business Name'})
                         continue
 
                     record = {
@@ -389,6 +398,10 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
                     business_name = clean_str(row.get(bname_col, '')) if bname_col else ''
                     if not business_name:
+                        if all((pd.isna(v) or str(v).strip() in ('', 'nan')) for v in row.values):
+                            blank_rows += 1
+                        else:
+                            skipped.append({'row': i + 2, 'error': 'Missing Business Name'})
                         continue
 
                     record = {
@@ -411,6 +424,10 @@ class MSMEViewSet(viewsets.ModelViewSet):
                 else:  # Cohort 1
                     business_name = clean_str(row.get('Name', ''))
                     if not business_name:
+                        if all((pd.isna(v) or str(v).strip() in ('', 'nan')) for v in row.values):
+                            blank_rows += 1
+                        else:
+                            skipped.append({'row': i + 2, 'error': 'Missing Name (business)'})
                         continue
 
                     gender = map_gender(row.get('Sex of founder', row.get('Gender of Key contact person', '')))
@@ -460,13 +477,17 @@ class MSMEViewSet(viewsets.ModelViewSet):
             msg += f" (assigned to cohort: {cohort_name})"
         if skipped:
             msg += f", {len(skipped)} rows skipped"
+        if blank_rows:
+            msg += f", {blank_rows} blank rows ignored"
         msg += "."
 
         return Response({
             'created': created,
             'updated': updated,
             'skipped': len(skipped),
-            'errors': skipped[:20],  # cap at 20 in response
+            'blank_rows': blank_rows,
+            'errors': skipped[:50],  # cap at 50 in response
+            'total_rows': int(len(df)),
             'message': msg,
         })
 
@@ -809,6 +830,60 @@ class BGEGroupViewSet(viewsets.ModelViewSet):
             return Response(BGEGroupSerializer(group).data)
         except BusinessGrowthExpert.DoesNotExist:
             return Response({'error': 'Expert not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['post'], url_path='assign-msmes')
+    def assign_msmes(self, request, pk=None):
+        """Bulk-assign MSMEs to this group.
+        Body: {msme_ids: [...], session_number?: int, objectives?: str}.
+        Every BGE in the group's `members` will then see these MSMEs in their dashboard.
+        """
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can assign MSMEs to groups.")
+        group = self.get_object()
+        msme_ids = request.data.get('msme_ids', [])
+        if not isinstance(msme_ids, list) or not msme_ids:
+            return Response({'error': 'msme_ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        session_number = request.data.get('session_number')
+        objectives     = request.data.get('objectives', '').strip()
+
+        update_fields = {'assigned_group': group}
+        if session_number is not None:
+            try:
+                update_fields['session_number'] = int(session_number)
+            except (TypeError, ValueError):
+                return Response({'error': 'session_number must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+        if objectives:
+            update_fields['assignment_objectives'] = objectives
+
+        updated = MSME.objects.filter(id__in=msme_ids, is_active=True).update(**update_fields)
+        return Response({
+            'group_id': group.id,
+            'group_name': group.name,
+            'assigned': updated,
+            'msme_ids': msme_ids,
+        })
+
+    @action(detail=True, methods=['post'], url_path='unassign-msmes')
+    def unassign_msmes(self, request, pk=None):
+        """Remove the group assignment from given MSMEs (or all if msme_ids omitted).
+        Body: {msme_ids?: [...]}"""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can unassign MSMEs from groups.")
+        group = self.get_object()
+        msme_ids = request.data.get('msme_ids')
+        qs = MSME.objects.filter(assigned_group=group)
+        if isinstance(msme_ids, list) and msme_ids:
+            qs = qs.filter(id__in=msme_ids)
+        cleared = qs.update(assigned_group=None, session_number=None)
+        return Response({'group_id': group.id, 'cleared': cleared})
+
+    @action(detail=True, methods=['get'], url_path='msmes')
+    def list_msmes(self, request, pk=None):
+        """Return all MSMEs currently assigned to this group."""
+        group = self.get_object()
+        msmes = group.assigned_msmes.filter(is_active=True).order_by('session_number', 'business_name')
+        return Response(MSMESerializer(msmes, many=True).data)
 
 
 class SupportRequestViewSet(viewsets.ModelViewSet):

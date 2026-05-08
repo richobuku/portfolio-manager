@@ -166,6 +166,14 @@ class MSME(models.Model):
     assigned_bge = models.ForeignKey(
         'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_msmes'
     )
+    assigned_group = models.ForeignKey(
+        'BGEGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_msmes',
+        help_text='If set, every BGE in this group is considered assigned to this MSME.'
+    )
+    session_number = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text='Optional session within a group rotation (e.g. Session 1, Session 2).'
+    )
     assignment_objectives = models.TextField(
         blank=True,
         help_text='Objectives and scope of this BGE deployment for the MSME'
