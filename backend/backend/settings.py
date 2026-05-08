@@ -194,6 +194,13 @@ FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 if FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
 
+# Accept ANY Vercel preview/production URL for this project (deployment-specific
+# URLs change every push). Without this, only the canonical alias works and
+# direct deployment URLs cause CORS-blocked logins.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
