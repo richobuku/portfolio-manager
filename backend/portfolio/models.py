@@ -269,6 +269,10 @@ class PushSubscription(models.Model):
 class BGEGroup(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
+    objectives = models.TextField(
+        blank=True,
+        help_text='Mission statement for this group — flows into each assigned MSME and is visible to BGEs when they file reports.'
+    )
     members = models.ManyToManyField('BusinessGrowthExpert', blank=True, related_name='bge_groups')
     created_at = models.DateTimeField(auto_now_add=True)
 

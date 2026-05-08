@@ -472,6 +472,28 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         <DialogContent dividers>
           {reportErrors && <Alert severity="error" sx={{ mb: 2 }}>{reportErrors}</Alert>}
 
+          {/* Show the assignment / group objectives for the selected MSME so the BGE
+              has the team's mission in front of them while filling out the report. */}
+          {(() => {
+            const m = msmes.find(x => x.id === reportForm.msme);
+            if (!m) return null;
+            const ao = (m.assignment_objectives || '').trim();
+            const go = (m.assigned_group_objectives || '').trim();
+            if (!ao && !go) return null;
+            return (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {m.assigned_group_name && (
+                  <Typography variant="caption" fontWeight={600} display="block">
+                    {m.assigned_group_name} · objectives
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {ao || go}
+                </Typography>
+              </Alert>
+            );
+          })()}
+
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small" required>
@@ -481,7 +503,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     <MenuItem key={m.id} value={m.id}>
                       <Box>
                         <Typography variant="body2" fontWeight={500}>{m.business_name}</Typography>
-                        {m.msme_code && <Typography variant="caption" color="text.secondary">{m.msme_code}</Typography>}
+                        <Typography variant="caption" color="text.secondary">
+                          {m.msme_code}{m.assigned_group_name ? ` · ${m.assigned_group_name}` : ''}
+                        </Typography>
                       </Box>
                     </MenuItem>
                   ))}

@@ -969,8 +969,11 @@ class BGEGroupViewSet(viewsets.ModelViewSet):
                 update_fields['session_number'] = int(session_number)
             except (TypeError, ValueError):
                 return Response({'error': 'session_number must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
-        if objectives:
-            update_fields['assignment_objectives'] = objectives
+        # Use the form-supplied objectives if any, otherwise fall back to the group's
+        # canonical objectives so each MSME inherits its team's mission.
+        effective_objectives = objectives or (group.objectives or '').strip()
+        if effective_objectives:
+            update_fields['assignment_objectives'] = effective_objectives
 
         updated = MSME.objects.filter(id__in=msme_ids, is_active=True).update(**update_fields)
         return Response({

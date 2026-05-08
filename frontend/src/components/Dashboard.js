@@ -99,7 +99,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── bge group dialog ───────────────────────────────────────────────────────
   const [groupDialog, setGroupDialog] = useState(false);
-  const [groupForm, setGroupForm] = useState({ name: '', description: '' });
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', objectives: '' });
   const [groupLoading, setGroupLoading] = useState(false);
   const [manageGroupItem, setManageGroupItem] = useState(null);
 
@@ -445,7 +445,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       await axios.post(API_ENDPOINTS.BGE_GROUPS, groupForm, { headers });
       notify('Group created');
       setGroupDialog(false);
-      setGroupForm({ name: '', description: '' });
+      setGroupForm({ name: '', description: '', objectives: '' });
       fetchAll();
     } catch { notify('Failed to create group', 'error'); }
     finally { setGroupLoading(false); }
@@ -1943,11 +1943,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Dialog>
 
       {/* ── Create BGE Group ──────────────────────────────────────────────── */}
-      <Dialog open={groupDialog} onClose={() => setGroupDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>New BGE Group</DialogTitle>
+      <Dialog open={groupDialog} onClose={() => setGroupDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          New BGE Group
+          <Typography variant="caption" display="block" color="text.secondary">
+            Objectives flow into every MSME assigned to this group and appear in the BGE's report context.
+          </Typography>
+        </DialogTitle>
         <DialogContent dividers>
           <TextField fullWidth size="small" label="Group Name" sx={{ mb: 2 }} value={groupForm.name} onChange={e => setGroupForm({...groupForm, name: e.target.value})} />
-          <TextField fullWidth size="small" multiline rows={2} label="Description" value={groupForm.description} onChange={e => setGroupForm({...groupForm, description: e.target.value})} />
+          <TextField fullWidth size="small" multiline rows={2} label="Description" sx={{ mb: 2 }} value={groupForm.description} onChange={e => setGroupForm({...groupForm, description: e.target.value})} />
+          <TextField fullWidth size="small" multiline rows={4} label="Objectives" placeholder="What is this team's mission? e.g. Drive financial-literacy uptake among Lira & Gulu Cohort 1 MSMEs through 2 BGE-led sessions per quarter…"
+            value={groupForm.objectives} onChange={e => setGroupForm({...groupForm, objectives: e.target.value})}
+            helperText="Shown to the BGE inside their report context for each assigned MSME."
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGroupDialog(false)}>Cancel</Button>
@@ -1967,6 +1976,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </Typography>
         </DialogTitle>
         <DialogContent dividers>
+          {assignMsmeGroup?.objectives && (
+            <Alert severity="info" sx={{ mb: 2 }} icon={<Assignment fontSize="small" />}>
+              <Typography variant="caption" fontWeight={600} display="block">Group objectives (inherited by each MSME):</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{assignMsmeGroup.objectives}</Typography>
+            </Alert>
+          )}
           <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
             <TextField
               size="small" placeholder="Search MSMEs..." value={groupMsmeSearch}
