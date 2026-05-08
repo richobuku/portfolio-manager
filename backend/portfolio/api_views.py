@@ -560,22 +560,28 @@ class MSMEViewSet(viewsets.ModelViewSet):
                         'is_active': True,
                     }
 
-                # Update-or-create by business name + owner (avoid duplicates on re-upload)
-                lookup = {'business_name': record.pop('business_name')}
-                owner_name = record.get('owner_name', '')
+                # Update-or-create by business name + owner (avoid duplicates on re-upload).
+                # Pop both keys out of `record` so they aren't passed twice to create().
+                business_name = record.pop('business_name')
+                owner_name    = record.pop('owner_name', '')
+                lookup = {'business_name': business_name}
                 if owner_name:
                     lookup['owner_name'] = owner_name
 
                 existing = MSME.objects.filter(**lookup).first()
                 if existing:
                     if update_existing:
+                        # Restore owner_name into the update payload so existing rows can be enriched
+                        if owner_name and not existing.owner_name:
+                            existing.owner_name = owner_name
                         for k, v in record.items():
                             setattr(existing, k, v)
                         existing.save()
                         updated += 1
                     else:
-                        skipped.append({'row': i + 2, 'error': f'Duplicate skipped: {lookup.get("business_name", "")}'})
+                        skipped.append({'row': i + 2, 'error': f'Duplicate skipped: {business_name}'})
                 else:
+                    # `lookup` carries the unique-fields, `record` carries everything else
                     MSME.objects.create(**lookup, **record)
                     created += 1
 
