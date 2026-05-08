@@ -341,6 +341,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [msmeUploadFile, setMsmeUploadFile] = useState(null);
   const [msmeUploading, setMsmeUploading] = useState(false);
   const [msmeUploadSkipDups, setMsmeUploadSkipDups] = useState(false);
+  const [msmeUploadResult, setMsmeUploadResult] = useState(null);
   const msmeFileRef = React.useRef();
 
   const openMsmeUpload = () => {
@@ -349,11 +350,31 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setMsmeUploadNewCohort('');
     setMsmeUploadFile(null);
     setMsmeUploadSkipDups(false);
+    setMsmeUploadResult(null);
+  };
+
+  const downloadMsmeTemplate = async () => {
+    try {
+      const res = await axios.get(API_ENDPOINTS.UPLOAD_MSMES_TEMPLATE, {
+        headers, responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'MSME_Upload_Template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      notify('Could not download template', 'error');
+    }
   };
 
   const doMsmeUpload = async () => {
     if (!msmeUploadFile) { notify('Please select a file', 'error'); return; }
     setMsmeUploading(true);
+    setMsmeUploadResult(null);
     const fd = new FormData();
     fd.append('file', msmeUploadFile);
     const cohortName = msmeUploadCohort === '__new__' ? msmeUploadNewCohort.trim() : msmeUploadCohort;
@@ -361,8 +382,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     fd.append('update_existing', msmeUploadSkipDups ? 'false' : 'true');
     try {
       const res = await axios.post(API_ENDPOINTS.UPLOAD_MSMES, fd, { headers });
+      setMsmeUploadResult(res.data);
       notify(res.data?.message || 'MSMEs uploaded');
-      setMsmeUploadDialog(false);
       fetchAll();
     } catch (err) {
       notify(err.response?.data?.error || 'Upload failed', 'error');
@@ -1711,10 +1732,25 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       {/* ── Import MSME List ─────────────────────────────────────────────── */}
       <Dialog open={msmeUploadDialog} onClose={() => setMsmeUploadDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Import MSME List</DialogTitle>
+        <DialogTitle>
+          Import MSME List
+          <Typography variant="caption" display="block" color="text.secondary">
+            Use the unified template — works for any cohort.
+          </Typography>
+        </DialogTitle>
         <DialogContent dividers>
-          <Alert severity="info" sx={{ mb: 2 }} icon={false}>
-            Supports <strong>Cohort 1</strong> format (CSV or Excel with columns: <em>Name, District, Town, Name of contact person, Mobile phone numbers…</em>) and <strong>Cohort 2</strong> survey format (Excel with columns: <em>1.1. Business Name:, District, Town/City…</em>). The format is detected automatically.
+          <Alert
+            severity="info"
+            sx={{ mb: 2 }}
+            action={
+              <Button size="small" variant="outlined" onClick={downloadMsmeTemplate}>
+                Download template
+              </Button>
+            }
+          >
+            Required columns: <strong>Business Name, Owner Name, Sex, Phone, Email, District, Town</strong>.
+            Optional: Business Email, Business Type, Physical Location, Role, Cohort.
+            Legacy Cohort 1 / Cohort 2 files still upload — format is auto-detected.
           </Alert>
 
           {/* File picker */}
@@ -1776,13 +1812,57 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               Skip duplicates (leave existing records unchanged)
             </Typography>
           </Box>
+
+          {/* Result panel */}
+          {msmeUploadResult && (
+            <Alert severity={msmeUploadResult.skipped ? 'warning' : 'success'} sx={{ mt: 2 }}>
+              <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                {msmeUploadResult.message}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                <Chip size="small" color="success" label={`${msmeUploadResult.created || 0} created`} />
+                <Chip size="small" color="info"    label={`${msmeUploadResult.updated || 0} updated`} />
+                {msmeUploadResult.skipped > 0 && (
+                  <Chip size="small" color="warning" label={`${msmeUploadResult.skipped} skipped`} />
+                )}
+                {msmeUploadResult.blank_rows > 0 && (
+                  <Chip size="small" variant="outlined" label={`${msmeUploadResult.blank_rows} blank`} />
+                )}
+                <Chip size="small" variant="outlined" label={`${msmeUploadResult.total_rows || 0} total`} />
+              </Box>
+              {msmeUploadResult.errors?.length > 0 && (
+                <Box sx={{ mt: 1.5, maxHeight: 160, overflow: 'auto', bgcolor: 'background.paper', p: 1, borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                    Skipped rows:
+                  </Typography>
+                  {msmeUploadResult.errors.slice(0, 20).map((e, i) => (
+                    <Typography key={i} variant="caption" display="block" sx={{ fontFamily: 'monospace' }}>
+                      Row {e.row}: {e.error}
+                    </Typography>
+                  ))}
+                  {msmeUploadResult.errors.length > 20 && (
+                    <Typography variant="caption" color="text.secondary">
+                      …and {msmeUploadResult.errors.length - 20} more
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setMsmeUploadDialog(false)}>Cancel</Button>
+          <Button onClick={() => setMsmeUploadDialog(false)}>
+            {msmeUploadResult ? 'Close' : 'Cancel'}
+          </Button>
+          {msmeUploadResult && (
+            <Button onClick={() => { setMsmeUploadResult(null); setMsmeUploadFile(null); }}>
+              Upload another
+            </Button>
+          )}
           <Button
             variant="contained"
             onClick={doMsmeUpload}
-            disabled={msmeUploading || !msmeUploadFile || (msmeUploadCohort === '__new__' && !msmeUploadNewCohort.trim())}
+            disabled={msmeUploading || !msmeUploadFile || !!msmeUploadResult || (msmeUploadCohort === '__new__' && !msmeUploadNewCohort.trim())}
             startIcon={msmeUploading ? <CircularProgress size={16} /> : <Upload />}
           >
             {msmeUploading ? 'Uploading…' : 'Upload'}

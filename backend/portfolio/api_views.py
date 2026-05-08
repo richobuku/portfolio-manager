@@ -7,6 +7,7 @@ from django.db.models import Count, Sum
 from django.contrib.auth.models import User
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
+from django.http import HttpResponse
 import pandas as pd
 import io
 
@@ -188,6 +189,75 @@ class MSMEViewSet(viewsets.ModelViewSet):
             msme.cohort = None
         msme.save()
         return Response(MSMESerializer(msme).data)
+
+    @action(detail=False, methods=['get'], url_path='upload-template', permission_classes=[])
+    def upload_template(self, request):
+        """Download a blank MSME upload template (.xlsx) with the unified schema."""
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "MSMEs"
+
+        columns = [
+            ('Business Name',     32, 'Required. The legal/trading name of the MSME.'),
+            ('Owner Name',        24, 'Primary contact / owner name.'),
+            ('Sex',               10, 'Male or Female.'),
+            ('Phone',             18, 'Owner/contact phone number.'),
+            ('Email',             28, 'Owner/contact email.'),
+            ('Business Email',    28, 'Business email (if separate from owner email).'),
+            ('Business Type',     20, 'Micro / Small / Medium / Sole proprietorship / Company / Partnership / Cooperative.'),
+            ('District',          18, 'District of operation.'),
+            ('Town',              16, 'Town or city.'),
+            ('Physical Location', 32, 'Street / landmark address (optional).'),
+            ('Role',              18, 'Role of contact person (Director, Manager, etc.).'),
+            ('Cohort',            14, 'e.g. Cohort 1, Cohort 2 (optional — can also be set in upload form).'),
+        ]
+
+        header_font = Font(bold=True, color='FFFFFF', size=11)
+        header_fill = PatternFill('solid', start_color='1A2F4B')
+        header_align = Alignment(horizontal='center', vertical='center')
+
+        for i, (name, width, _) in enumerate(columns, start=1):
+            cell = ws.cell(row=1, column=i, value=name)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            ws.column_dimensions[get_column_letter(i)].width = width
+
+        ws.row_dimensions[1].height = 28
+        ws.freeze_panes = 'A2'
+
+        # Add an example row so users see the expected shape
+        example = [
+            'Acholi Shea Cooperative Ltd', 'Anena Sharon', 'Female', '256775779335',
+            'anena.sharon@example.com', 'info@acholishea.org', 'Cooperative',
+            'Gulu', 'Gulu', 'Plot 12, Gulu town', 'Director', 'Cohort 1',
+        ]
+        for i, val in enumerate(example, start=1):
+            c = ws.cell(row=2, column=i, value=val)
+            c.font = Font(italic=True, color='888888')
+
+        # Field-guidance row at the bottom
+        guide_row = 4
+        ws.cell(row=guide_row, column=1, value='Notes:').font = Font(bold=True, color='C8102E')
+        for i, (_, _, note) in enumerate(columns, start=1):
+            ws.cell(row=guide_row + 1, column=i, value=note).font = Font(size=9, color='666666', italic=True)
+            ws.cell(row=guide_row + 1, column=i).alignment = Alignment(wrap_text=True, vertical='top')
+        ws.row_dimensions[guide_row + 1].height = 60
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        resp = HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = 'attachment; filename="MSME_Upload_Template.xlsx"'
+        return resp
 
     @action(detail=False, methods=['post'], url_path='upload')
     def upload(self, request):

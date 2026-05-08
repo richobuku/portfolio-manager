@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   MSME_ANALYTICS:     `${API_BASE_URL}/api/msmes/analytics/`,
   EXPERT_LEADERBOARD: `${API_BASE_URL}/api/experts/leaderboard/`,
   UPLOAD_MSMES:       `${API_BASE_URL}/api/msmes/upload/`,
+  UPLOAD_MSMES_TEMPLATE: `${API_BASE_URL}/api/msmes/upload-template/`,
   UPLOAD_EXPERTS:     `${API_BASE_URL}/api/experts/upload/`,
 };
 
