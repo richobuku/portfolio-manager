@@ -16,7 +16,7 @@ import {
   AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
-  Lock, LockOpen,
+  Lock, LockOpen, Star, StarBorder,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL } from '../config';
@@ -523,6 +523,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } catch { notify('Failed to update group', 'error'); }
   };
 
+  // Set / clear the group's team lead (must be a current member)
+  const setGroupTeamLead = async (groupId, bgeId) => {
+    try {
+      const res = await axios.patch(`${API_ENDPOINTS.BGE_GROUPS}${groupId}/`, { team_lead: bgeId }, { headers });
+      if (res.data && manageGroupItem?.id === groupId) setManageGroupItem(res.data);
+      fetchAll();
+      notify(bgeId ? 'Team lead set' : 'Team lead cleared');
+    } catch { notify('Failed to set team lead', 'error'); }
+  };
+
   // ── group MSME assignment ──────────────────────────────────────────────────
   const openAssignMsmeDialog = async (group) => {
     setAssignMsmeGroup(group);
@@ -1013,6 +1023,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <Chip size="small" icon={<Business sx={{ fontSize: 14 }} />}
                         label={`${msmes.filter(m => m.assigned_group === group.id).length} MSMEs`}
                         color="primary" variant="outlined" />
+                  {group.team_lead_name && (
+                    <Chip size="small" icon={<Star sx={{ fontSize: 14 }} />}
+                          label={`Lead: ${group.team_lead_name}`}
+                          color="warning" variant="outlined" />
+                  )}
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {group.members_detail?.slice(0, 5).map(m => (
@@ -2105,17 +2120,41 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Dialog>
 
       <Dialog open={!!manageGroupItem} onClose={() => setManageGroupItem(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Manage Members — {manageGroupItem?.name}</DialogTitle>
+        <DialogTitle>
+          Manage Members — {manageGroupItem?.name}
+          <Typography variant="caption" display="block" color="text.secondary">
+            Tick a row to add/remove the BGE; click the star to designate them as team lead.
+          </Typography>
+        </DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
           <List dense>
             {experts.map(e => {
               const isMember = manageGroupItem?.members_detail?.some(m => m.id === e.id);
+              const isLead = manageGroupItem?.team_lead === e.id;
               return (
                 <ListItemButton key={e.id} onClick={() => toggleGroupMember(manageGroupItem.id, e.id, isMember)}>
                   <ListItemIcon>
                     <Checkbox checked={!!isMember} size="small" disableRipple />
                   </ListItemIcon>
-                  <ListItemText primary={e.name} secondary={`${e.location} · ${e.top_skills}`} />
+                  <ListItemText
+                    primary={e.name}
+                    secondary={`${e.location || '—'} · ${e.top_skills || '—'}${isLead ? ' · Team Lead' : ''}`}
+                  />
+                  <Tooltip title={isLead ? 'Remove team-lead' : (isMember ? 'Make team lead' : 'Add as member first')}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!isMember}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          setGroupTeamLead(manageGroupItem.id, isLead ? null : e.id);
+                        }}
+                        sx={{ mr: 1, color: isLead ? '#FFB300' : 'text.disabled' }}
+                      >
+                        {isLead ? <Star fontSize="small" /> : <StarBorder fontSize="small" />}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                   <Chip label={e.status} color={statusColor(e.status)} size="small" />
                 </ListItemButton>
               );

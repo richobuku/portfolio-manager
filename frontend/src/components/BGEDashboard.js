@@ -11,6 +11,7 @@ import {
 import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
+  Group as GroupIcon, Star,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
@@ -48,6 +49,20 @@ const EMPTY_REPORT = {
   status: 'draft',
 };
 
+const EMPTY_GROUP_REPORT = {
+  group: '',
+  session_number: '',
+  visit_date: new Date().toISOString().slice(0, 10),
+  msmes_supported: [],
+  session_overview: '',
+  challenges_identified: '',
+  interventions_delivered: '',
+  outcomes_achieved: '',
+  next_steps: '',
+  additional_notes: '',
+  status: 'draft',
+};
+
 export default function BGEDashboard({ token, currentUser, onLogout }) {
   const headers = { Authorization: `Bearer ${token}` };
   const bgeName = currentUser?.bge_profile?.name || currentUser?.username || 'BGE';
@@ -57,8 +72,19 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const [msmes, setMsmes] = useState([]);
   const [reports, setReports] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [groupReports, setGroupReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
+
+  // group-report dialog
+  const [groupReportDialog, setGroupReportDialog] = useState(false);
+  const [editingGroupReport, setEditingGroupReport] = useState(null);
+  const [groupReportForm, setGroupReportForm] = useState(EMPTY_GROUP_REPORT);
+  const [groupReportSaving, setGroupReportSaving] = useState(false);
+  const [groupReportErrors, setGroupReportErrors] = useState('');
+
+  const myBgeId = currentUser?.bge_profile?.id;
 
   // pagination
   const [reportPage, setReportPage] = useState(0);
@@ -103,17 +129,43 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchGroups = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.BGE_GROUPS, { headers: h });
+      const all = Array.isArray(res.data) ? res.data : res.data.results || [];
+      // Backend returns every group the BGE-user can see — for a non-admin
+      // BGE user, the list endpoint isn't tenant-scoped (it's open), so
+      // narrow to just the groups this BGE belongs to client-side.
+      setGroups(all.filter(g => (g.members_detail || []).some(m => m.id === myBgeId)));
+    } catch {
+      // silent — group view is optional
+    }
+  }, [token, myBgeId]);
+
+  const fetchGroupReports = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h });
+      setGroupReports(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // silent — endpoint may be unreachable on stale deploys
+    }
+  }, [token]);
+
   const pushAttempted = useRef(false);
 
   useEffect(() => {
     fetchMsmes();
     fetchReports();
+    fetchGroups();
+    fetchGroupReports();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, token]);
+  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, token]);
 
   const openNewReport = (msmeId = '') => {
     setEditingReport(null);
@@ -163,6 +215,65 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  // ── group reports ─────────────────────────────────────────────────────────
+  const openNewGroupReport = (groupId = '') => {
+    setEditingGroupReport(null);
+    setGroupReportForm({ ...EMPTY_GROUP_REPORT, group: groupId });
+    setGroupReportErrors('');
+    setGroupReportDialog(true);
+  };
+
+  const openEditGroupReport = (rep) => {
+    setEditingGroupReport(rep);
+    setGroupReportForm({
+      group: rep.group,
+      session_number: rep.session_number || '',
+      visit_date: rep.visit_date,
+      msmes_supported: rep.msmes_supported || [],
+      session_overview: rep.session_overview || '',
+      challenges_identified: rep.challenges_identified || '',
+      interventions_delivered: rep.interventions_delivered || '',
+      outcomes_achieved: rep.outcomes_achieved || '',
+      next_steps: rep.next_steps || '',
+      additional_notes: rep.additional_notes || '',
+      status: rep.status,
+    });
+    setGroupReportErrors('');
+    setGroupReportDialog(true);
+  };
+
+  const saveGroupReport = async () => {
+    if (!groupReportForm.group) { setGroupReportErrors('Please select a group.'); return; }
+    if (!groupReportForm.visit_date) { setGroupReportErrors('Please set a visit date.'); return; }
+    setGroupReportSaving(true);
+    setGroupReportErrors('');
+    const payload = {
+      ...groupReportForm,
+      session_number: groupReportForm.session_number === '' ? null : Number(groupReportForm.session_number),
+    };
+    try {
+      if (editingGroupReport) {
+        await axios.patch(`${API_ENDPOINTS.GROUP_REPORTS}${editingGroupReport.id}/`, payload, { headers });
+        notify('Group report updated');
+      } else {
+        await axios.post(API_ENDPOINTS.GROUP_REPORTS, payload, { headers });
+        notify('Group report saved');
+      }
+      setGroupReportDialog(false);
+      fetchGroupReports();
+    } catch (err) {
+      setGroupReportErrors(
+        err.response?.data?.detail
+        || JSON.stringify(err.response?.data || {})
+        || 'Failed to save group report.'
+      );
+    } finally {
+      setGroupReportSaving(false);
+    }
+  };
+
+  const isTeamLeadOf = (group) => group?.team_lead === myBgeId;
+
   const openMsmeDetail = async (msme) => {
     setSelectedMsme(msme);
     setMsmeDetailDialog(true);
@@ -176,8 +287,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   // ── sidebar ─────────────────────────────────────────────────────────────────
   const navItems = [
-    { key: 'msmes',   label: 'My MSMEs',  icon: <Business /> },
-    { key: 'reports', label: 'My Reports', icon: <Assignment /> },
+    { key: 'msmes',   label: 'My MSMEs',     icon: <Business /> },
+    { key: 'groups',  label: 'My Groups',    icon: <GroupIcon /> },
+    { key: 'reports', label: 'My Reports',   icon: <Assignment /> },
   ];
 
   const SidebarContent = () => (
@@ -326,6 +438,147 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 </Grid>
               </>
             )}
+          </Box>
+        )}
+
+        {/* ── My Groups ── */}
+        {section === 'groups' && (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>My Groups</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {groups.length} group{groups.length !== 1 ? 's' : ''} you're a member of
+                </Typography>
+              </Box>
+            </Box>
+
+            {groups.length === 0 && (
+              <Paper variant="outlined" sx={{ p: 6, textAlign: 'center', color: 'text.secondary' }}>
+                You're not currently part of any BGE group.
+              </Paper>
+            )}
+
+            <Grid container spacing={2}>
+              {groups.map(g => {
+                const groupMsmes = msmes.filter(m => m.assigned_group === g.id);
+                const youAreLead = isTeamLeadOf(g);
+                const reports = groupReports.filter(r => r.group === g.id);
+                return (
+                  <Grid item xs={12} key={g.id}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        {/* Header */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, gap: 2, flexWrap: 'wrap' }}>
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                              <Typography variant="subtitle1" fontWeight={700}>{g.name}</Typography>
+                              {youAreLead && (
+                                <Chip icon={<Star sx={{ fontSize: 14 }} />} label="You are the team lead" color="warning" size="small" />
+                              )}
+                            </Box>
+                            {g.description && (
+                              <Typography variant="caption" color="text.secondary">{g.description}</Typography>
+                            )}
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                              Team Lead: <strong>{g.team_lead_name || 'Not assigned'}</strong> · {g.member_count} member{g.member_count !== 1 ? 's' : ''}
+                            </Typography>
+                          </Box>
+                          {youAreLead && (
+                            <Button variant="contained" size="small" startIcon={<Add />}
+                                    onClick={() => openNewGroupReport(g.id)}>
+                              File Group Report
+                            </Button>
+                          )}
+                        </Box>
+
+                        {/* Objectives banner */}
+                        {g.objectives && (
+                          <Alert severity="info" icon={<Assignment fontSize="small" />} sx={{ mb: 2 }}>
+                            <Typography variant="caption" fontWeight={600} display="block">Group objectives</Typography>
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{g.objectives}</Typography>
+                          </Alert>
+                        )}
+
+                        {/* Members */}
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                          {(g.members_detail || []).map(m => (
+                            <Chip
+                              key={m.id}
+                              label={m.name}
+                              size="small"
+                              icon={m.id === g.team_lead ? <Star sx={{ fontSize: 14 }} /> : undefined}
+                              color={m.id === g.team_lead ? 'warning' : (m.id === myBgeId ? 'primary' : 'default')}
+                              variant={m.id === myBgeId ? 'filled' : 'outlined'}
+                            />
+                          ))}
+                        </Box>
+
+                        <Divider sx={{ my: 1.5 }} />
+
+                        {/* Assigned MSMEs */}
+                        <Typography variant="caption" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
+                          Assigned MSMEs ({groupMsmes.length})
+                        </Typography>
+                        {groupMsmes.length === 0 ? (
+                          <Typography variant="caption" color="text.secondary">No MSMEs assigned to this group yet.</Typography>
+                        ) : (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 240, overflow: 'auto' }}>
+                            {groupMsmes.map(m => (
+                              <Box key={m.id} sx={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                p: 1, borderRadius: 1, bgcolor: 'background.default',
+                              }}>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={500}>{m.business_name}</Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {m.msme_code}{m.session_number ? ` · Session ${m.session_number}` : ''}{m.city ? ` · ${m.city}` : ''}
+                                  </Typography>
+                                </Box>
+                                <Tooltip title="Open MSME"><IconButton size="small" onClick={() => openMsmeDetail(m)}><Visibility fontSize="small" /></IconButton></Tooltip>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+
+                        {/* Group reports already filed */}
+                        {reports.length > 0 && (
+                          <>
+                            <Divider sx={{ my: 1.5 }} />
+                            <Typography variant="caption" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
+                              Group reports ({reports.length})
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                              {reports.map(r => (
+                                <Box key={r.id} sx={{
+                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                  p: 1, borderRadius: 1, bgcolor: 'background.default',
+                                }}>
+                                  <Box>
+                                    <Typography variant="body2" fontWeight={500}>
+                                      {r.visit_date}{r.session_number ? ` · Session ${r.session_number}` : ''}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {r.msme_count} MSME{r.msme_count !== 1 ? 's' : ''} · by {r.team_lead_name || '—'}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Chip label={r.status} size="small" color={r.status === 'approved' ? 'success' : (r.status === 'submitted' ? 'primary' : 'default')} />
+                                    {youAreLead && r.status !== 'approved' && (
+                                      <IconButton size="small" onClick={() => openEditGroupReport(r)}><Edit fontSize="small" /></IconButton>
+                                    )}
+                                  </Box>
+                                </Box>
+                              ))}
+                            </Box>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
           </Box>
         )}
 
@@ -570,6 +823,130 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             startIcon={reportSaving ? <CircularProgress size={16} color="inherit" /> : <CheckCircle />}
           >
             {editingReport ? 'Update Report' : 'Save Report'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Group Report (team lead only) ────────────────────────────────── */}
+      <Dialog open={groupReportDialog} onClose={() => setGroupReportDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {editingGroupReport ? 'Edit Group Report' : 'New Group Report'}
+          <Typography variant="caption" display="block" color="text.secondary">
+            Team-lead-only. Document the session for the whole group.
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {groupReportErrors && <Alert severity="error" sx={{ mb: 2 }}>{groupReportErrors}</Alert>}
+
+          {/* Group + objectives reminder banner */}
+          {(() => {
+            const g = groups.find(x => x.id === groupReportForm.group);
+            if (!g) return null;
+            return (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <Typography variant="caption" fontWeight={600} display="block">
+                  {g.name} · objectives
+                </Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {g.objectives || '(no objectives recorded)'}
+                </Typography>
+              </Alert>
+            );
+          })()}
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small" required>
+                <InputLabel>Group</InputLabel>
+                <Select
+                  value={groupReportForm.group}
+                  label="Group"
+                  onChange={e => setGroupReportForm({ ...groupReportForm, group: e.target.value })}
+                  disabled={!!editingGroupReport}
+                >
+                  {groups.filter(g => isTeamLeadOf(g)).map(g => (
+                    <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <TextField
+                fullWidth size="small" type="number" label="Session # (optional)"
+                value={groupReportForm.session_number}
+                onChange={e => setGroupReportForm({ ...groupReportForm, session_number: e.target.value })}
+                inputProps={{ min: 1, max: 10 }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <TextField
+                fullWidth size="small" type="date" label="Visit Date" required
+                InputLabelProps={{ shrink: true }}
+                value={groupReportForm.visit_date}
+                onChange={e => setGroupReportForm({ ...groupReportForm, visit_date: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={groupReportForm.status}
+                  label="Status"
+                  onChange={e => setGroupReportForm({ ...groupReportForm, status: e.target.value })}
+                >
+                  <MenuItem value="draft">Draft</MenuItem>
+                  <MenuItem value="submitted">Submitted</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>MSMEs supported</InputLabel>
+                <Select
+                  multiple
+                  value={groupReportForm.msmes_supported}
+                  label="MSMEs supported"
+                  onChange={e => setGroupReportForm({ ...groupReportForm, msmes_supported: e.target.value })}
+                  renderValue={(ids) => `${ids.length} selected`}
+                >
+                  {msmes
+                    .filter(m => m.assigned_group === groupReportForm.group)
+                    .map(m => (
+                      <MenuItem key={m.id} value={m.id}>
+                        {m.business_name} {m.session_number ? `· S${m.session_number}` : ''}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          {[
+            { field: 'session_overview',        label: 'Session overview',        hint: 'How the session ran, attendance, format used.' },
+            { field: 'challenges_identified',   label: 'Challenges identified',   hint: 'Cross-cutting challenges observed across the cohort.' },
+            { field: 'interventions_delivered', label: 'Interventions delivered', hint: 'Group-level coaching, training, or facilitated activities.' },
+            { field: 'outcomes_achieved',       label: 'Outcomes achieved',       hint: 'Quantitative + qualitative outcomes from the session.' },
+            { field: 'next_steps',              label: 'Next steps',              hint: 'Follow-up plan agreed with the group.' },
+            { field: 'additional_notes',        label: 'Additional notes',        hint: 'Anything else worth recording.' },
+          ].map(({ field, label, hint }) => (
+            <TextField
+              key={field}
+              fullWidth multiline rows={3} size="small" label={label}
+              placeholder={hint}
+              value={groupReportForm[field]}
+              onChange={e => setGroupReportForm({ ...groupReportForm, [field]: e.target.value })}
+              sx={{ mt: 2 }}
+              InputLabelProps={{ shrink: true }}
+            />
+          ))}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setGroupReportDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained" onClick={saveGroupReport} disabled={groupReportSaving}
+            startIcon={groupReportSaving ? <CircularProgress size={16} color="inherit" /> : <CheckCircle />}
+          >
+            {editingGroupReport ? 'Update Report' : 'Save Report'}
           </Button>
         </DialogActions>
       </Dialog>
