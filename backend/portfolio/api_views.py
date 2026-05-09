@@ -16,7 +16,7 @@ from .models import (
     Portfolio, Investment, Transaction,
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
-    Cohort, BGEGroup, MSMEReport, PushSubscription,
+    Cohort, BGEGroup, MSMEReport, GroupReport, PushSubscription,
 )
 from pywebpush import webpush, WebPushException
 import json as _json
@@ -25,6 +25,7 @@ from .serializers import (
     MSMESerializer, BusinessGrowthExpertSerializer, SupportRequestSerializer,
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
+    GroupReportSerializer,
 )
 
 
@@ -1176,6 +1177,96 @@ class MSMEReportViewSet(viewsets.ModelViewSet):
             except Exception:
                 pass
         serializer.save()
+
+
+class GroupReportViewSet(viewsets.ModelViewSet):
+    """Group-level reports.
+
+    Visibility:
+    - Admins see every group report.
+    - A BGE sees reports for any group they're a member of (so the whole team
+      can read what the lead submitted).
+
+    Mutation:
+    - Only admins or the group's `team_lead` can create or edit reports
+      against that group. Other members can read but not write.
+    - status transitions: draft -> submitted (sets submitted_at),
+                          submitted -> approved (admin only, sets approved_at).
+    """
+    serializer_class = GroupReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            qs = GroupReport.objects.all()
+        else:
+            try:
+                bge = user.bge_profile
+                qs = GroupReport.objects.filter(group__members=bge).distinct()
+            except Exception:
+                qs = GroupReport.objects.none()
+
+        gid = self.request.query_params.get('group')
+        if gid:
+            qs = qs.filter(group_id=gid)
+        sid = self.request.query_params.get('session_number')
+        if sid:
+            qs = qs.filter(session_number=sid)
+        st = self.request.query_params.get('status')
+        if st:
+            qs = qs.filter(status=st)
+        return qs.select_related('group', 'team_lead').prefetch_related('msmes_supported')
+
+    def _user_can_write_for_group(self, user, group):
+        if user.is_staff or user.is_superuser:
+            return True
+        try:
+            bge = user.bge_profile
+        except Exception:
+            return False
+        return group.team_lead_id == bge.id
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        group = serializer.validated_data.get('group')
+        if not group:
+            raise PermissionDenied("`group` is required.")
+        if not self._user_can_write_for_group(user, group):
+            raise PermissionDenied(
+                "Only the group's team lead (or an admin) can file group reports."
+            )
+        # Stamp the team lead automatically — never trusted from request body.
+        try:
+            bge = user.bge_profile
+        except Exception:
+            bge = group.team_lead
+        serializer.save(team_lead=bge)
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        user = self.request.user
+        if not self._user_can_write_for_group(user, instance.group):
+            raise PermissionDenied(
+                "Only the group's team lead (or an admin) can edit this report."
+            )
+
+        # Stamp lifecycle timestamps when status transitions
+        from django.utils import timezone
+        new_status = serializer.validated_data.get('status', instance.status)
+        extra = {}
+        if instance.status != 'submitted' and new_status == 'submitted':
+            extra['submitted_at'] = timezone.now()
+        if instance.status != 'approved' and new_status == 'approved':
+            if not (user.is_staff or user.is_superuser):
+                raise PermissionDenied("Only admins can mark a report as Approved.")
+            extra['approved_at'] = timezone.now()
+        serializer.save(**extra)
+
+    def destroy(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can delete group reports.")
+        return super().destroy(request, *args, **kwargs)
 
 
 class BGEUserViewSet(viewsets.ViewSet):

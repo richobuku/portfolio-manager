@@ -290,6 +290,11 @@ class BGEGroup(models.Model):
         help_text='Mission statement for this group — flows into each assigned MSME and is visible to BGEs when they file reports.'
     )
     members = models.ManyToManyField('BusinessGrowthExpert', blank=True, related_name='bge_groups')
+    team_lead = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='led_groups',
+        help_text='Designated team lead. Only this BGE can file the group-level report.'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -380,6 +385,59 @@ class MSMEReport(models.Model):
 
     def __str__(self):
         return f"{self.visit_type} report — {self.msme.business_name} by {self.bge.name} ({self.visit_date})"
+
+
+class GroupReport(models.Model):
+    """One report covering an entire BGE group's session/rotation.
+    Authored by the group's team_lead and references the MSMEs the team
+    actually supported (drawn from the group's assigned MSMEs)."""
+
+    STATUS_CHOICES = [
+        ('draft',     'Draft'),
+        ('submitted', 'Submitted'),
+        ('approved',  'Approved'),
+    ]
+
+    group = models.ForeignKey(
+        'BGEGroup', on_delete=models.CASCADE, related_name='reports'
+    )
+    team_lead = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True,
+        related_name='led_reports',
+    )
+    session_number = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text='Optional rotation session this report covers.'
+    )
+    visit_date = models.DateField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+
+    # MSMEs the team actually engaged with during this session.
+    msmes_supported = models.ManyToManyField(
+        'MSME', blank=True, related_name='group_reports'
+    )
+
+    # Narrative sections — mirror the per-MSME report shape so admins can
+    # review at the same level of detail.
+    session_overview         = models.TextField(blank=True, help_text='How the session ran, attendance, format.')
+    challenges_identified    = models.TextField(blank=True, help_text='Cross-cutting challenges observed across the cohort.')
+    interventions_delivered  = models.TextField(blank=True, help_text='Group-level interventions / training / coaching delivered.')
+    outcomes_achieved        = models.TextField(blank=True, help_text='Quantitative + qualitative outcomes from the session.')
+    next_steps               = models.TextField(blank=True, help_text='Follow-up plan agreed with the group.')
+    additional_notes         = models.TextField(blank=True)
+
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_at  = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-visit_date', '-created_at']
+        verbose_name = "Group Report"
+
+    def __str__(self):
+        sess = f" S{self.session_number}" if self.session_number else ''
+        return f"{self.group.name}{sess} — {self.visit_date}"
 
     class Meta:
         ordering = ['-visit_date', '-created_at']

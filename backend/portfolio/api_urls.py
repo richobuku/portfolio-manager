@@ -4,7 +4,7 @@ from .api_views import (
     PortfolioViewSet, InvestmentViewSet, TransactionViewSet,
     MSMEViewSet, BusinessGrowthExpertViewSet, SupportRequestViewSet,
     TrainingSessionViewSet, AttendanceViewSet, TrainingTopicViewSet,
-    CohortViewSet, BGEGroupViewSet, MSMEReportViewSet, BGEUserViewSet,
+    CohortViewSet, BGEGroupViewSet, MSMEReportViewSet, GroupReportViewSet, BGEUserViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset
@@ -26,6 +26,7 @@ router.register(r'training-sessions', TrainingSessionViewSet)
 router.register(r'attendance', AttendanceViewSet)
 router.register(r'training-topics', TrainingTopicViewSet)
 router.register(r'reports', MSMEReportViewSet, basename='report')
+router.register(r'group-reports', GroupReportViewSet, basename='group-report')
 router.register(r'bge-users', BGEUserViewSet, basename='bge-user')
 router.register(r'blockchain/transactions', BlockchainTransactionViewSet)
 router.register(r'blockchain/contracts', SmartContractViewSet)

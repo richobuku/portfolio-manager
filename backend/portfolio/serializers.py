@@ -3,7 +3,7 @@ from .models import (
     Portfolio, Investment, Transaction,
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
-    Cohort, BGEGroup, MSMEReport,
+    Cohort, BGEGroup, MSMEReport, GroupReport,
 )
 
 
@@ -86,6 +86,7 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
 class BGEGroupSerializer(serializers.ModelSerializer):
     member_count = serializers.SerializerMethodField()
     members_detail = BusinessGrowthExpertSerializer(source='members', many=True, read_only=True)
+    team_lead_name = serializers.CharField(source='team_lead.name', read_only=True)
 
     class Meta:
         model = BGEGroup
@@ -137,3 +138,26 @@ class MSMEReportSerializer(serializers.ModelSerializer):
         model = MSMEReport
         fields = '__all__'
         read_only_fields = ['bge', 'created_at', 'updated_at']
+
+
+class GroupReportSerializer(serializers.ModelSerializer):
+    group_name      = serializers.CharField(source='group.name', read_only=True)
+    group_objectives= serializers.CharField(source='group.objectives', read_only=True)
+    team_lead_name  = serializers.CharField(source='team_lead.name', read_only=True)
+    msme_count      = serializers.SerializerMethodField()
+    msmes_detail    = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GroupReport
+        fields = '__all__'
+        read_only_fields = ['team_lead', 'created_at', 'updated_at',
+                            'submitted_at', 'approved_at']
+
+    def get_msme_count(self, obj):
+        return obj.msmes_supported.count()
+
+    def get_msmes_detail(self, obj):
+        return [
+            {'id': m.id, 'business_name': m.business_name, 'msme_code': m.msme_code}
+            for m in obj.msmes_supported.all()[:50]
+        ]

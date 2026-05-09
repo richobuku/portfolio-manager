@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport
+from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
 admin.site.site_header = "PRUDEV II — Portfolio Manager"
@@ -116,3 +116,12 @@ class MSMEReportAdmin(admin.ModelAdmin):
     list_filter = ('status', 'visit_type', 'visit_date')
     search_fields = ('msme__business_name', 'bge__name')
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(GroupReport)
+class GroupReportAdmin(admin.ModelAdmin):
+    list_display = ('group', 'team_lead', 'session_number', 'visit_date', 'status', 'created_at')
+    list_filter = ('status', 'visit_date', 'group')
+    search_fields = ('group__name', 'team_lead__name')
+    readonly_fields = ('created_at', 'updated_at', 'submitted_at', 'approved_at')
+    filter_horizontal = ('msmes_supported',)
