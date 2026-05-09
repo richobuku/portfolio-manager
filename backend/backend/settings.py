@@ -164,11 +164,25 @@ GMAIL_HOST_USER   = os.environ.get('GMAIL_HOST_USER',   'richobuku@gmail.com')
 GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 EMAIL_REPLY_TO    = os.environ.get('EMAIL_REPLY_TO',    'richard.obuku@gopa.eu')
 
-EMAIL_BACKEND     = (
-    'django.core.mail.backends.smtp.EmailBackend'
-    if GMAIL_APP_PASSWORD
-    else 'django.core.mail.backends.console.EmailBackend'
-)
+if GMAIL_APP_PASSWORD:
+    # Properly configured — use SMTP
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+elif DEBUG:
+    # Local development: print emails to the console so devs can iterate
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    # Production with NO password configured: do NOT silently fall through
+    # to console (which drops every email into stdout). Instead, leave the
+    # SMTP backend in place — it'll raise a clear auth error when used —
+    # and log a loud startup warning so the misconfiguration is visible.
+    import logging as _logging
+    _logging.getLogger(__name__).error(
+        "GMAIL_APP_PASSWORD is not set in production. Email sending will fail "
+        "with an authentication error until this environment variable is "
+        "configured on the host."
+    )
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
 EMAIL_HOST        = 'smtp.gmail.com'
 EMAIL_PORT        = 587
 EMAIL_USE_TLS     = True

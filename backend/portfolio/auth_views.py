@@ -252,20 +252,30 @@ def google_login_view(request):
     if not email:
         return Response({'error': 'Google account has no email address.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Find or create the Django user
-    user, created = User.objects.get_or_create(
-        email=email,
-        defaults={
-            'username': email.split('@')[0] + '_g' + google_id[-5:],
-            'first_name': given_name,
-            'last_name': family_name,
-            'is_active': True,
-        }
-    )
-
-    if created:
+    # Resolve the local user. Django's User.email is NOT unique by default,
+    # so a get_or_create on email could raise MultipleObjectsReturned. Pick
+    # the most-recently-active match to keep behaviour predictable.
+    candidates = User.objects.filter(email__iexact=email).order_by('-last_login', '-date_joined')
+    user = candidates.first()
+    created = False
+    if user is None:
+        # Mint a fresh username; fall back through suffixes if it collides.
+        base = (email.split('@')[0] + '_g' + (google_id[-5:] or 'x')).lower()
+        username = base
+        n = 1
+        while User.objects.filter(username=username).exists():
+            n += 1
+            username = f"{base}{n}"
+        user = User.objects.create(
+            email=email,
+            username=username,
+            first_name=given_name,
+            last_name=family_name,
+            is_active=True,
+        )
         user.set_unusable_password()
         user.save()
+        created = True
 
     if not user.is_active:
         return Response({'error': 'This account has been disabled. Contact your administrator.'}, status=status.HTTP_403_FORBIDDEN)

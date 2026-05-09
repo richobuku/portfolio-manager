@@ -234,6 +234,7 @@ class MSMEViewSet(viewsets.ModelViewSet):
             ('Email',             28, 'Owner/contact email.'),
             ('Business Email',    28, 'Business email (if separate from owner email).'),
             ('Business Type',     20, 'Micro / Small / Medium / Sole proprietorship / Company / Partnership / Cooperative.'),
+            ('Sector',            22, 'Optional. Manufacturing / Services / Trade / Agriculture / Technology / Healthcare / Education / Construction / Other. Auto-inferred from Business Type if blank.'),
             ('District',          18, 'District of operation.'),
             ('Town',              16, 'Town or city.'),
             ('Physical Location', 32, 'Street / landmark address (optional).'),
@@ -259,7 +260,7 @@ class MSMEViewSet(viewsets.ModelViewSet):
         example = [
             'Acholi Shea Cooperative Ltd', 'Anena Sharon', 'Female', '256775779335',
             'anena.sharon@example.com', 'info@acholishea.org', 'Cooperative',
-            'Gulu', 'Gulu', 'Plot 12, Gulu town', 'Director', 'Cohort 1',
+            'Agriculture', 'Gulu', 'Gulu', 'Plot 12, Gulu town', 'Director', 'Cohort 1',
         ]
         for i, val in enumerate(example, start=1):
             c = ws.cell(row=2, column=i, value=val)
@@ -439,6 +440,7 @@ class MSMEViewSet(viewsets.ModelViewSet):
             u_email    = col_map.get('Email')
             u_bemail   = col_map.get('Business Email')
             u_type     = col_map.get('Business Type')
+            u_sector   = col_map.get('Sector')   # optional — falls back to map_sector(Business Type)
             u_district = col_map.get('District')
             u_town     = col_map.get('Town')
             u_address  = col_map.get('Physical Location') or col_map.get('Address')
@@ -491,7 +493,11 @@ class MSMEViewSet(viewsets.ModelViewSet):
                         'email':         clean_str(row.get(u_email, '')) if u_email else '',
                         'business_email': clean_str(row.get(u_bemail, '')) if u_bemail else '',
                         'business_type': map_business_type(row.get(u_type, '')) if u_type else 'MICRO',
-                        'sector':        'OTHER',
+                        # Sector: prefer an explicit Sector column, otherwise infer from Business Type / sector keywords
+                        'sector':        (
+                            map_sector(row.get(u_sector, '')) if u_sector
+                            else (map_sector(row.get(u_type, '')) if u_type else 'OTHER')
+                        ),
                         'state':         clean_str(row.get(u_district, '')) if u_district else '',
                         'city':          clean_str(row.get(u_town, '')) if u_town else '',
                         'address':       clean_str(row.get(u_address, '')) if u_address else '',
