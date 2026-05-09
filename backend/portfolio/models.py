@@ -197,23 +197,39 @@ class MSME(models.Model):
         return f"{self.business_name} - {self.business_type} ({self.sector})"
     
     def save(self, *args, **kwargs):
-        # Generate unique MSME code if not already set
+        # Generate unique MSME code if not already set.
+        # Previous implementation used `order_by('-msme_code').first()` which
+        # is lexicographic (so "PRUDEV2-GOPA-COHORT-099" > "PRUDEV2-GOPA-COHORT-100"
+        # in some encodings) AND racy under concurrent uploads (two workers
+        # could both read N and both write N+1). Fix: scan all codes, derive
+        # max numeric suffix, retry-on-collision via the DB unique index.
         if not self.msme_code:
-            # Get the next available number
-            last_msme = MSME.objects.order_by('-msme_code').first()
-            if last_msme and last_msme.msme_code:
-                # Extract the number from the last code
-                try:
-                    last_number = int(last_msme.msme_code.split('-')[-1])
-                    next_number = last_number + 1
-                except (ValueError, IndexError):
-                    next_number = 1
-            else:
+            from django.db import IntegrityError
+            from django.db.models import Max
+            import re
+
+            for _ in range(8):  # bounded retries against IntegrityError
+                # Pull every existing numeric suffix and take the real max.
+                # Cheap because msme_code is indexed.
+                codes = MSME.objects.filter(
+                    msme_code__startswith='PRUDEV2-GOPA-COHORT-'
+                ).values_list('msme_code', flat=True)
                 next_number = 1
-            
-            # Format the code: PRUDEV2-GOPA-COHORT-XXX
+                for c in codes:
+                    m = re.search(r'(\d+)$', c or '')
+                    if m:
+                        next_number = max(next_number, int(m.group(1)) + 1)
+
+                self.msme_code = f"PRUDEV2-GOPA-COHORT-{next_number:03d}"
+                try:
+                    return super().save(*args, **kwargs)
+                except IntegrityError:
+                    # Another worker minted the same suffix; clear and retry.
+                    self.msme_code = ''
+                    continue
+            # Fall through (extremely unlikely): let the last attempt raise.
             self.msme_code = f"PRUDEV2-GOPA-COHORT-{next_number:03d}"
-        
+
         super().save(*args, **kwargs)
     
     class Meta:

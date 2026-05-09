@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Count, Sum
 from django.contrib.auth.models import User
 from django.core.mail import send_mail, EmailMultiAlternatives
@@ -163,9 +164,11 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['patch'])
     def assign_bge(self, request, pk=None):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can assign BGEs.")
         msme = self.get_object()
         bge_id = request.data.get('bge_id')
-        objectives = request.data.get('objectives', '').strip()
+        objectives = (request.data.get('objectives') or '').strip()
         assignment_date = request.data.get('assignment_date') or None
         bge = None  # initialise so the notification block below is always safe
         if bge_id:
@@ -197,6 +200,8 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['patch'])
     def assign_cohort(self, request, pk=None):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can assign cohorts.")
         msme = self.get_object()
         cohort_id = request.data.get('cohort_id')
         if cohort_id:
@@ -280,9 +285,16 @@ class MSMEViewSet(viewsets.ModelViewSet):
         return resp
 
     @action(detail=False, methods=['post'], url_path='upload')
+    @transaction.atomic
     def upload(self, request):
         """Upload MSME list from Cohort 1 (CSV/Excel) or Cohort 2 (Survey Excel).
         Auto-detects format from column names.
+
+        The whole import runs inside one DB transaction. Per-row exceptions are
+        captured into the `skipped` list (so one bad row doesn't kill the rest),
+        but if anything escapes that try/except — or the function returns with
+        an HTTP error after rows were inserted — the transaction is rolled back
+        and the table is left in its pre-import state.
         Accepts optional form field: cohort_name (string).
         """
         if not (request.user.is_staff or request.user.is_superuser):
@@ -588,22 +600,25 @@ class MSMEViewSet(viewsets.ModelViewSet):
                 if owner_name:
                     lookup['owner_name'] = owner_name
 
-                existing = MSME.objects.filter(**lookup).first()
-                if existing:
-                    if update_existing:
-                        # Restore owner_name into the update payload so existing rows can be enriched
-                        if owner_name and not existing.owner_name:
-                            existing.owner_name = owner_name
-                        for k, v in record.items():
-                            setattr(existing, k, v)
-                        existing.save()
-                        updated += 1
+                # Wrap each row's DB write in a savepoint so an IntegrityError
+                # on row N doesn't poison the outer transaction for rows N+1..end.
+                with transaction.atomic():
+                    existing = MSME.objects.filter(**lookup).first()
+                    if existing:
+                        if update_existing:
+                            # Restore owner_name into the update payload so existing rows can be enriched
+                            if owner_name and not existing.owner_name:
+                                existing.owner_name = owner_name
+                            for k, v in record.items():
+                                setattr(existing, k, v)
+                            existing.save()
+                            updated += 1
+                        else:
+                            skipped.append({'row': i + 2, 'error': f'Duplicate skipped: {business_name}'})
                     else:
-                        skipped.append({'row': i + 2, 'error': f'Duplicate skipped: {business_name}'})
-                else:
-                    # `lookup` carries the unique-fields, `record` carries everything else
-                    MSME.objects.create(**lookup, **record)
-                    created += 1
+                        # `lookup` carries the unique-fields, `record` carries everything else
+                        MSME.objects.create(**lookup, **record)
+                        created += 1
 
             except Exception as e:
                 skipped.append({'row': i + 2, 'error': str(e)})
@@ -947,6 +962,8 @@ class BGEGroupViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def add_member(self, request, pk=None):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can change group membership.")
         group = self.get_object()
         bge_id = request.data.get('bge_id')
         try:
@@ -958,6 +975,8 @@ class BGEGroupViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def remove_member(self, request, pk=None):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can change group membership.")
         group = self.get_object()
         bge_id = request.data.get('bge_id')
         try:
@@ -1030,7 +1049,22 @@ class SupportRequestViewSet(viewsets.ModelViewSet):
     serializer_class = SupportRequestSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        # BGEs only see SupportRequests that they're matched on; admins see all
+        u = self.request.user
+        qs = SupportRequest.objects.all()
+        if not (u.is_staff or u.is_superuser):
+            try:
+                bge = u.bge_profile
+                qs = qs.filter(matched_bges=bge).distinct()
+            except Exception:
+                qs = qs.none()
+        return qs
+
     def create(self, request, *args, **kwargs):
+        # Public-form flow leaves an MSME's request — but an authenticated user
+        # creating one must still be the MSME-owner / admin. Restrict here so a
+        # logged-in BGE cannot inject support requests on behalf of others.
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         support_request = serializer.save()
@@ -1040,6 +1074,21 @@ class SupportRequestViewSet(viewsets.ModelViewSet):
         support_request.matched_bges.set(nearby)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    def update(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can edit support requests.")
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can edit support requests.")
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can delete support requests.")
+        return super().destroy(request, *args, **kwargs)
+
 
 class TrainingSessionViewSet(viewsets.ModelViewSet):
     queryset = TrainingSession.objects.all()
@@ -1048,6 +1097,8 @@ class TrainingSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def mark_attendance(self, request, pk=None):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can mark attendance.")
         session = self.get_object()
         msme_id = request.data.get('msme_id')
         present = request.data.get('present', True)
@@ -1175,16 +1226,32 @@ class BGEUserViewSet(viewsets.ViewSet):
 
         return Response({'id': user.id, 'username': user.username, 'email': user.email}, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['post'], url_path='set-password')
-    def set_password(self, request, pk=None):
-        self._require_admin(request)
-        new_password = request.data.get('password', '').strip()
-        if not new_password or len(new_password) < 6:
-            return Response({'error': 'Password must be at least 6 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+    def _get_target_non_admin_user(self, pk, request):
+        """Resolve a target user that is NOT a staff/superuser. Raises 403 if it
+        is — admins managing other admins must use Django's admin site."""
         try:
             user = User.objects.get(pk=pk)
         except User.DoesNotExist:
-            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return None, Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        # Even an admin should not be able to demote / lock-out / re-password
+        # another admin via this BGE-user endpoint. The list view already hides
+        # them; close the loophole on the detail mutations too.
+        if user.is_staff or user.is_superuser:
+            return None, Response(
+                {'error': 'Cannot manage staff/superuser accounts here. Use Django admin.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return user, None
+
+    @action(detail=True, methods=['post'], url_path='set-password')
+    def set_password(self, request, pk=None):
+        self._require_admin(request)
+        new_password = (request.data.get('password') or '').strip()
+        if not new_password or len(new_password) < 6:
+            return Response({'error': 'Password must be at least 6 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+        user, err = self._get_target_non_admin_user(pk, request)
+        if err is not None:
+            return err
         user.set_password(new_password)
         user.save()
         return Response({'message': f'Password updated for {user.username}.'})
@@ -1193,10 +1260,9 @@ class BGEUserViewSet(viewsets.ViewSet):
     def link_bge(self, request, pk=None):
         self._require_admin(request)
         bge_id = request.data.get('bge_id')
-        try:
-            user = User.objects.get(pk=pk)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        user, err = self._get_target_non_admin_user(pk, request)
+        if err is not None:
+            return err
         if bge_id:
             try:
                 bge = BusinessGrowthExpert.objects.get(pk=bge_id)
@@ -1213,10 +1279,9 @@ class BGEUserViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['patch'], url_path='toggle-active')
     def toggle_active(self, request, pk=None):
         self._require_admin(request)
-        try:
-            user = User.objects.get(pk=pk)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        user, err = self._get_target_non_admin_user(pk, request)
+        if err is not None:
+            return err
         user.is_active = not user.is_active
         user.save()
         return Response({'is_active': user.is_active})

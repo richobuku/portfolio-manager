@@ -17,10 +17,17 @@ try:
     GOOGLE_AUTH_AVAILABLE = True
 except ImportError:
     GOOGLE_AUTH_AVAILABLE = False
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from .models import BusinessGrowthExpert
 
-# In-memory reset tokens {token: user_id} — simple, no DB migration needed
-_reset_tokens = {}
+# Stateless password-reset tokens. Survive process restarts and work across
+# gunicorn workers (the previous in-memory dict failed on both counts).
+# `default_token_generator` hashes (user.pk, user.password, last_login,
+# timestamp) with SECRET_KEY — invalidated on password change automatically,
+# expires after PASSWORD_RESET_TIMEOUT (default 3 days).
+_reset_token_gen = PasswordResetTokenGenerator()
 
 GOOGLE_CLIENT_ID = '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com'
 
@@ -145,10 +152,12 @@ def request_password_reset(request):
 
     user = User.objects.filter(email__iexact=email).first()
     if user:
-        token = secrets.token_urlsafe(32)
-        _reset_tokens[token] = user.id
+        # Stateless token: validates against user.pk + password hash + last_login.
+        # Carry the user id alongside so confirm_password_reset can look up.
+        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+        token  = _reset_token_gen.make_token(user)
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-        reset_link = f"{frontend_url}/reset-password?token={token}"
+        reset_link = f"{frontend_url}/reset-password?uid={uidb64}&token={token}"
         reply_to = getattr(settings, 'EMAIL_REPLY_TO', settings.DEFAULT_FROM_EMAIL)
         html = f"""
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px">
@@ -185,20 +194,28 @@ def request_password_reset(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def confirm_password_reset(request):
-    token = request.data.get('token', '').strip()
+    token    = (request.data.get('token') or '').strip()
+    uidb64   = (request.data.get('uid')   or '').strip()
     password = request.data.get('password', '')
     if not token or not password:
         return Response({'message': 'Token and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
     if len(password) < 8:
         return Response({'message': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    user_id = _reset_tokens.pop(token, None)
-    if not user_id:
-        return Response({'message': 'Invalid or expired reset link.'}, status=status.HTTP_400_BAD_REQUEST)
+    # Resolve the user from the uid carried alongside the token. Callers that
+    # only pass `token` (legacy emails issued before the upgrade) will end up
+    # here with no uid and get rejected — that's intentional, those tokens were
+    # in-memory and lost on restart anyway.
+    user = None
+    if uidb64:
+        try:
+            user_id = int(force_str(urlsafe_base64_decode(uidb64)))
+            user = User.objects.filter(pk=user_id).first()
+        except (TypeError, ValueError, OverflowError):
+            user = None
 
-    user = User.objects.filter(id=user_id).first()
-    if not user:
-        return Response({'message': 'User not found.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not user or not _reset_token_gen.check_token(user, token):
+        return Response({'message': 'Invalid or expired reset link.'}, status=status.HTTP_400_BAD_REQUEST)
 
     user.set_password(password)
     user.save()

@@ -13,6 +13,7 @@ export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token') || '';
+  const uid   = searchParams.get('uid')   || '';
 
   const [password, setPassword]       = useState('');
   const [confirm, setConfirm]         = useState('');
@@ -37,7 +38,7 @@ export default function ResetPassword() {
       const res = await fetch(API_ENDPOINTS.PASSWORD_RESET_CONFIRM, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, uid, password }),
       });
       const data = await res.json();
       if (res.ok) {
