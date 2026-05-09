@@ -16,7 +16,7 @@ import {
   AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
-  Lock, LockOpen, Star, StarBorder,
+  Lock, LockOpen, Star, StarBorder, Download,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -525,6 +525,29 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (res.data && manageGroupItem?.id === groupId) setManageGroupItem(res.data);
       fetchAll();
     } catch { notify('Failed to update group', 'error'); }
+  };
+
+  // ── PDF helpers (MSME + Group reports) ─────────────────────────────────────
+  const openReportPdf = async (kind, reportId, mode = 'view') => {
+    const base = kind === 'group' ? API_ENDPOINTS.GROUP_REPORTS : API_ENDPOINTS.REPORTS;
+    try {
+      const res = await axios.get(
+        `${base}${reportId}/pdf/${mode === 'download' ? '?dl=1' : ''}`,
+        { headers, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (mode === 'download') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${kind === 'group' ? 'GroupReport' : 'MSMEReport'}_${reportId}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else {
+        window.open(url, '_blank');
+      }
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch {
+      notify('Failed to render PDF', 'error');
+    }
   };
 
   // Set / clear the group's team lead (must be a current member)
@@ -1619,6 +1642,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <Tooltip title="View report">
                         <IconButton size="small" color="primary" onClick={() => setViewReport({ ...r, _msme: msme, _bgeName: r.bge_name || bge.name })}>
                           <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Open PDF">
+                        <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'view')}>
+                          <PictureAsPdf fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Download PDF">
+                        <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'download')}>
+                          <Download fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </Box>

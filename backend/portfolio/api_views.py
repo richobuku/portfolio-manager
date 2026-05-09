@@ -1280,6 +1280,19 @@ class MSMEReportViewSet(viewsets.ModelViewSet):
                 pass
         serializer.save()
 
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """Render this MSME visit report as a styled PDF."""
+        from .pdf_reports import render_msme_report
+        report = self.get_object()
+        buf = render_msme_report(report)
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        fname = f"MSMEReport_{report.msme.business_name[:30].replace(' ', '_')}_{report.visit_date}.pdf"
+        # `inline` so the browser shows the PDF in a viewer; ?dl=1 forces download
+        disposition = 'attachment' if request.query_params.get('dl') else 'inline'
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
+
 
 class GroupReportViewSet(viewsets.ModelViewSet):
     """Group-level reports.
@@ -1369,6 +1382,19 @@ class GroupReportViewSet(viewsets.ModelViewSet):
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can delete group reports.")
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """Render this group report as a styled PDF (header / metadata strip /
+        objectives banner / MSMEs table / narrative sections)."""
+        from .pdf_reports import render_group_report
+        report = self.get_object()
+        buf = render_group_report(report)
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        fname = f"GroupReport_{report.group.name.replace(' ', '_')}_{report.visit_date}.pdf"
+        disposition = 'attachment' if request.query_params.get('dl') else 'inline'
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
 
 
 class BGEUserViewSet(viewsets.ViewSet):

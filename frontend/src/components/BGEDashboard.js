@@ -274,6 +274,53 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const isTeamLeadOf = (group) => group?.team_lead === myBgeId;
 
+  // ── PDF / print helpers ───────────────────────────────────────────────────
+  // Open the server-rendered PDF for an MSME visit report. `mode='download'`
+  // forces a file download (?dl=1); `mode='view'` opens it inline so the
+  // browser's PDF viewer handles its own print/save UI.
+  const openMsmeReportPdf = async (reportId, mode = 'view') => {
+    try {
+      const res = await axios.get(
+        `${API_ENDPOINTS.REPORTS}${reportId}/pdf/${mode === 'download' ? '?dl=1' : ''}`,
+        { headers, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (mode === 'download') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `MSMEReport_${reportId}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else {
+        window.open(url, '_blank');
+      }
+      // Defer revoke so the new tab can read the URL
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch {
+      notify('Failed to render PDF', 'error');
+    }
+  };
+
+  const openGroupReportPdf = async (reportId, mode = 'view') => {
+    try {
+      const res = await axios.get(
+        `${API_ENDPOINTS.GROUP_REPORTS}${reportId}/pdf/${mode === 'download' ? '?dl=1' : ''}`,
+        { headers, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (mode === 'download') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `GroupReport_${reportId}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else {
+        window.open(url, '_blank');
+      }
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch {
+      notify('Failed to render PDF', 'error');
+    }
+  };
+
   const openMsmeDetail = async (msme) => {
     setSelectedMsme(msme);
     setMsmeDetailDialog(true);
@@ -564,6 +611,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                   </Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                     <Chip label={r.status} size="small" color={r.status === 'approved' ? 'success' : (r.status === 'submitted' ? 'primary' : 'default')} />
+                                    <Tooltip title="View PDF">
+                                      <IconButton size="small" onClick={() => openGroupReportPdf(r.id, 'view')}><Visibility fontSize="small" /></IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Download PDF">
+                                      <IconButton size="small" onClick={() => openGroupReportPdf(r.id, 'download')}><PictureAsPdf fontSize="small" /></IconButton>
+                                    </Tooltip>
                                     {youAreLead && r.status !== 'approved' && (
                                       <IconButton size="small" onClick={() => openEditGroupReport(r)}><Edit fontSize="small" /></IconButton>
                                     )}
@@ -1012,6 +1065,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Box>
             </DialogContent>
             <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1 }}>
+              <Button onClick={() => openMsmeReportPdf(viewReport.id, 'view')}>
+                Open PDF
+              </Button>
+              <Button startIcon={<PictureAsPdf />} onClick={() => openMsmeReportPdf(viewReport.id, 'download')}>
+                Download PDF
+              </Button>
               <Button onClick={() => setViewReport(null)}>Close</Button>
             </DialogActions>
           </>;

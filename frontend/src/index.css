@@ -11,3 +11,20 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* ── Print stylesheet for in-app report dialogs ─────────────────────────────
+   Most users will use the server-rendered PDF (Open PDF / Download PDF), but
+   if they hit Cmd+P with the report dialog open we make sure only the
+   dialog content is printed — sidebars, toolbars, and other dashboard
+   chrome are hidden. */
+@media print {
+  body * { visibility: hidden !important; }
+  .MuiDialog-root,
+  .MuiDialog-root * { visibility: visible !important; }
+  .MuiDialog-root { position: absolute; top: 0; left: 0; right: 0; }
+  .MuiDialog-root .MuiDialogActions-root,
+  .MuiBackdrop-root { display: none !important; }
+  .MuiPaper-root { box-shadow: none !important; }
+  /* Avoid page-breaks inside narrative paragraphs */
+  p, li { page-break-inside: avoid; }
+}
