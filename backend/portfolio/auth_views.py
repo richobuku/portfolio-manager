@@ -29,7 +29,13 @@ from .models import BusinessGrowthExpert
 # expires after PASSWORD_RESET_TIMEOUT (default 3 days).
 _reset_token_gen = PasswordResetTokenGenerator()
 
-GOOGLE_CLIENT_ID = '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com'
+import os as _os
+# Read from env in production; fall back to the project-default ID so local
+# dev still works without configuration.
+GOOGLE_CLIENT_ID = _os.environ.get(
+    'GOOGLE_CLIENT_ID',
+    '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com',
+)
 
 
 def _build_user_response(user):

@@ -772,7 +772,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Paper variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
         <TextField
           size="small" placeholder="Search name, owner, sector…" value={msmeSearch}
-          onChange={e => setMsmeSearch(e.target.value)} onKeyPress={e => e.key === 'Enter' && fetchAll()}
+          onChange={e => setMsmeSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchAll()}
           InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
           sx={{ minWidth: 220 }}
         />
@@ -910,7 +910,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <TableRow key={e.id} hover>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: BRAND.primaryMain }}>{e.name[0]}</Avatar>
+                    <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: BRAND.primaryMain }}>{(e.name || '?')[0]}</Avatar>
                     <Box>
                       <Typography variant="body2" fontWeight={500}>{e.name}</Typography>
                       {e.email && <Typography variant="caption" color="text.secondary">{e.email}</Typography>}
@@ -1016,7 +1016,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {group.members_detail?.slice(0, 5).map(m => (
-                    <Chip key={m.id} avatar={<Avatar sx={{ fontSize: 10 }}>{m.name[0]}</Avatar>} label={m.name} size="small" />
+                    <Chip key={m.id} avatar={<Avatar sx={{ fontSize: 10 }}>{(m.name || '?')[0]}</Avatar>} label={m.name} size="small" />
                   ))}
                   {group.member_count > 5 && <Chip label={`+${group.member_count - 5} more`} size="small" variant="outlined" />}
                 </Box>
@@ -1101,7 +1101,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>No sessions yet</TableCell></TableRow>
             ) : paginate(trainingSessions, sessionPage).map(s => (
               <TableRow key={s.id} hover>
-                <TableCell fontWeight={500}>{s.title}</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{s.title}</TableCell>
                 <TableCell>{s.date}</TableCell>
                 <TableCell>{s.location || '—'}</TableCell>
                 <TableCell>{s.topic_name || '—'}</TableCell>
@@ -1215,7 +1215,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <TableRow key={u.id} hover>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: BRAND.programmeGreen }}>{u.username[0].toUpperCase()}</Avatar>
+                      <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: BRAND.programmeGreen }}>{(u.username || '?')[0].toUpperCase()}</Avatar>
                       <Typography fontSize={13} fontWeight={600}>{u.username}</Typography>
                     </Box>
                   </TableCell>
@@ -1428,7 +1428,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       {/* Header row */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                         <Avatar sx={{ width: 36, height: 36, fontSize: 14, bgcolor: BRAND.primaryMain }}>
-                          {e.name[0]}
+                          {(e.name || '?')[0]}
                         </Avatar>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography variant="subtitle2" fontWeight={700} noWrap>

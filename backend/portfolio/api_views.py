@@ -684,7 +684,10 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
         group = self.request.query_params.get('group')
         if group:
             qs = qs.filter(bge_groups__id=group)
-        return qs.order_by('-created_at')
+        # Prefetch the relations the serializer pulls in (assigned_msmes,
+        # bge_groups). Without this, listing N BGEs caused 2*N extra queries
+        # (each BGE serialized triggered .assigned_msmes.all() and .bge_groups.all()).
+        return qs.prefetch_related('assigned_msmes', 'bge_groups').order_by('-created_at')
 
     def destroy(self, request, *args, **kwargs):
         if not request.user.is_staff and not request.user.is_superuser:
@@ -693,9 +696,11 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def leaderboard(self, request):
-        bges = BusinessGrowthExpert.objects.filter(status='approved').annotate(
-            support_count=Count('support_requests')
-        ).order_by('-support_count')
+        bges = (BusinessGrowthExpert.objects
+                .filter(status='approved')
+                .prefetch_related('assigned_msmes', 'bge_groups')
+                .annotate(support_count=Count('support_requests'))
+                .order_by('-support_count'))
         return Response(BusinessGrowthExpertSerializer(bges, many=True).data)
 
     def _build_assignment_email(self, bge):
@@ -1296,7 +1301,14 @@ class BGEUserViewSet(viewsets.ViewSet):
 # ── Push notification helpers ──────────────────────────────────────────────────
 
 def _send_push(subscription_obj, title, body, url='/'):
-    """Send a single Web Push notification. Silently ignores errors."""
+    """Send a single Web Push notification.
+
+    Errors are logged. 404/410 responses (subscription gone — user uninstalled
+    the PWA or revoked permission) cause the row to be deleted so the next
+    notify run doesn't waste a request on a dead endpoint.
+    """
+    import logging as _logging
+    log = _logging.getLogger(__name__)
     try:
         webpush(
             subscription_info={
@@ -1307,8 +1319,19 @@ def _send_push(subscription_obj, title, body, url='/'):
             vapid_private_key=settings.VAPID_PRIVATE_KEY,
             vapid_claims=settings.VAPID_CLAIMS,
         )
-    except WebPushException:
-        pass
+    except WebPushException as exc:
+        # Prune subscriptions the push service has explicitly retired.
+        status_code = getattr(getattr(exc, 'response', None), 'status_code', None)
+        if status_code in (404, 410):
+            try:
+                subscription_obj.delete()
+                log.info("Pruned dead push subscription id=%s (%s)",
+                         subscription_obj.pk, status_code)
+            except Exception:
+                pass
+        else:
+            log.warning("Push send failed for subscription id=%s: %s",
+                        getattr(subscription_obj, 'pk', '?'), exc)
 
 
 def _notify_bge(bge, title, body, url='/'):

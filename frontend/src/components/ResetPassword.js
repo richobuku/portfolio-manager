@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Card, CardContent, TextField, Button, Typography,
@@ -21,6 +21,13 @@ export default function ResetPassword() {
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState('');
+  // Track the post-success redirect timer so it can be cleared if the user
+  // navigates away before it fires (otherwise React warns about state updates
+  // on an unmounted component, and the user gets bounced unexpectedly).
+  const redirectTimerRef = useRef(null);
+  useEffect(() => () => {
+    if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,7 +50,7 @@ export default function ResetPassword() {
       const data = await res.json();
       if (res.ok) {
         setSuccess(data.message || 'Password reset successfully.');
-        setTimeout(() => navigate('/login'), 2500);
+        redirectTimerRef.current = setTimeout(() => navigate('/login'), 2500);
       } else {
         setError(data.message || 'Reset failed. The link may have expired.');
       }
