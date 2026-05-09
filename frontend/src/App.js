@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import BGEDashboard from './components/BGEDashboard';
@@ -49,21 +50,40 @@ export default function App() {
     setCurrentUser(user);
   };
 
-  const handleLogout = () => {
+  const handleLogout = React.useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setToken(null);
     setCurrentUser(null);
-  };
+  }, []);
 
   const isAdmin = !!(currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'admin');
   const isBGE   = !!(currentUser?.role === 'bge');
 
-  // If token exists but user role is unrecognised, clear and force re-login
-  if (token && currentUser && !isAdmin && !isBGE) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  }
+  // If token exists but user role is unrecognised, clear (in an effect, not the
+  // render body — mutating storage during render causes a stale read on the
+  // very same render and was previously leaving the app in a half-logged-in state).
+  useEffect(() => {
+    if (token && currentUser && !isAdmin && !isBGE) {
+      handleLogout();
+    }
+  }, [token, currentUser, isAdmin, isBGE, handleLogout]);
+
+  // Global 401 interceptor — once installed, any request that comes back with
+  // an expired/forged token clears local session and bounces the user to /login
+  // instead of leaving them on a broken dashboard.
+  useEffect(() => {
+    const id = axios.interceptors.response.use(
+      r => r,
+      err => {
+        if (err?.response?.status === 401 && localStorage.getItem('token')) {
+          handleLogout();
+        }
+        return Promise.reject(err);
+      }
+    );
+    return () => axios.interceptors.response.eject(id);
+  }, [handleLogout]);
 
   return (
     <ErrorBoundary>

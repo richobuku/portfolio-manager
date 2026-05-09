@@ -27,7 +27,8 @@ GOOGLE_CLIENT_ID = '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleuse
 
 def _build_user_response(user):
     """Shared helper to build the login response payload."""
-    token = f"token_{user.id}_{user.username}"
+    from .authentication import sign_token
+    token = sign_token(user.id, user.username)
     bge_profile = None
     role = 'admin' if (user.is_staff or user.is_superuser) else 'bge'
     try:
