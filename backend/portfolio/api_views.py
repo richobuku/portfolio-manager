@@ -651,24 +651,126 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def analytics(self, request):
-        msmes = MSME.objects.filter(is_active=True)
-        agg = msmes.aggregate(
+        """Rich analytics for the dashboard. Accepts optional filters that all
+        downstream aggregations honour:
+          ?cohort=<id>  ?district=<name>  ?sector=<code>  ?bge=<id>
+        """
+        from django.db.models import Q
+        from django.db.models.functions import TruncMonth
+
+        qs = MSME.objects.filter(is_active=True)
+
+        # Apply optional filters so the analytics page can drill down.
+        cohort_id = request.query_params.get('cohort')
+        if cohort_id:
+            qs = qs.filter(cohort_id=cohort_id)
+        district = request.query_params.get('district')
+        if district:
+            qs = qs.filter(state__iexact=district)
+        sector = request.query_params.get('sector')
+        if sector:
+            qs = qs.filter(sector=sector)
+        bge_id = request.query_params.get('bge')
+        if bge_id:
+            qs = qs.filter(Q(assigned_bge_id=bge_id) | Q(assigned_group__members__id=bge_id)).distinct()
+
+        agg = qs.aggregate(
             total_investment_needed=Sum('investment_needed'),
             total_annual_revenue=Sum('annual_revenue'),
             total_employees=Sum('employee_count'),
         )
-        cohort_stats = list(
-            msmes.values('cohort__name', 'cohort_id').annotate(count=Count('id')).order_by('cohort__name')
+
+        # Reports / activity stats
+        from .models import MSMEReport, GroupReport
+        report_status_stats = list(
+            MSMEReport.objects.values('status').annotate(count=Count('id'))
         )
+        group_report_status_stats = list(
+            GroupReport.objects.values('status').annotate(count=Count('id'))
+        )
+
+        # BGE workload (top 15 BGEs by direct + group-assigned MSMEs)
+        bge_workload = []
+        for bge in (BusinessGrowthExpert.objects
+                    .filter(status='approved')
+                    .prefetch_related('assigned_msmes', 'bge_groups__assigned_msmes')[:50]):
+            direct = bge.assigned_msmes.filter(is_active=True).count()
+            via_group = MSME.objects.filter(
+                is_active=True,
+                assigned_group__members=bge,
+            ).distinct().count()
+            bge_workload.append({
+                'bge_id':       bge.id,
+                'bge_name':     bge.name,
+                'direct':       direct,
+                'via_group':    via_group,
+                'total':        direct + via_group,
+                'reports_count': bge.reports.count(),
+            })
+        bge_workload.sort(key=lambda x: x['total'], reverse=True)
+        bge_workload = bge_workload[:15]
+
+        # Group performance — MSMEs per group + reports filed
+        group_stats = []
+        for g in BGEGroup.objects.prefetch_related('assigned_msmes', 'reports'):
+            group_stats.append({
+                'group_id':    g.id,
+                'group_name':  g.name,
+                'msme_count':  g.assigned_msmes.filter(is_active=True).count(),
+                'member_count': g.members.count(),
+                'reports_count': g.reports.count(),
+                'team_lead_name': g.team_lead.name if g.team_lead else None,
+            })
+        group_stats.sort(key=lambda x: x['msme_count'], reverse=True)
+
+        # Time series — MSMEs created per month (last 18 months)
+        time_series = list(
+            qs.annotate(month=TruncMonth('created_at'))
+              .values('month')
+              .annotate(count=Count('id'))
+              .order_by('month')
+        )
+
+        # Gender × Business Type cross-tab — for stacked bar
+        gender_x_type = list(
+            qs.values('gender', 'business_type')
+              .annotate(count=Count('id'))
+              .order_by('business_type', 'gender')
+        )
+
         return Response({
-            'total_msmes': msmes.count(),
+            # KPIs
+            'total_msmes': qs.count(),
             'total_investment_needed': agg['total_investment_needed'] or 0,
-            'total_annual_revenue': agg['total_annual_revenue'] or 0,
-            'total_employees': agg['total_employees'] or 0,
-            'business_type_stats': list(msmes.values('business_type').annotate(count=Count('id'))),
-            'sector_stats': list(msmes.values('sector').annotate(count=Count('id'))),
-            'cohort_stats': cohort_stats,
-            'top_cities': list(msmes.values('city').exclude(city='').annotate(count=Count('id')).order_by('-count')[:10]),
+            'total_annual_revenue':    agg['total_annual_revenue']    or 0,
+            'total_employees':         agg['total_employees']         or 0,
+            'total_bges':              BusinessGrowthExpert.objects.count(),
+            'total_groups':            BGEGroup.objects.count(),
+            'total_reports':           MSMEReport.objects.count(),
+            'total_group_reports':     GroupReport.objects.count(),
+
+            # Distributions
+            'business_type_stats': list(qs.values('business_type').annotate(count=Count('id'))),
+            'sector_stats':        list(qs.values('sector').annotate(count=Count('id'))),
+            'cohort_stats':        list(qs.values('cohort__name', 'cohort_id').annotate(count=Count('id')).order_by('cohort__name')),
+            'gender_stats':        list(qs.values('gender').annotate(count=Count('id'))),
+            'top_districts':       list(qs.values('state').exclude(state='').annotate(count=Count('id')).order_by('-count')[:10]),
+            'top_cities':          list(qs.values('city').exclude(city='').annotate(count=Count('id')).order_by('-count')[:10]),
+
+            # Cross-tabs
+            'gender_x_type': gender_x_type,
+
+            # BGE / Group performance
+            'bge_status_stats':    list(BusinessGrowthExpert.objects.values('status').annotate(count=Count('id'))),
+            'bge_workload':        bge_workload,
+            'group_stats':         group_stats,
+
+            # Reports
+            'report_status_stats': report_status_stats,
+            'group_report_status_stats': group_report_status_stats,
+
+            # Time series
+            'time_series':         time_series,
         })
 
 

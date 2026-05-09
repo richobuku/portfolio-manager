@@ -19,6 +19,10 @@ import {
   Lock, LockOpen, Star, StarBorder,
 } from '@mui/icons-material';
 import axios from 'axios';
+import {
+  PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL } from '../config';
 import { BRAND } from '../theme';
 
@@ -1139,61 +1143,327 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     </Box>
   );
 
-  const renderAnalytics = () => (
-    <Box>
-      <SectionHeader title="Analytics" subtitle="Programme overview" />
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {[
-          { icon: <Business />, val: analytics.total_msmes || 0, label: 'Total MSMEs', color: BRAND.primaryMain },
-          { icon: <People />, val: analytics.total_employees || 0, label: 'Total Employees', color: BRAND.sidebarBg },
-          { icon: <TrendingUp />, val: fmt(analytics.total_annual_revenue), label: 'Annual Revenue', color: BRAND.programmeGreen },
-          { icon: <Support />, val: experts.length, label: 'Experts', color: BRAND.gizRed },
-        ].map((s, i) => (
-          <Grid item xs={6} md={3} key={i}>
-            <Card sx={{ bgcolor: s.color, color: '#fff' }}>
-              <CardContent sx={{ pb: '16px !important' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="h5" fontWeight={700}>{s.val}</Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>{s.label}</Typography>
-                  </Box>
-                  <Box sx={{ opacity: 0.7 }}>{s.icon}</Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+  // Brand-aligned palette for charts
+  const CHART_PALETTE = [
+    '#1A2F4B', '#C8102E', '#2E7D32', '#F9A825', '#0288D1',
+    '#7B1FA2', '#5D4037', '#00897B', '#FF6F00', '#3949AB',
+  ];
 
-      <Grid container spacing={2}>
-        {[
-          { title: 'By Type', data: analytics.business_type_stats, key: 'business_type' },
-          { title: 'By Sector', data: analytics.sector_stats, key: 'sector' },
-          { title: 'By Cohort', data: analytics.cohort_stats, key: 'cohort__name' },
-        ].map(chart => (
-          <Grid item xs={12} md={4} key={chart.title}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>{chart.title}</Typography>
-                {(chart.data || []).map((stat, i) => (
-                  <Box key={i} sx={{ mb: 1.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
-                      <Typography variant="caption">{stat[chart.key] || 'Unassigned'}</Typography>
-                      <Typography variant="caption" fontWeight={600}>{stat.count}</Typography>
-                    </Box>
-                    <LinearProgress variant="determinate"
-                      value={analytics.total_msmes ? (stat.count / analytics.total_msmes) * 100 : 0}
-                      sx={{ height: 6, borderRadius: 3 }}
-                    />
-                  </Box>
-                ))}
-              </CardContent>
-            </Card>
+  // Drill-down filter state for the analytics page
+  const [analyticsFilter, setAnalyticsFilter] = useState({
+    cohort: '', district: '', sector: '', bge: '',
+  });
+  const [richAnalytics, setRichAnalytics] = useState(null);
+
+  // Refetch analytics whenever the filter changes
+  useEffect(() => {
+    if (!token) return;
+    const params = new URLSearchParams();
+    Object.entries(analyticsFilter).forEach(([k, v]) => { if (v) params.append(k, v); });
+    axios.get(`${API_ENDPOINTS.MSMES}analytics/?${params}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setRichAnalytics(r.data))
+      .catch(() => setRichAnalytics(null));
+  }, [token, analyticsFilter]);
+
+  const A = richAnalytics || analytics || {};
+
+  // Helper: convert a [{key:value, count}] list into recharts shape
+  const pieData = (rows, labelKey) =>
+    (rows || []).map(r => ({ name: r[labelKey] || 'Unspecified', value: r.count }));
+
+  const renderAnalytics = () => {
+    const monthlyData = (A.time_series || []).map(t => ({
+      month: t.month ? new Date(t.month).toLocaleString('en', { month: 'short', year: '2-digit' }) : '?',
+      MSMEs: t.count,
+    }));
+
+    const totalMsmes = A.total_msmes || 0;
+    const dropFilters = () => setAnalyticsFilter({ cohort: '', district: '', sector: '', bge: '' });
+    const hasFilters = !!(analyticsFilter.cohort || analyticsFilter.district || analyticsFilter.sector || analyticsFilter.bge);
+
+    const KPI = ({ icon, val, label, color }) => (
+      <Card sx={{ bgcolor: color, color: '#fff', height: '100%' }}>
+        <CardContent sx={{ pb: '16px !important' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h5" fontWeight={800}>{val}</Typography>
+              <Typography variant="caption" sx={{ opacity: 0.85 }}>{label}</Typography>
+            </Box>
+            <Box sx={{ opacity: 0.65 }}>{icon}</Box>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+
+    const ChartCard = ({ title, subtitle, children, height = 260 }) => (
+      <Card variant="outlined" sx={{ height: '100%' }}>
+        <CardContent>
+          <Box sx={{ mb: 1.5 }}>
+            <Typography variant="subtitle2" fontWeight={700}>{title}</Typography>
+            {subtitle && <Typography variant="caption" color="text.secondary">{subtitle}</Typography>}
+          </Box>
+          <Box sx={{ width: '100%', height }}>{children}</Box>
+        </CardContent>
+      </Card>
+    );
+
+    return (
+      <Box>
+        <SectionHeader title="Analytics" subtitle="Programme intelligence dashboard" />
+
+        {/* ── Filter bar ──────────────────────────────────────────────────── */}
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="caption" fontWeight={700} sx={{ color: 'text.secondary' }}>FILTERS</Typography>
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Cohort</InputLabel>
+                <Select label="Cohort" value={analyticsFilter.cohort}
+                  onChange={e => setAnalyticsFilter(f => ({ ...f, cohort: e.target.value }))}>
+                  <MenuItem value="">All</MenuItem>
+                  {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>District</InputLabel>
+                <Select label="District" value={analyticsFilter.district}
+                  onChange={e => setAnalyticsFilter(f => ({ ...f, district: e.target.value }))}>
+                  <MenuItem value="">All</MenuItem>
+                  {(A.top_districts || []).map(d => <MenuItem key={d.state} value={d.state}>{d.state}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Sector</InputLabel>
+                <Select label="Sector" value={analyticsFilter.sector}
+                  onChange={e => setAnalyticsFilter(f => ({ ...f, sector: e.target.value }))}>
+                  <MenuItem value="">All</MenuItem>
+                  {(A.sector_stats || []).map(s => <MenuItem key={s.sector} value={s.sector}>{s.sector}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>BGE</InputLabel>
+                <Select label="BGE" value={analyticsFilter.bge}
+                  onChange={e => setAnalyticsFilter(f => ({ ...f, bge: e.target.value }))}>
+                  <MenuItem value="">All</MenuItem>
+                  {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+              {hasFilters && (
+                <Button size="small" onClick={dropFilters}>Clear filters</Button>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* ── KPI strip ───────────────────────────────────────────────────── */}
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          {[
+            { icon: <Business />,    val: totalMsmes,                            label: 'MSMEs (filtered)', color: BRAND.primaryMain   },
+            { icon: <Group />,       val: A.total_groups || 0,                   label: 'BGE Groups',       color: BRAND.sidebarBg     },
+            { icon: <Support />,     val: A.total_bges || experts.length,        label: 'Experts',          color: BRAND.gizRed        },
+            { icon: <Assignment />,  val: (A.total_reports || 0) + (A.total_group_reports || 0), label: 'Reports filed', color: BRAND.programmeGreen },
+            { icon: <People />,      val: A.total_employees || 0,                label: 'Total Employees',  color: '#5D4037'           },
+            { icon: <TrendingUp />,  val: fmt(A.total_annual_revenue),           label: 'Annual Revenue',   color: '#0288D1'           },
+          ].map((s, i) => (
+            <Grid item xs={6} md={4} lg={2} key={i}>
+              <KPI {...s} />
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* ── Row 1: Distributions (3 pies) ───────────────────────────────── */}
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} md={4}>
+            <ChartCard title="By Business Type" subtitle="Share of MSMEs by scale">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={pieData(A.business_type_stats, 'business_type')} dataKey="value" nameKey="name"
+                       outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    {(A.business_type_stats || []).map((_, i) => (
+                      <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                    ))}
+                  </Pie>
+                  <ReTooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
           </Grid>
-        ))}
-      </Grid>
-    </Box>
-  );
+          <Grid item xs={12} md={4}>
+            <ChartCard title="By Sector" subtitle="Industry distribution">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={pieData(A.sector_stats, 'sector')} dataKey="value" nameKey="name"
+                       innerRadius={45} outerRadius={80} paddingAngle={2}>
+                    {(A.sector_stats || []).map((_, i) => (
+                      <Cell key={i} fill={CHART_PALETTE[(i + 2) % CHART_PALETTE.length]} />
+                    ))}
+                  </Pie>
+                  <ReTooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <ChartCard title="By Gender" subtitle="Founder demographics">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={pieData(A.gender_stats, 'gender')} dataKey="value" nameKey="name"
+                       innerRadius={45} outerRadius={80}>
+                    {(A.gender_stats || []).map((_, i) => (
+                      <Cell key={i} fill={['#1A2F4B', '#C8102E', '#999'][i % 3]} />
+                    ))}
+                  </Pie>
+                  <ReTooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+        </Grid>
+
+        {/* ── Row 2: Time series + Cohort bar ─────────────────────────────── */}
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} md={8}>
+            <ChartCard title="MSMEs Onboarded Over Time" subtitle="Monthly cumulative growth" height={280}>
+              <ResponsiveContainer>
+                <AreaChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <ReTooltip />
+                  <Area type="monotone" dataKey="MSMEs" stroke="#1A2F4B" fill="#1A2F4B" fillOpacity={0.18} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <ChartCard title="By Cohort" subtitle="MSME enrolment per cohort" height={280}>
+              <ResponsiveContainer>
+                <BarChart data={(A.cohort_stats || []).map(c => ({ name: c.cohort__name || 'Unassigned', count: c.count }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <ReTooltip />
+                  <Bar dataKey="count" fill="#C8102E" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+        </Grid>
+
+        {/* ── Row 3: Top districts (horizontal bar) + BGE workload ────────── */}
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} md={6}>
+            <ChartCard title="Top Districts" subtitle="MSME concentration" height={300}>
+              <ResponsiveContainer>
+                <BarChart layout="vertical" data={(A.top_districts || []).map(d => ({ name: d.state, count: d.count }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
+                  <ReTooltip />
+                  <Bar dataKey="count" fill="#1A2F4B" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <ChartCard title="BGE Workload" subtitle="MSMEs assigned (direct + via group)" height={300}>
+              <ResponsiveContainer>
+                <BarChart layout="vertical" data={(A.bge_workload || []).slice(0, 10).map(b => ({
+                  name: (b.bge_name || '').slice(0, 18),
+                  Direct: b.direct,
+                  ViaGroup: b.via_group,
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10 }} />
+                  <ReTooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Direct"   stackId="a" fill="#1A2F4B" />
+                  <Bar dataKey="ViaGroup" stackId="a" fill="#C8102E" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+        </Grid>
+
+        {/* ── Row 4: BGE pipeline + Group performance ─────────────────────── */}
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} md={4}>
+            <ChartCard title="BGE Pipeline" subtitle="Approval funnel" height={260}>
+              <ResponsiveContainer>
+                <BarChart data={(A.bge_status_stats || []).map(s => ({ name: s.status, count: s.count }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <ReTooltip />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {(A.bge_status_stats || []).map((s, i) => (
+                      <Cell key={i} fill={s.status === 'approved' ? '#2E7D32' : (s.status === 'pending' ? '#F9A825' : '#C8102E')} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+          <Grid item xs={12} md={8}>
+            <ChartCard title="Group Performance" subtitle="MSMEs assigned + reports filed per group" height={260}>
+              <ResponsiveContainer>
+                <BarChart data={(A.group_stats || []).slice(0, 10).map(g => ({
+                  name: (g.group_name || '').slice(0, 18),
+                  MSMEs: g.msme_count,
+                  Reports: g.reports_count,
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <ReTooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="MSMEs"   fill="#1A2F4B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Reports" fill="#2E7D32" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+        </Grid>
+
+        {/* ── Row 5: Reports status mini-pies ─────────────────────────────── */}
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <ChartCard title="MSME Reports — by status" subtitle={`${A.total_reports || 0} reports total`} height={220}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={pieData(A.report_status_stats, 'status')} dataKey="value" nameKey="name" outerRadius={70}>
+                    {(A.report_status_stats || []).map((s, i) => (
+                      <Cell key={i} fill={s.status === 'submitted' ? '#1A2F4B' : (s.status === 'reviewed' ? '#2E7D32' : '#C8102E')} />
+                    ))}
+                  </Pie>
+                  <ReTooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <ChartCard title="Group Reports — by status" subtitle={`${A.total_group_reports || 0} group reports total`} height={220}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={pieData(A.group_report_status_stats, 'status')} dataKey="value" nameKey="name" outerRadius={70}>
+                    {(A.group_report_status_stats || []).map((s, i) => (
+                      <Cell key={i} fill={s.status === 'submitted' ? '#1A2F4B' : (s.status === 'approved' ? '#2E7D32' : '#C8102E')} />
+                    ))}
+                  </Pie>
+                  <ReTooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  };
 
   const renderUsers = () => (
     <Box>
