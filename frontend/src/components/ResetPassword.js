@@ -61,7 +61,10 @@ export default function ResetPassword() {
     }
   };
 
-  if (!token) {
+  // Both `token` AND `uid` must be present — the backend looks up the user
+  // from `uid` and validates the stateless reset token against that user.
+  // A link missing either piece can't be validated, so reject up-front.
+  if (!token || !uid) {
     return (
       <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f5f5' }}>
         <Alert severity="error">Invalid reset link. Please request a new one.</Alert>

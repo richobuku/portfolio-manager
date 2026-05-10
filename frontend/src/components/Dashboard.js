@@ -125,6 +125,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── reports ────────────────────────────────────────────────────────────────
   const [reports, setReports] = useState([]);
+  const [groupReports, setGroupReports] = useState([]);
   const [reportFilterBge, setReportFilterBge] = useState('');
   const [reportFilterStatus, setReportFilterStatus] = useState('');
   const [viewReport, setViewReport] = useState(null);
@@ -175,7 +176,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (reportFilterBge) reportParams.append('bge', reportFilterBge);
       if (reportFilterStatus) reportParams.append('status', reportFilterStatus);
 
-      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes] = await Promise.all([
+      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes] = await Promise.all([
         axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
         axios.get(API_ENDPOINTS.EXPERTS, { headers: h }),
         axios.get(API_ENDPOINTS.COHORTS, { headers: h }),
@@ -185,6 +186,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         axios.get(`${API_ENDPOINTS.MSMES}analytics/`, { headers: h }),
         axios.get(API_ENDPOINTS.BGE_USERS, { headers: h }),
         axios.get(`${API_ENDPOINTS.REPORTS}?${reportParams}`, { headers: h }),
+        axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h }).catch(() => ({ data: [] })),
       ]);
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
@@ -196,6 +198,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setTrainingTopics(toArr(tRes.data));
       setAnalytics(aRes.data);
       setBgeUsers(Array.isArray(uRes.data) ? uRes.data : []);
+      setGroupReports(toArr(grRes.data));
       setReports(toArr(rRes.data));
       setError('');
     } catch {
@@ -525,6 +528,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (res.data && manageGroupItem?.id === groupId) setManageGroupItem(res.data);
       fetchAll();
     } catch { notify('Failed to update group', 'error'); }
+  };
+
+  // ── Group report approval (admin) ──────────────────────────────────────────
+  const approveGroupReport = async (id) => {
+    try {
+      await axios.patch(`${API_ENDPOINTS.GROUP_REPORTS}${id}/`, { status: 'approved' }, { headers });
+      notify('Group report approved');
+      fetchAll();
+    } catch (e) {
+      notify(e.response?.data?.error || 'Failed to approve report', 'error');
+    }
   };
 
   // ── PDF helpers (MSME + Group reports) ─────────────────────────────────────
@@ -1178,17 +1192,36 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   });
   const [richAnalytics, setRichAnalytics] = useState(null);
 
-  // Refetch analytics whenever the filter changes
+  // Refetch analytics whenever the filter changes — debounced + cancellable.
+  // Without this the page fired a request on every Select change and a slow
+  // response could overwrite a fresher one.
   useEffect(() => {
     if (!token) return;
-    const params = new URLSearchParams();
-    Object.entries(analyticsFilter).forEach(([k, v]) => { if (v) params.append(k, v); });
-    axios.get(`${API_ENDPOINTS.MSMES}analytics/?${params}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => setRichAnalytics(r.data))
-      .catch(() => setRichAnalytics(null));
+    const controller = new AbortController();
+    const handle = setTimeout(async () => {
+      const params = new URLSearchParams();
+      Object.entries(analyticsFilter).forEach(([k, v]) => { if (v) params.append(k, v); });
+      try {
+        const r = await axios.get(
+          `${API_ENDPOINTS.MSMES}analytics/?${params}`,
+          { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal },
+        );
+        setRichAnalytics(r.data || null);
+      } catch (e) {
+        if (!axios.isCancel(e) && e.name !== 'CanceledError') {
+          // Drop back to the unfiltered baseline so charts don't blank out
+          setRichAnalytics(null);
+        }
+      }
+    }, 250);
+    return () => { clearTimeout(handle); controller.abort(); };
   }, [token, analyticsFilter]);
 
-  const A = richAnalytics || analytics || {};
+  // Prefer the filtered payload, else the baseline `analytics` state, else
+  // an empty object so chart components don't crash on undefined.
+  const A = (richAnalytics && Object.keys(richAnalytics).length > 0)
+    ? richAnalytics
+    : (analytics || {});
 
   // Helper: convert a [{key:value, count}] list into recharts shape
   const pieData = (rows, labelKey) =>
@@ -1667,6 +1700,72 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           onPageChange={(_, p) => setReportPage(p)}
         />
       </TableContainer>
+
+      {/* ── Group Reports panel (admin approval) ─────────────────────── */}
+      <Box sx={{ mt: 4 }}>
+        <SectionHeader title="Group Reports" subtitle={`${groupReports.length} group report${groupReports.length === 1 ? '' : 's'} filed`} />
+        {groupReports.length === 0 ? (
+          <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+            No group reports yet. Team leads file these from the BGE dashboard.
+          </Paper>
+        ) : (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell>Group</TableCell>
+                  <TableCell>Team Lead</TableCell>
+                  <TableCell>Session</TableCell>
+                  <TableCell>Visit Date</TableCell>
+                  <TableCell>MSMEs</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {groupReports.map(g => (
+                  <TableRow key={g.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={500}>{g.group_name}</Typography>
+                    </TableCell>
+                    <TableCell>{g.team_lead_name || '—'}</TableCell>
+                    <TableCell>{g.session_number ? `Session ${g.session_number}` : '—'}</TableCell>
+                    <TableCell>{g.visit_date}</TableCell>
+                    <TableCell>{g.msme_count || 0}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={g.status} size="small"
+                        color={g.status === 'approved' ? 'success' : (g.status === 'submitted' ? 'primary' : 'default')}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="Open PDF">
+                          <IconButton size="small" onClick={() => openReportPdf('group', g.id, 'view')}>
+                            <PictureAsPdf fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Download PDF">
+                          <IconButton size="small" onClick={() => openReportPdf('group', g.id, 'download')}>
+                            <Download fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {g.status === 'submitted' && (
+                          <Tooltip title="Approve report">
+                            <IconButton size="small" color="success" onClick={() => approveGroupReport(g.id)}>
+                              <CheckCircle fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Box>
     </Box>
   );
 

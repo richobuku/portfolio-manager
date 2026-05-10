@@ -914,7 +914,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 <Select
                   value={groupReportForm.group}
                   label="Group"
-                  onChange={e => setGroupReportForm({ ...groupReportForm, group: e.target.value })}
+                  // Switching group also clears the MSME multi-select — otherwise
+                  // ids from the previous group's MSMEs would silently slip into
+                  // the POST even though the dropdown filtered them out.
+                  onChange={e => setGroupReportForm({
+                    ...groupReportForm,
+                    group: e.target.value,
+                    msmes_supported: [],
+                  })}
                   disabled={!!editingGroupReport}
                 >
                   {groups.filter(g => isTeamLeadOf(g)).map(g => (
