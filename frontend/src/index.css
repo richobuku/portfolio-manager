@@ -16,7 +16,10 @@ code {
    Most users will use the server-rendered PDF (Open PDF / Download PDF), but
    if they hit Cmd+P with the report dialog open we make sure only the
    dialog content is printed — sidebars, toolbars, and other dashboard
-   chrome are hidden. */
+   chrome are hidden, and the .print-letterhead element (a logo strip that's
+   hidden on screen) is revealed and pinned to the top of the printed page. */
+.print-letterhead { display: none; }
+
 @media print {
   body * { visibility: hidden !important; }
   .MuiDialog-root,
@@ -25,6 +28,27 @@ code {
   .MuiDialog-root .MuiDialogActions-root,
   .MuiBackdrop-root { display: none !important; }
   .MuiPaper-root { box-shadow: none !important; }
+
+  /* Branded letterhead — hidden on screen, shown only on print. */
+  .print-letterhead {
+    display: flex !important;
+    visibility: visible !important;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid #C8102E;
+    padding: 8px 12px 12px 12px;
+    margin-bottom: 12px;
+  }
+  .print-letterhead img.gopa { height: 56px; width: auto; }
+  .print-letterhead img.giz  { height: 64px; width: auto; }
+  .print-letterhead .wordmark {
+    text-align: center; flex: 1;
+    color: #1A2F4B;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .print-letterhead .wordmark .title    { font-weight: 800; font-size: 18px; letter-spacing: -0.3px; }
+  .print-letterhead .wordmark .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+
   /* Avoid page-breaks inside narrative paragraphs */
   p, li { page-break-inside: avoid; }
 }

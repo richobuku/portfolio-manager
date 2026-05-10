@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from django.contrib.auth.models import User
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
@@ -133,11 +133,16 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
         search = self.request.query_params.get('search')
         if search:
-            qs = (
-                qs.filter(business_name__icontains=search) |
-                qs.filter(owner_name__icontains=search) |
-                qs.filter(sector__icontains=search) |
-                qs.filter(msme_code__icontains=search)
+            # Combine search clauses with Q() inside ONE .filter(), not via
+            # queryset union (`qs.filter(...) | qs.filter(...)`) — the union
+            # form silently drops the BGE tenant scoping that was applied
+            # above, leaking every other BGE's MSMEs into search results.
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(business_name__icontains=search) |
+                Q(owner_name__icontains=search)    |
+                Q(sector__icontains=search)        |
+                Q(msme_code__icontains=search)
             )
 
         business_type = self.request.query_params.get('business_type')
@@ -690,37 +695,62 @@ class MSMEViewSet(viewsets.ModelViewSet):
         )
 
         # BGE workload (top 15 BGEs by direct + group-assigned MSMEs)
+        # Annotate everything in 2 queries instead of (1 + 3*N) per BGE.
+        bge_qs = (BusinessGrowthExpert.objects
+                  .filter(status='approved')
+                  .annotate(
+                      direct=Count(
+                          'assigned_msmes',
+                          filter=Q(assigned_msmes__is_active=True),
+                          distinct=True,
+                      ),
+                      reports_count=Count('reports', distinct=True),
+                  ))
+        # `via_group` = MSMEs reachable through any of the BGE's groups.
+        # Cheaper as a single grouped query than per-BGE.
+        via_group_counts = dict(
+            MSME.objects.filter(is_active=True, assigned_group__members__isnull=False)
+                        .values_list('assigned_group__members')
+                        .annotate(c=Count('id', distinct=True))
+                        .values_list('assigned_group__members', 'c')
+        )
         bge_workload = []
-        for bge in (BusinessGrowthExpert.objects
-                    .filter(status='approved')
-                    .prefetch_related('assigned_msmes', 'bge_groups__assigned_msmes')[:50]):
-            direct = bge.assigned_msmes.filter(is_active=True).count()
-            via_group = MSME.objects.filter(
-                is_active=True,
-                assigned_group__members=bge,
-            ).distinct().count()
+        for bge in bge_qs[:50]:
+            via = via_group_counts.get(bge.id, 0)
             bge_workload.append({
                 'bge_id':       bge.id,
                 'bge_name':     bge.name,
-                'direct':       direct,
-                'via_group':    via_group,
-                'total':        direct + via_group,
-                'reports_count': bge.reports.count(),
+                'direct':       bge.direct,
+                'via_group':    via,
+                'total':        bge.direct + via,
+                'reports_count': bge.reports_count,
             })
         bge_workload.sort(key=lambda x: x['total'], reverse=True)
         bge_workload = bge_workload[:15]
 
-        # Group performance — MSMEs per group + reports filed
-        group_stats = []
-        for g in BGEGroup.objects.prefetch_related('assigned_msmes', 'reports'):
-            group_stats.append({
-                'group_id':    g.id,
-                'group_name':  g.name,
-                'msme_count':  g.assigned_msmes.filter(is_active=True).count(),
-                'member_count': g.members.count(),
-                'reports_count': g.reports.count(),
+        # Group performance — annotate in one query, no per-row counts.
+        group_qs = (BGEGroup.objects
+                    .select_related('team_lead')
+                    .annotate(
+                        msme_count=Count(
+                            'assigned_msmes',
+                            filter=Q(assigned_msmes__is_active=True),
+                            distinct=True,
+                        ),
+                        active_member_count=Count('members', distinct=True),
+                        reports_count=Count('reports', distinct=True),
+                    ))
+        group_stats = [
+            {
+                'group_id':       g.id,
+                'group_name':     g.name,
+                'msme_count':     g.msme_count,
+                'member_count':   g.active_member_count,
+                'reports_count':  g.reports_count,
                 'team_lead_name': g.team_lead.name if g.team_lead else None,
-            })
+            }
+            for g in group_qs
+        ]
         group_stats.sort(key=lambda x: x['msme_count'], reverse=True)
 
         # Time series — MSMEs created per month (last 18 months)
@@ -1096,6 +1126,12 @@ class BGEGroupViewSet(viewsets.ModelViewSet):
         try:
             bge = BusinessGrowthExpert.objects.get(pk=bge_id)
             group.members.remove(bge)
+            # If the BGE we just removed was the team lead, clear that role too
+            # so they can't keep submitting reports on a group they no longer
+            # belong to (the write-permission check matches on team_lead_id).
+            if group.team_lead_id == bge.id:
+                group.team_lead = None
+                group.save(update_fields=['team_lead'])
             return Response(BGEGroupSerializer(group).data)
         except BusinessGrowthExpert.DoesNotExist:
             return Response({'error': 'Expert not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -1352,10 +1388,21 @@ class GroupReportViewSet(viewsets.ModelViewSet):
                 "Only the group's team lead (or an admin) can file group reports."
             )
         # Stamp the team lead automatically — never trusted from request body.
+        # Resolution order:
+        #   1. Author's own bge_profile (BGE filing the report on themselves)
+        #   2. Group's designated team_lead (admin filing on the team's behalf)
+        # If neither resolves, refuse to create — an owner-less report can't be
+        # edited later because every write check matches on team_lead_id.
+        bge = None
         try:
             bge = user.bge_profile
         except Exception:
             bge = group.team_lead
+        if bge is None:
+            raise PermissionDenied(
+                "Cannot create a group report without a team lead. "
+                "Set a team lead on the group first."
+            )
         serializer.save(team_lead=bge)
 
     def perform_update(self, serializer):

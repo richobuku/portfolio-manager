@@ -2789,6 +2789,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             { key: 'additional_notes',      label: 'Additional Notes' },
           ];
           return <>
+            {/* Branded letterhead — hidden on screen, shown on print only. */}
+            <div className="print-letterhead">
+              <img className="gopa" src="/gopa-logo.png" alt="GOPA AFC" />
+              <div className="wordmark">
+                <div className="title">PRUDEV II</div>
+                <div className="subtitle">MSME Portfolio Management</div>
+              </div>
+              <img className="giz" src="/giz-logo.png" alt="German Cooperation · Implemented by GIZ" />
+            </div>
             {/* Header bar */}
             <Box sx={{ bgcolor: BRAND.sidebarBg, px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box sx={{ flex: 1 }}>
