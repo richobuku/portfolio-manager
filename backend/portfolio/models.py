@@ -417,6 +417,13 @@ class GroupReport(models.Model):
         'MSME', blank=True, related_name='group_reports'
     )
 
+    # Attendance — group members who showed up to / participated in the session.
+    # Defaults to empty; team lead checks the present members in the dialog.
+    attendees = models.ManyToManyField(
+        'BusinessGrowthExpert', blank=True, related_name='attended_group_reports',
+        help_text='Group members who attended this session.'
+    )
+
     # Narrative sections — mirror the per-MSME report shape so admins can
     # review at the same level of detail.
     session_overview         = models.TextField(blank=True, help_text='How the session ran, attendance, format.')
@@ -441,3 +448,43 @@ class GroupReport(models.Model):
 
     class Meta:
         ordering = ['-visit_date', '-created_at']
+
+
+class GroupReportContribution(models.Model):
+    """A note from one group member contributing to a group report.
+
+    The team lead reviews these while consolidating the final report.
+    Each (group_report, bge) pair is unique — a member can edit their
+    contribution but not file two for the same report. Members can also
+    flag specific MSMEs they engaged with personally.
+    """
+    group_report = models.ForeignKey(
+        'GroupReport', on_delete=models.CASCADE, related_name='contributions'
+    )
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.CASCADE, related_name='group_contributions'
+    )
+    # MSMEs (drawn from the parent report's group) that THIS member personally
+    # engaged with during the session.
+    msmes_observed = models.ManyToManyField(
+        'MSME', blank=True, related_name='group_contributions'
+    )
+
+    notes = models.TextField(
+        blank=True,
+        help_text='Member-level observations to feed into the consolidated group report.',
+    )
+    challenges_observed = models.TextField(blank=True)
+    interventions_made  = models.TextField(blank=True)
+    follow_up_needed    = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        unique_together = [('group_report', 'bge')]
+        verbose_name = "Group Report Contribution"
+
+    def __str__(self):
+        return f"{self.bge.name} → {self.group_report}"

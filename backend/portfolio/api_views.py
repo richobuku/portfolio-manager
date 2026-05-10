@@ -16,7 +16,7 @@ from .models import (
     Portfolio, Investment, Transaction,
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
-    Cohort, BGEGroup, MSMEReport, GroupReport, PushSubscription,
+    Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription,
 )
 from pywebpush import webpush, WebPushException
 import json as _json
@@ -25,7 +25,7 @@ from .serializers import (
     MSMESerializer, BusinessGrowthExpertSerializer, SupportRequestSerializer,
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
-    GroupReportSerializer,
+    GroupReportSerializer, GroupReportContributionSerializer,
 )
 
 
@@ -1442,6 +1442,109 @@ class GroupReportViewSet(viewsets.ModelViewSet):
         disposition = 'attachment' if request.query_params.get('dl') else 'inline'
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
         return resp
+
+
+class GroupReportContributionViewSet(viewsets.ModelViewSet):
+    """A note from one group member feeding into a group report.
+
+    Visibility:
+    - Admins see every contribution.
+    - A BGE sees their own contributions + every contribution to a group
+      report whose group they belong to (so the team lead can read them
+      while consolidating the consolidated report, and other members get
+      transparency into what their teammates submitted).
+
+    Mutation:
+    - Members can create/edit only their own contribution. The `bge` field
+      is auto-stamped from request.user; never trusted from the body.
+    - Admins can edit any contribution.
+    - One contribution per (group_report, bge) pair (unique_together).
+      Re-POSTing for the same pair returns 200 with the existing record
+      so the frontend can use it as upsert.
+    """
+    serializer_class = GroupReportContributionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = GroupReportContribution.objects.select_related(
+            'bge', 'group_report__group',
+        ).prefetch_related('msmes_observed')
+        if user.is_staff or user.is_superuser:
+            pass
+        else:
+            try:
+                bge = user.bge_profile
+            except Exception:
+                return qs.none()
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(bge=bge) | Q(group_report__group__members=bge)
+            ).distinct()
+
+        gr = self.request.query_params.get('group_report')
+        if gr:
+            qs = qs.filter(group_report_id=gr)
+        return qs
+
+    def _bge_for_user(self):
+        try:
+            return self.request.user.bge_profile
+        except Exception:
+            return None
+
+    def create(self, request, *args, **kwargs):
+        bge = self._bge_for_user()
+        is_admin = request.user.is_staff or request.user.is_superuser
+        if bge is None and not is_admin:
+            raise PermissionDenied("You don't have a BGE profile.")
+
+        gr_id = request.data.get('group_report')
+        if not gr_id:
+            return Response({'error': 'group_report is required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            gr = GroupReport.objects.select_related('group').get(pk=gr_id)
+        except GroupReport.DoesNotExist:
+            return Response({'error': 'group_report not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Member must belong to the group
+        if bge and not gr.group.members.filter(pk=bge.pk).exists() and not is_admin:
+            raise PermissionDenied("You're not a member of this group.")
+
+        contributor = bge if bge else gr.group.team_lead
+        if contributor is None:
+            return Response({'error': 'No bge to attribute the contribution to.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Upsert: if (group_report, bge) already exists, return that row
+        existing = GroupReportContribution.objects.filter(
+            group_report=gr, bge=contributor,
+        ).first()
+        if existing:
+            ser = self.get_serializer(existing, data=request.data, partial=True)
+            ser.is_valid(raise_exception=True)
+            ser.save()
+            return Response(ser.data, status=status.HTTP_200_OK)
+
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        ser.save(bge=contributor)
+        return Response(ser.data, status=status.HTTP_201_CREATED)
+
+    def perform_update(self, serializer):
+        bge = self._bge_for_user()
+        is_admin = self.request.user.is_staff or self.request.user.is_superuser
+        instance = self.get_object()
+        if not is_admin and (bge is None or instance.bge_id != bge.id):
+            raise PermissionDenied("You can only edit your own contribution.")
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        bge = self._bge_for_user()
+        is_admin = request.user.is_staff or request.user.is_superuser
+        instance = self.get_object()
+        if not is_admin and (bge is None or instance.bge_id != bge.id):
+            raise PermissionDenied("You can only delete your own contribution.")
+        return super().destroy(request, *args, **kwargs)
 
 
 class BGEUserViewSet(viewsets.ViewSet):
