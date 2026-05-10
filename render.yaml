@@ -25,8 +25,14 @@ services:
           property: connectionString
       - key: ALLOWED_HOSTS
         value: .onrender.com
+      # Canonical public URL — used for password-reset links, CORS allow-list,
+      # and any other place the backend needs to know the frontend's address.
       - key: FRONTEND_URL
-        value: https://frontend-richard-obukus-projects.vercel.app
+        value: https://bds.glowi.africa
+      # Comma-separated extras kept in CORS allow-list so the legacy Vercel
+      # URLs continue to work alongside the canonical custom domain.
+      - key: CORS_EXTRA_ORIGINS
+        value: https://frontend-richard-obukus-projects.vercel.app,https://frontend-richobuku-richard-obukus-projects.vercel.app,https://frontend-two-rose-13.vercel.app
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_PASSWORD

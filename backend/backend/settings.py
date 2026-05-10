@@ -204,9 +204,17 @@ CORS_ALLOWED_ORIGINS = [
 # Expose as a proper settings attribute so auth_views can use it
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
-# Add production frontend URLs if available
+# Add canonical frontend URL to CORS allow-list
 if FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
+
+# Optional comma-separated list of additional origins to allow
+# (e.g. legacy Vercel preview URLs while we migrate to a custom domain).
+# Empty string = none, single value with no comma also fine.
+_extra = os.environ.get('CORS_EXTRA_ORIGINS', '')
+for origin in [o.strip() for o in _extra.split(',') if o.strip()]:
+    if origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(origin)
 
 # Accept ANY Vercel preview/production URL for this project (deployment-specific
 # URLs change every push). Without this, only the canonical alias works and

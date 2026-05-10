@@ -2,6 +2,16 @@
   "version": 2,
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "build",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        { "type": "host", "value": "frontend-(.*)\\.vercel\\.app" }
+      ],
+      "destination": "https://bds.glowi.africa/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
