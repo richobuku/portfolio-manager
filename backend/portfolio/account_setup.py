@@ -123,16 +123,29 @@ def send_welcome_email(bge, username, password):
 
     try:
         reply_to = [getattr(settings, 'EMAIL_REPLY_TO', '')] if getattr(settings, 'EMAIL_REPLY_TO', '') else None
+
+        # BCC the admin (or whoever BGE_WELCOME_EMAIL_BCC points at) so there's
+        # a paper trail of every auto-provisioned account. Skip if the BCC
+        # address is the same as the recipient — no need to double-deliver.
+        bcc_addr = (getattr(settings, 'BGE_WELCOME_EMAIL_BCC', '') or '').strip()
+        bcc = [bcc_addr] if bcc_addr and bcc_addr.lower() != bge.email.lower() else None
+
         msg = EmailMultiAlternatives(
             subject=subject,
             body=text,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[bge.email],
+            bcc=bcc,
             reply_to=reply_to,
         )
         msg.attach_alternative(html, 'text/html')
         msg.send(fail_silently=False)
-        log.info("Welcome email sent to %s for BGE #%s", bge.email, bge.id)
+        log.info(
+            "Welcome email sent to %s%s for BGE #%s",
+            bge.email,
+            f" (BCC {bcc_addr})" if bcc else "",
+            bge.id,
+        )
         return True
     except Exception as exc:
         log.error("Welcome email failed for BGE #%s (%s): %s", bge.id, bge.email, exc)

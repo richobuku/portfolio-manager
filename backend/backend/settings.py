@@ -193,6 +193,14 @@ DEFAULT_FROM_EMAIL  = f'PRUDEV II Programme <{GMAIL_HOST_USER}>'
 EMAIL_TIMEOUT      = 30
 EMAIL_FAIL_SILENTLY = False
 
+# Optional admin BCC for outgoing welcome emails (BGE auto-provisioning).
+# Falls back to ADMIN_EMAIL so it works without extra env-var configuration
+# on Render. Set to empty string to disable.
+BGE_WELCOME_EMAIL_BCC = os.environ.get(
+    'BGE_WELCOME_EMAIL_BCC',
+    os.environ.get('ADMIN_EMAIL', ''),
+).strip()
+
 # CORS Configuration for Frontend Integration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React development server
