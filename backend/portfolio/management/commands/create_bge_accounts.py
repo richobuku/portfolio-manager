@@ -1,53 +1,30 @@
 """Bulk-create login accounts for every BGE that doesn't already have one.
 
-Usage:
-    python manage.py create_bge_accounts                  # creates with default password
-    python manage.py create_bge_accounts --password bds123
-    python manage.py create_bge_accounts --dry-run        # preview without saving
-    python manage.py create_bge_accounts --reset          # also rotate password on already-linked BGEs
+Usage on Render shell:
+    python manage.py create_bge_accounts                   # default 'bds123'
+    python manage.py create_bge_accounts --password Xyz123 # custom default
+    python manage.py create_bge_accounts --no-email        # skip welcome emails
+    python manage.py create_bge_accounts --reset           # rotate already-linked too
+    python manage.py create_bge_accounts --dry-run         # preview only
 
-Username preference (first non-empty wins):
-  1. local-part of email (lowercased)
-  2. slug of `name`         (e.g. "Kobusinge Racheal" → "kobusinge.racheal")
-  3. slug of `bge_code`     (last-resort)
+For each BGE without a linked Django User, this calls into
+`portfolio.account_setup.ensure_bge_account` — the same helper that the
+post_save signal uses, so the bulk run and individual creates produce
+identical results (username minting, email content, etc.).
 
-If a generated username collides with an existing User, the command appends
-'2', '3', … until it finds a free slot, so the run never hits an
-IntegrityError.
+Going forward, any BGE created via API / admin / public-signup form will
+automatically get an account + welcome email via the signal — this command
+exists for the one-off migration of BGEs that pre-date the signal.
 """
-import re
-
-from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from portfolio.models import BusinessGrowthExpert
-
-
-def _slug(text):
-    s = re.sub(r'[^a-z0-9]+', '.', (text or '').lower()).strip('.')
-    return re.sub(r'\.+', '.', s)
-
-
-def _mint_username(bge):
-    if bge.email:
-        return bge.email.split('@')[0].lower()
-    if bge.name:
-        return _slug(bge.name)
-    if bge.bge_code:
-        return _slug(bge.bge_code)
-    return None
-
-
-def _unique(base):
-    """Walk ('base', 'base2', 'base3', ...) until a free username is found."""
-    if not User.objects.filter(username=base).exists():
-        return base
-    for n in range(2, 1000):
-        candidate = f'{base}{n}'
-        if not User.objects.filter(username=candidate).exists():
-            return candidate
-    raise RuntimeError(f'Could not mint a unique username from "{base}" (1000 attempts)')
+from portfolio.account_setup import (
+    ensure_bge_account,
+    send_welcome_email,
+    DEFAULT_PASSWORD,
+)
 
 
 class Command(BaseCommand):
@@ -55,25 +32,27 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--password',
-            default='bds123',
-            help='Default password (default: bds123).',
+            '--password', default=DEFAULT_PASSWORD,
+            help=f"Password to set (default: {DEFAULT_PASSWORD}).",
         )
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
+            '--dry-run', action='store_true',
             help="Print what would happen without saving anything.",
         )
         parser.add_argument(
-            '--reset',
-            action='store_true',
+            '--reset', action='store_true',
             help="Also reset password for BGEs that already have a linked User.",
+        )
+        parser.add_argument(
+            '--no-email', action='store_true',
+            help="Skip sending welcome emails (just provision accounts).",
         )
 
     def handle(self, *args, **opts):
-        password = opts['password']
-        dry_run  = opts['dry_run']
-        reset    = opts['reset']
+        password   = opts['password']
+        dry_run    = opts['dry_run']
+        reset      = opts['reset']
+        send_email = not opts['no_email']
 
         unlinked = BusinessGrowthExpert.objects.filter(user__isnull=True).order_by('id')
         linked   = BusinessGrowthExpert.objects.filter(user__isnull=False).order_by('id')
@@ -84,46 +63,32 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING("(dry-run — nothing will be saved)"))
 
-        created = 0
-        skipped = 0
-        rotated = 0
+        created = rotated = skipped = 0
 
         with transaction.atomic():
             for bge in unlinked:
-                base = _mint_username(bge)
-                if not base:
-                    skipped += 1
-                    self.stdout.write(self.style.WARNING(
-                        f"  ⚠ Skipped BGE #{bge.id} ({bge.name or '?'}) — no email/name/bge_code"
-                    ))
-                    continue
-
-                username = _unique(base)
-                first, _, last = (bge.name or '').partition(' ')
-
                 if dry_run:
-                    self.stdout.write(f"  ✓ would create: {username} for {bge.name}")
-                    created += 1
+                    from portfolio.account_setup import mint_username, unique_username
+                    base = mint_username(bge)
+                    candidate = unique_username(base) if base else None
+                    if candidate:
+                        self.stdout.write(f"  ✓ would create: {candidate:24}  →  {bge.name}")
+                        created += 1
+                    else:
+                        skipped += 1
+                        self.stdout.write(self.style.WARNING(
+                            f"  ⚠ would skip BGE #{bge.id} ({bge.name or '?'}) — no usable identifier"
+                        ))
                     continue
 
-                user, was_new = User.objects.get_or_create(
-                    username=username,
-                    defaults={
-                        'email':      bge.email or '',
-                        'first_name': first,
-                        'last_name':  last,
-                        'is_active':  True,
-                    },
-                )
-                user.set_password(password)
-                user.save()
-
-                bge.user = user
-                bge.save(update_fields=['user'])
-                created += 1
-                self.stdout.write(self.style.SUCCESS(
-                    f"  ✓ created: {username:24}  →  {bge.name}"
-                ))
+                outcome = ensure_bge_account(bge, password=password, send_email=send_email)
+                if outcome == 'created':
+                    created += 1
+                    self.stdout.write(self.style.SUCCESS(
+                        f"  ✓ created: {bge.user.username:24}  →  {bge.name}"
+                    ))
+                elif outcome == 'skipped':
+                    skipped += 1
 
             if reset:
                 for bge in linked:
@@ -134,12 +99,13 @@ class Command(BaseCommand):
                     bge.user.set_password(password)
                     bge.user.save(update_fields=['password'])
                     rotated += 1
+                    if send_email:
+                        send_welcome_email(bge, bge.user.username, password)
                     self.stdout.write(self.style.SUCCESS(
                         f"  ✓ rotated:  {bge.user.username:24}  →  {bge.name}"
                     ))
 
             if dry_run:
-                # rollback the empty txn just to be tidy
                 transaction.set_rollback(True)
 
         self.stdout.write('')
@@ -147,9 +113,8 @@ class Command(BaseCommand):
             f"Done. created={created}  rotated={rotated}  skipped={skipped}"
         ))
         if not dry_run and (created or rotated):
-            self.stdout.write(self.style.WARNING(
-                f"All affected accounts now have password: {password}"
-            ))
-            self.stdout.write(self.style.WARNING(
-                "Tell BGEs to change it on first login (Forgot password? on the login page)."
-            ))
+            self.stdout.write(self.style.WARNING(f"Default password: {password}"))
+            if send_email:
+                self.stdout.write(self.style.WARNING("Welcome emails sent. Tell BGEs to change their password on first login."))
+            else:
+                self.stdout.write(self.style.WARNING("Welcome emails NOT sent (--no-email). Distribute credentials manually."))
