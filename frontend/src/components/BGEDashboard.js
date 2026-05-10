@@ -68,6 +68,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const bgeName = currentUser?.bge_profile?.name || currentUser?.username || 'BGE';
 
   const [section, setSection] = useState('msmes');
+  // 'all' | 'direct' | groupId — filters the My MSMEs grid
+  const [msmeFilter, setMsmeFilter] = useState('all');
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const [msmes, setMsmes] = useState([]);
@@ -427,39 +429,128 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         {loading && <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 4 }} />}
 
         {/* ── My MSMEs ── */}
-        {section === 'msmes' && !loading && (
-          <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>My Assigned MSMEs</Typography>
-                <Typography variant="body2" color="text.secondary">{msmes.length} enterprise{msmes.length !== 1 ? 's' : ''} assigned to you</Typography>
-              </Box>
-              <Button variant="contained" startIcon={<Add />} onClick={() => openNewReport()}>New Report</Button>
-            </Box>
+        {section === 'msmes' && !loading && (() => {
+          // Classify each MSME: direct if assigned_bge points at me, else
+          // it must be via a group (since the backend wouldn't include it
+          // in my queryset otherwise).
+          const isDirect = (m) => m.assigned_bge === myBgeId;
+          const directMsmes  = msmes.filter(isDirect);
+          const groupMsmes   = msmes.filter(m => !isDirect(m));
 
-            {msmes.length === 0 ? (
-              <Paper sx={{ p: 6, textAlign: 'center' }}>
-                <Business sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-                <Typography color="text.secondary">No MSMEs assigned yet. Contact your programme administrator.</Typography>
-              </Paper>
-            ) : (
-              <>
+          // Active filter: 'all' | 'direct' | groupId
+          const filtered = msmes.filter(m => {
+            if (msmeFilter === 'all') return true;
+            if (msmeFilter === 'direct') return isDirect(m);
+            return m.assigned_group === msmeFilter;
+          });
+
+          const filterChips = [
+            { id: 'all',    label: `All (${msmes.length})`,           color: 'default' },
+            { id: 'direct', label: `Directly assigned (${directMsmes.length})`, color: 'primary' },
+            ...groups
+              .filter(g => groupMsmes.some(m => m.assigned_group === g.id))
+              .map(g => ({
+                id: g.id,
+                label: `${g.name} (${groupMsmes.filter(m => m.assigned_group === g.id).length})`,
+                color: 'warning',
+              })),
+          ];
+
+          return (
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>My Assigned MSMEs</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    <Box component="span" sx={{ color: BRAND.primaryMain, fontWeight: 600 }}>
+                      {directMsmes.length} direct
+                    </Box>
+                    {' · '}
+                    <Box component="span" sx={{ color: '#F9A825', fontWeight: 600 }}>
+                      {groupMsmes.length} via group
+                    </Box>
+                    {' · '}
+                    {msmes.length} total
+                  </Typography>
+                </Box>
+                <Button variant="contained" startIcon={<Add />} onClick={() => openNewReport()}>New Report</Button>
+              </Box>
+
+              {/* Filter chips */}
+              {msmes.length > 0 && (
+                <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                  {filterChips.map(c => (
+                    <Chip
+                      key={c.id}
+                      label={c.label}
+                      onClick={() => setMsmeFilter(c.id)}
+                      color={msmeFilter === c.id ? c.color : 'default'}
+                      variant={msmeFilter === c.id ? 'filled' : 'outlined'}
+                      sx={{ fontWeight: 600 }}
+                    />
+                  ))}
+                </Box>
+              )}
+
+              {msmes.length === 0 ? (
+                <Paper sx={{ p: 6, textAlign: 'center' }}>
+                  <Business sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                  <Typography color="text.secondary">No MSMEs assigned yet. Contact your programme administrator.</Typography>
+                </Paper>
+              ) : (
                 <Grid container spacing={2} sx={{ mb: 2 }}>
-                  {msmes.map((m) => {
+                  {filtered.map((m) => {
                     const msmeReportCount = reports.filter(r => r.msme === m.id).length;
+                    const direct = isDirect(m);
+                    const accent = direct ? BRAND.primaryMain : '#F9A825';
+                    const sourceLabel = direct ? 'Direct' : (m.assigned_group_name || 'Via group');
                     return (
                       <Grid item xs={12} sm={6} md={4} key={m.id}>
-                        <Card sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 } }} onClick={() => openMsmeDetail(m)}>
+                        <Card
+                          sx={{
+                            cursor: 'pointer',
+                            '&:hover': { boxShadow: 3 },
+                            borderLeft: `4px solid ${accent}`,
+                          }}
+                          onClick={() => openMsmeDetail(m)}
+                        >
                           <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                               <Typography fontWeight={700} fontSize={14} sx={{ flex: 1, mr: 1 }}>{m.business_name}</Typography>
                               <Chip label={m.business_type || 'MSME'} size="small" variant="outlined" />
                             </Box>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>{m.msme_code}</Typography>
-                            {m.sector && <Typography variant="caption" color="text.secondary">{m.sector}</Typography>}
-                            {m.cohort_name && (
-                              <Chip label={`Cohort ${m.cohort_name}`} size="small" sx={{ mt: 1, bgcolor: BRAND.programmeGreen + '20', color: BRAND.programmeGreen, fontWeight: 600 }} />
-                            )}
+                            {m.sector && <Typography variant="caption" color="text.secondary" display="block">{m.sector}</Typography>}
+
+                            {/* Source attribution chip */}
+                            <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
+                              <Chip
+                                label={sourceLabel}
+                                size="small"
+                                icon={direct ? <Business sx={{ fontSize: 14 }} /> : <GroupIcon sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  bgcolor: accent + '18',
+                                  color: accent,
+                                  fontWeight: 700,
+                                  border: `1px solid ${accent}40`,
+                                }}
+                              />
+                              {m.cohort_name && (
+                                <Chip
+                                  label={`Cohort ${m.cohort_name}`}
+                                  size="small"
+                                  sx={{ bgcolor: BRAND.programmeGreen + '20', color: BRAND.programmeGreen, fontWeight: 600 }}
+                                />
+                              )}
+                              {m.session_number && (
+                                <Chip
+                                  label={`Session ${m.session_number}`}
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              )}
+                            </Box>
+
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                               <Typography variant="caption" color="text.secondary">
                                 {msmeReportCount} report{msmeReportCount !== 1 ? 's' : ''}
@@ -483,10 +574,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     );
                   })}
                 </Grid>
-              </>
-            )}
-          </Box>
-        )}
+              )}
+            </Box>
+          );
+        })()}
 
         {/* ── My Groups ── */}
         {section === 'groups' && (
