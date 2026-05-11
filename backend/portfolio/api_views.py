@@ -16,7 +16,7 @@ from .models import (
     Portfolio, Investment, Transaction,
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
-    Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription,
+    Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
 )
 from pywebpush import webpush, WebPushException
 import json as _json
@@ -25,7 +25,7 @@ from .serializers import (
     MSMESerializer, BusinessGrowthExpertSerializer, SupportRequestSerializer,
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
-    GroupReportSerializer, GroupReportContributionSerializer,
+    GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
 )
 
 
@@ -1715,6 +1715,70 @@ def _notify_bge(bge, title, body, url='/'):
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated as _IsAuth, AllowAny as _AllowAny
+
+class WorkOrderViewSet(viewsets.ModelViewSet):
+    """CRUD for Work Orders.
+
+    Visibility:
+    - Admins see all work orders.
+    - A BGE sees only their own work orders.
+
+    Creation:
+    - Admins can create for any BGE (pass `bge` pk in body).
+    - A BGE user can only create for themselves (bge auto-stamped).
+    """
+    serializer_class = WorkOrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = WorkOrder.objects.select_related('bge', 'group')
+        if user.is_staff or user.is_superuser:
+            bge_id = self.request.query_params.get('bge')
+            if bge_id:
+                qs = qs.filter(bge_id=bge_id)
+            return qs
+        try:
+            bge = user.bge_profile
+        except Exception:
+            return qs.none()
+        return qs.filter(bge=bge)
+
+    def _bge_for_user(self):
+        try:
+            return self.request.user.bge_profile
+        except Exception:
+            return None
+
+    def perform_create(self, serializer):
+        is_admin = self.request.user.is_staff or self.request.user.is_superuser
+        if is_admin:
+            serializer.save()
+        else:
+            bge = self._bge_for_user()
+            if bge is None:
+                raise PermissionDenied("You don't have a BGE profile.")
+            serializer.save(bge=bge)
+
+    def perform_update(self, serializer):
+        is_admin = self.request.user.is_staff or self.request.user.is_superuser
+        instance = self.get_object()
+        bge = self._bge_for_user()
+        if not is_admin and (bge is None or instance.bge_id != bge.id):
+            raise PermissionDenied("You can only edit your own work orders.")
+        if not is_admin:
+            serializer.save(bge=instance.bge)
+        else:
+            serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        is_admin = request.user.is_staff or request.user.is_superuser
+        instance = self.get_object()
+        bge = self._bge_for_user()
+        if not is_admin and (bge is None or instance.bge_id != bge.id):
+            raise PermissionDenied("You can only delete your own work orders.")
+        return super().destroy(request, *args, **kwargs)
+
 
 @api_view(['POST'])
 @permission_classes([_IsAuth])

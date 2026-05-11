@@ -28,5 +28,9 @@
     "django"
   ],
   "author": "PRUDEV II Team",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@react-oauth/google": "^0.11.1",
+    "@react-pdf/renderer": "^3.4.4"
+  }
 }

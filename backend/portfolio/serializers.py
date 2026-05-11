@@ -3,7 +3,7 @@ from .models import (
     Portfolio, Investment, Transaction,
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
-    Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution,
+    Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
 )
 
 
@@ -197,3 +197,16 @@ class GroupReportContributionSerializer(serializers.ModelSerializer):
         model = GroupReportContribution
         fields = '__all__'
         read_only_fields = ['bge', 'created_at', 'updated_at']
+
+
+class WorkOrderSerializer(serializers.ModelSerializer):
+    bge_name         = serializers.CharField(source='bge.name', read_only=True)
+    bge_code_display = serializers.CharField(source='bge.bge_code', read_only=True)
+    group_name       = serializers.CharField(source='group.name', read_only=True, allow_null=True)
+    work_order_type_display = serializers.CharField(source='get_work_order_type_display', read_only=True)
+    status_display   = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = WorkOrder
+        fields = '__all__'
+        read_only_fields = ['work_order_number', 'created_at', 'updated_at']

@@ -488,3 +488,73 @@ class GroupReportContribution(models.Model):
 
     def __str__(self):
         return f"{self.bge.name} → {self.group_report}"
+
+
+class WorkOrder(models.Model):
+    TYPE_CHOICES = [
+        ('msme_support', 'MSME CRM & Business Support'),
+        ('mobilisation', 'Mobilisation / Outreach'),
+        ('group_session', 'Peer-to-Peer Group Session'),
+        ('other', 'Other'),
+    ]
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('issued', 'Issued'),
+        ('signed', 'Signed'),
+    ]
+
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.CASCADE, related_name='work_orders'
+    )
+    group = models.ForeignKey(
+        'BGEGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='work_orders'
+    )
+
+    work_order_number = models.CharField(max_length=100, unique=True, blank=True)
+    work_order_type   = models.CharField(max_length=30, choices=TYPE_CHOICES, default='msme_support')
+    project_name      = models.CharField(max_length=200, default='Promoting Rural Development II (PRUDEV II)')
+    issue_date        = models.DateField()
+    start_date        = models.DateField(null=True, blank=True)
+    end_date          = models.DateField(null=True, blank=True)
+    location          = models.CharField(max_length=200, blank=True, default='Northern Uganda (Gulu & Lira)')
+    duration          = models.CharField(max_length=100, blank=True, default='2 months')
+
+    # Schedule 1
+    objective  = models.TextField(blank=True)
+    key_tasks  = models.TextField(blank=True, help_text='One task per line.')
+
+    # Deliverables — list of {task_num, description, due_date}
+    deliverables_json = models.JSONField(default=list, blank=True)
+
+    # Payment Terms – Schedule 2
+    rate_per_day          = models.PositiveIntegerField(default=60000)
+    max_days              = models.PositiveSmallIntegerField(default=4)
+    transport_reimbursed  = models.BooleanField(default=True)
+    payment_notes         = models.TextField(blank=True)
+
+    # Signatures
+    team_leader_name     = models.CharField(max_length=200, default='Stephen Maxi Opwonya')
+    team_leader_position = models.CharField(max_length=200, default='Team Leader')
+    status               = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    bge_signed_date      = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-issue_date', '-created_at']
+        verbose_name = "Work Order"
+        verbose_name_plural = "Work Orders"
+
+    def __str__(self):
+        return self.work_order_number or f"WO-{self.pk}"
+
+    def save(self, *args, **kwargs):
+        if not self.work_order_number:
+            import re
+            code = self.bge.bge_code or ''
+            m = re.search(r'BGE-([A-Z0-9]+)-', code)
+            short = m.group(1) if m else str(self.bge_id)
+            seq = WorkOrder.objects.filter(bge=self.bge).count() + 1
+            self.work_order_number = f"PRUDEV II-BGE-{short}-{seq:02d}"
+        super().save(*args, **kwargs)
