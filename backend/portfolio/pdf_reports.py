@@ -172,6 +172,53 @@ def _build_doc():
     return buf, doc
 
 
+def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE / Admin)', sig_label='BGE Signature'):
+    """Signature row appended to the bottom of any BGE-authored document.
+    Left column: reviewer/team-lead placeholder (always equal-height blank).
+    Right column: BGE signature image if available, otherwise blank of same height.
+    """
+    from reportlab.platypus import Image as RLImage, KeepTogether
+
+    SIG_H = 20 * mm  # fixed height — same whether image exists or not
+
+    reviewer_col = [
+        Paragraph(reviewer_label, s['label']),
+        Spacer(1, SIG_H),           # blank placeholder, equal to BGE sig height
+        Paragraph('_' * 35, s['body']),
+        Paragraph('Name: ___________________________', s['meta']),
+        Paragraph('Position: ________________________', s['meta']),
+        Paragraph('Date: ____________________________', s['meta']),
+    ]
+
+    bge_col = [Paragraph(sig_label, s['label']), Spacer(1, 4)]
+    if bge and bge.signature:
+        try:
+            sig_path = bge.signature.path
+            if os.path.isfile(sig_path):
+                bge_col.append(RLImage(sig_path, width=80 * mm, height=SIG_H,
+                                       kind='proportional'))
+            else:
+                bge_col.append(Spacer(1, SIG_H))
+        except Exception:
+            bge_col.append(Spacer(1, SIG_H))
+    else:
+        bge_col.append(Spacer(1, SIG_H))
+
+    bge_col += [
+        Paragraph('_' * 35, s['body']),
+        Paragraph(_safe_html(bge.name if bge else '—'), s['body']),
+        Paragraph(_safe_html((bge.bge_code if bge else '') or ''), s['label']),
+        Paragraph(
+            f'Date: {signed_date}' if signed_date else 'Date: ___________________________',
+            s['meta'],
+        ),
+    ]
+
+    t = Table([[reviewer_col, bge_col]], colWidths=[85 * mm, 85 * mm], hAlign='LEFT')
+    t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    return KeepTogether([t])
+
+
 def render_msme_report(report):
     """Build a styled PDF for one MSMEReport."""
     s = _styles()
@@ -213,6 +260,9 @@ def render_msme_report(report):
     ]
     for title, body in sections:
         story.extend(_section(s, title, body))
+
+    story.append(Spacer(1, 12))
+    story.append(_sig_block(s, bge, getattr(report, 'updated_at', None)))
 
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
@@ -283,6 +333,14 @@ def render_group_report(report):
     ]
     for title, body in sections:
         story.extend(_section(s, title, body))
+
+    story.append(Spacer(1, 12))
+    team_lead = report.team_lead if report.team_lead else (group.team_lead if group.team_lead else None)
+    story.append(_sig_block(
+        s, team_lead,
+        reviewer_label='For GOPA AFC / PRUDEV II Programme',
+        sig_label='Team Lead Signature',
+    ))
 
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
@@ -399,10 +457,14 @@ def render_work_order(work_order):
 
     story.append(Spacer(1, 12))
 
-    # Signature block: team leader left, BGE right
+    # Signature block: team leader left, BGE right — both sides use the same
+    # fixed height (SIG_H) so the columns are visually equal even when the TL
+    # signature image hasn't been applied yet.
+    SIG_H = 20 * mm
+
     tl_col = [
         Paragraph('For GOPA AFC / PRUDEV II Programme', s['label']),
-        Spacer(1, 18),
+        Spacer(1, SIG_H),           # equal-height placeholder, always
         Paragraph('_' * 35, s['body']),
         Paragraph(_safe_html(work_order.team_leader_name or 'Stephen Maxi Opwonya'), s['body']),
         Paragraph(_safe_html(work_order.team_leader_position or 'Team Leader'), s['label']),
@@ -414,21 +476,21 @@ def render_work_order(work_order):
         try:
             sig_path = bge.signature.path
             if os.path.isfile(sig_path):
-                bge_col.append(RLImage(sig_path, width=60 * mm, height=20 * mm,
+                bge_col.append(RLImage(sig_path, width=80 * mm, height=SIG_H,
                                        kind='proportional'))
             else:
-                bge_col.append(Spacer(1, 18))
+                bge_col.append(Spacer(1, SIG_H))
         except Exception:
-            bge_col.append(Spacer(1, 18))
+            bge_col.append(Spacer(1, SIG_H))
     else:
-        bge_col.append(Spacer(1, 18))
+        bge_col.append(Spacer(1, SIG_H))
 
     bge_col += [
         Paragraph('_' * 35, s['body']),
         Paragraph(_safe_html(bge.name), s['body']),
         Paragraph(_safe_html(bge.bge_code or ''), s['label']),
         Paragraph(
-            f'Date: {work_order.bge_signed_date}' if work_order.bge_signed_date else 'Date: ___________',
+            f'Date: {work_order.bge_signed_date}' if work_order.bge_signed_date else 'Date: ___________________________',
             s['meta'],
         ),
     ]

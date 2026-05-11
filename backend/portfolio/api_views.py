@@ -1921,6 +1921,20 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         self._require_admin()
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """Admin-only: render the work order as a PDF for download/preview."""
+        self._require_admin()
+        work_order = self.get_object()
+        from .pdf_reports import render_work_order
+        buf = render_work_order(work_order)
+        fname = f'WorkOrder_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}.pdf'
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        dl = request.query_params.get('dl', '0')
+        disp = 'attachment' if dl == '1' else 'inline'
+        resp['Content-Disposition'] = f'{disp}; filename="{fname}"'
+        return resp
+
     @action(detail=True, methods=['post'], url_path='issue')
     def issue(self, request, pk=None):
         """Admin-only: set status → issued, generate PDF, email to BGE."""

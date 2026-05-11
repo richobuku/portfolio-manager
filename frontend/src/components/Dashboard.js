@@ -23,7 +23,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -2330,6 +2330,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             Issue
                           </Button>
                         </span>
+                      </Tooltip>
+                    )}
+                    {wo.status !== 'draft' && (
+                      <Tooltip title={wo.status === 'signed' ? 'Download signed work order PDF' : 'Preview work order PDF'}>
+                        <IconButton
+                          size="small"
+                          color={wo.status === 'signed' ? 'success' : 'primary'}
+                          component="a"
+                          href={`${WORK_ORDER_PDF_URL(wo.id)}?dl=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Download fontSize="small" />
+                        </IconButton>
                       </Tooltip>
                     )}
                     <Tooltip title="Edit">
