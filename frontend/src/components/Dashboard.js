@@ -36,10 +36,11 @@ const NAV_ITEMS = [
   { key: 'users',       label: 'User Accounts',  icon: <ManageAccounts /> },
   { key: 'bgegroups',   label: 'BGE Groups',     icon: <Group /> },
   { key: 'cohorts',     label: 'Cohorts',        icon: <AccountTree /> },
-  { key: 'training',    label: 'Training',       icon: <School /> },
-  { key: 'reports',     label: 'Reports',        icon: <PictureAsPdf /> },
-  { key: 'workorders',  label: 'Work Orders',    icon: <Assignment /> },
-  { key: 'analytics',   label: 'Analytics',      icon: <Assessment /> },
+  { key: 'training',       label: 'Training',       icon: <School /> },
+  { key: 'participation',  label: 'Participation',  icon: <TrendingUp /> },
+  { key: 'reports',        label: 'Reports',        icon: <PictureAsPdf /> },
+  { key: 'workorders',     label: 'Work Orders',    icon: <Assignment /> },
+  { key: 'analytics',      label: 'Analytics',      icon: <Assessment /> },
 ];
 
 export default function Dashboard({ token, currentUser, onLogout }) {
@@ -132,8 +133,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [sessionLoading, setSessionLoading] = useState(false);
   const [attendanceDialog, setAttendanceDialog] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [sessionMsmes, setSessionMsmes] = useState([]);
+  const [sessionAttendees, setSessionAttendees] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+
+  // ── participation summary ──────────────────────────────────────────────────
+  const [participationSummary, setParticipationSummary] = useState(null);
+  const [participationLoading, setParticipationLoading] = useState(false);
+  const [participationCohort, setParticipationCohort] = useState('');
 
   // ── reports ────────────────────────────────────────────────────────────────
   const [reports, setReports] = useState([]);
@@ -658,30 +664,96 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     finally { setSessionLoading(false); }
   };
 
+  const EMPTY_ATTENDEE = () => ({
+    _key: Math.random(),
+    id: null,
+    msme: '',
+    attendee_name: '',
+    attendee_phone: '',
+    gender: '',
+    age_group: '',
+    refugee_status: 'H',
+    consent_photo: true,
+    consent_contact: true,
+    present: true,
+  });
+
   const openAttendance = async (session) => {
     setSelectedSession(session);
     setAttendanceLoading(true);
     setAttendanceDialog(true);
     try {
       const res = await axios.get(`${API_ENDPOINTS.ATTENDANCE}?session=${session.id}`, { headers });
-      const attended = new Set((Array.isArray(res.data) ? res.data : res.data.results || []).filter(a => a.present).map(a => a.msme));
-      setSessionMsmes(msmes.map(m => ({ ...m, present: attended.has(m.id) })));
+      const records = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      if (records.length > 0) {
+        setSessionAttendees(records.map(r => ({ ...r, _key: r.id })));
+      } else {
+        // Pre-fill from session's MSMEs for convenience
+        const sessionMsmeList = msmes.filter(m => m.is_active);
+        setSessionAttendees(sessionMsmeList.length > 0
+          ? sessionMsmeList.slice(0, 20).map(m => ({
+              ...EMPTY_ATTENDEE(),
+              msme: m.id,
+              attendee_name: m.owner_name || '',
+              attendee_phone: m.phone || '',
+              gender: m.gender === 'MALE' ? 'M' : m.gender === 'FEMALE' ? 'F' : '',
+            }))
+          : [EMPTY_ATTENDEE()]);
+      }
     } catch { notify('Failed to load attendance', 'error'); }
     finally { setAttendanceLoading(false); }
+  };
+
+  const updateAttendee = (key, field, value) => {
+    setSessionAttendees(prev => prev.map(a => a._key === key ? { ...a, [field]: value } : a));
+  };
+
+  const addAttendeeRow = () => {
+    setSessionAttendees(prev => [...prev, EMPTY_ATTENDEE()]);
+  };
+
+  const removeAttendeeRow = (key) => {
+    setSessionAttendees(prev => prev.filter(a => a._key !== key));
   };
 
   const saveAttendance = async () => {
     setAttendanceLoading(true);
     try {
-      await Promise.all(sessionMsmes.map(m =>
-        axios.post(`${API_ENDPOINTS.TRAINING_SESSIONS}${selectedSession.id}/mark_attendance/`, { msme_id: m.id, present: m.present }, { headers })
-      ));
+      const present = sessionAttendees.filter(a => a.present);
+      await Promise.all(present.map(a => {
+        const payload = {
+          session: selectedSession.id,
+          msme: a.msme || null,
+          attendee_name: a.attendee_name,
+          attendee_phone: a.attendee_phone,
+          gender: a.gender,
+          age_group: a.age_group,
+          refugee_status: a.refugee_status || 'H',
+          consent_photo: a.consent_photo,
+          consent_contact: a.consent_contact,
+          present: true,
+        };
+        if (a.id) return axios.patch(`${API_ENDPOINTS.ATTENDANCE}${a.id}/`, payload, { headers });
+        return axios.post(API_ENDPOINTS.ATTENDANCE, payload, { headers });
+      }));
       notify('Attendance saved');
       setAttendanceDialog(false);
       fetchAll();
     } catch { notify('Failed to save attendance', 'error'); }
     finally { setAttendanceLoading(false); }
   };
+
+  const fetchParticipationSummary = useCallback(async (cohortId = '') => {
+    setParticipationLoading(true);
+    try {
+      const url = cohortId
+        ? `${API_ENDPOINTS.ATTENDANCE_SUMMARY}?cohort=${cohortId}`
+        : API_ENDPOINTS.ATTENDANCE_SUMMARY;
+      const res = await axios.get(url, { headers });
+      setParticipationSummary(res.data);
+    } catch { notify('Failed to load participation summary', 'error'); }
+    finally { setParticipationLoading(false); }
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── user management helpers ────────────────────────────────────────────────
   const createBGEUser = async () => {
@@ -2418,6 +2490,121 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     </Box>
   );
 
+  const renderParticipation = () => {
+    const s = participationSummary;
+    const statBox = (label, value, color = '#1565C0') => (
+      <Grid item xs={6} sm={4} md={3} key={label}>
+        <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+          <Typography variant="h4" fontWeight={700} sx={{ color }}>{value ?? '—'}</Typography>
+          <Typography variant="caption" color="text.secondary">{label}</Typography>
+        </Paper>
+      </Grid>
+    );
+    return (
+      <Box sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box>
+            <Typography variant="h5" fontWeight={700}>Participation Summary</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Aggregated attendance + BGE report data across all sessions and deployments
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Filter by Cohort</InputLabel>
+              <Select value={participationCohort} label="Filter by Cohort"
+                onChange={e => { setParticipationCohort(e.target.value); fetchParticipationSummary(e.target.value); }}>
+                <MenuItem value="">All Cohorts</MenuItem>
+                {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <Button variant="outlined" onClick={() => fetchParticipationSummary(participationCohort)}>
+              Refresh
+            </Button>
+          </Box>
+        </Box>
+
+        {participationLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+        ) : !s ? (
+          <Box sx={{ textAlign: 'center', py: 6 }}>
+            <Typography color="text.secondary" gutterBottom>No data loaded yet.</Typography>
+            <Button variant="contained" onClick={() => fetchParticipationSummary('')}>Load Summary</Button>
+          </Box>
+        ) : (
+          <>
+            {/* Top-level totals */}
+            <Typography variant="subtitle1" fontWeight={700} gutterBottom>Overall Attendance Totals</Typography>
+            <Grid container spacing={2} sx={{ mb: 4 }}>
+              {statBox('Total Attendees', s.total, '#1565C0')}
+              {statBox('Female', s.female, '#AD1457')}
+              {statBox('Male', s.male, '#1565C0')}
+              {statBox('Female Youth (18–34)', s.female_youth, '#AD1457')}
+              {statBox('Male Youth (18–34)', s.male_youth, '#1565C0')}
+              {statBox('Adult Female', s.female_adult, '#AD1457')}
+              {statBox('Adult Male', s.male_adult, '#1565C0')}
+              {statBox('Refugees (total)', s.refugees_total, '#E65100')}
+              {statBox('Female Refugees', s.refugee_female, '#E65100')}
+              {statBox('Male Refugees', s.refugee_male, '#E65100')}
+              {statBox('Host Community', s.host_community, '#2E7D32')}
+            </Grid>
+
+            {/* BGE report totals */}
+            <Typography variant="subtitle1" fontWeight={700} gutterBottom>BGE Field Reports</Typography>
+            <Grid container spacing={2} sx={{ mb: 4 }}>
+              {statBox('MSME Visit Reports', s.msme_reports, '#5C6BC0')}
+              {statBox('Unique MSMEs Visited', s.unique_msmes_visited, '#5C6BC0')}
+              {statBox('Group Sessions Filed', s.group_sessions, '#00695C')}
+            </Grid>
+
+            {/* Per-cohort breakdown */}
+            {(s.by_cohort || []).length > 0 && (
+              <>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>Breakdown by Cohort / Deployment</Typography>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableRow>
+                        <TableCell>Cohort</TableCell>
+                        <TableCell align="center">Attendees</TableCell>
+                        <TableCell align="center">Female</TableCell>
+                        <TableCell align="center">Male</TableCell>
+                        <TableCell align="center">Youth</TableCell>
+                        <TableCell align="center">Adults</TableCell>
+                        <TableCell align="center">Refugees</TableCell>
+                        <TableCell align="center">Host Comm.</TableCell>
+                        <TableCell align="center">MSME Reports</TableCell>
+                        <TableCell align="center">Unique MSMEs</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {s.by_cohort.map(c => (
+                        <TableRow key={c.cohort_id} hover>
+                          <TableCell fontWeight={500}>{c.cohort_name}</TableCell>
+                          <TableCell align="center"><Chip label={c.attendees} size="small" color="primary" /></TableCell>
+                          <TableCell align="center">{c.female}</TableCell>
+                          <TableCell align="center">{c.male}</TableCell>
+                          <TableCell align="center">{c.youth}</TableCell>
+                          <TableCell align="center">{c.adults}</TableCell>
+                          <TableCell align="center">
+                            {c.refugees > 0 ? <Chip label={c.refugees} size="small" color="warning" /> : '0'}
+                          </TableCell>
+                          <TableCell align="center">{c.host_comm}</TableCell>
+                          <TableCell align="center">{c.msme_reports}</TableCell>
+                          <TableCell align="center">{c.unique_msmes}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
+          </>
+        )}
+      </Box>
+    );
+  };
+
   const sectionMap = {
     msmes: renderMSMEs,
     experts: renderExperts,
@@ -2426,6 +2613,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     bgegroups: renderBGEGroups,
     cohorts: renderCohorts,
     training: renderTraining,
+    participation: renderParticipation,
     reports: renderReports,
     workorders: renderWorkOrders,
     analytics: renderAnalytics,
@@ -3004,43 +3192,160 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </DialogActions>
       </Dialog>
 
-      {/* ── Attendance ────────────────────────────────────────────────────── */}
-      <Dialog open={attendanceDialog} onClose={() => setAttendanceDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Attendance — {selectedSession?.title} ({selectedSession?.date})</DialogTitle>
+      {/* ── Attendance (per-person demographic sheet) ─────────────────────── */}
+      <Dialog open={attendanceDialog} onClose={() => setAttendanceDialog(false)} maxWidth="xl" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          Attendance Sheet — {selectedSession?.title}
+          <Typography variant="caption" display="block" color="text.secondary">
+            {selectedSession?.date} · {selectedSession?.location}
+          </Typography>
+        </DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
           {attendanceLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
           ) : (
-            <Table size="small">
-              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell padding="checkbox">Present</TableCell>
-                  <TableCell>Code</TableCell>
-                  <TableCell>Business</TableCell>
-                  <TableCell>Owner</TableCell>
-                  <TableCell>Location</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sessionMsmes.map(m => (
-                  <TableRow key={m.id} hover onClick={() => setSessionMsmes(prev => prev.map(x => x.id === m.id ? {...x, present: !x.present} : x))} sx={{cursor:'pointer'}}>
-                    <TableCell padding="checkbox"><Checkbox checked={!!m.present} size="small" /></TableCell>
-                    <TableCell><Chip label={m.msme_code} size="small" variant="outlined" /></TableCell>
-                    <TableCell>{m.business_name}</TableCell>
-                    <TableCell>{m.owner_name}</TableCell>
-                    <TableCell>{m.city}</TableCell>
+            <Box>
+              {/* Per-person rows */}
+              <Table size="small" stickyHeader>
+                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell sx={{ minWidth: 30 }}>#</TableCell>
+                    <TableCell sx={{ minWidth: 160 }}>Name</TableCell>
+                    <TableCell sx={{ minWidth: 120 }}>Phone</TableCell>
+                    <TableCell sx={{ minWidth: 180 }}>MSME / Business</TableCell>
+                    <TableCell sx={{ minWidth: 60 }}>Sex</TableCell>
+                    <TableCell sx={{ minWidth: 90 }}>Age Group</TableCell>
+                    <TableCell sx={{ minWidth: 90 }}>Status</TableCell>
+                    <TableCell sx={{ minWidth: 80 }} align="center">Consent</TableCell>
+                    <TableCell />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {sessionAttendees.map((att, idx) => (
+                    <TableRow key={att._key} hover>
+                      <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
+                      <TableCell>
+                        <TextField size="small" placeholder="Full name" variant="standard"
+                          value={att.attendee_name}
+                          onChange={e => updateAttendee(att._key, 'attendee_name', e.target.value)}
+                          sx={{ minWidth: 140 }} />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" placeholder="Phone" variant="standard"
+                          value={att.attendee_phone}
+                          onChange={e => updateAttendee(att._key, 'attendee_phone', e.target.value)}
+                          sx={{ minWidth: 110 }} />
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard" displayEmpty
+                          value={att.msme || ''}
+                          onChange={e => {
+                            const m = msmes.find(x => x.id === e.target.value);
+                            updateAttendee(att._key, 'msme', e.target.value);
+                            if (m && !att.attendee_name) updateAttendee(att._key, 'attendee_name', m.owner_name || '');
+                          }}
+                          sx={{ minWidth: 160 }}>
+                          <MenuItem value=""><em>— walk-in —</em></MenuItem>
+                          {msmes.filter(m => m.is_active).map(m => (
+                            <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
+                          ))}
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard" displayEmpty
+                          value={att.gender}
+                          onChange={e => updateAttendee(att._key, 'gender', e.target.value)}
+                          sx={{ minWidth: 55 }}>
+                          <MenuItem value=""><em>—</em></MenuItem>
+                          <MenuItem value="M">M</MenuItem>
+                          <MenuItem value="F">F</MenuItem>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard" displayEmpty
+                          value={att.age_group}
+                          onChange={e => updateAttendee(att._key, 'age_group', e.target.value)}
+                          sx={{ minWidth: 80 }}>
+                          <MenuItem value=""><em>—</em></MenuItem>
+                          <MenuItem value="18-34">18–34</MenuItem>
+                          <MenuItem value="35-45">35–45</MenuItem>
+                          <MenuItem value="46-55">46–55</MenuItem>
+                          <MenuItem value="56+">56+</MenuItem>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard"
+                          value={att.refugee_status}
+                          onChange={e => updateAttendee(att._key, 'refugee_status', e.target.value)}
+                          sx={{ minWidth: 80 }}>
+                          <MenuItem value="H">Host Comm.</MenuItem>
+                          <MenuItem value="R">Refugee</MenuItem>
+                        </Select>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Photo consent">
+                          <Checkbox size="small" checked={!!att.consent_photo}
+                            onChange={e => updateAttendee(att._key, 'consent_photo', e.target.checked)} />
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small" color="error" onClick={() => removeAttendeeRow(att._key)}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Summary table — mirrors the PRUDEV II attendance sheet footer */}
+              {sessionAttendees.length > 0 && (() => {
+                const present = sessionAttendees;
+                const male   = present.filter(a => a.gender === 'M');
+                const female = present.filter(a => a.gender === 'F');
+                const youth  = present.filter(a => a.age_group === '18-34');
+                const adult  = present.filter(a => ['35-45','46-55','56+'].includes(a.age_group));
+                const ref    = present.filter(a => a.refugee_status === 'R');
+                const host   = present.filter(a => a.refugee_status === 'H');
+                return (
+                  <Box sx={{ m: 2, p: 2, bgcolor: '#F3F6FB', border: '1px solid #c5d5e8', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={700} gutterBottom>Summary</Typography>
+                    <Grid container spacing={1}>
+                      {[
+                        { label: 'Total', value: present.length, color: '#1565C0' },
+                        { label: 'Female', value: female.length, color: '#AD1457' },
+                        { label: 'Male', value: male.length, color: '#1565C0' },
+                        { label: 'Female Youth', value: youth.filter(a => a.gender === 'F').length, color: '#AD1457' },
+                        { label: 'Male Youth', value: youth.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Adult Female', value: adult.filter(a => a.gender === 'F').length, color: '#AD1457' },
+                        { label: 'Adult Male', value: adult.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Refugees', value: ref.length, color: '#E65100' },
+                        { label: 'Female Refugee', value: ref.filter(a => a.gender === 'F').length, color: '#E65100' },
+                        { label: 'Male Refugee', value: ref.filter(a => a.gender === 'M').length, color: '#E65100' },
+                        { label: 'Host Community', value: host.length, color: '#2E7D32' },
+                      ].map(({ label, value, color }) => (
+                        <Grid item xs={6} sm={4} md={3} lg={2} key={label}>
+                          <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#fff', borderRadius: 1, border: `1px solid ${color}20` }}>
+                            <Typography variant="h6" fontWeight={700} sx={{ color }}>{value}</Typography>
+                            <Typography variant="caption" color="text.secondary">{label}</Typography>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                );
+              })()}
+            </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Typography variant="body2" sx={{ flex:1, pl:2, color:'text.secondary' }}>
-            {sessionMsmes.filter(m => m.present).length} / {sessionMsmes.length} present
-          </Typography>
+          <Button size="small" startIcon={<Add />} onClick={addAttendeeRow} sx={{ mr: 'auto' }}>
+            Add row
+          </Button>
           <Button onClick={() => setAttendanceDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveAttendance} disabled={attendanceLoading}>Save</Button>
+          <Button variant="contained" onClick={saveAttendance} disabled={attendanceLoading}>
+            {attendanceLoading ? <CircularProgress size={18} /> : 'Save Attendance'}
+          </Button>
         </DialogActions>
       </Dialog>
 

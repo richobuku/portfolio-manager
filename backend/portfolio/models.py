@@ -343,16 +343,42 @@ class TrainingSession(models.Model):
         return f"{self.title} ({self.date})"
 
 class Attendance(models.Model):
-    session = models.ForeignKey(TrainingSession, on_delete=models.CASCADE, related_name='attendances')
-    msme = models.ForeignKey('MSME', on_delete=models.CASCADE, related_name='attendances')
-    present = models.BooleanField(default=False)
-    marked_at = models.DateTimeField(auto_now=True)
+    AGE_GROUP_CHOICES = [
+        ('18-34', '18–34 (Youth)'),
+        ('35-45', '35–45'),
+        ('46-55', '46–55'),
+        ('56+',   '56+'),
+    ]
+    GENDER_CHOICES = [
+        ('M', 'Male'),
+        ('F', 'Female'),
+    ]
+    REFUGEE_STATUS_CHOICES = [
+        ('R', 'Refugee'),
+        ('H', 'Host Community'),
+    ]
+
+    session        = models.ForeignKey(TrainingSession, on_delete=models.CASCADE, related_name='attendances')
+    # msme is now optional — we can record walk-in / non-MSME participants too
+    msme           = models.ForeignKey('MSME', on_delete=models.SET_NULL, null=True, blank=True, related_name='attendances')
+    present        = models.BooleanField(default=True)
+    marked_at      = models.DateTimeField(auto_now=True)
+
+    # Per-person demographic fields (matching the PRUDEV II attendance sheet)
+    attendee_name  = models.CharField(max_length=200, blank=True)
+    attendee_phone = models.CharField(max_length=30, blank=True)
+    gender         = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
+    age_group      = models.CharField(max_length=10, choices=AGE_GROUP_CHOICES, blank=True)
+    refugee_status = models.CharField(max_length=1, choices=REFUGEE_STATUS_CHOICES, blank=True, default='H')
+    consent_photo  = models.BooleanField(default=True)
+    consent_contact= models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ('session', 'msme')
+        ordering = ['session', 'attendee_name']
 
     def __str__(self):
-        return f"{self.msme} - {self.session}: {'Present' if self.present else 'Absent'}"
+        name = self.attendee_name or (self.msme.business_name if self.msme else '?')
+        return f"{name} — {self.session}"
 
 
 class MSMEReport(models.Model):

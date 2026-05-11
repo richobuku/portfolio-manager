@@ -1312,30 +1312,122 @@ class TrainingSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def mark_attendance(self, request, pk=None):
+        """Legacy single-MSME toggle kept for backward compat."""
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can mark attendance.")
         session = self.get_object()
         msme_id = request.data.get('msme_id')
         present = request.data.get('present', True)
-        attendance, _ = Attendance.objects.get_or_create(
-            session=session, msme_id=msme_id, defaults={'present': present}
-        )
-        attendance.present = present
-        attendance.save()
-        return Response(AttendanceSerializer(attendance).data)
+        qs = Attendance.objects.filter(session=session, msme_id=msme_id)
+        if qs.exists():
+            att = qs.first()
+            att.present = present
+            att.save()
+        else:
+            att = Attendance.objects.create(session=session, msme_id=msme_id, present=present)
+        return Response(AttendanceSerializer(att).data)
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):
-    queryset = Attendance.objects.all()
+    queryset = Attendance.objects.select_related('msme', 'session').all()
     serializer_class = AttendanceSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = Attendance.objects.all()
+        qs = Attendance.objects.select_related('msme', 'session').all()
         sid = self.request.query_params.get('session')
         if sid:
             qs = qs.filter(session_id=sid)
+        cohort = self.request.query_params.get('cohort')
+        if cohort:
+            qs = qs.filter(msme__cohort_id=cohort)
         return qs
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """
+        Participation summary aggregated from attendance records + BGE reports.
+        Accepts optional filters: cohort, session, date_from, date_to.
+        Returns demographic breakdown + report totals per cohort.
+        """
+        from django.db.models import Count, Q
+        from portfolio.models import MSMEReport, GroupReport, Cohort as CohortModel
+
+        cohort_id  = request.query_params.get('cohort')
+        session_id = request.query_params.get('session')
+        date_from  = request.query_params.get('date_from')
+        date_to    = request.query_params.get('date_to')
+
+        att_qs = Attendance.objects.filter(present=True)
+        rep_qs = MSMEReport.objects.filter(status='submitted')
+        grp_qs = GroupReport.objects.filter(status__in=['submitted', 'approved'])
+
+        if cohort_id:
+            att_qs = att_qs.filter(msme__cohort_id=cohort_id)
+            rep_qs = rep_qs.filter(msme__cohort_id=cohort_id)
+            grp_qs = grp_qs.filter(group__bge_groups_msmes__cohort_id=cohort_id)
+        if session_id:
+            att_qs = att_qs.filter(session_id=session_id)
+        if date_from:
+            att_qs = att_qs.filter(session__date__gte=date_from)
+            rep_qs = rep_qs.filter(visit_date__gte=date_from)
+            grp_qs = grp_qs.filter(session_date__gte=date_from)
+        if date_to:
+            att_qs = att_qs.filter(session__date__lte=date_to)
+            rep_qs = rep_qs.filter(visit_date__lte=date_to)
+            grp_qs = grp_qs.filter(session_date__lte=date_to)
+
+        total     = att_qs.count()
+        male      = att_qs.filter(gender='M').count()
+        female    = att_qs.filter(gender='F').count()
+        youth     = att_qs.filter(age_group='18-34')
+        adult     = att_qs.exclude(age_group='18-34').filter(age_group__in=['35-45','46-55','56+'])
+        refugees  = att_qs.filter(refugee_status='R')
+        host_comm = att_qs.filter(refugee_status='H')
+
+        male_youth    = youth.filter(gender='M').count()
+        female_youth  = youth.filter(gender='F').count()
+        male_adult    = adult.filter(gender='M').count()
+        female_adult  = adult.filter(gender='F').count()
+        refugee_male  = refugees.filter(gender='M').count()
+        refugee_female= refugees.filter(gender='F').count()
+
+        # Per-cohort breakdown for compound view
+        cohorts_data = []
+        for cohort in CohortModel.objects.all().order_by('name'):
+            c_att  = att_qs.filter(msme__cohort=cohort)
+            c_rep  = rep_qs.filter(msme__cohort=cohort)
+            cohorts_data.append({
+                'cohort_id':   cohort.id,
+                'cohort_name': cohort.name,
+                'attendees':   c_att.count(),
+                'male':        c_att.filter(gender='M').count(),
+                'female':      c_att.filter(gender='F').count(),
+                'youth':       c_att.filter(age_group='18-34').count(),
+                'adults':      c_att.exclude(age_group='18-34').count(),
+                'refugees':    c_att.filter(refugee_status='R').count(),
+                'host_comm':   c_att.filter(refugee_status='H').count(),
+                'msme_reports':c_rep.count(),
+                'unique_msmes':c_rep.values('msme').distinct().count(),
+            })
+
+        return Response({
+            'total': total,
+            'male': male,
+            'female': female,
+            'male_youth':    male_youth,
+            'female_youth':  female_youth,
+            'male_adult':    male_adult,
+            'female_adult':  female_adult,
+            'refugees_total': refugees.count(),
+            'refugee_male':  refugee_male,
+            'refugee_female':refugee_female,
+            'host_community':host_comm.count(),
+            'msme_reports':  rep_qs.count(),
+            'unique_msmes_visited': rep_qs.values('msme').distinct().count(),
+            'group_sessions': grp_qs.count(),
+            'by_cohort': cohorts_data,
+        })
 
 
 class TrainingTopicViewSet(viewsets.ModelViewSet):

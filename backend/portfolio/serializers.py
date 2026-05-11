@@ -130,8 +130,12 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
 
 
 class AttendanceSerializer(serializers.ModelSerializer):
-    msme_name = serializers.CharField(source='msme.business_name', read_only=True)
-    session_title = serializers.CharField(source='session.title', read_only=True)
+    msme_name    = serializers.CharField(source='msme.business_name', read_only=True, allow_null=True)
+    msme_code    = serializers.CharField(source='msme.msme_code',     read_only=True, allow_null=True)
+    msme_owner   = serializers.CharField(source='msme.owner_name',    read_only=True, allow_null=True)
+    msme_phone   = serializers.CharField(source='msme.phone',         read_only=True, allow_null=True)
+    session_title = serializers.CharField(source='session.title',     read_only=True)
+    session_date  = serializers.DateField(source='session.date',      read_only=True)
 
     class Meta:
         model = Attendance
