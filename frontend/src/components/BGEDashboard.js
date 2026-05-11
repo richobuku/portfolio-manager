@@ -73,48 +73,6 @@ const EMPTY_CONTRIBUTION = {
   follow_up_needed: '',
 };
 
-const WORK_ORDER_DEFAULTS = {
-  msme_support: {
-    objective: `To mobilise assigned MSMEs (up to 65 per peer-to-peer group) for peer-to-peer learning sessions, onboard them onto a suitable CRM platform based on their individual interest and business needs (such as Message Carrier, Brevo, or an equivalent tool), ensure their customer information is accurate and up to date, unlock sales opportunities, and provide structured 1-on-1 business development support.`,
-    key_tasks: `1. Mobilise assigned MSMEs by reaching out, explaining session objectives, and confirming participation dates and location.\n2. Document any MSME that is unavailable or declines in the non-engagement register and notify the Senior BGE promptly.\n3. Assess each MSME's interest, digital capacity, and business needs to recommend the most appropriate CRM platform and support them to register and set up their account.\n4. Ensure all CRM account login credentials are handed directly to the MSME owner and not stored by the BGE.\n5. Assist each MSME in configuring their chosen CRM system by helping them input, structure, and verify their customer contact list.\n6. Work with each MSME to identify and unlock sales opportunities using their updated customer data.\n7. Conduct a structured 1-on-1 session with each assigned MSME using the standardised PRUDEV II session template.\n8. Attend and actively participate in the peer-to-peer learning sessions, supporting facilitation and ensuring MSMEs are engaged.\n9. Maintain personal accountability for the accuracy and timely submission of all attendance sheets and field reports.\n10. Document all field activities, session notes, and MSME progress in the required PRUDEV II formats.\n11. Maintain confidentiality of all MSME data and business information at all times.`,
-    deliverables_json: [
-      { task_num: 1, description: 'MSME mobilisation list – names and contacts of all MSMEs confirmed for the peer-to-peer session', due_date: 'End of Week 1' },
-      { task_num: 2, description: 'MSME non-engagement register – documented record of any MSME that was unavailable or declined, including reason and date of attempt', due_date: 'Rolling – within 2 days of each contact attempt' },
-      { task_num: 3, description: 'Signed MSME registration forms for the selected CRM platform', due_date: 'Rolling – per MSME onboarded' },
-      { task_num: 4, description: 'CRM set-up confirmation report – evidence that each MSME has an active account, owns their login credentials, and has their customer list uploaded', due_date: 'End of Week 2' },
-      { task_num: 5, description: 'Updated customer list per MSME – cleaned, verified, and entered into the CRM system', due_date: 'End of Week 2' },
-      { task_num: 6, description: '1-on-1 session notes for each MSME (using standardised PRUDEV II template) – business performance, CRM utilisation, sales unlock priorities, and agreed next steps', due_date: 'Within 2 days of each session' },
-      { task_num: 7, description: 'Signed peer-to-peer session attendance sheets – original signed sheets submitted to the Senior BGE', due_date: 'Per session, day of event' },
-      { task_num: 8, description: 'Monthly field activity report – covering peer-to-peer session attendance, CRM adoption, 1-on-1 sessions conducted, non-engagement cases, and key MSME challenges', due_date: 'Last working day of each month' },
-      { task_num: 9, description: 'Approved invoice and signed timesheet', due_date: 'With monthly report submission' },
-    ],
-  },
-  mobilisation: {
-    objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
-    key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.\n2. Clarify programme expectations – this is NOT a job offer; it is training to build their own business.\n3. Gather applicant information: full name, contact number, district, qualifications, smartphone access, and logistics concerns.\n4. Identify and flag barriers to participation (transport, accommodation, timing) and document in the barrier report.\n5. Provide follow-up SMS reminders to confirmed participants with dates, venue details, and what to bring.\n6. Track confirmed vs. declined applicants and provide updates to the BDS Component Coordinator.`,
-    deliverables_json: [
-      { task_num: 1, description: 'Daily Call Log – record of each call made, time, outcome (confirmed/declined/unreachable), and notes', due_date: 'Daily' },
-      { task_num: 2, description: 'Applicant Information Sheet – updated contact list with confirmed participants, qualifications verified, and logistics information', due_date: 'End of mobilisation period' },
-      { task_num: 3, description: 'Barrier Report – summary of identified barriers to participation and recommendations for support', due_date: 'End of mobilisation period' },
-      { task_num: 4, description: 'Final Mobilisation Summary Report – confirmation rates, analysis of no-shows/declines, and final participant count', due_date: 'Day after mobilisation closes' },
-    ],
-  },
-  group_session: {
-    objective: `To facilitate and document peer-to-peer learning sessions with assigned MSME groups. The BGE will ensure effective knowledge sharing, monitor MSME engagement and progress, and submit timely session reports.`,
-    key_tasks: `1. Prepare session materials and agenda in line with PRUDEV II session templates.\n2. Facilitate the peer-to-peer group session, ensuring all assigned MSMEs are engaged and participate actively.\n3. Document attendance and participation using the official PRUDEV II attendance sheet.\n4. Capture key discussions, challenges raised, and outcomes agreed during the session.\n5. Support individual MSMEs with queries or follow-up actions arising from the session.\n6. Submit session notes and attendance records within the required timelines.`,
-    deliverables_json: [
-      { task_num: 1, description: 'Signed attendance sheet – original submitted to Senior BGE on the day of the session', due_date: 'Day of session' },
-      { task_num: 2, description: 'Session notes – key topics discussed, challenges raised, and agreed follow-up actions', due_date: 'Within 2 days of session' },
-      { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session' },
-    ],
-  },
-  other: {
-    objective: '',
-    key_tasks: '',
-    deliverables_json: [],
-  },
-};
-
 const STANDARD_CONDITIONS = [
   'The BGE must use only the standardised PRUDEV II tools and templates and submit all reports in the provided formats.',
   'The BGE is fully accountable for the accuracy, completeness, and timely submission of all attendance sheets and field reports.',
@@ -127,25 +85,6 @@ const STANDARD_CONDITIONS = [
   'GOPA AFC reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
 ];
 
-const EMPTY_WORK_ORDER = {
-  work_order_type: 'msme_support',
-  issue_date: new Date().toISOString().slice(0, 10),
-  start_date: '',
-  end_date: '',
-  location: 'Northern Uganda (Gulu & Lira)',
-  duration: '2 months',
-  objective: WORK_ORDER_DEFAULTS.msme_support.objective,
-  key_tasks: WORK_ORDER_DEFAULTS.msme_support.key_tasks,
-  deliverables_json: WORK_ORDER_DEFAULTS.msme_support.deliverables_json,
-  rate_per_day: 60000,
-  max_days: 4,
-  transport_reimbursed: true,
-  payment_notes: '',
-  team_leader_name: 'Stephen Maxi Opwonya',
-  team_leader_position: 'Team Leader',
-  status: 'draft',
-  group: '',
-};
 
 export default function BGEDashboard({ token, currentUser, onLogout }) {
   const headers = { Authorization: `Bearer ${token}` };
@@ -175,13 +114,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [contributionErrors, setContributionErrors] = useState('');
   const [contributionEditingId, setContributionEditingId] = useState(null);
 
-  // Work orders
+  // Work orders (read-only for BGE — admin issues, BGE views)
   const [workOrders, setWorkOrders] = useState([]);
-  const [workOrderDialog, setWorkOrderDialog] = useState(false);
-  const [workOrderForm, setWorkOrderForm] = useState(EMPTY_WORK_ORDER);
-  const [workOrderSaving, setWorkOrderSaving] = useState(false);
-  const [workOrderErrors, setWorkOrderErrors] = useState('');
   const [workOrderPreview, setWorkOrderPreview] = useState(null);
+
+  // Signature upload
+  const [sigFile, setSigFile] = useState(null);
+  const [sigUploading, setSigUploading] = useState(false);
+  const [sigUrl, setSigUrl] = useState(currentUser?.bge_profile?.signature_url || null);
+  const sigInputRef = useRef(null);
 
   const myBgeId = currentUser?.bge_profile?.id;
   const myBgeCode = currentUser?.bge_profile?.bge_code || '';
@@ -504,39 +445,26 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
-  // ── work order helpers ────────────────────────────────────────────────────
-  const openNewWorkOrder = () => {
-    setWorkOrderForm({ ...EMPTY_WORK_ORDER });
-    setWorkOrderErrors('');
-    setWorkOrderDialog(true);
-  };
-
-  const handleWorkOrderTypeChange = (type) => {
-    const defaults = WORK_ORDER_DEFAULTS[type] || WORK_ORDER_DEFAULTS.other;
-    setWorkOrderForm(f => ({
-      ...f,
-      work_order_type: type,
-      objective: defaults.objective,
-      key_tasks: defaults.key_tasks,
-      deliverables_json: defaults.deliverables_json,
-    }));
-  };
-
-  const saveWorkOrder = async () => {
-    if (!workOrderForm.issue_date) { setWorkOrderErrors('Issue date is required.'); return; }
-    setWorkOrderSaving(true);
-    setWorkOrderErrors('');
+  // ── signature upload ──────────────────────────────────────────────────────
+  const uploadSignature = async () => {
+    if (!sigFile) return;
+    setSigUploading(true);
     try {
-      await axios.post(API_ENDPOINTS.WORK_ORDERS, workOrderForm, { headers });
-      notify('Work order created');
-      setWorkOrderDialog(false);
-      fetchWorkOrders();
-    } catch (err) {
-      setWorkOrderErrors(
-        err.response?.data?.detail || JSON.stringify(err.response?.data || {}) || 'Failed to save work order.'
+      const bgeId = currentUser?.bge_profile?.id;
+      const fd = new FormData();
+      fd.append('signature', sigFile);
+      const res = await axios.post(
+        `${API_ENDPOINTS.EXPERTS}${bgeId}/upload-signature/`,
+        fd,
+        { headers: { ...headers, 'Content-Type': 'multipart/form-data' } },
       );
+      setSigUrl(res.data.signature_url);
+      setSigFile(null);
+      notify('Signature uploaded successfully');
+    } catch (err) {
+      notify(err.response?.data?.error || 'Signature upload failed', 'error');
     } finally {
-      setWorkOrderSaving(false);
+      setSigUploading(false);
     }
   };
 
@@ -958,28 +886,59 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </Box>
         )}
 
-        {/* ── Work Orders ── */}
+        {/* ── Work Orders (read-only — admin issues) ── */}
         {section === 'workorders' && (
           <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>Work Orders</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {workOrders.length} work order{workOrders.length !== 1 ? 's' : ''} issued
-                  {myBgeCode && (
-                    <Box component="span" sx={{ ml: 1, color: BRAND.primaryMain, fontWeight: 600 }}>
-                      · BGE code: {myBgeCode}
-                    </Box>
-                  )}
-                </Typography>
+            {/* Signature upload card */}
+            <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} gutterBottom>My Signature</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Upload a JPEG or PNG of your signature. It will be cleaned (background removed) and
+                embedded in your work orders and reports when you submit them.
+              </Typography>
+              {sigUrl && (
+                <Box sx={{ mb: 1.5, p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, display: 'inline-block', bgcolor: '#f9f9f9' }}>
+                  <img src={sigUrl} alt="My signature" style={{ maxHeight: 60, maxWidth: 220, display: 'block' }} />
+                </Box>
+              )}
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  ref={sigInputRef}
+                  style={{ display: 'none' }}
+                  onChange={e => setSigFile(e.target.files[0] || null)}
+                />
+                <Button variant="outlined" size="small" onClick={() => sigInputRef.current?.click()}>
+                  {sigFile ? sigFile.name : 'Choose file…'}
+                </Button>
+                {sigFile && (
+                  <Button variant="contained" size="small" onClick={uploadSignature} disabled={sigUploading}>
+                    {sigUploading ? <CircularProgress size={16} /> : 'Upload'}
+                  </Button>
+                )}
+                {sigUrl && !sigFile && (
+                  <Typography variant="caption" color="success.main">Signature on file ✓</Typography>
+                )}
               </Box>
-              <Button variant="contained" startIcon={<Add />} onClick={openNewWorkOrder}>New Work Order</Button>
+            </Card>
+
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={700}>Issued Work Orders</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {workOrders.length} work order{workOrders.length !== 1 ? 's' : ''} issued to you
+                {myBgeCode && (
+                  <Box component="span" sx={{ ml: 1, color: BRAND.primaryMain, fontWeight: 600 }}>
+                    · BGE code: {myBgeCode}
+                  </Box>
+                )}
+              </Typography>
             </Box>
 
             {workOrders.length === 0 ? (
               <Paper sx={{ p: 6, textAlign: 'center' }}>
                 <Description sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-                <Typography color="text.secondary">No work orders yet.</Typography>
+                <Typography color="text.secondary">No work orders have been issued to you yet.</Typography>
               </Paper>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1000,7 +959,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           <Chip
                             label={wo.status_display || wo.status}
                             size="small"
-                            color={wo.status === 'signed' ? 'success' : wo.status === 'issued' ? 'primary' : 'default'}
+                            color={wo.status === 'signed' ? 'success' : 'primary'}
                           />
                           <Tooltip title="Print / Save as PDF">
                             <IconButton size="small" onClick={() => setWorkOrderPreview(wo)}>
@@ -1521,125 +1480,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <Button onClick={() => setContributionDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={saveContribution} disabled={contributionSaving}>
             {contributionSaving ? <CircularProgress size={18} /> : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── Work Order create dialog ── */}
-      <Dialog open={workOrderDialog} onClose={() => setWorkOrderDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Typography fontWeight={700}>New Work Order</Typography>
-          <Typography variant="caption" color="text.secondary">
-            PRUDEV II · {currentUser?.bge_profile?.name || ''} · {myBgeCode}
-          </Typography>
-        </DialogTitle>
-        <DialogContent dividers>
-          {workOrderErrors && <Alert severity="error" sx={{ mb: 2 }}>{workOrderErrors}</Alert>}
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Work Order Type</InputLabel>
-                <Select
-                  value={workOrderForm.work_order_type}
-                  label="Work Order Type"
-                  onChange={e => handleWorkOrderTypeChange(e.target.value)}
-                >
-                  <MenuItem value="msme_support">MSME CRM & Business Support</MenuItem>
-                  <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
-                  <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Issue Date" type="date" InputLabelProps={{ shrink: true }}
-                value={workOrderForm.issue_date}
-                onChange={e => setWorkOrderForm(f => ({ ...f, issue_date: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Start Date" type="date" InputLabelProps={{ shrink: true }}
-                value={workOrderForm.start_date}
-                onChange={e => setWorkOrderForm(f => ({ ...f, start_date: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="End Date" type="date" InputLabelProps={{ shrink: true }}
-                value={workOrderForm.end_date}
-                onChange={e => setWorkOrderForm(f => ({ ...f, end_date: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={8}>
-              <TextField fullWidth size="small" label="Location"
-                value={workOrderForm.location}
-                onChange={e => setWorkOrderForm(f => ({ ...f, location: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Duration (e.g. 2 months)"
-                value={workOrderForm.duration}
-                onChange={e => setWorkOrderForm(f => ({ ...f, duration: e.target.value }))} />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>1. Objective</Typography>
-              <TextField fullWidth multiline minRows={3} size="small"
-                value={workOrderForm.objective}
-                onChange={e => setWorkOrderForm(f => ({ ...f, objective: e.target.value }))} />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>2. Key Tasks</Typography>
-              <TextField fullWidth multiline minRows={5} size="small"
-                helperText="One task per line"
-                value={workOrderForm.key_tasks}
-                onChange={e => setWorkOrderForm(f => ({ ...f, key_tasks: e.target.value }))} />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>3. Deliverables</Typography>
-              {workOrderForm.deliverables_json.map((d, i) => (
-                <Box key={i} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'flex-start' }}>
-                  <Typography variant="caption" sx={{ pt: 1, minWidth: 20, fontWeight: 700 }}>{d.task_num}.</Typography>
-                  <TextField size="small" sx={{ flex: 3 }} multiline
-                    value={d.description}
-                    onChange={e => {
-                      const updated = [...workOrderForm.deliverables_json];
-                      updated[i] = { ...d, description: e.target.value };
-                      setWorkOrderForm(f => ({ ...f, deliverables_json: updated }));
-                    }} />
-                  <TextField size="small" sx={{ flex: 1 }} label="Due"
-                    value={d.due_date}
-                    onChange={e => {
-                      const updated = [...workOrderForm.deliverables_json];
-                      updated[i] = { ...d, due_date: e.target.value };
-                      setWorkOrderForm(f => ({ ...f, deliverables_json: updated }));
-                    }} />
-                </Box>
-              ))}
-              <Button size="small" startIcon={<Add />} onClick={() => setWorkOrderForm(f => ({
-                ...f,
-                deliverables_json: [...f.deliverables_json, { task_num: f.deliverables_json.length + 1, description: '', due_date: '' }],
-              }))}>Add deliverable</Button>
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Rate per day (UGX)" type="number"
-                value={workOrderForm.rate_per_day}
-                onChange={e => setWorkOrderForm(f => ({ ...f, rate_per_day: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Maximum days" type="number"
-                value={workOrderForm.max_days}
-                onChange={e => setWorkOrderForm(f => ({ ...f, max_days: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Team Leader Name"
-                value={workOrderForm.team_leader_name}
-                onChange={e => setWorkOrderForm(f => ({ ...f, team_leader_name: e.target.value }))} />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setWorkOrderDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveWorkOrder} disabled={workOrderSaving}>
-            {workOrderSaving ? <CircularProgress size={18} /> : 'Save Work Order'}
           </Button>
         </DialogActions>
       </Dialog>

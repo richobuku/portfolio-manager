@@ -287,3 +287,156 @@ def render_group_report(report):
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
     return buf
+
+
+def render_work_order(work_order):
+    """Build a styled PDF for one WorkOrder (PRUDEV II template)."""
+    import os
+    from reportlab.platypus import Image as RLImage, KeepTogether
+
+    s = _styles()
+    buf, doc = _build_doc()
+    story = []
+
+    bge = work_order.bge
+
+    story.append(Paragraph('WORK ORDER', s['h1']))
+    story.append(Paragraph(
+        f'{work_order.get_work_order_type_display()} · {work_order.work_order_number}',
+        s['sub'],
+    ))
+
+    story.append(_kv_table([
+        ['Work Order #',    work_order.work_order_number or '—'],
+        ['Project',         work_order.project_name or '—'],
+        ['Type',            work_order.get_work_order_type_display()],
+        ['Issue Date',      str(work_order.issue_date)],
+        ['BGE',             bge.name],
+        ['BGE Code',        bge.bge_code or '—'],
+        ['Email',           bge.email or '—'],
+        ['Location',        work_order.location or '—'],
+        ['Duration',        work_order.duration or '—'],
+        ['Start Date',      str(work_order.start_date) if work_order.start_date else '—'],
+        ['End Date',        str(work_order.end_date) if work_order.end_date else '—'],
+    ]))
+
+    story.append(Spacer(1, 8))
+
+    story.append(Paragraph('SCHEDULE 1 — SCOPE OF WORK', s['sectiontitle']))
+    story.extend(_section(s, 'Objective', work_order.objective))
+
+    if work_order.key_tasks:
+        story.append(Paragraph('Key Tasks', s['sectiontitle']))
+        for i, line in enumerate(work_order.key_tasks.splitlines(), start=1):
+            line = line.strip()
+            if line:
+                story.append(Paragraph(
+                    f'{i}. {_safe_html(line)}',
+                    ParagraphStyle('task', parent=s['body'], leftIndent=10),
+                ))
+
+    deliverables = work_order.deliverables_json or []
+    if deliverables:
+        story.append(Spacer(1, 6))
+        story.append(Paragraph('Deliverables', s['sectiontitle']))
+        rows = [['#', 'Description', 'Due Date']]
+        for d in deliverables:
+            rows.append([
+                str(d.get('task_num', '')),
+                d.get('description', ''),
+                str(d.get('due_date', '—')),
+            ])
+        t = Table(rows, hAlign='LEFT',
+                  colWidths=[12 * mm, 120 * mm, 38 * mm], repeatRows=1)
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY),
+            ('TEXTCOLOR',  (0, 0), (-1, 0), HexColor('#FFFFFF')),
+            ('FONT',       (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+            ('FONT',       (0, 1), (-1, -1), 'Helvetica', 9),
+            ('LINEBELOW',  (0, 0), (-1, -1), 0.25, LIGHT_GREY),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
+        ]))
+        story.append(t)
+
+    story.append(Spacer(1, 8))
+
+    story.append(Paragraph('SCHEDULE 2 — PAYMENT TERMS', s['sectiontitle']))
+    gross = work_order.rate_per_day * work_order.max_days
+    wht   = int(gross * 0.06)
+    net   = gross - wht
+    story.append(_kv_table([
+        ['Daily Rate',    f'UGX {work_order.rate_per_day:,}'],
+        ['Maximum Days',  str(work_order.max_days)],
+        ['Gross Amount',  f'UGX {gross:,}'],
+        ['WHT (6%)',      f'UGX {wht:,}'],
+        ['Net Payable',   f'UGX {net:,}'],
+        ['Transport',     'Reimbursed at cost' if work_order.transport_reimbursed else 'Not reimbursed'],
+    ]))
+    if work_order.payment_notes:
+        story.extend(_section(s, 'Payment Notes', work_order.payment_notes))
+
+    story.append(Spacer(1, 8))
+
+    CONDITIONS = [
+        'The BGE shall carry out the assignment with due diligence and in accordance with GOPA AFC and GIZ standards.',
+        'The BGE shall submit field visit reports within 5 working days of each visit.',
+        'Fees are conditional on satisfactory delivery of reports and approved deliverables.',
+        'Transport will be reimbursed upon submission of receipts / fuel log.',
+        'The BGE shall maintain confidentiality of all MSME and programme information.',
+        'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
+        'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+        'Any changes to the scope require written approval from the Team Leader.',
+        '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+    ]
+    story.append(Paragraph('CONDITIONS', s['sectiontitle']))
+    for i, cond in enumerate(CONDITIONS, start=1):
+        story.append(Paragraph(
+            f'{i}. {_safe_html(cond)}',
+            ParagraphStyle('cond', parent=s['body'], fontSize=9, leftIndent=10),
+        ))
+
+    story.append(Spacer(1, 12))
+
+    # Signature block: team leader left, BGE right
+    tl_col = [
+        Paragraph('For GOPA AFC / PRUDEV II Programme', s['label']),
+        Spacer(1, 18),
+        Paragraph('_' * 35, s['body']),
+        Paragraph(_safe_html(work_order.team_leader_name or 'Stephen Maxi Opwonya'), s['body']),
+        Paragraph(_safe_html(work_order.team_leader_position or 'Team Leader'), s['label']),
+        Paragraph(f'Date: {work_order.issue_date}', s['meta']),
+    ]
+
+    bge_col = [Paragraph('Accepted by BGE', s['label']), Spacer(1, 4)]
+    if bge.signature:
+        try:
+            sig_path = bge.signature.path
+            if os.path.isfile(sig_path):
+                bge_col.append(RLImage(sig_path, width=60 * mm, height=20 * mm,
+                                       kind='proportional'))
+            else:
+                bge_col.append(Spacer(1, 18))
+        except Exception:
+            bge_col.append(Spacer(1, 18))
+    else:
+        bge_col.append(Spacer(1, 18))
+
+    bge_col += [
+        Paragraph('_' * 35, s['body']),
+        Paragraph(_safe_html(bge.name), s['body']),
+        Paragraph(_safe_html(bge.bge_code or ''), s['label']),
+        Paragraph(
+            f'Date: {work_order.bge_signed_date}' if work_order.bge_signed_date else 'Date: ___________',
+            s['meta'],
+        ),
+    ]
+
+    sig_table = Table([[tl_col, bge_col]], colWidths=[85 * mm, 85 * mm], hAlign='LEFT')
+    sig_table.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    story.append(KeepTogether([sig_table]))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf

@@ -1010,6 +1010,71 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=True, methods=['post'], url_path='upload-signature')
+    def upload_signature(self, request, pk=None):
+        """BGE or admin can upload / replace the BGE's signature image.
+
+        The image is processed with Pillow: converted to RGBA and white/near-white
+        pixels are made transparent, producing a clean signature on any background.
+        """
+        bge = self.get_object()
+        # BGEs can only update their own signature; admins can update any.
+        is_admin = request.user.is_staff or request.user.is_superuser
+        try:
+            requester_bge = request.user.bge_profile
+        except Exception:
+            requester_bge = None
+        if not is_admin and (requester_bge is None or requester_bge.id != bge.id):
+            raise PermissionDenied("You can only upload your own signature.")
+
+        sig_file = request.FILES.get('signature')
+        if not sig_file:
+            return Response({'error': 'No signature file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not sig_file.content_type.startswith('image/'):
+            return Response({'error': 'File must be a JPEG or PNG image.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from PIL import Image as PilImage
+            import io as _io
+
+            img = PilImage.open(sig_file).convert('RGBA')
+
+            # Make near-white pixels transparent so the signature floats cleanly
+            datas = img.getdata()
+            new_data = []
+            threshold = 230  # pixels brighter than this in all channels → transparent
+            for item in datas:
+                r, g, b, a = item
+                if r > threshold and g > threshold and b > threshold:
+                    new_data.append((r, g, b, 0))
+                else:
+                    new_data.append((r, g, b, a))
+            img.putdata(new_data)
+
+            # Normalise size: cap at 600px wide keeping aspect ratio
+            max_w = 600
+            if img.width > max_w:
+                ratio = max_w / img.width
+                img = img.resize((max_w, int(img.height * ratio)), PilImage.LANCZOS)
+
+            buf = _io.BytesIO()
+            img.save(buf, format='PNG')
+            buf.seek(0)
+
+            from django.core.files.base import ContentFile
+            filename = f'sig_{bge.bge_code or bge.id}.png'
+            bge.signature.delete(save=False)  # remove old file if present
+            bge.signature.save(filename, ContentFile(buf.read()), save=True)
+
+        except Exception as exc:
+            return Response({'error': f'Image processing failed: {exc}'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'signature_url': request.build_absolute_uri(bge.signature.url) if bge.signature else None,
+            'detail': 'Signature uploaded and processed successfully.',
+        })
+
     @action(detail=False, methods=['post'], url_path='upload')
     def upload(self, request):
         """Upload BGE list from Excel. Matches PRUDEV II BGE list format."""
@@ -1717,18 +1782,21 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated as _IsAuth, AllowAny as _AllowAny
 
 class WorkOrderViewSet(viewsets.ModelViewSet):
-    """CRUD for Work Orders.
+    """Work Order management.
 
     Visibility:
-    - Admins see all work orders.
-    - A BGE sees only their own work orders.
+    - Admins see all work orders (any status).
+    - BGEs see only their own work orders with status 'issued' or 'signed'.
 
-    Creation:
-    - Admins can create for any BGE (pass `bge` pk in body).
-    - A BGE user can only create for themselves (bge auto-stamped).
+    Mutation (create / update / delete / issue):
+    - Admin-only. BGEs have read-only access.
     """
     serializer_class = WorkOrderSerializer
     permission_classes = [IsAuthenticated]
+
+    def _is_admin(self):
+        u = self.request.user
+        return u.is_staff or u.is_superuser
 
     def get_queryset(self):
         user = self.request.user
@@ -1738,46 +1806,77 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             if bge_id:
                 qs = qs.filter(bge_id=bge_id)
             return qs
+        # BGE users: their own issued/signed orders only
         try:
             bge = user.bge_profile
         except Exception:
             return qs.none()
-        return qs.filter(bge=bge)
+        return qs.filter(bge=bge, status__in=['issued', 'signed'])
 
-    def _bge_for_user(self):
-        try:
-            return self.request.user.bge_profile
-        except Exception:
-            return None
+    def _require_admin(self):
+        if not self._is_admin():
+            raise PermissionDenied("Work order management is restricted to administrators.")
 
     def perform_create(self, serializer):
-        is_admin = self.request.user.is_staff or self.request.user.is_superuser
-        if is_admin:
-            serializer.save()
-        else:
-            bge = self._bge_for_user()
-            if bge is None:
-                raise PermissionDenied("You don't have a BGE profile.")
-            serializer.save(bge=bge)
+        self._require_admin()
+        serializer.save()
 
     def perform_update(self, serializer):
-        is_admin = self.request.user.is_staff or self.request.user.is_superuser
-        instance = self.get_object()
-        bge = self._bge_for_user()
-        if not is_admin and (bge is None or instance.bge_id != bge.id):
-            raise PermissionDenied("You can only edit your own work orders.")
-        if not is_admin:
-            serializer.save(bge=instance.bge)
-        else:
-            serializer.save()
+        self._require_admin()
+        serializer.save()
 
     def destroy(self, request, *args, **kwargs):
-        is_admin = request.user.is_staff or request.user.is_superuser
-        instance = self.get_object()
-        bge = self._bge_for_user()
-        if not is_admin and (bge is None or instance.bge_id != bge.id):
-            raise PermissionDenied("You can only delete your own work orders.")
+        self._require_admin()
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='issue')
+    def issue(self, request, pk=None):
+        """Admin-only: set status → issued, generate PDF, email to BGE."""
+        self._require_admin()
+        work_order = self.get_object()
+
+        if work_order.status == 'issued':
+            return Response({'detail': 'Already issued.'}, status=status.HTTP_200_OK)
+
+        work_order.status = 'issued'
+        work_order.save(update_fields=['status'])
+
+        # Generate PDF
+        from .pdf_reports import render_work_order
+        pdf_buf = render_work_order(work_order)
+        pdf_bytes = pdf_buf.read()
+
+        bge = work_order.bge
+        recipient_email = bge.email or ''
+        admin_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
+        recipients = [r for r in [recipient_email, admin_email] if r]
+
+        if recipients:
+            subject = f'Work Order Issued — {work_order.work_order_number}'
+            body = (
+                f'Dear {bge.name},\n\n'
+                f'Please find attached your work order ({work_order.work_order_number}) '
+                f'for the PRUDEV II programme.\n\n'
+                f'Work Order Type: {work_order.get_work_order_type_display()}\n'
+                f'Issue Date: {work_order.issue_date}\n'
+                f'Net Payable: UGX {work_order.rate_per_day * work_order.max_days - int(work_order.rate_per_day * work_order.max_days * 0.06):,}\n\n'
+                f'Regards,\nPRUDEV II Programme Team\nGOPA AFC / GIZ'
+            )
+            email = EmailMultiAlternatives(subject, body,
+                                           getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
+                                           recipients)
+            filename = f'WorkOrder_{work_order.work_order_number.replace(" ", "_")}.pdf'
+            email.attach(filename, pdf_bytes, 'application/pdf')
+            try:
+                email.send(fail_silently=False)
+            except Exception as exc:
+                return Response(
+                    {'detail': f'Issued but email failed: {exc}'},
+                    status=status.HTTP_200_OK,
+                )
+
+        serializer = self.get_serializer(work_order)
+        return Response(serializer.data)
 
 
 @api_view(['POST'])

@@ -65,6 +65,7 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
     assigned_msme_count = serializers.SerializerMethodField()
     assigned_msmes_list = serializers.SerializerMethodField()
     group_names = serializers.SerializerMethodField()
+    signature_url = serializers.SerializerMethodField()
 
     class Meta:
         model = BusinessGrowthExpert
@@ -81,6 +82,14 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
 
     def get_group_names(self, obj):
         return list(obj.bge_groups.values_list('name', flat=True))
+
+    def get_signature_url(self, obj):
+        if not obj.signature:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.signature.url)
+        return obj.signature.url
 
 
 class BGEGroupSerializer(serializers.ModelSerializer):

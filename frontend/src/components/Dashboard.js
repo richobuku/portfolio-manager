@@ -23,7 +23,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -38,6 +38,7 @@ const NAV_ITEMS = [
   { key: 'cohorts',     label: 'Cohorts',        icon: <AccountTree /> },
   { key: 'training',    label: 'Training',       icon: <School /> },
   { key: 'reports',     label: 'Reports',        icon: <PictureAsPdf /> },
+  { key: 'workorders',  label: 'Work Orders',    icon: <Assignment /> },
   { key: 'analytics',   label: 'Analytics',      icon: <Assessment /> },
 ];
 
@@ -69,6 +70,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [trainingTopics, setTrainingTopics] = useState([]);
   const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // ── work orders ───────────────────────────────────────────────────────────
+  const [workOrders, setWorkOrders] = useState([]);
+  const [woFilterBge, setWoFilterBge] = useState('');
+  const [woFilterStatus, setWoFilterStatus] = useState('');
+  const [woDialog, setWoDialog] = useState(false);
+  const [woEditing, setWoEditing] = useState(null);
+  const [woForm, setWoForm] = useState({});
+  const [woSaving, setWoSaving] = useState(false);
+  const [woErrors, setWoErrors] = useState('');
+  const [woIssuing, setWoIssuing] = useState(null);
 
   // ── filters ────────────────────────────────────────────────────────────────
   const [msmeSearch, setMsmeSearch] = useState('');
@@ -210,6 +222,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   }, [token]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const fetchWorkOrders = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    const params = new URLSearchParams();
+    if (woFilterBge) params.append('bge', woFilterBge);
+    if (woFilterStatus) params.append('status', woFilterStatus);
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.WORK_ORDERS}?${params}`, { headers: h });
+      setWorkOrders(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      setWorkOrders([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, woFilterBge, woFilterStatus]);
+
+  useEffect(() => { fetchWorkOrders(); }, [fetchWorkOrders]);
 
   // Lightweight, debounced refetch JUST for the MSME list when search/filter
   // changes. AbortController cancels any in-flight request when the user keeps
@@ -2011,6 +2039,285 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     );
   };
 
+  const WO_EMPTY = {
+    bge: '',
+    group: '',
+    work_order_type: 'msme_support',
+    project_name: 'Promoting Rural Development II (PRUDEV II)',
+    issue_date: new Date().toISOString().slice(0, 10),
+    start_date: '',
+    end_date: '',
+    location: 'Northern Uganda (Gulu & Lira)',
+    duration: '2 months',
+    objective: '',
+    key_tasks: '',
+    deliverables_json: [],
+    rate_per_day: 60000,
+    max_days: 4,
+    transport_reimbursed: true,
+    payment_notes: '',
+    team_leader_name: 'Stephen Maxi Opwonya',
+    team_leader_position: 'Team Leader',
+  };
+
+  const openWoCreate = () => { setWoEditing(null); setWoForm({ ...WO_EMPTY }); setWoErrors(''); setWoDialog(true); };
+  const openWoEdit = (wo) => {
+    setWoEditing(wo);
+    setWoForm({
+      bge: wo.bge,
+      group: wo.group || '',
+      work_order_type: wo.work_order_type,
+      project_name: wo.project_name,
+      issue_date: wo.issue_date,
+      start_date: wo.start_date || '',
+      end_date: wo.end_date || '',
+      location: wo.location,
+      duration: wo.duration,
+      objective: wo.objective,
+      key_tasks: wo.key_tasks,
+      deliverables_json: wo.deliverables_json || [],
+      rate_per_day: wo.rate_per_day,
+      max_days: wo.max_days,
+      transport_reimbursed: wo.transport_reimbursed,
+      payment_notes: wo.payment_notes || '',
+      team_leader_name: wo.team_leader_name,
+      team_leader_position: wo.team_leader_position,
+    });
+    setWoErrors('');
+    setWoDialog(true);
+  };
+
+  const saveWo = async () => {
+    if (!woForm.bge) { setWoErrors('BGE is required.'); return; }
+    if (!woForm.issue_date) { setWoErrors('Issue date is required.'); return; }
+    setWoSaving(true); setWoErrors('');
+    try {
+      const payload = { ...woForm, group: woForm.group || null };
+      if (woEditing) {
+        await axios.put(`${API_ENDPOINTS.WORK_ORDERS}${woEditing.id}/`, payload, { headers });
+      } else {
+        await axios.post(API_ENDPOINTS.WORK_ORDERS, payload, { headers });
+      }
+      setSuccess(woEditing ? 'Work order updated.' : 'Work order created.');
+      setWoDialog(false);
+      fetchWorkOrders();
+    } catch (err) {
+      setWoErrors(err.response?.data?.detail || JSON.stringify(err.response?.data || {}) || 'Save failed.');
+    } finally {
+      setWoSaving(false);
+    }
+  };
+
+  const issueWo = async (wo) => {
+    setWoIssuing(wo.id);
+    try {
+      await axios.post(WORK_ORDER_ISSUE_URL(wo.id), {}, { headers });
+      setSuccess(`Work order ${wo.work_order_number} issued and emailed to ${wo.bge_name}.`);
+      fetchWorkOrders();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to issue work order.');
+    } finally {
+      setWoIssuing(null);
+    }
+  };
+
+  const deleteWo = async (wo) => {
+    if (!window.confirm(`Delete work order ${wo.work_order_number}?`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.WORK_ORDERS}${wo.id}/`, { headers });
+      setSuccess('Work order deleted.');
+      fetchWorkOrders();
+    } catch {
+      setError('Failed to delete work order.');
+    }
+  };
+
+  const renderWorkOrders = () => (
+    <Box>
+      <SectionHeader title="Work Orders" subtitle={`${workOrders.length} work orders`}>
+        <Button variant="contained" startIcon={<Add />} size="small" onClick={openWoCreate}>New Work Order</Button>
+      </SectionHeader>
+
+      {/* Filters */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Filter by BGE</InputLabel>
+          <Select value={woFilterBge} label="Filter by BGE" onChange={e => setWoFilterBge(e.target.value)}>
+            <MenuItem value="">All BGEs</MenuItem>
+            {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Status</InputLabel>
+          <Select value={woFilterStatus} label="Status" onChange={e => setWoFilterStatus(e.target.value)}>
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="draft">Draft</MenuItem>
+            <MenuItem value="issued">Issued</MenuItem>
+            <MenuItem value="signed">Signed</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      {workOrders.length === 0 ? (
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <Assignment sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+          <Typography color="text.secondary">No work orders yet.</Typography>
+        </Paper>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {workOrders.map(wo => (
+            <Card variant="outlined" key={wo.id}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+                  <Box>
+                    <Typography fontWeight={700}>{wo.work_order_number}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {wo.work_order_type_display} · {wo.bge_name} ({wo.bge_code_display})
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Issued: {wo.issue_date}{wo.start_date ? ` · Start: ${wo.start_date}` : ''}{wo.end_date ? ` – ${wo.end_date}` : ''}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">{wo.location}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Chip
+                      label={wo.status_display || wo.status}
+                      size="small"
+                      color={wo.status === 'signed' ? 'success' : wo.status === 'issued' ? 'primary' : 'default'}
+                    />
+                    {wo.status === 'draft' && (
+                      <Tooltip title="Issue & email PDF to BGE">
+                        <span>
+                          <Button
+                            variant="contained" size="small" color="success"
+                            startIcon={woIssuing === wo.id ? <CircularProgress size={14} color="inherit" /> : <Email />}
+                            disabled={woIssuing === wo.id}
+                            onClick={() => issueWo(wo)}
+                          >
+                            Issue
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    )}
+                    <Tooltip title="Edit">
+                      <IconButton size="small" onClick={() => openWoEdit(wo)} disabled={wo.status !== 'draft'}>
+                        <Edit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton size="small" color="error" onClick={() => deleteWo(wo)} disabled={wo.status !== 'draft'}>
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Box>
+                {wo.objective && (
+                  <Alert severity="info" sx={{ mt: 1.5, py: 0.5 }} icon={false}>
+                    <Typography variant="caption" fontWeight={600}>Objective</Typography>
+                    <Typography variant="caption" display="block">
+                      {wo.objective.length > 200 ? wo.objective.slice(0, 200) + '…' : wo.objective}
+                    </Typography>
+                  </Alert>
+                )}
+                <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Rate: <strong>UGX {Number(wo.rate_per_day).toLocaleString()}/day</strong>
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Max: <strong>{wo.max_days} days</strong>
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Net: <strong>UGX {(wo.rate_per_day * wo.max_days * 0.94).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      )}
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={woDialog} onClose={() => setWoDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle fontWeight={700}>{woEditing ? 'Edit Work Order' : 'New Work Order'}</DialogTitle>
+        <DialogContent dividers>
+          {woErrors && <Alert severity="error" sx={{ mb: 2 }}>{woErrors}</Alert>}
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small" required>
+                <InputLabel>BGE</InputLabel>
+                <Select value={woForm.bge} label="BGE" onChange={e => setWoForm(f => ({ ...f, bge: e.target.value }))}>
+                  {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Work Order Type</InputLabel>
+                <Select value={woForm.work_order_type} label="Work Order Type"
+                  onChange={e => setWoForm(f => ({ ...f, work_order_type: e.target.value }))}>
+                  <MenuItem value="msme_support">MSME CRM & Business Support</MenuItem>
+                  <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
+                  <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Issue Date" type="date" InputLabelProps={{ shrink: true }}
+                value={woForm.issue_date} onChange={e => setWoForm(f => ({ ...f, issue_date: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Start Date" type="date" InputLabelProps={{ shrink: true }}
+                value={woForm.start_date} onChange={e => setWoForm(f => ({ ...f, start_date: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="End Date" type="date" InputLabelProps={{ shrink: true }}
+                value={woForm.end_date} onChange={e => setWoForm(f => ({ ...f, end_date: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={8}>
+              <TextField fullWidth size="small" label="Location"
+                value={woForm.location} onChange={e => setWoForm(f => ({ ...f, location: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Duration"
+                value={woForm.duration} onChange={e => setWoForm(f => ({ ...f, duration: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth multiline minRows={3} size="small" label="Objective"
+                value={woForm.objective} onChange={e => setWoForm(f => ({ ...f, objective: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth multiline minRows={5} size="small" label="Key Tasks (one per line)"
+                value={woForm.key_tasks} onChange={e => setWoForm(f => ({ ...f, key_tasks: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Rate / day (UGX)" type="number"
+                value={woForm.rate_per_day} onChange={e => setWoForm(f => ({ ...f, rate_per_day: Number(e.target.value) }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Maximum days" type="number"
+                value={woForm.max_days} onChange={e => setWoForm(f => ({ ...f, max_days: Number(e.target.value) }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Team Leader Name"
+                value={woForm.team_leader_name} onChange={e => setWoForm(f => ({ ...f, team_leader_name: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth size="small" label="Payment notes (optional)"
+                value={woForm.payment_notes} onChange={e => setWoForm(f => ({ ...f, payment_notes: e.target.value }))} />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setWoDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveWo} disabled={woSaving}>
+            {woSaving ? <CircularProgress size={18} /> : (woEditing ? 'Save Changes' : 'Create')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+
   const sectionMap = {
     msmes: renderMSMEs,
     experts: renderExperts,
@@ -2020,6 +2327,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     cohorts: renderCohorts,
     training: renderTraining,
     reports: renderReports,
+    workorders: renderWorkOrders,
     analytics: renderAnalytics,
   };
 

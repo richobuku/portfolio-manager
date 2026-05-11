@@ -263,6 +263,10 @@ class BusinessGrowthExpert(models.Model):
         blank=True,
         help_text='Shared objectives for this BGE across all their assigned MSMEs'
     )
+    signature = models.ImageField(
+        upload_to='signatures/', null=True, blank=True,
+        help_text='JPEG/PNG signature image; background will be normalised on upload'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
