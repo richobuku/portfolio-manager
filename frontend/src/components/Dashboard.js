@@ -2265,6 +2265,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const downloadWoPdf = async (wo) => {
+    try {
+      const res = await axios.get(WORK_ORDER_PDF_URL(wo.id), {
+        headers, responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `WorkOrder_${(wo.work_order_number || wo.id).replace(/\s/g, '_')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { notify('Failed to download PDF', 'error'); }
+  };
+
   const renderWorkOrders = () => (
     <Box>
       <SectionHeader title="Work Orders" subtitle={`${workOrders.length} work orders`}>
@@ -2333,14 +2347,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       </Tooltip>
                     )}
                     {wo.status !== 'draft' && (
-                      <Tooltip title={wo.status === 'signed' ? 'Download signed work order PDF' : 'Preview work order PDF'}>
+                      <Tooltip title={wo.status === 'signed' ? 'Download signed work order PDF' : 'Download work order PDF'}>
                         <IconButton
                           size="small"
                           color={wo.status === 'signed' ? 'success' : 'primary'}
-                          component="a"
-                          href={`${WORK_ORDER_PDF_URL(wo.id)}?dl=1`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          onClick={() => downloadWoPdf(wo)}
                         >
                           <Download fontSize="small" />
                         </IconButton>
