@@ -2039,6 +2039,64 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     );
   };
 
+  const WO_DEFAULTS = {
+    msme_support: {
+      objective: `To mobilise assigned MSMEs (up to 65 per peer-to-peer group) for peer-to-peer learning sessions, onboard them onto a suitable CRM platform based on their individual interest and business needs (such as Message Carrier, Brevo, or an equivalent tool), ensure their customer information is accurate and up to date, unlock sales opportunities, and provide structured 1-on-1 business development support.`,
+      key_tasks: `1. Mobilise assigned MSMEs by reaching out, explaining session objectives, and confirming participation dates and location.
+2. Document any MSME that is unavailable or declines in the non-engagement register and notify the Senior BGE promptly.
+3. Assess each MSME's interest, digital capacity, and business needs to recommend the most appropriate CRM platform.
+4. Ensure all CRM account login credentials are handed directly to the MSME owner and not stored by the BGE.
+5. Assist each MSME in configuring their chosen CRM system by helping them input, structure, and verify their customer contact list.
+6. Work with each MSME to identify and unlock sales opportunities using their updated customer data.
+7. Conduct a structured 1-on-1 session with each assigned MSME using the standardised PRUDEV II session template.
+8. Attend and actively participate in the peer-to-peer learning sessions, supporting facilitation and ensuring MSMEs are engaged.
+9. Maintain personal accountability for the accuracy and timely submission of all attendance sheets and field reports.
+10. Document all field activities, session notes, and MSME progress in the required PRUDEV II formats.
+11. Maintain confidentiality of all MSME data and business information at all times.`,
+      deliverables_json: [
+        { task_num: 1, description: 'MSME mobilisation list – names and contacts of all MSMEs confirmed for the peer-to-peer session', due_date: 'End of Week 1' },
+        { task_num: 2, description: 'MSME non-engagement register – documented record of any MSME that was unavailable or declined', due_date: 'Rolling – within 2 days of each contact attempt' },
+        { task_num: 3, description: 'Signed MSME registration forms for the selected CRM platform', due_date: 'Rolling – per MSME onboarded' },
+        { task_num: 4, description: 'CRM set-up confirmation report – evidence that each MSME has an active account and customer list uploaded', due_date: 'End of Week 2' },
+        { task_num: 5, description: 'Updated customer list per MSME – cleaned, verified, and entered into the CRM system', due_date: 'End of Week 2' },
+        { task_num: 6, description: '1-on-1 session notes for each MSME (using standardised PRUDEV II template)', due_date: 'Within 2 days of each session' },
+        { task_num: 7, description: 'Signed peer-to-peer session attendance sheets submitted to the Senior BGE', due_date: 'Per session, day of event' },
+        { task_num: 8, description: 'Monthly field activity report covering CRM adoption, sessions conducted, and key MSME challenges', due_date: 'Last working day of each month' },
+        { task_num: 9, description: 'Approved invoice and signed timesheet', due_date: 'With monthly report submission' },
+      ],
+    },
+    mobilisation: {
+      objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
+      key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
+2. Clarify programme expectations – this is NOT a job offer; it is training to build their own business.
+3. Gather applicant information: full name, contact number, district, qualifications, smartphone access, and logistics concerns.
+4. Identify and flag barriers to participation (transport, accommodation, timing) and document in the barrier report.
+5. Provide follow-up SMS reminders to confirmed participants with dates, venue details, and what to bring.
+6. Track confirmed vs. declined applicants and provide updates to the BDS Component Coordinator.`,
+      deliverables_json: [
+        { task_num: 1, description: 'Daily Call Log – record of each call made, time, outcome, and notes', due_date: 'Daily' },
+        { task_num: 2, description: 'Applicant Information Sheet – confirmed participants, qualifications verified, logistics information', due_date: 'End of mobilisation period' },
+        { task_num: 3, description: 'Barrier Report – summary of identified barriers and recommendations for support', due_date: 'End of mobilisation period' },
+        { task_num: 4, description: 'Final Mobilisation Summary Report – confirmation rates, analysis of no-shows/declines, final participant count', due_date: 'Day after mobilisation closes' },
+      ],
+    },
+    group_session: {
+      objective: `To facilitate and document peer-to-peer learning sessions with assigned MSME groups. The BGE will ensure effective knowledge sharing, monitor MSME engagement and progress, and submit timely session reports.`,
+      key_tasks: `1. Prepare session materials and agenda in line with PRUDEV II session templates.
+2. Facilitate the peer-to-peer group session, ensuring all assigned MSMEs are engaged and participate actively.
+3. Document attendance and participation using the official PRUDEV II attendance sheet.
+4. Capture key discussions, challenges raised, and outcomes agreed during the session.
+5. Support individual MSMEs with queries or follow-up actions arising from the session.
+6. Submit session notes and attendance records within the required timelines.`,
+      deliverables_json: [
+        { task_num: 1, description: 'Signed attendance sheet – original submitted to Senior BGE on the day of the session', due_date: 'Day of session' },
+        { task_num: 2, description: 'Session notes – key topics discussed, challenges raised, and agreed follow-up actions', due_date: 'Within 2 days of session' },
+        { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session' },
+      ],
+    },
+    other: { objective: '', key_tasks: '', deliverables_json: [] },
+  };
+
   const WO_EMPTY = {
     bge: '',
     group: '',
@@ -2049,15 +2107,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     end_date: '',
     location: 'Northern Uganda (Gulu & Lira)',
     duration: '2 months',
-    objective: '',
-    key_tasks: '',
-    deliverables_json: [],
+    ...WO_DEFAULTS.msme_support,
     rate_per_day: 60000,
     max_days: 4,
     transport_reimbursed: true,
     payment_notes: '',
     team_leader_name: 'Stephen Maxi Opwonya',
     team_leader_position: 'Team Leader',
+  };
+
+  const applyWoDefaults = (type) => {
+    const d = WO_DEFAULTS[type] || WO_DEFAULTS.other;
+    setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json }));
   };
 
   const openWoCreate = () => { setWoEditing(null); setWoForm({ ...WO_EMPTY }); setWoErrors(''); setWoDialog(true); };
@@ -2254,7 +2315,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <FormControl fullWidth size="small">
                 <InputLabel>Work Order Type</InputLabel>
                 <Select value={woForm.work_order_type} label="Work Order Type"
-                  onChange={e => setWoForm(f => ({ ...f, work_order_type: e.target.value }))}>
+                  onChange={e => applyWoDefaults(e.target.value)}>
                   <MenuItem value="msme_support">MSME CRM & Business Support</MenuItem>
                   <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                   <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
@@ -2288,8 +2349,47 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </Grid>
             <Grid item xs={12}>
               <TextField fullWidth multiline minRows={5} size="small" label="Key Tasks (one per line)"
+                helperText="Each numbered task on its own line — pre-populated by type, fully editable."
                 value={woForm.key_tasks} onChange={e => setWoForm(f => ({ ...f, key_tasks: e.target.value }))} />
             </Grid>
+
+            {/* Deliverables table */}
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" fontWeight={700}>Deliverables</Typography>
+                <Button size="small" startIcon={<Add />} onClick={() => setWoForm(f => ({
+                  ...f,
+                  deliverables_json: [...f.deliverables_json, { task_num: f.deliverables_json.length + 1, description: '', due_date: '' }],
+                }))}>Add row</Button>
+              </Box>
+              {(woForm.deliverables_json || []).map((d, i) => (
+                <Box key={i} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'flex-start' }}>
+                  <Typography variant="caption" sx={{ pt: 1.2, minWidth: 22, fontWeight: 700 }}>{d.task_num}.</Typography>
+                  <TextField size="small" sx={{ flex: 3 }} multiline label="Deliverable description"
+                    value={d.description}
+                    onChange={e => {
+                      const upd = [...woForm.deliverables_json];
+                      upd[i] = { ...d, description: e.target.value };
+                      setWoForm(f => ({ ...f, deliverables_json: upd }));
+                    }} />
+                  <TextField size="small" sx={{ flex: 1 }} label="Due date"
+                    value={d.due_date}
+                    onChange={e => {
+                      const upd = [...woForm.deliverables_json];
+                      upd[i] = { ...d, due_date: e.target.value };
+                      setWoForm(f => ({ ...f, deliverables_json: upd }));
+                    }} />
+                  <IconButton size="small" color="error" sx={{ mt: 0.5 }} onClick={() => {
+                    const upd = woForm.deliverables_json.filter((_, j) => j !== i)
+                      .map((x, j) => ({ ...x, task_num: j + 1 }));
+                    setWoForm(f => ({ ...f, deliverables_json: upd }));
+                  }}>
+                    <Delete fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+            </Grid>
+
             <Grid item xs={12} sm={4}>
               <TextField fullWidth size="small" label="Rate / day (UGX)" type="number"
                 value={woForm.rate_per_day} onChange={e => setWoForm(f => ({ ...f, rate_per_day: Number(e.target.value) }))} />

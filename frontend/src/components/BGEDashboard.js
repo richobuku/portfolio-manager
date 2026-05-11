@@ -114,6 +114,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [contributionErrors, setContributionErrors] = useState('');
   const [contributionEditingId, setContributionEditingId] = useState(null);
 
+  // Contributions loaded inside the team-lead group report dialog
+  const [reportContributions, setReportContributions] = useState([]);
+
   // Work orders (read-only for BGE — admin issues, BGE views)
   const [workOrders, setWorkOrders] = useState([]);
   const [workOrderPreview, setWorkOrderPreview] = useState(null);
@@ -245,18 +248,19 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setReportDialog(true);
   };
 
-  const saveReport = async () => {
+  const saveReport = async (statusOverride) => {
     if (!reportForm.msme) { setReportErrors('Please select an MSME.'); return; }
     if (!reportForm.visit_date) { setReportErrors('Please set a visit date.'); return; }
     setReportSaving(true);
     setReportErrors('');
+    const payload = statusOverride ? { ...reportForm, status: statusOverride } : reportForm;
     try {
       if (editingReport) {
-        await axios.patch(`${API_ENDPOINTS.REPORTS}${editingReport.id}/`, reportForm, { headers });
-        notify('Report updated');
+        await axios.patch(`${API_ENDPOINTS.REPORTS}${editingReport.id}/`, payload, { headers });
+        notify(statusOverride === 'submitted' ? 'Report submitted' : 'Draft saved');
       } else {
-        await axios.post(API_ENDPOINTS.REPORTS, reportForm, { headers });
-        notify('Report saved');
+        await axios.post(API_ENDPOINTS.REPORTS, payload, { headers });
+        notify(statusOverride === 'submitted' ? 'Report submitted' : 'Draft saved');
       }
       setReportDialog(false);
       fetchReports();
@@ -275,7 +279,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setGroupReportDialog(true);
   };
 
-  const openEditGroupReport = (rep) => {
+  const openEditGroupReport = async (rep) => {
     setEditingGroupReport(rep);
     setGroupReportForm({
       group: rep.group,
@@ -292,10 +296,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       status: rep.status,
     });
     setGroupReportErrors('');
+    setReportContributions([]);
+    // Load member contributions so the lead can integrate them
+    try {
+      const r = await axios.get(
+        `${API_ENDPOINTS.GROUP_REPORT_CONTRIBUTIONS}?group_report=${rep.id}`,
+        { headers }
+      );
+      const list = Array.isArray(r.data) ? r.data : (r.data.results || []);
+      setReportContributions(list.filter(c => c.bge !== myBgeId)); // exclude lead's own
+    } catch {
+      setReportContributions([]);
+    }
     setGroupReportDialog(true);
   };
 
-  const saveGroupReport = async () => {
+  const saveGroupReport = async (statusOverride) => {
     if (!groupReportForm.group) { setGroupReportErrors('Please select a group.'); return; }
     if (!groupReportForm.visit_date) { setGroupReportErrors('Please set a visit date.'); return; }
     setGroupReportSaving(true);
@@ -303,14 +319,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     const payload = {
       ...groupReportForm,
       session_number: groupReportForm.session_number === '' ? null : Number(groupReportForm.session_number),
+      ...(statusOverride ? { status: statusOverride } : {}),
     };
     try {
       if (editingGroupReport) {
         await axios.patch(`${API_ENDPOINTS.GROUP_REPORTS}${editingGroupReport.id}/`, payload, { headers });
-        notify('Group report updated');
+        notify(statusOverride === 'submitted' ? 'Group report submitted' : 'Group report draft saved');
       } else {
         await axios.post(API_ENDPOINTS.GROUP_REPORTS, payload, { headers });
-        notify('Group report saved');
+        notify(statusOverride === 'submitted' ? 'Group report submitted' : 'Group report draft saved');
       }
       setGroupReportDialog(false);
       fetchGroupReports();
@@ -592,56 +609,104 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   <Typography color="text.secondary">No MSMEs directly assigned yet. Contact your programme administrator.</Typography>
                 </Paper>
               ) : (
-                <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
                   {directMsmes.map((m) => {
                     const msmeReportCount = reports.filter(r => r.msme === m.id).length;
+                    const lastReport = reports.filter(r => r.msme === m.id).sort((a, b) => b.visit_date > a.visit_date ? 1 : -1)[0];
                     return (
-                      <Grid item xs={12} sm={6} md={4} key={m.id}>
-                        <Card
-                          sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, borderLeft: `4px solid ${BRAND.primaryMain}` }}
-                          onClick={() => openMsmeDetail(m)}
-                        >
-                          <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                              <Typography fontWeight={700} fontSize={14} sx={{ flex: 1, mr: 1 }}>{m.business_name}</Typography>
+                      <Card key={m.id}
+                        sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, borderLeft: `4px solid ${BRAND.primaryMain}` }}
+                        onClick={() => openMsmeDetail(m)}
+                      >
+                        <CardContent>
+                          {/* Row 1: name + type + action buttons */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, gap: 1 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography fontWeight={700} fontSize={15}>{m.business_name}</Typography>
+                              <Typography variant="caption" color="text.secondary">{m.msme_code}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
                               <Chip label={m.business_type || 'MSME'} size="small" variant="outlined" />
+                              <Tooltip title="View details & reports">
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMsmeDetail(m); }}>
+                                  <Visibility fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="New report">
+                                <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
+                                  <Add fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
                             </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>{m.msme_code}</Typography>
-                            {m.sector && <Typography variant="caption" color="text.secondary" display="block">{m.sector}</Typography>}
+                          </Box>
 
-                            <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
-                              {m.cohort_name && (
-                                <Chip label={`Cohort ${m.cohort_name}`} size="small"
-                                  sx={{ bgcolor: BRAND.programmeGreen + '20', color: BRAND.programmeGreen, fontWeight: 600 }} />
-                              )}
-                              {m.session_number && (
-                                <Chip label={`Session ${m.session_number}`} size="small" variant="outlined" />
-                              )}
-                            </Box>
-
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {msmeReportCount} report{msmeReportCount !== 1 ? 's' : ''}
+                          {/* Row 2: key fields grid */}
+                          <Grid container spacing={1} sx={{ mb: 1 }}>
+                            {m.owner_name && (
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary" display="block">Owner</Typography>
+                                <Typography variant="body2" fontWeight={500}>{m.owner_name}</Typography>
+                              </Grid>
+                            )}
+                            {m.phone && (
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary" display="block">Phone</Typography>
+                                <Typography variant="body2">{m.phone}</Typography>
+                              </Grid>
+                            )}
+                            {(m.city || m.state) && (
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary" display="block">Location</Typography>
+                                <Typography variant="body2">{[m.city, m.state].filter(Boolean).join(', ')}</Typography>
+                              </Grid>
+                            )}
+                            {m.sector && (
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary" display="block">Sector</Typography>
+                                <Typography variant="body2">{m.sector}</Typography>
+                              </Grid>
+                            )}
+                            {m.assignment_date && (
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary" display="block">Assigned</Typography>
+                                <Typography variant="body2">{m.assignment_date}</Typography>
+                              </Grid>
+                            )}
+                            <Grid item xs={6} sm={3}>
+                              <Typography variant="caption" color="text.secondary" display="block">Reports</Typography>
+                              <Typography variant="body2" fontWeight={600} color={msmeReportCount > 0 ? 'primary.main' : 'text.secondary'}>
+                                {msmeReportCount} filed{lastReport ? ` · last ${lastReport.visit_date}` : ''}
                               </Typography>
-                              <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                <Tooltip title="View & write reports">
-                                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMsmeDetail(m); }}>
-                                    <Visibility fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="New report for this MSME">
-                                  <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
-                                    <Add fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Box>
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      </Grid>
+                            </Grid>
+                          </Grid>
+
+                          {/* Assignment objectives (truncated) */}
+                          {m.assignment_objectives && (
+                            <Alert severity="info" icon={false} sx={{ py: 0.5, mt: 0.5 }}>
+                              <Typography variant="caption" fontWeight={600} display="block">Assignment objective</Typography>
+                              <Typography variant="caption" sx={{ whiteSpace: 'pre-wrap' }}>
+                                {m.assignment_objectives.length > 180
+                                  ? m.assignment_objectives.slice(0, 180) + '…'
+                                  : m.assignment_objectives}
+                              </Typography>
+                            </Alert>
+                          )}
+
+                          {/* Chips row */}
+                          <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
+                            {m.cohort_name && (
+                              <Chip label={`Cohort ${m.cohort_name}`} size="small"
+                                sx={{ bgcolor: BRAND.programmeGreen + '20', color: BRAND.programmeGreen, fontWeight: 600 }} />
+                            )}
+                            {m.session_number && (
+                              <Chip label={`Session ${m.session_number}`} size="small" variant="outlined" />
+                            )}
+                          </Box>
+                        </CardContent>
+                      </Card>
                     );
                   })}
-                </Grid>
+                </Box>
               )}
             </Box>
           );
@@ -1114,15 +1179,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select value={reportForm.status} label="Status" onChange={e => setReportForm({ ...reportForm, status: e.target.value })}>
-                  <MenuItem value="draft">Draft</MenuItem>
-                  <MenuItem value="submitted">Submitted</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
           </Grid>
 
           <Divider sx={{ my: 2 }}>
@@ -1149,13 +1205,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             />
           ))}
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
           <Button onClick={() => setReportDialog(false)}>Cancel</Button>
+          <Button variant="outlined" onClick={() => saveReport('draft')} disabled={reportSaving}>
+            Save Draft
+          </Button>
           <Button
-            variant="contained" onClick={saveReport} disabled={reportSaving}
+            variant="contained" color="success"
+            onClick={() => saveReport('submitted')}
+            disabled={reportSaving}
             startIcon={reportSaving ? <CircularProgress size={16} color="inherit" /> : <CheckCircle />}
           >
-            {editingReport ? 'Update Report' : 'Save Report'}
+            Submit Report
           </Button>
         </DialogActions>
       </Dialog>
@@ -1186,6 +1247,100 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Alert>
             );
           })()}
+
+          {/* ── Member contributions panel (team lead only, editing existing report) ── */}
+          {editingGroupReport && reportContributions.length > 0 && (
+            <Box sx={{ mb: 3, p: 2, bgcolor: '#FFF8E1', border: '1px solid #FFD54F', borderRadius: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Member Contributions ({reportContributions.length})
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Review what your members filed, then integrate into the report fields below.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  size="small"
+                  color="warning"
+                  onClick={() => {
+                    // Merge all contributions into the group report narrative fields
+                    const withAttrib = (arr, key) =>
+                      arr.filter(c => (c[key] || '').trim()).map(c => `[${c.bge_name}]\n${c[key]}`).join('\n\n---\n\n');
+
+                    setGroupReportForm(f => {
+                      const notes       = withAttrib(reportContributions, 'notes');
+                      const challenges  = withAttrib(reportContributions, 'challenges_observed');
+                      const interventions = withAttrib(reportContributions, 'interventions_made');
+                      const followUp    = withAttrib(reportContributions, 'follow_up_needed');
+
+                      const append = (existing, incoming) =>
+                        incoming ? (existing ? `${existing}\n\n--- Member contributions ---\n\n${incoming}` : incoming) : existing;
+
+                      // Collect unique MSME ids observed across all contributions
+                      const observedIds = [...new Set(
+                        reportContributions.flatMap(c => c.msmes_observed || [])
+                      )];
+                      const mergedMsmes = [...new Set([...(f.msmes_supported || []), ...observedIds])];
+
+                      return {
+                        ...f,
+                        session_overview:      append(f.session_overview, notes),
+                        challenges_identified: append(f.challenges_identified, challenges),
+                        interventions_delivered: append(f.interventions_delivered, interventions),
+                        next_steps:            append(f.next_steps, followUp),
+                        msmes_supported:       mergedMsmes,
+                      };
+                    });
+                    notify('Contributions integrated — review and edit the fields below before saving.');
+                  }}
+                >
+                  Integrate All
+                </Button>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {reportContributions.map(c => (
+                  <Box key={c.id} sx={{ p: 1.5, bgcolor: '#fff', borderRadius: 1, border: '1px solid #FFE082' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700}>{c.bge_name} ({c.bge_code})</Typography>
+                      <Button
+                        size="small" variant="outlined" color="warning"
+                        sx={{ minWidth: 0, px: 1.5, py: 0.25, fontSize: 11 }}
+                        onClick={() => {
+                          setGroupReportForm(f => {
+                            const append = (existing, incoming) =>
+                              incoming ? (existing ? `${existing}\n\n[${c.bge_name}] ${incoming}` : `[${c.bge_name}] ${incoming}`) : existing;
+                            const observedIds = c.msmes_observed || [];
+                            const mergedMsmes = [...new Set([...(f.msmes_supported || []), ...observedIds])];
+                            return {
+                              ...f,
+                              session_overview:      append(f.session_overview, c.notes),
+                              challenges_identified: append(f.challenges_identified, c.challenges_observed),
+                              interventions_delivered: append(f.interventions_delivered, c.interventions_made),
+                              next_steps:            append(f.next_steps, c.follow_up_needed),
+                              msmes_supported:       mergedMsmes,
+                            };
+                          });
+                          notify(`${c.bge_name}'s contribution integrated`);
+                        }}
+                      >
+                        Integrate
+                      </Button>
+                    </Box>
+                    {c.notes && <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 0.25 }}><strong>Notes:</strong> {c.notes.length > 120 ? c.notes.slice(0, 120) + '…' : c.notes}</Typography>}
+                    {c.challenges_observed && <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 0.25 }}><strong>Challenges:</strong> {c.challenges_observed.length > 100 ? c.challenges_observed.slice(0, 100) + '…' : c.challenges_observed}</Typography>}
+                    {c.interventions_made && <Typography variant="caption" display="block" color="text.secondary"><strong>Interventions:</strong> {c.interventions_made.length > 100 ? c.interventions_made.slice(0, 100) + '…' : c.interventions_made}</Typography>}
+                    {(c.msmes_observed || []).length > 0 && (
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.25 }}>
+                        <strong>MSMEs observed:</strong> {c.msmes_observed.length}
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
 
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
@@ -1225,19 +1380,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 value={groupReportForm.visit_date}
                 onChange={e => setGroupReportForm({ ...groupReportForm, visit_date: e.target.value })}
               />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={groupReportForm.status}
-                  label="Status"
-                  onChange={e => setGroupReportForm({ ...groupReportForm, status: e.target.value })}
-                >
-                  <MenuItem value="draft">Draft</MenuItem>
-                  <MenuItem value="submitted">Submitted</MenuItem>
-                </Select>
-              </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small">
@@ -1360,13 +1502,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             />
           ))}
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
           <Button onClick={() => setGroupReportDialog(false)}>Cancel</Button>
+          <Button variant="outlined" onClick={() => saveGroupReport('draft')} disabled={groupReportSaving}>
+            Save Draft
+          </Button>
           <Button
-            variant="contained" onClick={saveGroupReport} disabled={groupReportSaving}
+            variant="contained" color="success"
+            onClick={() => saveGroupReport('submitted')}
+            disabled={groupReportSaving}
             startIcon={groupReportSaving ? <CircularProgress size={16} color="inherit" /> : <CheckCircle />}
           >
-            {editingGroupReport ? 'Update Report' : 'Save Report'}
+            Submit Report
           </Button>
         </DialogActions>
       </Dialog>
