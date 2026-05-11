@@ -658,7 +658,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, payload, { headers });
       notify('Session created');
       setSessionDialog(false);
-      setSessionForm({ title: '', date: '', location: '', description: '', topic: '' });
+      setSessionForm({ title: '', date: '', location: '', description: '', topic: '', work_order: '' });
       fetchAll();
     } catch { notify('Failed to create session', 'error'); }
     finally { setSessionLoading(false); }

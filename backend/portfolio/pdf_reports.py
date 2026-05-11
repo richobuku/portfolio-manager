@@ -26,6 +26,8 @@ RED  = HexColor('#C8102E')
 GREY = HexColor('#666666')
 LIGHT_GREY = HexColor('#F5F5F5')
 
+SIG_H = 10 * mm  # signature block height — 50% of original 20mm
+
 # Logo assets — copied into static/portfolio/images/ alongside the React
 # /public copies, so the PDF generator doesn't depend on the frontend
 # build artefacts.
@@ -178,8 +180,6 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
     Right column: BGE signature image if available, otherwise blank of same height.
     """
     from reportlab.platypus import Image as RLImage, KeepTogether
-
-    SIG_H = 10 * mm  # fixed height — same whether image exists or not (50% of original 20mm)
 
     reviewer_col = [
         Paragraph(reviewer_label, s['label']),
@@ -470,8 +470,6 @@ def render_work_order(work_order):
     # Signature block: team leader left, BGE right — both sides use the same
     # fixed height (SIG_H) so the columns are visually equal even when the TL
     # signature image hasn't been applied yet.
-    SIG_H = 10 * mm  # 50% of original 20mm
-
     tl_col = [
         Paragraph('For GOPA AFC / PRUDEV II Programme', s['label']),
         Spacer(1, 4),               # same gap as BGE column before the sig area

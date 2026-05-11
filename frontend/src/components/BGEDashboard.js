@@ -307,7 +307,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         { headers }
       );
       const list = Array.isArray(r.data) ? r.data : (r.data.results || []);
-      setReportContributions(list.filter(c => c.bge !== myBgeId)); // exclude lead's own
+      setReportContributions(list.filter(c => Number(c.bge) !== Number(myBgeId))); // exclude lead's own
     } catch {
       setReportContributions([]);
     }
@@ -357,7 +357,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         { headers }
       );
       const list = Array.isArray(r.data) ? r.data : (r.data.results || []);
-      const mine = list.find(c => c.bge === myBgeId);
+      const mine = list.find(c => Number(c.bge) === Number(myBgeId));
       if (mine) {
         setContributionEditingId(mine.id);
         setContributionForm({

@@ -1378,11 +1378,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if date_from:
             att_qs = att_qs.filter(session__date__gte=date_from)
             rep_qs = rep_qs.filter(visit_date__gte=date_from)
-            grp_qs = grp_qs.filter(session_date__gte=date_from)
+            grp_qs = grp_qs.filter(visit_date__gte=date_from)
         if date_to:
             att_qs = att_qs.filter(session__date__lte=date_to)
             rep_qs = rep_qs.filter(visit_date__lte=date_to)
-            grp_qs = grp_qs.filter(session_date__lte=date_to)
+            grp_qs = grp_qs.filter(visit_date__lte=date_to)
 
         def _dem(qs):
             youth    = qs.filter(age_group='18-34')
