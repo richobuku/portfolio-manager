@@ -1534,16 +1534,41 @@ class MSMEReportViewSet(viewsets.ModelViewSet):
                 pass
         serializer.save()
 
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        new_status = serializer.validated_data.get('status', instance.status)
+        report = serializer.save()
+        # Snapshot the PDF when the report is first submitted so the BGE's
+        # signature and report content are frozen at submission time.
+        if instance.status != 'submitted' and new_status == 'submitted':
+            if not report.submitted_pdf:
+                try:
+                    from .pdf_reports import render_msme_report
+                    from django.core.files.base import ContentFile
+                    pdf_bytes = render_msme_report(report).read()
+                    safe_name = report.msme.business_name[:30].replace(' ', '_')
+                    fname = f"MSMEReport_{safe_name}_{report.visit_date}.pdf"
+                    report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=True)
+                except Exception:
+                    pass
+
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
-        """Render this MSME visit report as a styled PDF."""
+        """Render this MSME visit report as a styled PDF.
+        Submitted reports return the stored snapshot; drafts are rendered on demand."""
         from .pdf_reports import render_msme_report
         report = self.get_object()
+        fname = f"MSMEReport_{report.msme.business_name[:30].replace(' ', '_')}_{report.visit_date}.pdf"
+        disposition = 'attachment' if request.query_params.get('dl') else 'inline'
+        if report.submitted_pdf:
+            try:
+                resp = HttpResponse(report.submitted_pdf.read(), content_type='application/pdf')
+                resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+                return resp
+            except Exception:
+                pass
         buf = render_msme_report(report)
         resp = HttpResponse(buf.read(), content_type='application/pdf')
-        fname = f"MSMEReport_{report.msme.business_name[:30].replace(' ', '_')}_{report.visit_date}.pdf"
-        # `inline` so the browser shows the PDF in a viewer; ?dl=1 forces download
-        disposition = 'attachment' if request.query_params.get('dl') else 'inline'
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
         return resp
 
@@ -1641,7 +1666,20 @@ class GroupReportViewSet(viewsets.ModelViewSet):
             if not (user.is_staff or user.is_superuser):
                 raise PermissionDenied("Only admins can mark a report as Approved.")
             extra['approved_at'] = timezone.now()
-        serializer.save(**extra)
+        report = serializer.save(**extra)
+
+        # Snapshot the PDF on first submission so the copy is frozen at that moment.
+        if instance.status != 'submitted' and new_status == 'submitted':
+            if not report.submitted_pdf:
+                try:
+                    from .pdf_reports import render_group_report
+                    from django.core.files.base import ContentFile
+                    pdf_bytes = render_group_report(report).read()
+                    safe_name = report.group.name.replace(' ', '_')
+                    fname = f"GroupReport_{safe_name}_{report.visit_date}.pdf"
+                    report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=True)
+                except Exception:
+                    pass
 
     def destroy(self, request, *args, **kwargs):
         if not (request.user.is_staff or request.user.is_superuser):
@@ -1650,14 +1688,21 @@ class GroupReportViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
-        """Render this group report as a styled PDF (header / metadata strip /
-        objectives banner / MSMEs table / narrative sections)."""
+        """Render this group report as a styled PDF.
+        Submitted/approved reports return the stored snapshot; drafts are rendered on demand."""
         from .pdf_reports import render_group_report
         report = self.get_object()
-        buf = render_group_report(report)
-        resp = HttpResponse(buf.read(), content_type='application/pdf')
         fname = f"GroupReport_{report.group.name.replace(' ', '_')}_{report.visit_date}.pdf"
         disposition = 'attachment' if request.query_params.get('dl') else 'inline'
+        if report.submitted_pdf:
+            try:
+                resp = HttpResponse(report.submitted_pdf.read(), content_type='application/pdf')
+                resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+                return resp
+            except Exception:
+                pass
+        buf = render_group_report(report)
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
         return resp
 
@@ -2068,23 +2113,46 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         work_order.status = 'signed'
         work_order.bge_signed_date = timezone.now().date()
         work_order.save(update_fields=['status', 'bge_signed_date'])
+
+        # Generate the signed PDF immediately and persist it so the BGE's
+        # signature is captured at this exact moment.  All future downloads
+        # serve this frozen copy rather than regenerating.
+        try:
+            from .pdf_reports import render_work_order
+            from django.core.files.base import ContentFile
+            pdf_bytes = render_work_order(work_order).read()
+            fname = f'WO_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}_signed.pdf'
+            work_order.signed_pdf.save(fname, ContentFile(pdf_bytes), save=True)
+        except Exception:
+            pass  # signing is complete even if PDF storage fails
+
         return Response(self.get_serializer(work_order).data)
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
-        """Render the work order as a PDF. Admin can access any; BGE can access their own."""
+        """Render the work order as a PDF. Admin can access any; BGE can access their own.
+        Signed work orders return the stored signed copy; others are rendered on demand."""
         work_order = self.get_object()
         user = request.user
         is_admin = user.is_staff or user.is_superuser
         is_owner = hasattr(user, 'bge_profile') and user.bge_profile == work_order.bge
         if not (is_admin or is_owner):
             raise PermissionDenied("You can only download your own work orders.")
-        from .pdf_reports import render_work_order
-        buf = render_work_order(work_order)
         fname = f'WorkOrder_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}.pdf'
-        resp = HttpResponse(buf.read(), content_type='application/pdf')
         dl = request.query_params.get('dl', '0')
         disp = 'attachment' if dl == '1' else 'inline'
+        # Serve the stored signed copy when available — guarantees the download
+        # matches exactly what the BGE signed.
+        if work_order.signed_pdf:
+            try:
+                resp = HttpResponse(work_order.signed_pdf.read(), content_type='application/pdf')
+                resp['Content-Disposition'] = f'{disp}; filename="{fname}"'
+                return resp
+            except Exception:
+                pass  # fall through to regeneration if file is missing from storage
+        from .pdf_reports import render_work_order
+        buf = render_work_order(work_order)
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
         resp['Content-Disposition'] = f'{disp}; filename="{fname}"'
         return resp
 

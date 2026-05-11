@@ -1136,37 +1136,46 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         {/* ── Work Orders (read-only — admin issues) ── */}
         {section === 'workorders' && (
           <Box>
-            {/* Signature upload card */}
+            {/* Signature card — compact when a signature is already stored */}
             <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>My Signature</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Upload a JPEG or PNG of your signature. It will be cleaned (background removed) and
-                embedded in your work orders and reports when you submit them.
-              </Typography>
-              {sigUrl && (
-                <Box sx={{ mb: 1.5, p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, display: 'inline-block', bgcolor: '#f9f9f9' }}>
-                  <img src={sigUrl} alt="My signature" style={{ maxHeight: 60, maxWidth: 220, display: 'block' }} />
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={700} gutterBottom>My Signature</Typography>
+                  {sigUrl ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                      <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, display: 'inline-block', bgcolor: '#f9f9f9' }}>
+                        <img src={sigUrl} alt="My signature" style={{ maxHeight: 48, maxWidth: 180, display: 'block' }} />
+                      </Box>
+                      <Typography variant="caption" color="success.main" fontWeight={600}>Signature on file ✓</Typography>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Upload a JPEG or PNG of your signature — it will be embedded in your work orders and reports automatically.
+                    </Typography>
+                  )}
                 </Box>
-              )}
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  ref={sigInputRef}
-                  style={{ display: 'none' }}
-                  onChange={e => setSigFile(e.target.files[0] || null)}
-                />
-                <Button variant="outlined" size="small" onClick={() => sigInputRef.current?.click()}>
-                  {sigFile ? sigFile.name : 'Choose file…'}
-                </Button>
-                {sigFile && (
-                  <Button variant="contained" size="small" onClick={uploadSignature} disabled={sigUploading}>
-                    {sigUploading ? <CircularProgress size={16} /> : 'Upload'}
-                  </Button>
-                )}
-                {sigUrl && !sigFile && (
-                  <Typography variant="caption" color="success.main">Signature on file ✓</Typography>
-                )}
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    ref={sigInputRef}
+                    style={{ display: 'none' }}
+                    onChange={e => setSigFile(e.target.files[0] || null)}
+                  />
+                  {sigFile ? (
+                    <>
+                      <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sigFile.name}</Typography>
+                      <Button variant="contained" size="small" onClick={uploadSignature} disabled={sigUploading}>
+                        {sigUploading ? <CircularProgress size={14} color="inherit" /> : 'Upload'}
+                      </Button>
+                      <Button size="small" onClick={() => setSigFile(null)}>Cancel</Button>
+                    </>
+                  ) : (
+                    <Button variant={sigUrl ? 'text' : 'outlined'} size="small" onClick={() => sigInputRef.current?.click()}>
+                      {sigUrl ? 'Update signature' : 'Choose file…'}
+                    </Button>
+                  )}
+                </Box>
               </Box>
             </Card>
 

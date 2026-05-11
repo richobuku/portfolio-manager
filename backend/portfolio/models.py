@@ -415,6 +415,12 @@ class MSMEReport(models.Model):
     next_steps = models.TextField(blank=True, help_text='Next steps and follow-up actions')
     additional_notes = models.TextField(blank=True, help_text='Any additional observations or notes')
 
+    # Frozen PDF snapshot generated when the report is submitted.
+    # Served instead of regenerating so the submitted copy is immutable.
+    submitted_pdf = models.FileField(
+        upload_to='reports/submitted/', null=True, blank=True,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -467,6 +473,11 @@ class GroupReport(models.Model):
     outcomes_achieved        = models.TextField(blank=True, help_text='Quantitative + qualitative outcomes from the session.')
     next_steps               = models.TextField(blank=True, help_text='Follow-up plan agreed with the group.')
     additional_notes         = models.TextField(blank=True)
+
+    # Frozen PDF snapshot generated when the report is submitted.
+    submitted_pdf = models.FileField(
+        upload_to='group_reports/submitted/', null=True, blank=True,
+    )
 
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
@@ -606,6 +617,12 @@ class WorkOrder(models.Model):
     team_leader_position = models.CharField(max_length=200, default='Team Leader')
     status               = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     bge_signed_date      = models.DateField(null=True, blank=True)
+
+    # Frozen PDF generated at signing time — includes the BGE's signature.
+    # Served on all subsequent downloads so the signed copy is immutable.
+    signed_pdf = models.FileField(
+        upload_to='work_orders/signed/', null=True, blank=True,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
