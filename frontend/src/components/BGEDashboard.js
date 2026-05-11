@@ -540,11 +540,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
-  const printWorkOrder = (wo) => {
-    setWorkOrderPreview(wo);
-    setTimeout(() => window.print(), 300);
-  };
-
   // ── sidebar ─────────────────────────────────────────────────────────────────
   const navItems = [
     { key: 'msmes',       label: 'My MSMEs',      icon: <Business /> },
@@ -799,25 +794,34 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
                         <Divider sx={{ my: 1.5 }} />
 
-                        {/* Assigned MSMEs — summary count only */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {/* Assigned MSMEs — full scrollable list */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                           <GroupIcon sx={{ fontSize: 16, color: '#F9A825' }} />
                           <Typography variant="caption" fontWeight={600}>
-                            {groupMsmes.length} MSME{groupMsmes.length !== 1 ? 's' : ''} assigned to this group
+                            Assigned MSMEs ({groupMsmes.length})
                           </Typography>
-                          {groupMsmes.length > 0 && (
-                            <Chip
-                              label={`${groupMsmes.length} assigned`}
-                              size="small"
-                              sx={{ bgcolor: '#F9A82520', color: '#8a6d00', fontWeight: 700, border: '1px solid #F9A82540' }}
-                            />
-                          )}
                         </Box>
-                        {groupMsmes.length > 0 && (
-                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                            {groupMsmes.slice(0, 3).map(m => m.business_name).join(', ')}
-                            {groupMsmes.length > 3 ? ` + ${groupMsmes.length - 3} more` : ''}
-                          </Typography>
+                        {groupMsmes.length === 0 ? (
+                          <Typography variant="caption" color="text.secondary">No MSMEs assigned to this group yet.</Typography>
+                        ) : (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 240, overflow: 'auto' }}>
+                            {groupMsmes.map(m => (
+                              <Box key={m.id} sx={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                p: 1, borderRadius: 1, bgcolor: 'background.default',
+                              }}>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={500}>{m.business_name}</Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {m.msme_code}{m.session_number ? ` · Session ${m.session_number}` : ''}{m.city ? ` · ${m.city}` : ''}
+                                  </Typography>
+                                </Box>
+                                <Tooltip title="Open MSME">
+                                  <IconButton size="small" onClick={() => openMsmeDetail(m)}><Visibility fontSize="small" /></IconButton>
+                                </Tooltip>
+                              </Box>
+                            ))}
+                          </Box>
                         )}
 
                         {/* Group reports already filed */}
@@ -1490,6 +1494,35 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </DialogActions>
           </>;
         })()}
+      </Dialog>
+
+      {/* ── Member contribution dialog ── */}
+      <Dialog open={contributionDialog} onClose={() => setContributionDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>My Contribution</DialogTitle>
+        <DialogContent dividers>
+          {contributionErrors && <Alert severity="error" sx={{ mb: 2 }}>{contributionErrors}</Alert>}
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+            Share your field notes with the team lead to help consolidate the group report.
+          </Typography>
+          <TextField fullWidth multiline minRows={3} label="Notes / Observations" sx={{ mb: 2 }}
+            value={contributionForm.notes}
+            onChange={e => setContributionForm(f => ({ ...f, notes: e.target.value }))} />
+          <TextField fullWidth multiline minRows={2} label="Challenges observed" sx={{ mb: 2 }}
+            value={contributionForm.challenges_observed}
+            onChange={e => setContributionForm(f => ({ ...f, challenges_observed: e.target.value }))} />
+          <TextField fullWidth multiline minRows={2} label="Interventions made" sx={{ mb: 2 }}
+            value={contributionForm.interventions_made}
+            onChange={e => setContributionForm(f => ({ ...f, interventions_made: e.target.value }))} />
+          <TextField fullWidth multiline minRows={2} label="Follow-up needed"
+            value={contributionForm.follow_up_needed}
+            onChange={e => setContributionForm(f => ({ ...f, follow_up_needed: e.target.value }))} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setContributionDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveContribution} disabled={contributionSaving}>
+            {contributionSaving ? <CircularProgress size={18} /> : 'Save'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* ── Work Order create dialog ── */}
