@@ -179,7 +179,7 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
     """
     from reportlab.platypus import Image as RLImage, KeepTogether
 
-    SIG_H = 20 * mm  # fixed height — same whether image exists or not
+    SIG_H = 10 * mm  # fixed height — same whether image exists or not (50% of original 20mm)
 
     reviewer_col = [
         Paragraph(reviewer_label, s['label']),
@@ -196,7 +196,7 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
         try:
             sig_path = bge.signature.path
             if os.path.isfile(sig_path):
-                bge_col.append(RLImage(sig_path, width=80 * mm, height=SIG_H,
+                bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
                                        kind='proportional'))
             else:
                 bge_col.append(Spacer(1, SIG_H))
@@ -205,12 +205,21 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
     else:
         bge_col.append(Spacer(1, SIG_H))
 
+    # Format date — signed_date may be a date, datetime, or string
+    if signed_date:
+        try:
+            date_str = signed_date.strftime('%d %b %Y') if hasattr(signed_date, 'strftime') else str(signed_date)[:10]
+        except Exception:
+            date_str = str(signed_date)
+    else:
+        date_str = None
+
     bge_col += [
         Paragraph('_' * 35, s['body']),
         Paragraph(_safe_html(bge.name if bge else '—'), s['body']),
         Paragraph(_safe_html((bge.bge_code if bge else '') or ''), s['label']),
         Paragraph(
-            f'Date: {signed_date}' if signed_date else 'Date: ___________________________',
+            f'Date: {date_str}' if date_str else 'Date: ___________________________',
             s['meta'],
         ),
     ]
@@ -461,7 +470,7 @@ def render_work_order(work_order):
     # Signature block: team leader left, BGE right — both sides use the same
     # fixed height (SIG_H) so the columns are visually equal even when the TL
     # signature image hasn't been applied yet.
-    SIG_H = 20 * mm
+    SIG_H = 10 * mm  # 50% of original 20mm
 
     tl_col = [
         Paragraph('For GOPA AFC / PRUDEV II Programme', s['label']),
@@ -478,7 +487,7 @@ def render_work_order(work_order):
         try:
             sig_path = bge.signature.path
             if os.path.isfile(sig_path):
-                bge_col.append(RLImage(sig_path, width=80 * mm, height=SIG_H,
+                bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
                                        kind='proportional'))
             else:
                 bge_col.append(Spacer(1, SIG_H))

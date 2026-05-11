@@ -1346,17 +1346,18 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """
-        Participation summary aggregated from attendance records + BGE reports.
-        Accepts optional filters: cohort, session, date_from, date_to.
-        Returns demographic breakdown + report totals per cohort.
+        Participation summary — demographic totals from attendance + BGE report counts.
+        Filters: cohort, session, work_order, bge, date_from, date_to.
+        Groups: by_cohort, by_work_order (each deployment/activity).
         """
-        from django.db.models import Count, Q
-        from portfolio.models import MSMEReport, GroupReport, Cohort as CohortModel
+        from portfolio.models import MSMEReport, GroupReport, Cohort as CohortModel, WorkOrder
 
-        cohort_id  = request.query_params.get('cohort')
-        session_id = request.query_params.get('session')
-        date_from  = request.query_params.get('date_from')
-        date_to    = request.query_params.get('date_to')
+        cohort_id     = request.query_params.get('cohort')
+        session_id    = request.query_params.get('session')
+        work_order_id = request.query_params.get('work_order')
+        bge_id        = request.query_params.get('bge')
+        date_from     = request.query_params.get('date_from')
+        date_to       = request.query_params.get('date_to')
 
         att_qs = Attendance.objects.filter(present=True)
         rep_qs = MSMEReport.objects.filter(status='submitted')
@@ -1365,7 +1366,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if cohort_id:
             att_qs = att_qs.filter(msme__cohort_id=cohort_id)
             rep_qs = rep_qs.filter(msme__cohort_id=cohort_id)
-            grp_qs = grp_qs.filter(group__bge_groups_msmes__cohort_id=cohort_id)
+        if work_order_id:
+            att_qs = att_qs.filter(session__work_order_id=work_order_id)
+            rep_qs = rep_qs.filter(bge__work_orders__id=work_order_id)
+        if bge_id:
+            att_qs = att_qs.filter(session__work_order__bge_id=bge_id)
+            rep_qs = rep_qs.filter(bge_id=bge_id)
+            grp_qs = grp_qs.filter(team_lead_id=bge_id)
         if session_id:
             att_qs = att_qs.filter(session_id=session_id)
         if date_from:
@@ -1377,57 +1384,71 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             rep_qs = rep_qs.filter(visit_date__lte=date_to)
             grp_qs = grp_qs.filter(session_date__lte=date_to)
 
-        total     = att_qs.count()
-        male      = att_qs.filter(gender='M').count()
-        female    = att_qs.filter(gender='F').count()
-        youth     = att_qs.filter(age_group='18-34')
-        adult     = att_qs.exclude(age_group='18-34').filter(age_group__in=['35-45','46-55','56+'])
-        refugees  = att_qs.filter(refugee_status='R')
-        host_comm = att_qs.filter(refugee_status='H')
+        def _dem(qs):
+            youth    = qs.filter(age_group='18-34')
+            adult    = qs.exclude(age_group='18-34').filter(age_group__in=['35-45','46-55','56+'])
+            refugees = qs.filter(refugee_status='R')
+            host     = qs.filter(refugee_status='H')
+            return {
+                'total':         qs.count(),
+                'male':          qs.filter(gender='M').count(),
+                'female':        qs.filter(gender='F').count(),
+                'male_youth':    youth.filter(gender='M').count(),
+                'female_youth':  youth.filter(gender='F').count(),
+                'male_adult':    adult.filter(gender='M').count(),
+                'female_adult':  adult.filter(gender='F').count(),
+                'refugees_total':refugees.count(),
+                'refugee_male':  refugees.filter(gender='M').count(),
+                'refugee_female':refugees.filter(gender='F').count(),
+                'host_community':host.count(),
+            }
 
-        male_youth    = youth.filter(gender='M').count()
-        female_youth  = youth.filter(gender='F').count()
-        male_adult    = adult.filter(gender='M').count()
-        female_adult  = adult.filter(gender='F').count()
-        refugee_male  = refugees.filter(gender='M').count()
-        refugee_female= refugees.filter(gender='F').count()
+        overall = _dem(att_qs)
+        overall.update({
+            'msme_reports':         rep_qs.count(),
+            'unique_msmes_visited': rep_qs.values('msme').distinct().count(),
+            'group_sessions':       grp_qs.count(),
+        })
 
-        # Per-cohort breakdown for compound view
+        # Per-cohort breakdown
         cohorts_data = []
         for cohort in CohortModel.objects.all().order_by('name'):
-            c_att  = att_qs.filter(msme__cohort=cohort)
-            c_rep  = rep_qs.filter(msme__cohort=cohort)
-            cohorts_data.append({
-                'cohort_id':   cohort.id,
-                'cohort_name': cohort.name,
-                'attendees':   c_att.count(),
-                'male':        c_att.filter(gender='M').count(),
-                'female':      c_att.filter(gender='F').count(),
-                'youth':       c_att.filter(age_group='18-34').count(),
-                'adults':      c_att.exclude(age_group='18-34').count(),
-                'refugees':    c_att.filter(refugee_status='R').count(),
-                'host_comm':   c_att.filter(refugee_status='H').count(),
-                'msme_reports':c_rep.count(),
-                'unique_msmes':c_rep.values('msme').distinct().count(),
-            })
+            c_att = att_qs.filter(msme__cohort=cohort)
+            c_rep = rep_qs.filter(msme__cohort=cohort)
+            if c_att.count() == 0 and c_rep.count() == 0:
+                continue
+            row = _dem(c_att)
+            row.update({'cohort_id': cohort.id, 'cohort_name': cohort.name,
+                        'msme_reports': c_rep.count(),
+                        'unique_msmes': c_rep.values('msme').distinct().count()})
+            cohorts_data.append(row)
 
-        return Response({
-            'total': total,
-            'male': male,
-            'female': female,
-            'male_youth':    male_youth,
-            'female_youth':  female_youth,
-            'male_adult':    male_adult,
-            'female_adult':  female_adult,
-            'refugees_total': refugees.count(),
-            'refugee_male':  refugee_male,
-            'refugee_female':refugee_female,
-            'host_community':host_comm.count(),
-            'msme_reports':  rep_qs.count(),
-            'unique_msmes_visited': rep_qs.values('msme').distinct().count(),
-            'group_sessions': grp_qs.count(),
-            'by_cohort': cohorts_data,
-        })
+        # Per-work-order breakdown (activity/deployment level)
+        wo_data = []
+        for wo in WorkOrder.objects.select_related('bge').order_by('-issue_date'):
+            w_att = att_qs.filter(session__work_order=wo)
+            w_rep = rep_qs.filter(bge=wo.bge)
+            if w_att.count() == 0 and w_rep.count() == 0:
+                continue
+            row = _dem(w_att)
+            row.update({
+                'work_order_id':     wo.id,
+                'work_order_number': wo.work_order_number,
+                'work_order_type':   wo.get_work_order_type_display(),
+                'bge_name':          wo.bge.name,
+                'bge_code':          wo.bge.bge_code or '',
+                'issue_date':        str(wo.issue_date),
+                'start_date':        str(wo.start_date) if wo.start_date else None,
+                'end_date':          str(wo.end_date) if wo.end_date else None,
+                'status':            wo.status,
+                'msme_reports':      w_rep.count(),
+                'unique_msmes':      w_rep.values('msme').distinct().count(),
+            })
+            wo_data.append(row)
+
+        overall['by_cohort'] = cohorts_data
+        overall['by_work_order'] = wo_data
+        return Response(overall)
 
 
 class TrainingTopicViewSet(viewsets.ModelViewSet):
@@ -1946,9 +1967,13 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
-        """Admin-only: render the work order as a PDF for download/preview."""
-        self._require_admin()
+        """Render the work order as a PDF. Admin can access any; BGE can access their own."""
         work_order = self.get_object()
+        user = request.user
+        is_admin = user.is_staff or user.is_superuser
+        is_owner = hasattr(user, 'bge_profile') and user.bge_profile == work_order.bge
+        if not (is_admin or is_owner):
+            raise PermissionDenied("You can only download your own work orders.")
         from .pdf_reports import render_work_order
         buf = render_work_order(work_order)
         fname = f'WorkOrder_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}.pdf'

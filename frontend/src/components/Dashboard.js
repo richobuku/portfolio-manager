@@ -129,7 +129,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── training dialogs ───────────────────────────────────────────────────────
   const [sessionDialog, setSessionDialog] = useState(false);
-  const [sessionForm, setSessionForm] = useState({ title: '', date: '', location: '', description: '', topic: '' });
+  const [sessionForm, setSessionForm] = useState({ title: '', date: '', location: '', description: '', topic: '', work_order: '' });
   const [sessionLoading, setSessionLoading] = useState(false);
   const [attendanceDialog, setAttendanceDialog] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -2582,10 +2582,60 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               {statBox('Group Sessions Filed', s.group_sessions, '#00695C')}
             </Grid>
 
+            {/* Per-work-order breakdown (activity/deployment level) */}
+            {(s.by_work_order || []).length > 0 && (
+              <>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom sx={{ mt: 2 }}>
+                  By BGE Deployment / Work Order
+                </Typography>
+                <TableContainer component={Paper} variant="outlined" sx={{ mb: 4 }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableRow>
+                        <TableCell>Work Order</TableCell>
+                        <TableCell>BGE</TableCell>
+                        <TableCell>Type</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell align="center">Attendees</TableCell>
+                        <TableCell align="center">F</TableCell>
+                        <TableCell align="center">M</TableCell>
+                        <TableCell align="center">Youth</TableCell>
+                        <TableCell align="center">Refugees</TableCell>
+                        <TableCell align="center">Reports</TableCell>
+                        <TableCell align="center">MSMEs</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {s.by_work_order.map(w => (
+                        <TableRow key={w.work_order_id} hover>
+                          <TableCell sx={{ fontWeight: 600, fontSize: 12 }}>{w.work_order_number}</TableCell>
+                          <TableCell sx={{ fontSize: 12 }}>{w.bge_name}</TableCell>
+                          <TableCell sx={{ fontSize: 12 }}>{w.work_order_type}</TableCell>
+                          <TableCell>
+                            <Chip label={w.status} size="small"
+                              color={w.status === 'signed' ? 'success' : w.status === 'issued' ? 'primary' : 'default'} />
+                          </TableCell>
+                          <TableCell align="center"><Chip label={w.total} size="small" color="primary" /></TableCell>
+                          <TableCell align="center">{w.female}</TableCell>
+                          <TableCell align="center">{w.male}</TableCell>
+                          <TableCell align="center">{(w.male_youth || 0) + (w.female_youth || 0)}</TableCell>
+                          <TableCell align="center">
+                            {w.refugees_total > 0 ? <Chip label={w.refugees_total} size="small" color="warning" /> : '0'}
+                          </TableCell>
+                          <TableCell align="center">{w.msme_reports}</TableCell>
+                          <TableCell align="center">{w.unique_msmes}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
+
             {/* Per-cohort breakdown */}
             {(s.by_cohort || []).length > 0 && (
               <>
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>Breakdown by Cohort / Deployment</Typography>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>Breakdown by Cohort</Typography>
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
                     <TableHead sx={{ bgcolor: '#f5f5f5' }}>
@@ -2605,16 +2655,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <TableBody>
                       {s.by_cohort.map(c => (
                         <TableRow key={c.cohort_id} hover>
-                          <TableCell fontWeight={500}>{c.cohort_name}</TableCell>
-                          <TableCell align="center"><Chip label={c.attendees} size="small" color="primary" /></TableCell>
+                          <TableCell sx={{ fontWeight: 500 }}>{c.cohort_name}</TableCell>
+                          <TableCell align="center"><Chip label={c.total} size="small" color="primary" /></TableCell>
                           <TableCell align="center">{c.female}</TableCell>
                           <TableCell align="center">{c.male}</TableCell>
-                          <TableCell align="center">{c.youth}</TableCell>
-                          <TableCell align="center">{c.adults}</TableCell>
+                          <TableCell align="center">{(c.male_youth || 0) + (c.female_youth || 0)}</TableCell>
+                          <TableCell align="center">{(c.male_adult || 0) + (c.female_adult || 0)}</TableCell>
                           <TableCell align="center">
-                            {c.refugees > 0 ? <Chip label={c.refugees} size="small" color="warning" /> : '0'}
+                            {c.refugees_total > 0 ? <Chip label={c.refugees_total} size="small" color="warning" /> : '0'}
                           </TableCell>
-                          <TableCell align="center">{c.host_comm}</TableCell>
+                          <TableCell align="center">{c.host_community}</TableCell>
                           <TableCell align="center">{c.msme_reports}</TableCell>
                           <TableCell align="center">{c.unique_msmes}</TableCell>
                         </TableRow>
@@ -3203,6 +3253,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <Select value={sessionForm.topic} onChange={e => setSessionForm({...sessionForm, topic: e.target.value})} label="Topic">
                   <MenuItem value="">None</MenuItem>
                   {trainingTopics.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small"><InputLabel>Link to Work Order / Deployment</InputLabel>
+                <Select value={sessionForm.work_order} onChange={e => setSessionForm({...sessionForm, work_order: e.target.value})} label="Link to Work Order / Deployment">
+                  <MenuItem value="">— Not linked —</MenuItem>
+                  {workOrders.map(wo => (
+                    <MenuItem key={wo.id} value={wo.id}>
+                      {wo.work_order_number} · {wo.bge_name} ({wo.work_order_type_display})
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>

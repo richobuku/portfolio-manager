@@ -120,7 +120,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // Work orders
   const [workOrders, setWorkOrders] = useState([]);
   const [workOrderPreview, setWorkOrderPreview] = useState(null);
-  const [woSigning, setWoSigning] = useState(null);   // id of WO being signed
+  const [woReview, setWoReview] = useState(null);       // WO being reviewed in dialog
+  const [woSigning, setWoSigning] = useState(null);     // id of WO being signed
+  const [woPdfBlob, setWoPdfBlob] = useState(null);     // blob URL for PDF preview
 
   // Signature upload
   const [sigFile, setSigFile] = useState(null);
@@ -511,6 +513,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       a.click();
       URL.revokeObjectURL(url);
     } catch { notify('Failed to download PDF', 'error'); }
+  };
+
+  const reviewWo = async (wo) => {
+    setWoReview(wo);
+    setWoPdfBlob(null);
+    try {
+      const res = await axios.get(WORK_ORDER_PDF_URL(wo.id), { headers, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      setWoPdfBlob(url);
+    } catch { notify('Failed to load work order PDF', 'error'); }
+  };
+
+  const closeReview = () => {
+    if (woPdfBlob) URL.revokeObjectURL(woPdfBlob);
+    setWoPdfBlob(null);
+    setWoReview(null);
   };
 
   // ── sidebar ─────────────────────────────────────────────────────────────────
@@ -1070,7 +1088,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                               </span>
                             </Tooltip>
                           )}
-                          <Tooltip title="Download signed PDF">
+                          <Tooltip title="Review work order PDF">
+                            <IconButton size="small" color="info" onClick={() => reviewWo(wo)}>
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download PDF">
                             <IconButton size="small" color={wo.status === 'signed' ? 'success' : 'default'} onClick={() => downloadWoPdf(wo)}>
                               <Download fontSize="small" />
                             </IconButton>
@@ -1802,6 +1825,38 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <DialogActions>
             <Button onClick={() => setWorkOrderPreview(null)}>Close</Button>
             <Button variant="contained" startIcon={<Print />} onClick={() => window.print()}>Print / Save as PDF</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* ── Work Order PDF Review dialog ─────────────────────────────────── */}
+      {woReview && (
+        <Dialog open onClose={closeReview} maxWidth="lg" fullWidth PaperProps={{ sx: { height: '90vh' } }}>
+          <DialogTitle sx={{ pb: 0 }}>
+            {woReview.work_order_number}
+            <Typography variant="caption" display="block" color="text.secondary">
+              {woReview.work_order_type_display} · Issued {woReview.issue_date}
+              {woReview.status === 'signed' && ' · Signed ✓'}
+            </Typography>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
+            {!woPdfBlob ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <iframe
+                src={woPdfBlob}
+                title="Work Order PDF"
+                style={{ flex: 1, border: 'none', width: '100%', height: '100%' }}
+              />
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeReview}>Close</Button>
+            <Button variant="contained" startIcon={<Download />} onClick={() => downloadWoPdf(woReview)}>
+              Download PDF
+            </Button>
           </DialogActions>
         </Dialog>
       )}

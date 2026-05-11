@@ -338,6 +338,11 @@ class TrainingSession(models.Model):
     description = models.TextField(blank=True)
     topic = models.ForeignKey(TrainingTopic, on_delete=models.SET_NULL, null=True, related_name='sessions')
     businesses = models.ManyToManyField('MSME', blank=True, related_name='sessions_attended')
+    work_order = models.ForeignKey(
+        'WorkOrder', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='training_sessions',
+        help_text='Optional: link this session to a BGE deployment/work order for reporting.'
+    )
 
     def __str__(self):
         return f"{self.title} ({self.date})"
