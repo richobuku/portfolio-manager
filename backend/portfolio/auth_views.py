@@ -29,12 +29,7 @@ from .models import BusinessGrowthExpert
 _reset_token_gen = PasswordResetTokenGenerator()
 
 import os as _os
-# Read from env in production; fall back to the project-default ID so local
-# dev still works without configuration.
-GOOGLE_CLIENT_ID = _os.environ.get(
-    'GOOGLE_CLIENT_ID',
-    '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com',
-)
+GOOGLE_CLIENT_ID = _os.environ.get('GOOGLE_CLIENT_ID', '')
 
 
 def _build_user_response(user):
@@ -235,6 +230,8 @@ def google_login_view(request):
     and return an app session token.
     """
     if not GOOGLE_AUTH_AVAILABLE:
+        return Response({'error': 'Google login is not configured on this server.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    if not GOOGLE_CLIENT_ID:
         return Response({'error': 'Google login is not configured on this server.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     google_token = request.data.get('token', '')

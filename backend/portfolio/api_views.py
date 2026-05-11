@@ -1032,6 +1032,8 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
         sig_file = request.FILES.get('signature')
         if not sig_file:
             return Response({'error': 'No signature file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        if sig_file.size > 5 * 1024 * 1024:  # 5 MB hard cap
+            return Response({'error': 'Signature file must be under 5 MB.'}, status=status.HTTP_400_BAD_REQUEST)
         if not sig_file.content_type.startswith('image/'):
             return Response({'error': 'File must be a JPEG or PNG image.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1308,9 +1310,23 @@ class SupportRequestViewSet(viewsets.ModelViewSet):
 
 
 class TrainingSessionViewSet(viewsets.ModelViewSet):
-    queryset = TrainingSession.objects.all()
     serializer_class = TrainingSessionSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = TrainingSession.objects.select_related('topic', 'work_order').all()
+        user = self.request.user
+        if not (user.is_staff or user.is_superuser):
+            # BGEs see only sessions linked to their own work orders (or unlinked ones)
+            try:
+                bge = user.bge_profile
+                qs = qs.filter(Q(work_order__bge=bge) | Q(work_order__isnull=True))
+            except Exception:
+                return qs.none()
+        work_order_id = self.request.query_params.get('work_order')
+        if work_order_id:
+            qs = qs.filter(work_order_id=work_order_id)
+        return qs
 
     @action(detail=True, methods=['post'])
     def mark_attendance(self, request, pk=None):
@@ -1737,7 +1753,18 @@ class GroupReportAttendanceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
         qs = GroupReportAttendance.objects.select_related('msme', 'group_report')
+        # Non-admin BGEs can only see attendance for group reports belonging to
+        # groups they are a member of (team lead or regular member).
+        if not (user.is_staff or user.is_superuser):
+            bge = self._bge_for_user()
+            if bge is None:
+                return qs.none()
+            qs = qs.filter(
+                Q(group_report__team_lead=bge) |
+                Q(group_report__group__members=bge)
+            ).distinct()
         group_report_id = self.request.query_params.get('group_report')
         if group_report_id:
             qs = qs.filter(group_report_id=group_report_id)
@@ -1861,8 +1888,8 @@ class BGEUserViewSet(viewsets.ViewSet):
     def set_password(self, request, pk=None):
         self._require_admin(request)
         new_password = (request.data.get('password') or '').strip()
-        if not new_password or len(new_password) < 6:
-            return Response({'error': 'Password must be at least 6 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not new_password or len(new_password) < 8:
+            return Response({'error': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
         user, err = self._get_target_non_admin_user(pk, request)
         if err is not None:
             return err

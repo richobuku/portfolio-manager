@@ -25,10 +25,16 @@ load_dotenv(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-vum0&fc!vwf0=b!j!s5zr4h8k+tq8w72bj)&a@ln-l%bt%$m0_')
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    if os.environ.get('DJANGO_ENV') == 'production':
+        raise RuntimeError("SECRET_KEY environment variable must be set in production.")
+    # Development-only fallback — never committed to production
+    _secret_key = 'django-insecure-dev-only-do-not-use-in-production'
+SECRET_KEY = _secret_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
@@ -270,6 +276,6 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 
 # VAPID keys for Web Push notifications
-VAPID_PUBLIC_KEY  = 'BNnpWxm6leoeTv_adABmTgTeIuNZOcWQqiY2hVa9M9Hjpmmo_YImgdbCBqZpUBlt2AnX6vxdquneem0B_Ld84ng'
-VAPID_PRIVATE_KEY = 'fl8iq2jZaNjJnZEb0PQ6KIQsaMQaajrvWPCJQQRWVlE'
-VAPID_CLAIMS      = {'sub': 'mailto:admin@prudev.org'}
+VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY',  'BNnpWxm6leoeTv_adABmTgTeIuNZOcWQqiY2hVa9M9Hjpmmo_YImgdbCBqZpUBlt2AnX6vxdquneem0B_Ld84ng')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', 'fl8iq2jZaNjJnZEb0PQ6KIQsaMQaajrvWPCJQQRWVlE')
+VAPID_CLAIMS      = {'sub': os.environ.get('VAPID_SUBJECT', 'mailto:admin@prudev.org')}
