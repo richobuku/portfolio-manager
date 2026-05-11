@@ -1921,6 +1921,29 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         self._require_admin()
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=['post'], url_path='sign')
+    def sign(self, request, pk=None):
+        """BGE confirms acceptance: marks work order as signed with today's date."""
+        from django.utils import timezone
+        work_order = self.get_object()
+
+        # Only the BGE this work order belongs to (or an admin) may sign it
+        user = request.user
+        is_admin = user.is_staff or user.is_superuser
+        is_owner = hasattr(user, 'bge_profile') and user.bge_profile == work_order.bge
+        if not (is_admin or is_owner):
+            raise PermissionDenied("You can only sign your own work orders.")
+
+        if work_order.status == 'signed':
+            return Response({'detail': 'Already signed.'}, status=status.HTTP_200_OK)
+        if work_order.status == 'draft':
+            return Response({'detail': 'Work order has not been issued yet.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        work_order.status = 'signed'
+        work_order.bge_signed_date = timezone.now().date()
+        work_order.save(update_fields=['status', 'bge_signed_date'])
+        return Response(self.get_serializer(work_order).data)
+
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
         """Admin-only: render the work order as a PDF for download/preview."""

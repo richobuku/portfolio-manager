@@ -183,6 +183,7 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
 
     reviewer_col = [
         Paragraph(reviewer_label, s['label']),
+        Spacer(1, 4),               # same gap as sig column
         Spacer(1, SIG_H),           # blank placeholder, equal to BGE sig height
         Paragraph('_' * 35, s['body']),
         Paragraph('Name: ___________________________', s['meta']),
@@ -464,6 +465,7 @@ def render_work_order(work_order):
 
     tl_col = [
         Paragraph('For GOPA AFC / PRUDEV II Programme', s['label']),
+        Spacer(1, 4),               # same gap as BGE column before the sig area
         Spacer(1, SIG_H),           # equal-height placeholder, always
         Paragraph('_' * 35, s['body']),
         Paragraph(_safe_html(work_order.team_leader_name or 'Stephen Maxi Opwonya'), s['body']),

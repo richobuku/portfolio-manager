@@ -11,10 +11,10 @@ import {
 import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
-  Group as GroupIcon, Star, Description, Print,
+  Group as GroupIcon, Star, Description, Print, Download,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { API_ENDPOINTS } from '../config';
+import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
 
@@ -117,9 +117,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // Contributions loaded inside the team-lead group report dialog
   const [reportContributions, setReportContributions] = useState([]);
 
-  // Work orders (read-only for BGE — admin issues, BGE views)
+  // Work orders
   const [workOrders, setWorkOrders] = useState([]);
   const [workOrderPreview, setWorkOrderPreview] = useState(null);
+  const [woSigning, setWoSigning] = useState(null);   // id of WO being signed
 
   // Signature upload
   const [sigFile, setSigFile] = useState(null);
@@ -483,6 +484,33 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     } finally {
       setSigUploading(false);
     }
+  };
+
+  // ── work order sign + download ────────────────────────────────────────────
+  const signWo = async (wo) => {
+    if (!window.confirm(`Sign work order ${wo.work_order_number}? This confirms your acceptance and cannot be undone.`)) return;
+    setWoSigning(wo.id);
+    try {
+      const res = await axios.post(WORK_ORDER_SIGN_URL(wo.id), {}, { headers });
+      setWorkOrders(prev => prev.map(w => w.id === wo.id ? res.data : w));
+      notify(`Work order ${wo.work_order_number} signed successfully`);
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Failed to sign work order', 'error');
+    } finally {
+      setWoSigning(null);
+    }
+  };
+
+  const downloadWoPdf = async (wo) => {
+    try {
+      const res = await axios.get(WORK_ORDER_PDF_URL(wo.id), { headers, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `WorkOrder_${(wo.work_order_number || wo.id).replace(/\s/g, '_')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { notify('Failed to download PDF', 'error'); }
   };
 
   // ── sidebar ─────────────────────────────────────────────────────────────────
@@ -1026,6 +1054,27 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             size="small"
                             color={wo.status === 'signed' ? 'success' : 'primary'}
                           />
+                          {wo.status === 'issued' && (
+                            <Tooltip title={sigUrl ? 'Sign this work order — uses your uploaded signature' : 'Upload your signature first, then sign'}>
+                              <span>
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  color="success"
+                                  disabled={woSigning === wo.id || !sigUrl}
+                                  startIcon={woSigning === wo.id ? <CircularProgress size={14} color="inherit" /> : <CheckCircle />}
+                                  onClick={() => signWo(wo)}
+                                >
+                                  Sign
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="Download signed PDF">
+                            <IconButton size="small" color={wo.status === 'signed' ? 'success' : 'default'} onClick={() => downloadWoPdf(wo)}>
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Print / Save as PDF">
                             <IconButton size="small" onClick={() => setWorkOrderPreview(wo)}>
                               <Print fontSize="small" />
