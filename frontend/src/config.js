@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   REPORTS:            `${API_BASE_URL}/api/reports/`,
   GROUP_REPORTS:      `${API_BASE_URL}/api/group-reports/`,
   GROUP_REPORT_CONTRIBUTIONS: `${API_BASE_URL}/api/group-report-contributions/`,
+  GROUP_REPORT_ATTENDANCE:    `${API_BASE_URL}/api/group-report-attendance/`,
   WORK_ORDERS:        `${API_BASE_URL}/api/work-orders/`,
   BGE_USERS:          `${API_BASE_URL}/api/bge-users/`,
   SUPPORT_REQUESTS:   `${API_BASE_URL}/api/support-requests/`,

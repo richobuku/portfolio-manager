@@ -525,6 +525,40 @@ class GroupReportContribution(models.Model):
         return f"{self.bge.name} → {self.group_report}"
 
 
+class GroupReportAttendance(models.Model):
+    """Per-person MSME attendance record for a group session report.
+
+    Mirrors the Attendance model but linked to GroupReport instead of
+    TrainingSession, allowing team leads to record who attended each
+    group session and link each person back to their MSME.
+    """
+    AGE_GROUP_CHOICES = [
+        ('18-34', '18–34 (Youth)'),
+        ('35-45', '35–45'),
+        ('46-55', '46–55'),
+        ('56+',   '56+'),
+    ]
+    GENDER_CHOICES       = [('M', 'Male'), ('F', 'Female')]
+    REFUGEE_STATUS_CHOICES = [('R', 'Refugee'), ('H', 'Host Community')]
+
+    group_report    = models.ForeignKey('GroupReport', on_delete=models.CASCADE, related_name='msme_attendance')
+    msme            = models.ForeignKey('MSME', on_delete=models.SET_NULL, null=True, blank=True, related_name='group_report_attendances')
+    attendee_name   = models.CharField(max_length=200, blank=True)
+    attendee_phone  = models.CharField(max_length=30, blank=True)
+    gender          = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
+    age_group       = models.CharField(max_length=10, choices=AGE_GROUP_CHOICES, blank=True)
+    refugee_status  = models.CharField(max_length=1, choices=REFUGEE_STATUS_CHOICES, blank=True, default='H')
+    consent_photo   = models.BooleanField(default=True)
+    consent_contact = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['group_report', 'attendee_name']
+
+    def __str__(self):
+        name = self.attendee_name or (self.msme.business_name if self.msme else '?')
+        return f"{name} — {self.group_report}"
+
+
 class WorkOrder(models.Model):
     TYPE_CHOICES = [
         ('msme_support', 'MSME CRM & Business Support'),

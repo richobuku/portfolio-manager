@@ -4,6 +4,7 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
+    GroupReportAttendance,
 )
 
 
@@ -55,10 +56,28 @@ class MSMESerializer(serializers.ModelSerializer):
     assigned_bge_name = serializers.CharField(source='assigned_bge.name', read_only=True)
     assigned_group_name = serializers.CharField(source='assigned_group.name', read_only=True)
     assigned_group_objectives = serializers.CharField(source='assigned_group.objectives', read_only=True)
+    total_reports = serializers.SerializerMethodField()
+    last_support_date = serializers.SerializerMethodField()
 
     class Meta:
         model = MSME
         fields = '__all__'
+
+    def get_total_reports(self, obj):
+        individual = obj.reports.count()
+        group = obj.group_reports.count()
+        return individual + group
+
+    def get_last_support_date(self, obj):
+        from datetime import date
+        dates = []
+        lr = obj.reports.order_by('-visit_date').values_list('visit_date', flat=True).first()
+        if lr:
+            dates.append(lr)
+        gr = obj.group_reports.order_by('-visit_date').values_list('visit_date', flat=True).first()
+        if gr:
+            dates.append(gr)
+        return str(max(dates)) if dates else None
 
 
 class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
@@ -212,6 +231,16 @@ class GroupReportContributionSerializer(serializers.ModelSerializer):
         model = GroupReportContribution
         fields = '__all__'
         read_only_fields = ['bge', 'created_at', 'updated_at']
+
+
+class GroupReportAttendanceSerializer(serializers.ModelSerializer):
+    msme_name   = serializers.CharField(source='msme.business_name', read_only=True, allow_null=True)
+    msme_code   = serializers.CharField(source='msme.msme_code',     read_only=True, allow_null=True)
+
+    class Meta:
+        model = GroupReportAttendance
+        fields = '__all__'
+        read_only_fields = ['created_at']
 
 
 class WorkOrderSerializer(serializers.ModelSerializer):

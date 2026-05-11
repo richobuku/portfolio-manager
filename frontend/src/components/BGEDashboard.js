@@ -6,12 +6,13 @@ import {
   TextField, FormControl, InputLabel, Select, MenuItem, Alert,
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
-  ListItemText, AppBar, Toolbar, Tooltip,
+  ListItemText, AppBar, Toolbar, Tooltip, Checkbox,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
+  Delete, HowToReg,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
@@ -117,6 +118,28 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // Contributions loaded inside the team-lead group report dialog
   const [reportContributions, setReportContributions] = useState([]);
 
+  // Per-person MSME attendance for the group report dialog
+  const [grpAttendees, setGrpAttendees] = useState([]);   // [{_key, id?, msme, attendee_name, ...}]
+  const _grpAttKey = useRef(0);
+  const newGrpRow = () => ({
+    _key: ++_grpAttKey.current,
+    id: null, msme: '', attendee_name: '', attendee_phone: '',
+    gender: '', age_group: '', refugee_status: 'H', consent_photo: true, consent_contact: true,
+  });
+
+  // Training sessions (for Work Orders section attendance recording)
+  const [sessions, setSessions] = useState([]);
+  const [sessionAttDialog, setSessionAttDialog] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [sessionAttendees, setSessionAttendees] = useState([]);
+  const [sessionAttLoading, setSessionAttLoading] = useState(false);
+  const _sessAttKey = useRef(0);
+  const newSessRow = () => ({
+    _key: ++_sessAttKey.current,
+    id: null, msme: '', attendee_name: '', attendee_phone: '',
+    gender: '', age_group: '', refugee_status: 'H', consent_photo: true, consent_contact: true,
+  });
+
   // Work orders
   const [workOrders, setWorkOrders] = useState([]);
   const [workOrderPreview, setWorkOrderPreview] = useState(null);
@@ -210,6 +233,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchSessions = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h });
+      setSessions(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // silent
+    }
+  }, [token]);
+
   const pushAttempted = useRef(false);
 
   useEffect(() => {
@@ -218,12 +251,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchGroups();
     fetchGroupReports();
     fetchWorkOrders();
+    fetchSessions();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, token]);
+  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSessions, token]);
 
   const openNewReport = (msmeId = '') => {
     setEditingReport(null);
@@ -279,6 +313,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setEditingGroupReport(null);
     setGroupReportForm({ ...EMPTY_GROUP_REPORT, group: groupId });
     setGroupReportErrors('');
+    setGrpAttendees([newGrpRow()]);
     setGroupReportDialog(true);
   };
 
@@ -300,16 +335,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     });
     setGroupReportErrors('');
     setReportContributions([]);
-    // Load member contributions so the lead can integrate them
-    try {
-      const r = await axios.get(
-        `${API_ENDPOINTS.GROUP_REPORT_CONTRIBUTIONS}?group_report=${rep.id}`,
-        { headers }
-      );
-      const list = Array.isArray(r.data) ? r.data : (r.data.results || []);
-      setReportContributions(list.filter(c => Number(c.bge) !== Number(myBgeId))); // exclude lead's own
-    } catch {
-      setReportContributions([]);
+    setGrpAttendees([]);
+    const h = { Authorization: `Bearer ${token}` };
+    // Load member contributions and existing attendance in parallel
+    const [contribRes, attRes] = await Promise.allSettled([
+      axios.get(`${API_ENDPOINTS.GROUP_REPORT_CONTRIBUTIONS}?group_report=${rep.id}`, { headers: h }),
+      axios.get(`${API_ENDPOINTS.GROUP_REPORT_ATTENDANCE}?group_report=${rep.id}`, { headers: h }),
+    ]);
+    if (contribRes.status === 'fulfilled') {
+      const list = Array.isArray(contribRes.value.data) ? contribRes.value.data : (contribRes.value.data.results || []);
+      setReportContributions(list.filter(c => Number(c.bge) !== Number(myBgeId)));
+    }
+    if (attRes.status === 'fulfilled') {
+      const list = Array.isArray(attRes.value.data) ? attRes.value.data : (attRes.value.data.results || []);
+      setGrpAttendees(list.length ? list.map(r => ({ ...r, _key: r.id })) : [newGrpRow()]);
+    } else {
+      setGrpAttendees([newGrpRow()]);
     }
     setGroupReportDialog(true);
   };
@@ -324,13 +365,36 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       session_number: groupReportForm.session_number === '' ? null : Number(groupReportForm.session_number),
       ...(statusOverride ? { status: statusOverride } : {}),
     };
+    const h = { Authorization: `Bearer ${token}` };
     try {
+      let reportId;
       if (editingGroupReport) {
-        await axios.patch(`${API_ENDPOINTS.GROUP_REPORTS}${editingGroupReport.id}/`, payload, { headers });
+        await axios.patch(`${API_ENDPOINTS.GROUP_REPORTS}${editingGroupReport.id}/`, payload, { headers: h });
+        reportId = editingGroupReport.id;
         notify(statusOverride === 'submitted' ? 'Group report submitted' : 'Group report draft saved');
       } else {
-        await axios.post(API_ENDPOINTS.GROUP_REPORTS, payload, { headers });
+        const r = await axios.post(API_ENDPOINTS.GROUP_REPORTS, payload, { headers: h });
+        reportId = r.data.id;
         notify(statusOverride === 'submitted' ? 'Group report submitted' : 'Group report draft saved');
+      }
+      // Save MSME attendance rows (present ones only)
+      if (reportId) {
+        const present = grpAttendees.filter(a => a.attendee_name || a.msme);
+        await Promise.allSettled(present.map(a => {
+          const ap = {
+            group_report: reportId,
+            msme: a.msme || null,
+            attendee_name: a.attendee_name,
+            attendee_phone: a.attendee_phone,
+            gender: a.gender,
+            age_group: a.age_group,
+            refugee_status: a.refugee_status || 'H',
+            consent_photo: a.consent_photo,
+            consent_contact: a.consent_contact,
+          };
+          if (a.id) return axios.patch(`${API_ENDPOINTS.GROUP_REPORT_ATTENDANCE}${a.id}/`, ap, { headers: h });
+          return axios.post(API_ENDPOINTS.GROUP_REPORT_ATTENDANCE, ap, { headers: h });
+        }));
       }
       setGroupReportDialog(false);
       fetchGroupReports();
@@ -346,6 +410,54 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   const isTeamLeadOf = (group) => group?.team_lead === myBgeId;
+
+  // ── Training session attendance (BGE side) ───────────────────────────────
+  const openSessionAtt = async (session) => {
+    setSelectedSession(session);
+    setSessionAttLoading(true);
+    setSessionAttDialog(true);
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.ATTENDANCE}?session=${session.id}`, { headers: h });
+      const records = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      setSessionAttendees(records.length ? records.map(r => ({ ...r, _key: r.id })) : [newSessRow()]);
+    } catch {
+      setSessionAttendees([newSessRow()]);
+    } finally {
+      setSessionAttLoading(false);
+    }
+  };
+
+  const saveSessionAtt = async () => {
+    setSessionAttLoading(true);
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const present = sessionAttendees.filter(a => a.attendee_name || a.msme);
+      await Promise.all(present.map(a => {
+        const ap = {
+          session: selectedSession.id,
+          msme: a.msme || null,
+          attendee_name: a.attendee_name,
+          attendee_phone: a.attendee_phone,
+          gender: a.gender,
+          age_group: a.age_group,
+          refugee_status: a.refugee_status || 'H',
+          consent_photo: a.consent_photo,
+          consent_contact: a.consent_contact,
+          present: true,
+        };
+        if (a.id) return axios.patch(`${API_ENDPOINTS.ATTENDANCE}${a.id}/`, ap, { headers: h });
+        return axios.post(API_ENDPOINTS.ATTENDANCE, ap, { headers: h });
+      }));
+      notify('Attendance saved');
+      setSessionAttDialog(false);
+      fetchSessions();
+    } catch {
+      notify('Failed to save attendance', 'error');
+    } finally {
+      setSessionAttLoading(false);
+    }
+  };
 
   // ── Member contributions ──────────────────────────────────────────────────
   const openContribution = async (groupReport) => {
@@ -658,7 +770,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
                   {directMsmes.map((m) => {
                     const msmeReportCount = reports.filter(r => r.msme === m.id).length;
-                    const lastReport = reports.filter(r => r.msme === m.id).sort((a, b) => b.visit_date > a.visit_date ? 1 : -1)[0];
+                    const lastIndividual = reports.filter(r => r.msme === m.id).sort((a, b) => b.visit_date > a.visit_date ? 1 : -1)[0];
+                    // last_support_date from the API already merges individual + group reports
+                    const lastSupportDate = m.last_support_date || lastIndividual?.visit_date;
+                    const totalSupports = m.total_reports || msmeReportCount;
                     return (
                       <Card key={m.id}
                         sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, borderLeft: `4px solid ${BRAND.primaryMain}` }}
@@ -719,9 +834,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                               </Grid>
                             )}
                             <Grid item xs={6} sm={3}>
-                              <Typography variant="caption" color="text.secondary" display="block">Reports</Typography>
-                              <Typography variant="body2" fontWeight={600} color={msmeReportCount > 0 ? 'primary.main' : 'text.secondary'}>
-                                {msmeReportCount} filed{lastReport ? ` · last ${lastReport.visit_date}` : ''}
+                              <Typography variant="caption" color="text.secondary" display="block">Supports</Typography>
+                              <Typography variant="body2" fontWeight={600} color={totalSupports > 0 ? 'primary.main' : 'text.secondary'}>
+                                {totalSupports} total{lastSupportDate ? ` · last ${lastSupportDate}` : ''}
                               </Typography>
                             </Grid>
                           </Grid>
@@ -871,31 +986,51 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                               Group reports ({reports.length})
                             </Typography>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                              {reports.map(r => (
+                              {reports.map(r => {
+                                const finalized = r.status === 'submitted' || r.status === 'approved';
+                                return (
                                 <Box key={r.id} sx={{
                                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                  p: 1, borderRadius: 1, bgcolor: 'background.default',
+                                  p: 1, borderRadius: 1,
+                                  bgcolor: finalized ? '#f5f5f5' : 'background.default',
+                                  opacity: finalized ? 0.8 : 1,
                                 }}>
                                   <Box>
-                                    <Typography variant="body2" fontWeight={500}>
+                                    <Typography variant="body2" fontWeight={500} color={finalized ? 'text.secondary' : 'inherit'}>
                                       {r.visit_date}{r.session_number ? ` · Session ${r.session_number}` : ''}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
                                       {r.msme_count} MSME{r.msme_count !== 1 ? 's' : ''} · by {r.team_lead_name || '—'}
                                     </Typography>
+                                    {r.status === 'submitted' && (
+                                      <Typography variant="caption" sx={{ display: 'block', color: 'primary.main', fontWeight: 600 }}>
+                                        Assignment report submitted — locked
+                                      </Typography>
+                                    )}
+                                    {r.status === 'approved' && (
+                                      <Typography variant="caption" sx={{ display: 'block', color: 'success.main', fontWeight: 600 }}>
+                                        Assignment completed ✓
+                                      </Typography>
+                                    )}
                                   </Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <Chip label={r.status} size="small" color={r.status === 'approved' ? 'success' : (r.status === 'submitted' ? 'primary' : 'default')} />
+                                    <Chip
+                                      label={r.status === 'approved' ? 'Completed' : r.status}
+                                      size="small"
+                                      color={r.status === 'approved' ? 'success' : (r.status === 'submitted' ? 'primary' : 'default')}
+                                    />
                                     <Tooltip title="View PDF">
                                       <IconButton size="small" onClick={() => openGroupReportPdf(r.id, 'view')}><Visibility fontSize="small" /></IconButton>
                                     </Tooltip>
                                     <Tooltip title="Download PDF">
                                       <IconButton size="small" onClick={() => openGroupReportPdf(r.id, 'download')}><PictureAsPdf fontSize="small" /></IconButton>
                                     </Tooltip>
-                                    {youAreLead && r.status !== 'approved' && (
-                                      <IconButton size="small" onClick={() => openEditGroupReport(r)}><Edit fontSize="small" /></IconButton>
+                                    {youAreLead && !finalized && (
+                                      <Tooltip title="Edit report">
+                                        <IconButton size="small" onClick={() => openEditGroupReport(r)}><Edit fontSize="small" /></IconButton>
+                                      </Tooltip>
                                     )}
-                                    {!youAreLead && r.status !== 'approved' && (
+                                    {!youAreLead && !finalized && (
                                       <Tooltip title="File my contribution">
                                         <IconButton size="small" color="warning" onClick={() => openContribution(r)}>
                                           <Edit fontSize="small" />
@@ -904,7 +1039,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     )}
                                   </Box>
                                 </Box>
-                              ))}
+                                );
+                              })}
                             </Box>
                           </>
                         )}
@@ -1120,10 +1256,46 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         <Typography variant="caption" color="text.secondary">
                           Max: <strong>{wo.max_days} days</strong>
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Team Leader: <strong>{wo.team_leader_name}</strong>
-                        </Typography>
+                        {wo.team_leader_name && (
+                          <Typography variant="caption" color="text.secondary">
+                            Team Leader: <strong>{wo.team_leader_name}</strong>
+                          </Typography>
+                        )}
                       </Box>
+
+                      {/* Training sessions linked to this work order */}
+                      {(() => {
+                        const linked = sessions.filter(s => s.work_order === wo.id);
+                        if (!linked.length) return null;
+                        return (
+                          <>
+                            <Divider sx={{ my: 1.5 }} />
+                            <Typography variant="caption" fontWeight={700} display="block" sx={{ mb: 0.75 }}>
+                              Training sessions ({linked.length})
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                              {linked.map(s => (
+                                <Box key={s.id} sx={{
+                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                  p: 1, borderRadius: 1, bgcolor: 'background.default',
+                                }}>
+                                  <Box>
+                                    <Typography variant="body2" fontWeight={500}>{s.title}</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {s.date}{s.location ? ` · ${s.location}` : ''} · {s.attendance_count ?? 0} present
+                                    </Typography>
+                                  </Box>
+                                  <Tooltip title="Record attendance">
+                                    <IconButton size="small" color="primary" onClick={() => openSessionAtt(s)}>
+                                      <HowToReg fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              ))}
+                            </Box>
+                          </>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 ))}
@@ -1132,6 +1304,151 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </Box>
         )}
       </Box>
+
+      {/* ── Training session attendance dialog (BGE side) ────────────────── */}
+      <Dialog open={sessionAttDialog} onClose={() => setSessionAttDialog(false)} maxWidth="xl" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          Attendance — {selectedSession?.title}
+          <Typography variant="caption" display="block" color="text.secondary">
+            {selectedSession?.date}{selectedSession?.location ? ` · ${selectedSession.location}` : ''}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          {sessionAttLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+          ) : (
+            <Box>
+              <Table size="small" stickyHeader>
+                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell sx={{ minWidth: 30 }}>#</TableCell>
+                    <TableCell sx={{ minWidth: 150 }}>Name</TableCell>
+                    <TableCell sx={{ minWidth: 110 }}>Phone</TableCell>
+                    <TableCell sx={{ minWidth: 170 }}>MSME / Business</TableCell>
+                    <TableCell sx={{ minWidth: 55 }}>Sex</TableCell>
+                    <TableCell sx={{ minWidth: 85 }}>Age Group</TableCell>
+                    <TableCell sx={{ minWidth: 80 }}>Status</TableCell>
+                    <TableCell sx={{ minWidth: 50 }} align="center">Consent</TableCell>
+                    <TableCell />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sessionAttendees.map((att, idx) => (
+                    <TableRow key={att._key} hover>
+                      <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
+                      <TableCell>
+                        <TextField size="small" placeholder="Full name" variant="standard"
+                          value={att.attendee_name || ''}
+                          onChange={e => setSessionAttendees(prev => prev.map(r => r._key === att._key ? { ...r, attendee_name: e.target.value } : r))}
+                          sx={{ minWidth: 130 }} />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" placeholder="Phone" variant="standard"
+                          value={att.attendee_phone || ''}
+                          onChange={e => setSessionAttendees(prev => prev.map(r => r._key === att._key ? { ...r, attendee_phone: e.target.value } : r))}
+                          sx={{ minWidth: 100 }} />
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard" displayEmpty
+                          value={att.msme || ''}
+                          onChange={e => {
+                            const m = msmes.find(x => x.id === e.target.value);
+                            setSessionAttendees(prev => prev.map(r => {
+                              if (r._key !== att._key) return r;
+                              return { ...r, msme: e.target.value, attendee_name: r.attendee_name || (m?.owner_name || '') };
+                            }));
+                          }}
+                          sx={{ minWidth: 150 }}>
+                          <MenuItem value=""><em>— walk-in —</em></MenuItem>
+                          {msmes.map(m => <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>)}
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard" displayEmpty value={att.gender || ''}
+                          onChange={e => setSessionAttendees(prev => prev.map(r => r._key === att._key ? { ...r, gender: e.target.value } : r))}
+                          sx={{ minWidth: 50 }}>
+                          <MenuItem value=""><em>—</em></MenuItem>
+                          <MenuItem value="M">M</MenuItem>
+                          <MenuItem value="F">F</MenuItem>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard" displayEmpty value={att.age_group || ''}
+                          onChange={e => setSessionAttendees(prev => prev.map(r => r._key === att._key ? { ...r, age_group: e.target.value } : r))}
+                          sx={{ minWidth: 75 }}>
+                          <MenuItem value=""><em>—</em></MenuItem>
+                          {['18-34','35-45','46-55','56+'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select size="small" variant="standard" value={att.refugee_status || 'H'}
+                          onChange={e => setSessionAttendees(prev => prev.map(r => r._key === att._key ? { ...r, refugee_status: e.target.value } : r))}
+                          sx={{ minWidth: 75 }}>
+                          <MenuItem value="H">Host</MenuItem>
+                          <MenuItem value="R">Refugee</MenuItem>
+                        </Select>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Photo consent">
+                          <Checkbox size="small" checked={!!att.consent_photo}
+                            onChange={e => setSessionAttendees(prev => prev.map(r => r._key === att._key ? { ...r, consent_photo: e.target.checked } : r))} />
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small" color="error"
+                          onClick={() => setSessionAttendees(prev => prev.filter(r => r._key !== att._key))}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {sessionAttendees.length > 0 && (() => {
+                const male   = sessionAttendees.filter(a => a.gender === 'M');
+                const female = sessionAttendees.filter(a => a.gender === 'F');
+                const youth  = sessionAttendees.filter(a => a.age_group === '18-34');
+                const adult  = sessionAttendees.filter(a => ['35-45','46-55','56+'].includes(a.age_group));
+                const ref    = sessionAttendees.filter(a => a.refugee_status === 'R');
+                return (
+                  <Box sx={{ m: 2, p: 2, bgcolor: '#F3F6FB', border: '1px solid #c5d5e8', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={700} gutterBottom>Summary</Typography>
+                    <Grid container spacing={1}>
+                      {[
+                        { label: 'Total', value: sessionAttendees.length, color: '#1565C0' },
+                        { label: 'Female', value: female.length, color: '#AD1457' },
+                        { label: 'Male', value: male.length, color: '#1565C0' },
+                        { label: 'Youth F', value: youth.filter(a => a.gender === 'F').length, color: '#AD1457' },
+                        { label: 'Youth M', value: youth.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Adult F', value: adult.filter(a => a.gender === 'F').length, color: '#AD1457' },
+                        { label: 'Adult M', value: adult.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Refugees', value: ref.length, color: '#E65100' },
+                        { label: 'Host Comm.', value: sessionAttendees.filter(a => a.refugee_status === 'H').length, color: '#2E7D32' },
+                      ].map(({ label, value, color }) => (
+                        <Grid item xs={6} sm={4} md={3} lg={2} key={label}>
+                          <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#fff', borderRadius: 1, border: `1px solid ${color}20` }}>
+                            <Typography variant="h6" fontWeight={700} sx={{ color }}>{value}</Typography>
+                            <Typography variant="caption" color="text.secondary">{label}</Typography>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                );
+              })()}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button size="small" startIcon={<Add />} onClick={() => setSessionAttendees(prev => [...prev, newSessRow()])} sx={{ mr: 'auto' }}>
+            Add row
+          </Button>
+          <Button onClick={() => setSessionAttDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveSessionAtt} disabled={sessionAttLoading}>
+            {sessionAttLoading ? <CircularProgress size={18} /> : 'Save Attendance'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── MSME detail dialog ── */}
       <Dialog open={msmeDetailDialog} onClose={() => setMsmeDetailDialog(false)} maxWidth="sm" fullWidth>
@@ -1523,6 +1840,153 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     );
                   })}
                 </Box>
+              </Box>
+            );
+          })()}
+
+          {/* ── MSME Attendance ── */}
+          {(() => {
+            const groupMsmes = msmes.filter(m => m.assigned_group === groupReportForm.group);
+            const updateRow = (key, field, val) =>
+              setGrpAttendees(prev => prev.map(r => r._key === key ? { ...r, [field]: val } : r));
+            const male   = grpAttendees.filter(a => a.gender === 'M');
+            const female = grpAttendees.filter(a => a.gender === 'F');
+            const youth  = grpAttendees.filter(a => a.age_group === '18-34');
+            const adult  = grpAttendees.filter(a => ['35-45','46-55','56+'].includes(a.age_group));
+            const ref    = grpAttendees.filter(a => a.refugee_status === 'R');
+            return (
+              <Box sx={{ mt: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <Box sx={{ px: 2, py: 1, bgcolor: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" fontWeight={700}>
+                    MSME Attendance ({grpAttendees.filter(a => a.attendee_name || a.msme).length} recorded)
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    {groupMsmes.length > 0 && grpAttendees.filter(a => a.attendee_name || a.msme).length === 0 && (
+                      <Button size="small" onClick={() => {
+                        setGrpAttendees(groupMsmes.map(m => ({
+                          ...newGrpRow(),
+                          msme: m.id,
+                          attendee_name: m.owner_name || '',
+                          attendee_phone: m.phone || '',
+                        })));
+                      }}>
+                        Pre-fill from group
+                      </Button>
+                    )}
+                    <Button size="small" startIcon={<Add />} onClick={() => setGrpAttendees(prev => [...prev, newGrpRow()])}>
+                      Add row
+                    </Button>
+                  </Box>
+                </Box>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#fafafa' }}>
+                      <TableRow>
+                        <TableCell sx={{ minWidth: 30, fontWeight: 700, fontSize: 11 }}>#</TableCell>
+                        <TableCell sx={{ minWidth: 150, fontWeight: 700, fontSize: 11 }}>Name</TableCell>
+                        <TableCell sx={{ minWidth: 110, fontWeight: 700, fontSize: 11 }}>Phone</TableCell>
+                        <TableCell sx={{ minWidth: 170, fontWeight: 700, fontSize: 11 }}>MSME / Business</TableCell>
+                        <TableCell sx={{ minWidth: 55, fontWeight: 700, fontSize: 11 }}>Sex</TableCell>
+                        <TableCell sx={{ minWidth: 85, fontWeight: 700, fontSize: 11 }}>Age Group</TableCell>
+                        <TableCell sx={{ minWidth: 80, fontWeight: 700, fontSize: 11 }}>Status</TableCell>
+                        <TableCell sx={{ minWidth: 50, fontWeight: 700, fontSize: 11 }} align="center">Photo</TableCell>
+                        <TableCell />
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {grpAttendees.map((row, idx) => (
+                        <TableRow key={row._key} hover>
+                          <TableCell sx={{ color: 'text.secondary', fontSize: 11 }}>{idx + 1}</TableCell>
+                          <TableCell>
+                            <TextField size="small" placeholder="Full name" variant="standard"
+                              value={row.attendee_name}
+                              onChange={e => updateRow(row._key, 'attendee_name', e.target.value)}
+                              sx={{ minWidth: 130 }} />
+                          </TableCell>
+                          <TableCell>
+                            <TextField size="small" placeholder="Phone" variant="standard"
+                              value={row.attendee_phone}
+                              onChange={e => updateRow(row._key, 'attendee_phone', e.target.value)}
+                              sx={{ minWidth: 100 }} />
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" displayEmpty
+                              value={row.msme || ''}
+                              onChange={e => {
+                                const m = msmes.find(x => x.id === e.target.value);
+                                updateRow(row._key, 'msme', e.target.value);
+                                if (m && !row.attendee_name) updateRow(row._key, 'attendee_name', m.owner_name || '');
+                              }}
+                              sx={{ minWidth: 150 }}>
+                              <MenuItem value=""><em>— walk-in —</em></MenuItem>
+                              {groupMsmes.map(m => (
+                                <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
+                              ))}
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" displayEmpty value={row.gender}
+                              onChange={e => updateRow(row._key, 'gender', e.target.value)} sx={{ minWidth: 50 }}>
+                              <MenuItem value=""><em>—</em></MenuItem>
+                              <MenuItem value="M">M</MenuItem>
+                              <MenuItem value="F">F</MenuItem>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" displayEmpty value={row.age_group}
+                              onChange={e => updateRow(row._key, 'age_group', e.target.value)} sx={{ minWidth: 75 }}>
+                              <MenuItem value=""><em>—</em></MenuItem>
+                              {['18-34','35-45','46-55','56+'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" value={row.refugee_status}
+                              onChange={e => updateRow(row._key, 'refugee_status', e.target.value)} sx={{ minWidth: 75 }}>
+                              <MenuItem value="H">Host</MenuItem>
+                              <MenuItem value="R">Refugee</MenuItem>
+                            </Select>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Tooltip title="Photo consent">
+                              <Checkbox size="small" checked={!!row.consent_photo}
+                                onChange={e => updateRow(row._key, 'consent_photo', e.target.checked)} />
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell>
+                            <IconButton size="small" color="error"
+                              onClick={() => setGrpAttendees(prev => prev.filter(r => r._key !== row._key))}>
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+                {grpAttendees.filter(a => a.attendee_name || a.msme).length > 0 && (
+                  <Box sx={{ px: 2, py: 1.5, bgcolor: '#F3F6FB', borderTop: '1px solid', borderColor: 'divider' }}>
+                    <Grid container spacing={1}>
+                      {[
+                        { label: 'Total', value: grpAttendees.length, color: '#1565C0' },
+                        { label: 'Female', value: female.length, color: '#AD1457' },
+                        { label: 'Male', value: male.length, color: '#1565C0' },
+                        { label: 'Youth F', value: youth.filter(a => a.gender === 'F').length, color: '#AD1457' },
+                        { label: 'Youth M', value: youth.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Adult F', value: adult.filter(a => a.gender === 'F').length, color: '#AD1457' },
+                        { label: 'Adult M', value: adult.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Refugees', value: ref.length, color: '#E65100' },
+                        { label: 'Host Comm.', value: grpAttendees.filter(a => a.refugee_status === 'H').length, color: '#2E7D32' },
+                      ].map(({ label, value, color }) => (
+                        <Grid item xs={4} sm={3} md={2} key={label}>
+                          <Box sx={{ textAlign: 'center', p: 0.75, bgcolor: '#fff', borderRadius: 1, border: `1px solid ${color}20` }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ color, fontSize: 14 }}>{value}</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>{label}</Typography>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                )}
               </Box>
             );
           })()}

@@ -964,12 +964,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <TableCell>Cohort</TableCell>
               <TableCell>Assigned BGE</TableCell>
               <TableCell>Location</TableCell>
+              <TableCell align="center">Supports</TableCell>
+              <TableCell>Last Support</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {paginate(msmes, msmePage).length === 0 ? (
-              <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
             ) : paginate(msmes, msmePage).map(m => (
               <TableRow key={m.id} hover>
                 <TableCell><Chip label={m.msme_code} size="small" variant="outlined" /></TableCell>
@@ -1014,6 +1016,27 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: 12 }}>
                     <LocationOn sx={{ fontSize: 14, color: 'text.secondary' }} />{m.city}
                   </Box>
+                </TableCell>
+                <TableCell align="center">
+                  {m.total_reports > 0 ? (
+                    <Chip label={m.total_reports} size="small" color="primary" variant="outlined" />
+                  ) : (
+                    <Typography variant="caption" color="text.disabled">—</Typography>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {m.last_support_date ? (
+                    <Typography variant="caption" color={
+                      // highlight recent (within 30 days) vs stale (>90 days)
+                      (new Date() - new Date(m.last_support_date)) / 86400000 < 30
+                        ? 'success.main'
+                        : (new Date() - new Date(m.last_support_date)) / 86400000 > 90
+                          ? 'warning.main'
+                          : 'text.primary'
+                    }>{m.last_support_date}</Typography>
+                  ) : (
+                    <Typography variant="caption" color="text.disabled">No visits yet</Typography>
+                  )}
                 </TableCell>
                 <TableCell><ActionCell item={m} type="msme" /></TableCell>
               </TableRow>

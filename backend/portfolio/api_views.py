@@ -17,6 +17,7 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
+    GroupReportAttendance,
 )
 from pywebpush import webpush, WebPushException
 import json as _json
@@ -26,6 +27,7 @@ from .serializers import (
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
     GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
+    GroupReportAttendanceSerializer,
 )
 
 
@@ -1722,6 +1724,60 @@ class GroupReportContributionViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if not is_admin and (bge is None or instance.bge_id != bge.id):
             raise PermissionDenied("You can only delete your own contribution.")
+        return super().destroy(request, *args, **kwargs)
+
+
+class GroupReportAttendanceViewSet(viewsets.ModelViewSet):
+    """Per-person MSME attendance records for group session reports.
+
+    BGE users (team leads) can create/update/delete records for their own
+    group reports. Admins have full access. Filter by ?group_report=<id>.
+    """
+    serializer_class = GroupReportAttendanceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = GroupReportAttendance.objects.select_related('msme', 'group_report')
+        group_report_id = self.request.query_params.get('group_report')
+        if group_report_id:
+            qs = qs.filter(group_report_id=group_report_id)
+        return qs
+
+    def _bge_for_user(self):
+        try:
+            return self.request.user.bge_profile
+        except Exception:
+            return None
+
+    def _can_edit(self, group_report_id):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return True
+        bge = self._bge_for_user()
+        if bge is None:
+            return False
+        try:
+            report = GroupReport.objects.get(pk=group_report_id)
+            return report.team_lead_id == bge.id or report.group.members.filter(pk=bge.id).exists()
+        except GroupReport.DoesNotExist:
+            return False
+
+    def perform_create(self, serializer):
+        group_report_id = serializer.validated_data.get('group_report').id
+        if not self._can_edit(group_report_id):
+            raise PermissionDenied("You can only record attendance for your own group reports.")
+        serializer.save()
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._can_edit(instance.group_report_id):
+            raise PermissionDenied("You can only update attendance for your own group reports.")
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._can_edit(instance.group_report_id):
+            raise PermissionDenied("You can only delete attendance for your own group reports.")
         return super().destroy(request, *args, **kwargs)
 
 
