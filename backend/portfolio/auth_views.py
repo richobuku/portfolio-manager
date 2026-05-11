@@ -3,11 +3,20 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.throttling import AnonRateThrottle
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
+
+
+class PasswordResetThrottle(AnonRateThrottle):
+    scope = 'password_reset'
 
 logger = logging.getLogger(__name__)
 try:
@@ -106,6 +115,7 @@ def _try_auto_link_bge(user, google_name, google_email):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
     username = request.data.get('username', '').strip()
     password = request.data.get('password', '')
@@ -132,6 +142,7 @@ def logout_view(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([PasswordResetThrottle])
 def request_password_reset(request):
     email = request.data.get('email', '').strip().lower()
     if not email:
@@ -193,6 +204,7 @@ def request_password_reset(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([PasswordResetThrottle])
 def confirm_password_reset(request):
     token    = (request.data.get('token') or '').strip()
     uidb64   = (request.data.get('uid')   or '').strip()
@@ -224,6 +236,7 @@ def confirm_password_reset(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def google_login_view(request):
     """
     Verify a Google ID token, auto-link to a BGE profile by email/name,

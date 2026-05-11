@@ -165,6 +165,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '200/day',        # unauthenticated — generous for API browsing
+        'user': '2000/day',       # authenticated users — normal usage ceiling
+        'login': '10/minute',     # brute-force protection on login endpoint
+        'password_reset': '5/hour', # prevent password-reset token enumeration
+    },
 }
 
 # ── Email Configuration (Gmail SMTP) ─────────────────────────────────────────

@@ -1402,53 +1402,75 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             rep_qs = rep_qs.filter(visit_date__lte=date_to)
             grp_qs = grp_qs.filter(visit_date__lte=date_to)
 
-        def _dem(qs):
-            youth    = qs.filter(age_group='18-34')
-            adult    = qs.exclude(age_group='18-34').filter(age_group__in=['35-45','46-55','56+'])
-            refugees = qs.filter(refugee_status='R')
-            host     = qs.filter(refugee_status='H')
+        # Pull the full attendance list once and aggregate in Python —
+        # avoids 11 separate COUNT queries per cohort/work-order in the loops below.
+        att_rows = list(att_qs.values('gender', 'age_group', 'refugee_status',
+                                      'msme_id', 'msme__cohort_id',
+                                      'session__work_order_id'))
+
+        def _dem_rows(rows):
+            youth   = [r for r in rows if r['age_group'] == '18-34']
+            adult   = [r for r in rows if r['age_group'] in ('35-45', '46-55', '56+')]
+            refs    = [r for r in rows if r['refugee_status'] == 'R']
+            host    = [r for r in rows if r['refugee_status'] == 'H']
             return {
-                'total':         qs.count(),
-                'male':          qs.filter(gender='M').count(),
-                'female':        qs.filter(gender='F').count(),
-                'male_youth':    youth.filter(gender='M').count(),
-                'female_youth':  youth.filter(gender='F').count(),
-                'male_adult':    adult.filter(gender='M').count(),
-                'female_adult':  adult.filter(gender='F').count(),
-                'refugees_total':refugees.count(),
-                'refugee_male':  refugees.filter(gender='M').count(),
-                'refugee_female':refugees.filter(gender='F').count(),
-                'host_community':host.count(),
+                'total':          len(rows),
+                'male':           sum(1 for r in rows if r['gender'] == 'M'),
+                'female':         sum(1 for r in rows if r['gender'] == 'F'),
+                'male_youth':     sum(1 for r in youth if r['gender'] == 'M'),
+                'female_youth':   sum(1 for r in youth if r['gender'] == 'F'),
+                'male_adult':     sum(1 for r in adult if r['gender'] == 'M'),
+                'female_adult':   sum(1 for r in adult if r['gender'] == 'F'),
+                'refugees_total': len(refs),
+                'refugee_male':   sum(1 for r in refs if r['gender'] == 'M'),
+                'refugee_female': sum(1 for r in refs if r['gender'] == 'F'),
+                'host_community': len(host),
             }
 
-        overall = _dem(att_qs)
+        overall = _dem_rows(att_rows)
         overall.update({
             'msme_reports':         rep_qs.count(),
             'unique_msmes_visited': rep_qs.values('msme').distinct().count(),
             'group_sessions':       grp_qs.count(),
         })
 
-        # Per-cohort breakdown
+        # Per-cohort breakdown — group already-fetched rows by cohort_id
+        rep_by_cohort = {}
+        for item in rep_qs.values('msme__cohort_id', 'msme_id'):
+            cid = item['msme__cohort_id']
+            if cid not in rep_by_cohort:
+                rep_by_cohort[cid] = {'count': 0, 'msmes': set()}
+            rep_by_cohort[cid]['count'] += 1
+            rep_by_cohort[cid]['msmes'].add(item['msme_id'])
+
         cohorts_data = []
         for cohort in CohortModel.objects.all().order_by('name'):
-            c_att = att_qs.filter(msme__cohort=cohort)
-            c_rep = rep_qs.filter(msme__cohort=cohort)
-            if c_att.count() == 0 and c_rep.count() == 0:
+            c_rows = [r for r in att_rows if r['msme__cohort_id'] == cohort.id]
+            c_rep  = rep_by_cohort.get(cohort.id, {'count': 0, 'msmes': set()})
+            if not c_rows and not c_rep['count']:
                 continue
-            row = _dem(c_att)
+            row = _dem_rows(c_rows)
             row.update({'cohort_id': cohort.id, 'cohort_name': cohort.name,
-                        'msme_reports': c_rep.count(),
-                        'unique_msmes': c_rep.values('msme').distinct().count()})
+                        'msme_reports': c_rep['count'],
+                        'unique_msmes': len(c_rep['msmes'])})
             cohorts_data.append(row)
 
-        # Per-work-order breakdown (activity/deployment level)
+        # Per-work-order breakdown — group rows by work_order_id
+        rep_by_bge = {}
+        for item in rep_qs.values('bge_id', 'msme_id'):
+            bid = item['bge_id']
+            if bid not in rep_by_bge:
+                rep_by_bge[bid] = {'count': 0, 'msmes': set()}
+            rep_by_bge[bid]['count'] += 1
+            rep_by_bge[bid]['msmes'].add(item['msme_id'])
+
         wo_data = []
         for wo in WorkOrder.objects.select_related('bge').order_by('-issue_date'):
-            w_att = att_qs.filter(session__work_order=wo)
-            w_rep = rep_qs.filter(bge=wo.bge)
-            if w_att.count() == 0 and w_rep.count() == 0:
+            w_rows = [r for r in att_rows if r['session__work_order_id'] == wo.id]
+            w_rep  = rep_by_bge.get(wo.bge_id, {'count': 0, 'msmes': set()})
+            if not w_rows and not w_rep['count']:
                 continue
-            row = _dem(w_att)
+            row = _dem_rows(w_rows)
             row.update({
                 'work_order_id':     wo.id,
                 'work_order_number': wo.work_order_number,
@@ -1459,8 +1481,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 'start_date':        str(wo.start_date) if wo.start_date else None,
                 'end_date':          str(wo.end_date) if wo.end_date else None,
                 'status':            wo.status,
-                'msme_reports':      w_rep.count(),
-                'unique_msmes':      w_rep.values('msme').distinct().count(),
+                'msme_reports':      w_rep['count'],
+                'unique_msmes':      len(w_rep['msmes']),
             })
             wo_data.append(row)
 

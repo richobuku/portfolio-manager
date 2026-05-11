@@ -91,15 +91,34 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_assigned_msme_count(self, obj):
+        # Use the prefetch cache when available (avoids a DB round-trip per BGE)
+        if 'assigned_msmes' in getattr(obj, '_prefetched_objects_cache', {}):
+            return sum(1 for m in obj.assigned_msmes.all() if m.is_active)
         return obj.assigned_msmes.filter(is_active=True).count()
 
     def get_assigned_msmes_list(self, obj):
+        # Filter from the prefetch cache when available — re-querying with
+        # .filter() would bypass the cache and cause N queries for N BGEs.
+        if 'assigned_msmes' in getattr(obj, '_prefetched_objects_cache', {}):
+            return [
+                {
+                    'id': m.id, 'business_name': m.business_name,
+                    'msme_code': m.msme_code, 'business_type': m.business_type,
+                    'sector': m.sector, 'city': m.city,
+                    'assignment_objectives': m.assignment_objectives,
+                    'assignment_date': str(m.assignment_date) if m.assignment_date else None,
+                }
+                for m in obj.assigned_msmes.all() if m.is_active
+            ]
         return list(
             obj.assigned_msmes.filter(is_active=True)
             .values('id', 'business_name', 'msme_code', 'business_type', 'sector', 'city', 'assignment_objectives', 'assignment_date')
         )
 
     def get_group_names(self, obj):
+        # Same pattern — use prefetch cache if available
+        if 'bge_groups' in getattr(obj, '_prefetched_objects_cache', {}):
+            return [g.name for g in obj.bge_groups.all()]
         return list(obj.bge_groups.values_list('name', flat=True))
 
     def get_signature_url(self, obj):
