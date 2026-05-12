@@ -175,7 +175,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── user management ────────────────────────────────────────────────────────
   const [bgeUsers, setBgeUsers] = useState([]);
   const [userDialog, setUserDialog] = useState(false);
-  const [userForm, setUserForm] = useState({ username: '', password: '', email: '', bge_id: '' });
+  const [userForm, setUserForm] = useState({ username: '', password: '', email: '', bge_id: '', role: 'bge', group_ids: [] });
   const [userLoading, setUserLoading] = useState(false);
   const [pwdDialog, setPwdDialog] = useState(false);
   const [pwdUser, setPwdUser] = useState(null);
@@ -782,10 +782,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     if (!userForm.username || !userForm.password) return;
     setUserLoading(true);
     try {
-      await axios.post(API_ENDPOINTS.BGE_USERS, userForm, { headers });
-      notify('User account created — welcome email sent if BGE has an email address');
+      const res = await axios.post(API_ENDPOINTS.BGE_USERS, {
+        username: userForm.username,
+        password: userForm.password,
+        email: userForm.email,
+        bge_id: userForm.role === 'bge' ? userForm.bge_id : '',
+      }, { headers });
+      // Set role if not a plain BGE account
+      if (userForm.role !== 'bge') {
+        await axios.patch(`${API_ENDPOINTS.BGE_USERS}${res.data.id}/set-role/`,
+          { role: userForm.role, group_ids: userForm.group_ids }, { headers });
+      }
+      notify('Account created — welcome email sent if an email address was provided');
       setUserDialog(false);
-      setUserForm({ username: '', password: '', email: '', bge_id: '' });
+      setUserForm({ username: '', password: '', email: '', bge_id: '', role: 'bge', group_ids: [] });
       fetchAll();
     } catch (e) { notify(e.response?.data?.error || 'Failed to create user', 'error'); }
     finally { setUserLoading(false); }
@@ -816,6 +826,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setUserForm(f => ({
       ...f,
       bge_id: bgeId,
+      role: 'bge',
       username: f.username || suggestedUsername,
       email: f.email || bge.email || '',
     }));
@@ -3839,35 +3850,57 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </DialogActions>
       </Dialog>
 
-      {/* ── Create BGE User ───────────────────────────────────────────────── */}
+      {/* ── Create User Account ───────────────────────────────────────────── */}
       <Dialog open={userDialog} onClose={() => setUserDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Create BGE Login Account</DialogTitle>
+        <DialogTitle>Create Login Account</DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Create a username and password for a BGE Expert so they can sign in to their portal.
-          </Typography>
-          <TextField fullWidth size="small" label="Username" sx={{ mb: 2 }}
-            value={userForm.username} onChange={e => setUserForm({ ...userForm, username: e.target.value })} />
-          <TextField fullWidth size="small" label="Password" type="password" sx={{ mb: 2 }}
-            value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} />
-          <TextField fullWidth size="small" label="Email (optional)" sx={{ mb: 2 }}
-            value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} />
-          <FormControl fullWidth size="small">
-            <InputLabel>Link to BGE Expert Profile</InputLabel>
-            <Select value={userForm.bge_id} label="Link to BGE Expert Profile"
-              onChange={e => handleUserBgeSelect(e.target.value)}>
-              <MenuItem value="">— Not linked yet —</MenuItem>
-              {experts.filter(e => !bgeUsers.some(u => u.bge_profile?.id === e.id)).map(e => (
-                <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>
-              ))}
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>Account Type</InputLabel>
+            <Select value={userForm.role} label="Account Type"
+              onChange={e => setUserForm(f => ({ ...f, role: e.target.value, bge_id: '', group_ids: [] }))}>
+              <MenuItem value="bge">BGE Expert — sees only their assigned MSMEs</MenuItem>
+              <MenuItem value="cohort_admin">Programme Manager — manages specific groups</MenuItem>
+              <MenuItem value="viewer">Viewer — read-only access to all data</MenuItem>
             </Select>
           </FormControl>
+
+          {userForm.role === 'bge' && (
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel>Link to BGE Expert Profile</InputLabel>
+              <Select value={userForm.bge_id} label="Link to BGE Expert Profile"
+                onChange={e => handleUserBgeSelect(e.target.value)}>
+                <MenuItem value="">— Not linked yet —</MenuItem>
+                {experts.filter(e => !bgeUsers.some(u => u.bge_profile?.id === e.id)).map(e => (
+                  <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          {userForm.role === 'cohort_admin' && (
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel>Managed Programme Groups</InputLabel>
+              <Select multiple value={userForm.group_ids} label="Managed Programme Groups"
+                onChange={e => setUserForm(f => ({ ...f, group_ids: e.target.value }))}>
+                {programmeGroups.map(g => (
+                  <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          <TextField fullWidth size="small" label="Username" sx={{ mb: 2 }}
+            value={userForm.username} onChange={e => setUserForm(f => ({ ...f, username: e.target.value }))} />
+          <TextField fullWidth size="small" label="Password" type="password" sx={{ mb: 2 }}
+            value={userForm.password} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))} />
+          <TextField fullWidth size="small" label="Email (optional)"
+            value={userForm.email} onChange={e => setUserForm(f => ({ ...f, email: e.target.value }))} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUserDialog(false)}>Cancel</Button>
-          <Button variant="contained" startIcon={<PersonAdd />}
-            onClick={createBGEUser}
-            disabled={userLoading || !userForm.username || !userForm.password}>
+          <Button variant="contained" startIcon={<PersonAdd />} onClick={createBGEUser}
+            disabled={userLoading || !userForm.username || !userForm.password ||
+              (userForm.role === 'cohort_admin' && userForm.group_ids.length === 0)}>
             {userLoading ? <CircularProgress size={18} /> : 'Create Account'}
           </Button>
         </DialogActions>
