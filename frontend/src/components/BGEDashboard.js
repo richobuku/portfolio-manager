@@ -171,6 +171,67 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [selectedMsme, setSelectedMsme] = useState(null);
   const [msmeReports, setMsmeReports] = useState([]);
 
+  // Growth update form
+  const [growthDialog, setGrowthDialog] = useState(false);
+  const [growthMsme, setGrowthMsme] = useState(null);
+  const [growthSnapshots, setGrowthSnapshots] = useState([]);
+  const [growthSaving, setGrowthSaving] = useState(false);
+  const [growthError, setGrowthError] = useState('');
+  const EMPTY_GROWTH = {
+    snapshot_date: new Date().toISOString().slice(0, 10),
+    source: 'bge_visit',
+    annual_turnover: '', total_assets: '',
+    employees_ft_male: '', employees_ft_female: '',
+    employees_pt_male: '', employees_pt_female: '',
+    has_tin: '', has_unbs: '', has_business_bank: '', has_mobile_money: '',
+    notes: '',
+  };
+  const [growthForm, setGrowthForm] = useState(EMPTY_GROWTH);
+
+  const openGrowthForm = async (msme) => {
+    setGrowthMsme(msme);
+    setGrowthForm(EMPTY_GROWTH);
+    setGrowthError('');
+    setGrowthDialog(true);
+    // Load existing snapshots for history display
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.GROWTH_SNAPSHOTS}?msme=${msme.id}`,
+        { headers: { Authorization: `Bearer ${token}` } });
+      setGrowthSnapshots(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch (e) { setGrowthSnapshots([]); }
+  };
+
+  const saveGrowthSnapshot = async () => {
+    if (!growthMsme) return;
+    setGrowthSaving(true); setGrowthError('');
+    const bgeId = currentUser?.bge_profile?.id;
+    const payload = {
+      msme: growthMsme.id,
+      snapshot_date: growthForm.snapshot_date,
+      source: growthForm.source,
+      collected_by: bgeId || null,
+      annual_turnover:   growthForm.annual_turnover   || null,
+      total_assets:      growthForm.total_assets      || null,
+      employees_ft_male:   growthForm.employees_ft_male   !== '' ? Number(growthForm.employees_ft_male)   : null,
+      employees_ft_female: growthForm.employees_ft_female !== '' ? Number(growthForm.employees_ft_female) : null,
+      employees_pt_male:   growthForm.employees_pt_male   !== '' ? Number(growthForm.employees_pt_male)   : null,
+      employees_pt_female: growthForm.employees_pt_female !== '' ? Number(growthForm.employees_pt_female) : null,
+      has_tin:           growthForm.has_tin           === '' ? null : growthForm.has_tin === 'true',
+      has_unbs:          growthForm.has_unbs          === '' ? null : growthForm.has_unbs === 'true',
+      has_business_bank: growthForm.has_business_bank === '' ? null : growthForm.has_business_bank === 'true',
+      has_mobile_money:  growthForm.has_mobile_money  === '' ? null : growthForm.has_mobile_money === 'true',
+      notes: growthForm.notes,
+    };
+    try {
+      await axios.post(API_ENDPOINTS.GROWTH_SNAPSHOTS, payload,
+        { headers: { Authorization: `Bearer ${token}` } });
+      notify('Growth update saved.');
+      setGrowthDialog(false);
+    } catch (e) {
+      setGrowthError(e.response?.data ? JSON.stringify(e.response.data) : 'Save failed.');
+    } finally { setGrowthSaving(false); }
+  };
+
   // in-app report viewer
   const [viewReport, setViewReport] = useState(null);
 
@@ -973,6 +1034,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                 <Tooltip title="Open MSME">
                                   <IconButton size="small" onClick={() => openMsmeDetail(m)}><Visibility fontSize="small" /></IconButton>
                                 </Tooltip>
+                                <Tooltip title="Record Growth Update">
+                                  <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
+                                    <Star fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
                               </Box>
                             ))}
                           </Box>
@@ -1595,11 +1661,153 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </DialogContent>
 
               <DialogActions>
+                <Button variant="outlined" size="small" color="success"
+                  onClick={() => { setMsmeDetailDialog(false); openGrowthForm(m); }}>
+                  Record Growth Update
+                </Button>
                 <Button onClick={() => setMsmeDetailDialog(false)}>Close</Button>
               </DialogActions>
             </>
           );
         })()}
+      </Dialog>
+
+      {/* ── Growth update form ── */}
+      <Dialog open={growthDialog} onClose={() => setGrowthDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Typography fontWeight={700}>Record Growth Update</Typography>
+          {growthMsme && <Typography variant="caption" color="text.secondary">{growthMsme.business_name}</Typography>}
+        </DialogTitle>
+        <DialogContent dividers>
+          {growthError && <Alert severity="error" sx={{ mb: 2 }}>{growthError}</Alert>}
+
+          <Grid container spacing={2}>
+            {/* Date + Source */}
+            <Grid item xs={6}>
+              <TextField fullWidth size="small" label="Date" type="date" InputLabelProps={{ shrink: true }}
+                value={growthForm.snapshot_date}
+                onChange={e => setGrowthForm(f => ({ ...f, snapshot_date: e.target.value }))} />
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Type</InputLabel>
+                <Select value={growthForm.source} label="Type"
+                  onChange={e => setGrowthForm(f => ({ ...f, source: e.target.value }))}>
+                  <MenuItem value="bge_visit">BGE Visit</MenuItem>
+                  <MenuItem value="quarterly">Quarterly Review</MenuItem>
+                  <MenuItem value="annual">Annual Review</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Revenue & Assets */}
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Financials (UGX)</Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField fullWidth size="small" label="Annual Revenue / Turnover"
+                type="number" inputProps={{ min: 0 }}
+                value={growthForm.annual_turnover}
+                onChange={e => setGrowthForm(f => ({ ...f, annual_turnover: e.target.value }))}
+                helperText="Total sales last 12 months" />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField fullWidth size="small" label="Total Assets"
+                type="number" inputProps={{ min: 0 }}
+                value={growthForm.total_assets}
+                onChange={e => setGrowthForm(f => ({ ...f, total_assets: e.target.value }))}
+                helperText="Business investment in assets" />
+            </Grid>
+
+            {/* Employees */}
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Employees</Typography>
+            </Grid>
+            {[
+              { key: 'employees_ft_male',   label: 'FT Male' },
+              { key: 'employees_ft_female', label: 'FT Female' },
+              { key: 'employees_pt_male',   label: 'PT Male' },
+              { key: 'employees_pt_female', label: 'PT Female' },
+            ].map(({ key, label }) => (
+              <Grid item xs={3} key={key}>
+                <TextField fullWidth size="small" label={label} type="number"
+                  inputProps={{ min: 0 }}
+                  value={growthForm[key]}
+                  onChange={e => setGrowthForm(f => ({ ...f, [key]: e.target.value }))} />
+              </Grid>
+            ))}
+
+            {/* Compliance */}
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Compliance & Financial Access</Typography>
+            </Grid>
+            {[
+              { key: 'has_tin',           label: 'Has TIN (Tax ID)' },
+              { key: 'has_unbs',          label: 'Registered with UNBS' },
+              { key: 'has_business_bank', label: 'Business Bank Account' },
+              { key: 'has_mobile_money',  label: 'Mobile Money Account' },
+            ].map(({ key, label }) => (
+              <Grid item xs={6} key={key}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>{label}</InputLabel>
+                  <Select value={growthForm[key]} label={label}
+                    onChange={e => setGrowthForm(f => ({ ...f, [key]: e.target.value }))}>
+                    <MenuItem value="">— Unknown —</MenuItem>
+                    <MenuItem value="true">Yes</MenuItem>
+                    <MenuItem value="false">No</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            ))}
+
+            {/* Notes */}
+            <Grid item xs={12}>
+              <TextField fullWidth size="small" label="Notes / Observations" multiline rows={3}
+                value={growthForm.notes}
+                onChange={e => setGrowthForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Key observations, what changed since last visit, challenges, etc." />
+            </Grid>
+          </Grid>
+
+          {/* ── History ── */}
+          {growthSnapshots.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>
+                Previous Snapshots ({growthSnapshots.length})
+              </Typography>
+              {[...growthSnapshots].reverse().map((s, i) => (
+                <Box key={s.id} sx={{ border: '1px solid #E8EDF2', borderRadius: 1.5, p: 1.5, mt: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography fontSize={12} fontWeight={600}>{s.snapshot_date}</Typography>
+                    <Chip size="small" label={s.source.replace('_', ' ')} variant="outlined" sx={{ fontSize: 10 }} />
+                  </Box>
+                  <Grid container spacing={1}>
+                    {s.annual_turnover && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Revenue</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.annual_turnover).toLocaleString()}</Typography></Grid>}
+                    {s.total_assets    && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Assets</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.total_assets).toLocaleString()}</Typography></Grid>}
+                    {(s.employees_ft_male != null || s.employees_ft_female != null) && (
+                      <Grid item xs={12}>
+                        <Typography fontSize={11} color="text.secondary">
+                          Employees: {(s.employees_ft_male||0)+(s.employees_ft_female||0)} FT
+                          {(s.employees_pt_male != null || s.employees_pt_female != null)
+                            ? ` · ${(s.employees_pt_male||0)+(s.employees_pt_female||0)} PT` : ''}
+                          {' '}({s.employees_ft_female||0} female FT)
+                        </Typography>
+                      </Grid>
+                    )}
+                    {s.notes && <Grid item xs={12}><Typography fontSize={11} color="text.secondary" sx={{ fontStyle: 'italic' }}>{s.notes}</Typography></Grid>}
+                  </Grid>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGrowthDialog(false)}>Cancel</Button>
+          <Button variant="contained" color="success" disabled={growthSaving} onClick={saveGrowthSnapshot}>
+            {growthSaving ? 'Saving…' : 'Save Update'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* ── Report form dialog ── */}
