@@ -163,6 +163,10 @@ class MSME(models.Model):
     cohort = models.ForeignKey(
         'Cohort', on_delete=models.SET_NULL, null=True, blank=True, related_name='msmes'
     )
+    programme_groups = models.ManyToManyField(
+        'ProgrammeGroup', blank=True, related_name='msmes',
+        help_text='Cross-cutting programme labels (e.g. Green MSMEs, Agroprocessors).',
+    )
     assigned_bge = models.ForeignKey(
         'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_msmes'
     )
@@ -646,19 +650,42 @@ class WorkOrder(models.Model):
         super().save(*args, **kwargs)
 
 
+class ProgrammeGroup(models.Model):
+    """A cross-cutting label that can be applied to any MSME regardless of cohort.
+
+    Examples: 'Green MSMEs', 'Agroprocessors'.
+    Programme managers are scoped to see only MSMEs in their assigned groups.
+    """
+    name        = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    color       = models.CharField(
+        max_length=7, blank=True, default='#1A2F4B',
+        help_text='Hex colour used for the chip in the UI (e.g. #2E7D32).',
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Programme Group"
+        verbose_name_plural = "Programme Groups"
+
+    def __str__(self):
+        return self.name
+
+
 class CohortAdmin(models.Model):
     """A programme manager who has full admin-level access but only for
-    the cohorts listed in `managed_cohorts`.  All data queries for MSMEs,
-    reports, attendance etc. are automatically scoped to those cohorts.
+    the programme groups listed in `managed_groups`.  All data queries for
+    MSMEs, reports, attendance etc. are automatically scoped to those groups.
 
     Superusers/staff see everything regardless of this model.
     """
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='cohort_admin_profile',
     )
-    managed_cohorts = models.ManyToManyField(
-        'Cohort', blank=True, related_name='cohort_admins',
-        help_text='Cohorts this programme manager can see and manage.',
+    managed_groups = models.ManyToManyField(
+        'ProgrammeGroup', blank=True, related_name='managers',
+        help_text='Programme groups this manager can see and manage.',
     )
 
     class Meta:
@@ -666,5 +693,5 @@ class CohortAdmin(models.Model):
         verbose_name_plural = "Programme Managers"
 
     def __str__(self):
-        names = ', '.join(c.name for c in self.managed_cohorts.all()) or '(no cohorts)'
+        names = ', '.join(g.name for g in self.managed_groups.all()) or '(no groups)'
         return f"{self.user.get_full_name() or self.user.username} → {names}"

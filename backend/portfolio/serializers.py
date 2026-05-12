@@ -4,8 +4,19 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
-    GroupReportAttendance,
+    GroupReportAttendance, ProgrammeGroup,
 )
+
+
+class ProgrammeGroupSerializer(serializers.ModelSerializer):
+    msme_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProgrammeGroup
+        fields = '__all__'
+
+    def get_msme_count(self, obj):
+        return obj.msmes.count()
 
 
 class PortfolioSerializer(serializers.ModelSerializer):
@@ -58,6 +69,7 @@ class MSMESerializer(serializers.ModelSerializer):
     assigned_group_objectives = serializers.CharField(source='assigned_group.objectives', read_only=True)
     total_reports = serializers.SerializerMethodField()
     last_support_date = serializers.SerializerMethodField()
+    programme_groups_detail = ProgrammeGroupSerializer(source='programme_groups', many=True, read_only=True)
 
     class Meta:
         model = MSME

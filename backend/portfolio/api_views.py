@@ -17,17 +17,17 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
-    GroupReportAttendance, CohortAdmin,
+    GroupReportAttendance, CohortAdmin, ProgrammeGroup,
 )
 
 
-def _managed_cohorts(user):
-    """Return the cohorts a programme manager (cohort_admin) can access,
-    or None for superusers/staff (no restriction)."""
+def _managed_groups(user):
+    """Return the ProgrammeGroup IDs a programme manager can access,
+    or None for superusers/staff (meaning no restriction)."""
     if user.is_staff or user.is_superuser:
         return None
     try:
-        return list(user.cohort_admin_profile.managed_cohorts.values_list('id', flat=True))
+        return list(user.cohort_admin_profile.managed_groups.values_list('id', flat=True))
     except CohortAdmin.DoesNotExist:
         return None
 from pywebpush import webpush, WebPushException
@@ -124,6 +124,33 @@ class CohortViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
+class ProgrammeGroupViewSet(viewsets.ModelViewSet):
+    """Cross-cutting labels that can be applied to MSMEs (e.g. Green MSMEs, Agroprocessors).
+    Read-only for non-admins; create/update/delete restricted to admins."""
+    queryset = ProgrammeGroup.objects.all()
+    serializer_class = None  # defined below via import
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        from .serializers import ProgrammeGroupSerializer
+        return ProgrammeGroupSerializer
+
+    def create(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can create programme groups.")
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can edit programme groups.")
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can delete programme groups.")
+        return super().destroy(request, *args, **kwargs)
+
+
 class MSMEViewSet(viewsets.ModelViewSet):
     queryset = MSME.objects.filter(is_active=True)
     serializer_class = MSMESerializer
@@ -133,10 +160,10 @@ class MSMEViewSet(viewsets.ModelViewSet):
         qs = MSME.objects.filter(is_active=True)
 
         user = self.request.user
-        cohort_ids = _managed_cohorts(user)
-        if cohort_ids is not None:
-            # Cohort admin — scope to their managed cohorts
-            qs = qs.filter(cohort_id__in=cohort_ids)
+        group_ids = _managed_groups(user)
+        if group_ids is not None:
+            # Programme manager — scope to MSMEs in their managed programme groups
+            qs = qs.filter(programme_groups__in=group_ids).distinct()
         elif not (user.is_staff or user.is_superuser):
             # BGE users only see their own assigned MSMEs — directly OR via any group they belong to
             try:
@@ -184,7 +211,7 @@ class MSMEViewSet(viewsets.ModelViewSet):
         u = request.user
         if u.is_staff or u.is_superuser:
             return True
-        return _managed_cohorts(u) is not None
+        return _managed_groups(u) is not None
 
     def destroy(self, request, *args, **kwargs):
         if not self._is_admin_or_cohort_admin(request):
@@ -243,6 +270,28 @@ class MSMEViewSet(viewsets.ModelViewSet):
             msme.cohort = None
         msme.save()
         return Response(MSMESerializer(msme).data)
+
+    @action(detail=True, methods=['patch'], url_path='set-groups')
+    def set_groups(self, request, pk=None):
+        """Add or remove this MSME from programme groups.
+
+        Body: { "group_ids": [1, 2, ...] }   — replaces the full set.
+        Body: { "add": [1], "remove": [2] }   — incremental add/remove.
+        """
+        if not self._is_admin_or_cohort_admin(request):
+            raise PermissionDenied("Only admins can modify programme group membership.")
+        msme = self.get_object()
+        if 'group_ids' in request.data:
+            ids = request.data['group_ids'] or []
+            msme.programme_groups.set(ids)
+        else:
+            add_ids    = request.data.get('add', [])
+            remove_ids = request.data.get('remove', [])
+            if add_ids:
+                msme.programme_groups.add(*add_ids)
+            if remove_ids:
+                msme.programme_groups.remove(*remove_ids)
+        return Response(MSMESerializer(msme, context={'request': request}).data)
 
     @action(detail=False, methods=['get'], url_path='upload-template', permission_classes=[])
     def upload_template(self, request):
@@ -1524,11 +1573,11 @@ class MSMEReportViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        cohort_ids = _managed_cohorts(user)
+        group_ids = _managed_groups(user)
         if user.is_staff or user.is_superuser:
             qs = MSMEReport.objects.all()
-        elif cohort_ids is not None:
-            qs = MSMEReport.objects.filter(msme__cohort_id__in=cohort_ids)
+        elif group_ids is not None:
+            qs = MSMEReport.objects.filter(msme__programme_groups__in=group_ids).distinct()
         else:
             try:
                 bge = user.bge_profile
@@ -1616,12 +1665,12 @@ class GroupReportViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        cohort_ids = _managed_cohorts(user)
+        group_ids = _managed_groups(user)
         if user.is_staff or user.is_superuser:
             qs = GroupReport.objects.all()
-        elif cohort_ids is not None:
+        elif group_ids is not None:
             qs = GroupReport.objects.filter(
-                group__assigned_msmes__cohort_id__in=cohort_ids
+                group__assigned_msmes__programme_groups__in=group_ids
             ).distinct()
         else:
             try:
@@ -1644,7 +1693,7 @@ class GroupReportViewSet(viewsets.ModelViewSet):
     def _user_can_write_for_group(self, user, group):
         if user.is_staff or user.is_superuser:
             return True
-        if _managed_cohorts(user) is not None:
+        if _managed_groups(user) is not None:
             return True  # cohort admin can edit reports in their groups
         try:
             bge = user.bge_profile

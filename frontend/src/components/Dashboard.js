@@ -23,7 +23,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, MSME_SET_GROUPS_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -67,6 +67,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [experts, setExperts] = useState([]);
   const [cohorts, setCohorts] = useState([]);
   const [bgeGroups, setBgeGroups] = useState([]);
+  const [programmeGroups, setProgrammeGroups] = useState([]);
   const [trainingSessions, setTrainingSessions] = useState([]);
   const [trainingTopics, setTrainingTopics] = useState([]);
   const [analytics, setAnalytics] = useState({});
@@ -194,7 +195,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (reportFilterBge) reportParams.append('bge', reportFilterBge);
       if (reportFilterStatus) reportParams.append('status', reportFilterStatus);
 
-      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes] = await Promise.all([
+      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes] = await Promise.all([
         axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
         axios.get(API_ENDPOINTS.EXPERTS, { headers: h }),
         axios.get(API_ENDPOINTS.COHORTS, { headers: h }),
@@ -205,6 +206,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         axios.get(API_ENDPOINTS.BGE_USERS, { headers: h }),
         axios.get(`${API_ENDPOINTS.REPORTS}?${reportParams}`, { headers: h }),
         axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+        axios.get(API_ENDPOINTS.PROGRAMME_GROUPS, { headers: h }).catch(() => ({ data: [] })),
       ]);
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
@@ -212,6 +214,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setExperts(toArr(eRes.data));
       setCohorts(toArr(cRes.data));
       setBgeGroups(toArr(gRes.data));
+      setProgrammeGroups(toArr(pgRes.data));
       setTrainingSessions(toArr(sRes.data));
       setTrainingTopics(toArr(tRes.data));
       setAnalytics(aRes.data);
@@ -434,6 +437,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify('Cohort assigned');
       fetchAll();
     } catch { notify('Failed to assign cohort', 'error'); }
+  };
+
+  const toggleProgrammeGroup = async (msme, groupId) => {
+    const current = (msme.programme_groups_detail || []).map(g => g.id);
+    const next = current.includes(groupId)
+      ? current.filter(id => id !== groupId)
+      : [...current, groupId];
+    try {
+      const res = await axios.patch(MSME_SET_GROUPS_URL(msme.id), { group_ids: next }, { headers });
+      setMsmes(prev => prev.map(m => m.id === msme.id ? res.data : m));
+    } catch { notify('Failed to update programme group', 'error'); }
   };
 
   // ── MSME upload dialog ─────────────────────────────────────────────────────
@@ -962,6 +976,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <TableCell>Owner</TableCell>
               <TableCell>Type</TableCell>
               <TableCell>Cohort</TableCell>
+              <TableCell>Groups</TableCell>
               <TableCell>Assigned BGE</TableCell>
               <TableCell>Location</TableCell>
               <TableCell align="center">Supports</TableCell>
@@ -971,7 +986,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </TableHead>
           <TableBody>
             {paginate(msmes, msmePage).length === 0 ? (
-              <TableRow><TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
             ) : paginate(msmes, msmePage).map(m => (
               <TableRow key={m.id} hover>
                 <TableCell><Chip label={m.msme_code} size="small" variant="outlined" /></TableCell>
@@ -987,6 +1002,44 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <MenuItem value=""><em>None</em></MenuItem>
                     {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                   </Select>
+                </TableCell>
+                <TableCell sx={{ minWidth: 160 }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                    {(m.programme_groups_detail || []).map(g => (
+                      <Chip
+                        key={g.id}
+                        label={g.name}
+                        size="small"
+                        onDelete={isAdmin ? () => toggleProgrammeGroup(m, g.id) : undefined}
+                        sx={{
+                          fontSize: 10, height: 20,
+                          bgcolor: g.color || '#1A2F4B',
+                          color: '#fff',
+                          '& .MuiChip-deleteIcon': { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
+                        }}
+                      />
+                    ))}
+                    {isAdmin && programmeGroups.filter(g =>
+                      !(m.programme_groups_detail || []).some(mg => mg.id === g.id)
+                    ).length > 0 && (
+                      <Select
+                        value=""
+                        displayEmpty
+                        variant="standard"
+                        disableUnderline
+                        size="small"
+                        onChange={e => { if (e.target.value) toggleProgrammeGroup(m, e.target.value); }}
+                        sx={{ fontSize: 11, minWidth: 28, '& .MuiSelect-select': { py: 0, px: 0.5 } }}
+                        renderValue={() => <Typography sx={{ fontSize: 18, lineHeight: 1, color: 'text.secondary' }}>+</Typography>}
+                      >
+                        <MenuItem value="" disabled><em>Add to group…</em></MenuItem>
+                        {programmeGroups
+                          .filter(g => !(m.programme_groups_detail || []).some(mg => mg.id === g.id))
+                          .map(g => <MenuItem key={g.id} value={g.id} sx={{ fontSize: 13 }}>{g.name}</MenuItem>)
+                        }
+                      </Select>
+                    )}
+                  </Box>
                 </TableCell>
                 <TableCell>
                   {m.assigned_bge_name ? (

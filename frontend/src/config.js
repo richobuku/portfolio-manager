@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   UPLOAD_MSMES:       `${API_BASE_URL}/api/msmes/upload/`,
   UPLOAD_MSMES_TEMPLATE: `${API_BASE_URL}/api/msmes/upload-template/`,
   UPLOAD_EXPERTS:     `${API_BASE_URL}/api/experts/upload/`,
+  PROGRAMME_GROUPS:   `${API_BASE_URL}/api/programme-groups/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
@@ -35,6 +36,7 @@ export const WORK_ORDER_ISSUE_URL = (id) => `${API_BASE_URL}/api/work-orders/${i
 export const WORK_ORDER_SIGN_URL  = (id) => `${API_BASE_URL}/api/work-orders/${id}/sign/`;
 export const WORK_ORDER_PDF_URL   = (id) => `${API_BASE_URL}/api/work-orders/${id}/pdf/`;
 // legacy alias kept for any existing references
+export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;
 
 export default API_BASE_URL;

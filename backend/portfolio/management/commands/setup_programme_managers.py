@@ -14,7 +14,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
-from portfolio.models import Cohort, CohortAdmin
+from portfolio.models import ProgrammeGroup, CohortAdmin
 
 
 MANAGERS = [
@@ -32,7 +32,10 @@ MANAGERS = [
     },
 ]
 
-COHORTS = ['Green MSMEs', 'Agroprocessors']
+PROGRAMME_GROUPS = [
+    {'name': 'Green MSMEs',    'color': '#2E7D32'},
+    {'name': 'Agroprocessors', 'color': '#E65100'},
+]
 
 
 def _random_password(length=16):
@@ -52,13 +55,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         send_email = options['send_email']
 
-        # 1. Cohorts
-        created_cohorts = []
-        for name in COHORTS:
-            cohort, created = Cohort.objects.get_or_create(name=name)
-            status = 'created' if created else 'already exists'
-            self.stdout.write(f'  Cohort "{name}" — {status}')
-            created_cohorts.append(cohort)
+        # 1. Programme Groups
+        for g in PROGRAMME_GROUPS:
+            pg, created = ProgrammeGroup.objects.get_or_create(
+                name=g['name'], defaults={'color': g['color']}
+            )
+            self.stdout.write(f'  ProgrammeGroup "{pg.name}" — {"created" if created else "already exists"}')
 
         # 2. User accounts + CohortAdmin profiles
         for mgr in MANAGERS:

@@ -55,7 +55,7 @@ def _build_user_response(user):
         try:
             ca = user.cohort_admin_profile
             role = 'cohort_admin'
-            managed_cohort_ids = list(ca.managed_cohorts.values_list('id', flat=True))
+            managed_cohort_ids = list(ca.managed_groups.values_list('id', flat=True))
         except CohortAdmin.DoesNotExist:
             role = 'viewer'
 
