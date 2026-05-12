@@ -1276,12 +1276,15 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
 
             buf = _io.BytesIO()
             img.save(buf, format='PNG')
-            buf.seek(0)
+            png_bytes = buf.getvalue()
 
             from django.core.files.base import ContentFile
             filename = f'sig_{bge.bge_code or bge.id}.png'
             bge.signature.delete(save=False)  # remove old file if present
-            bge.signature.save(filename, ContentFile(buf.read()), save=True)
+            bge.signature.save(filename, ContentFile(png_bytes), save=False)
+            # Also persist bytes in DB so signature survives Render filesystem wipes
+            bge.signature_data = png_bytes
+            bge.save(update_fields=['signature', 'signature_data'])
 
         except Exception as exc:
             return Response({'error': f'Image processing failed: {exc}'},
@@ -2345,7 +2348,10 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             from django.core.files.base import ContentFile
             pdf_bytes = render_work_order(work_order).read()
             fname = f'WO_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}_signed.pdf'
-            work_order.signed_pdf.save(fname, ContentFile(pdf_bytes), save=True)
+            work_order.signed_pdf.save(fname, ContentFile(pdf_bytes), save=False)
+            # Store bytes in DB so the signed copy survives Render filesystem wipes
+            work_order.signed_pdf_data = pdf_bytes
+            work_order.save(update_fields=['signed_pdf', 'signed_pdf_data'])
         except Exception:
             pass  # signing is complete even if PDF storage fails
 
@@ -2364,15 +2370,19 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         fname = f'WorkOrder_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}.pdf'
         dl = request.query_params.get('dl', '0')
         disp = 'attachment' if dl == '1' else 'inline'
-        # Serve the stored signed copy when available — guarantees the download
-        # matches exactly what the BGE signed.
+        # Prefer DB-stored signed bytes (survives Render filesystem wipes).
+        # Fall back to filesystem copy, then regenerate live for unsigned orders.
+        if work_order.signed_pdf_data:
+            resp = HttpResponse(bytes(work_order.signed_pdf_data), content_type='application/pdf')
+            resp['Content-Disposition'] = f'{disp}; filename="{fname}"'
+            return resp
         if work_order.signed_pdf:
             try:
                 resp = HttpResponse(work_order.signed_pdf.read(), content_type='application/pdf')
                 resp['Content-Disposition'] = f'{disp}; filename="{fname}"'
                 return resp
             except Exception:
-                pass  # fall through to regeneration if file is missing from storage
+                pass
         from .pdf_reports import render_work_order
         buf = render_work_order(work_order)
         resp = HttpResponse(buf.read(), content_type='application/pdf')

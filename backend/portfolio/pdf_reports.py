@@ -192,17 +192,24 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
     ]
 
     bge_col = [Paragraph(sig_label, s['label']), Spacer(1, 4)]
-    if bge and bge.signature:
+    sig_drawn = False
+    if bge and getattr(bge, 'signature_data', None):
+        try:
+            bge_col.append(RLImage(io.BytesIO(bytes(bge.signature_data)),
+                                   width=40 * mm, height=SIG_H, kind='proportional'))
+            sig_drawn = True
+        except Exception:
+            pass
+    if not sig_drawn and bge and bge.signature:
         try:
             sig_path = bge.signature.path
             if os.path.isfile(sig_path):
                 bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
                                        kind='proportional'))
-            else:
-                bge_col.append(Spacer(1, SIG_H))
+                sig_drawn = True
         except Exception:
-            bge_col.append(Spacer(1, SIG_H))
-    else:
+            pass
+    if not sig_drawn:
         bge_col.append(Spacer(1, SIG_H))
 
     # Format date — signed_date may be a date, datetime, or string
@@ -481,17 +488,25 @@ def render_work_order(work_order):
     ]
 
     bge_col = [Paragraph('Accepted by BGE', s['label']), Spacer(1, 4)]
-    if bge.signature:
+    sig_drawn = False
+    # Prefer DB-stored bytes (survives Render filesystem wipes), then file path
+    if getattr(bge, 'signature_data', None):
+        try:
+            bge_col.append(RLImage(io.BytesIO(bytes(bge.signature_data)),
+                                   width=40 * mm, height=SIG_H, kind='proportional'))
+            sig_drawn = True
+        except Exception:
+            pass
+    if not sig_drawn and bge.signature:
         try:
             sig_path = bge.signature.path
             if os.path.isfile(sig_path):
                 bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
                                        kind='proportional'))
-            else:
-                bge_col.append(Spacer(1, SIG_H))
+                sig_drawn = True
         except Exception:
-            bge_col.append(Spacer(1, SIG_H))
-    else:
+            pass
+    if not sig_drawn:
         bge_col.append(Spacer(1, SIG_H))
 
     bge_col += [

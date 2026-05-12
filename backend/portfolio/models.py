@@ -382,6 +382,8 @@ class BusinessGrowthExpert(models.Model):
         upload_to='signatures/', null=True, blank=True,
         help_text='JPEG/PNG signature image; background will be normalised on upload'
     )
+    # Signature bytes stored in DB — survives filesystem wipes on Render deploys.
+    signature_data = models.BinaryField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -738,6 +740,8 @@ class WorkOrder(models.Model):
     signed_pdf = models.FileField(
         upload_to='work_orders/signed/', null=True, blank=True,
     )
+    # PDF bytes stored in DB — survives filesystem wipes on Render deploys.
+    signed_pdf_data = models.BinaryField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
