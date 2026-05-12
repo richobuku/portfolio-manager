@@ -1416,7 +1416,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setLoading(true); setResult(null); setError(null);
       const fd = new FormData(); fd.append('file', file);
       axios.post(`${API_ENDPOINTS.MSMES}import-diagnostics/`, fd,
-        { headers: { Authorization: `Token ${tok}`, 'Content-Type': 'multipart/form-data' } })
+        { headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'multipart/form-data' } })
         .then(r => { setResult(r.data.detail); setLoading(false); onImported(); })
         .catch(e => {
           const data = e.response?.data;
