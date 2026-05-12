@@ -46,7 +46,7 @@ const NAV_ITEMS = [
 
 export default function Dashboard({ token, currentUser, onLogout }) {
   const isViewer  = currentUser?.role === 'viewer';
-  const isStaff   = !!(currentUser?.is_staff || currentUser?.is_superuser);
+  const isStaff   = !!(currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'admin');
   const isAdmin   = !isViewer && (isStaff || currentUser?.role === 'cohort_admin');
   const headers   = { Authorization: `Bearer ${token}` };
 
