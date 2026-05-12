@@ -777,12 +777,42 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setUserLoading(true);
     try {
       await axios.post(API_ENDPOINTS.BGE_USERS, userForm, { headers });
-      notify('User account created');
+      notify('User account created — welcome email sent if BGE has an email address');
       setUserDialog(false);
       setUserForm({ username: '', password: '', email: '', bge_id: '' });
       fetchAll();
     } catch (e) { notify(e.response?.data?.error || 'Failed to create user', 'error'); }
     finally { setUserLoading(false); }
+  };
+
+  const bulkCreateMissingAccounts = async () => {
+    setUserLoading(true);
+    try {
+      const res = await axios.post(`${API_ENDPOINTS.BGE_USERS}bulk-create-missing/`, { password: 'bds123' }, { headers });
+      const { created, skipped, names } = res.data;
+      if (created > 0) {
+        notify(`Created ${created} account${created !== 1 ? 's' : ''}: ${names.join(', ')}. Welcome emails sent. Default password: bds123`);
+      } else {
+        notify('All BGE experts already have accounts.');
+      }
+      if (skipped > 0) notify(`${skipped} BGE(s) skipped — no name/email to generate username.`, 'warning');
+      fetchAll();
+    } catch (e) { notify(e.response?.data?.error || 'Failed to bulk create accounts', 'error'); }
+    finally { setUserLoading(false); }
+  };
+
+  // Auto-fill username/email when BGE is selected in the Create Account dialog
+  const handleUserBgeSelect = (bgeId) => {
+    const bge = experts.find(e => e.id === Number(bgeId) || e.id === bgeId);
+    if (!bge) { setUserForm(f => ({ ...f, bge_id: bgeId })); return; }
+    const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '').replace(/\.+/g, '.');
+    const suggestedUsername = bge.email ? bge.email.split('@')[0].toLowerCase() : slug(bge.name || '');
+    setUserForm(f => ({
+      ...f,
+      bge_id: bgeId,
+      username: f.username || suggestedUsername,
+      email: f.email || bge.email || '',
+    }));
   };
 
   const resetPassword = async () => {
@@ -1943,6 +1973,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderUsers = () => (
     <Box>
       <SectionHeader title="User Accounts" subtitle={`${bgeUsers.length} BGE login account${bgeUsers.length !== 1 ? 's' : ''}`}>
+        {experts.some(e => !bgeUsers.some(u => u.bge_profile?.id === e.id)) && (
+          <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={bulkCreateMissingAccounts} disabled={userLoading}>
+            {userLoading ? 'Creating…' : 'Create Missing Accounts'}
+          </Button>
+        )}
         <Button variant="contained" size="small" startIcon={<PersonAdd />} onClick={() => setUserDialog(true)}>
           Create Account
         </Button>
@@ -3771,7 +3806,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <FormControl fullWidth size="small">
             <InputLabel>Link to BGE Expert Profile</InputLabel>
             <Select value={userForm.bge_id} label="Link to BGE Expert Profile"
-              onChange={e => setUserForm({ ...userForm, bge_id: e.target.value })}>
+              onChange={e => handleUserBgeSelect(e.target.value)}>
               <MenuItem value="">— Not linked yet —</MenuItem>
               {experts.filter(e => !bgeUsers.some(u => u.bge_profile?.id === e.id)).map(e => (
                 <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>

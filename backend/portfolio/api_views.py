@@ -19,6 +19,7 @@ from .models import (
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
     GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
 )
+from .account_setup import ensure_bge_account, send_welcome_email
 
 
 def _managed_groups(user):
@@ -2258,16 +2259,35 @@ class BGEUserViewSet(viewsets.ViewSet):
         if bge_id:
             try:
                 bge = BusinessGrowthExpert.objects.get(pk=bge_id)
-                if hasattr(bge, 'user') and bge.user:
+                if bge.user:
                     user.delete()
                     return Response({'error': 'This BGE already has a user account linked.'}, status=status.HTTP_400_BAD_REQUEST)
+                type(bge).objects.filter(pk=bge.pk).update(user=user)
                 bge.user = user
-                bge.save()
+                send_welcome_email(bge, username, password)
             except BusinessGrowthExpert.DoesNotExist:
                 user.delete()
                 return Response({'error': 'BGE profile not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response({'id': user.id, 'username': user.username, 'email': user.email}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='bulk-create-missing')
+    def bulk_create_missing(self, request):
+        """Create login accounts for every BGE that doesn't have one yet.
+        Admin-only. Returns counts of created / skipped."""
+        self._require_admin(request)
+        password = request.data.get('password', 'bds123')
+        unlinked = BusinessGrowthExpert.objects.filter(user__isnull=True).order_by('id')
+        created = skipped = 0
+        names = []
+        for bge in unlinked:
+            outcome = ensure_bge_account(bge, password=password, send_email=True)
+            if outcome == 'created':
+                created += 1
+                names.append(bge.name or f'BGE #{bge.id}')
+            else:
+                skipped += 1
+        return Response({'created': created, 'skipped': skipped, 'names': names})
 
     def _get_target_non_admin_user(self, pk, request):
         """Resolve a target user that is NOT a staff/superuser. Raises 403 if it

@@ -214,7 +214,10 @@ class MSMEReportSerializer(serializers.ModelSerializer):
     msme_name     = serializers.CharField(source='msme.business_name', read_only=True)
     msme_code     = serializers.CharField(source='msme.msme_code',     read_only=True)
     bge_name      = serializers.CharField(source='bge.name',           read_only=True)
-    template_name = serializers.CharField(source='template.name',      read_only=True)
+    template_name = serializers.SerializerMethodField()
+
+    def get_template_name(self, obj):
+        return obj.template.name if obj.template_id else None
 
     class Meta:
         model = MSMEReport

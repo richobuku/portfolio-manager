@@ -1812,7 +1812,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         msmes={msmes}
         token={token}
         bgeProfile={currentUser?.bge_profile}
-        visitReportEdit={visitReportEdit}
+        editingReport={visitReportEdit}
       />
 
       {/* ── Legacy report form dialog (kept for fallback) ── */}
