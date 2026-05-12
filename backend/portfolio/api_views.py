@@ -17,7 +17,7 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
-    GroupReportAttendance, CohortAdmin, ProgrammeGroup,
+    GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot,
 )
 
 
@@ -38,7 +38,7 @@ from .serializers import (
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
     GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
-    GroupReportAttendanceSerializer,
+    GroupReportAttendanceSerializer, MSMEGrowthSnapshotSerializer,
 )
 
 
@@ -148,6 +148,33 @@ class ProgrammeGroupViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can delete programme groups.")
+        return super().destroy(request, *args, **kwargs)
+
+
+class MSMEGrowthSnapshotViewSet(viewsets.ModelViewSet):
+    """
+    Growth snapshots for a single MSME.
+
+    List/retrieve all snapshots for a given MSME:
+        GET /api/growth-snapshots/?msme=<id>
+
+    Create a new BGE-visit snapshot:
+        POST /api/growth-snapshots/
+        { msme, snapshot_date, source, annual_turnover, ... }
+    """
+    serializer_class   = MSMEGrowthSnapshotSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = MSMEGrowthSnapshot.objects.select_related('msme', 'collected_by').order_by('snapshot_date')
+        msme_id = self.request.query_params.get('msme')
+        if msme_id:
+            qs = qs.filter(msme_id=msme_id)
+        return qs
+
+    def destroy(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can delete snapshots.")
         return super().destroy(request, *args, **kwargs)
 
 

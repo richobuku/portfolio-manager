@@ -4,7 +4,7 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
-    GroupReportAttendance, ProgrammeGroup,
+    GroupReportAttendance, ProgrammeGroup, MSMEGrowthSnapshot,
 )
 
 
@@ -90,6 +90,16 @@ class MSMESerializer(serializers.ModelSerializer):
         if gr:
             dates.append(gr)
         return str(max(dates)) if dates else None
+
+
+class MSMEGrowthSnapshotSerializer(serializers.ModelSerializer):
+    collected_by_name = serializers.CharField(source='collected_by.name', read_only=True)
+    total_employees   = serializers.ReadOnlyField()
+    female_employee_ratio = serializers.ReadOnlyField()
+
+    class Meta:
+        model  = MSMEGrowthSnapshot
+        fields = '__all__'
 
 
 class BusinessGrowthExpertSerializer(serializers.ModelSerializer):

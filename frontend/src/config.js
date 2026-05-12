@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
   UPLOAD_MSMES_TEMPLATE: `${API_BASE_URL}/api/msmes/upload-template/`,
   UPLOAD_EXPERTS:     `${API_BASE_URL}/api/experts/upload/`,
   PROGRAMME_GROUPS:   `${API_BASE_URL}/api/programme-groups/`,
+  GROWTH_SNAPSHOTS:   `${API_BASE_URL}/api/growth-snapshots/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;

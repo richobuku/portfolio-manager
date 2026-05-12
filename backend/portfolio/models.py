@@ -196,7 +196,45 @@ class MSME(models.Model):
         ('OTHER', 'Other'),
     ]
     gender = models.CharField(max_length=10, choices=gender_choices, blank=True, null=True)
-    
+
+    # ── Diagnostic baseline (imported from the PRUDEV II application diagnostics) ──
+    diag_annual_turnover      = models.CharField(max_length=100, blank=True,
+        help_text='Total sales/turnover band from diagnostic tool (e.g. "10 – 100 million UGX")')
+    diag_total_assets         = models.CharField(max_length=100, blank=True,
+        help_text='Total assets band from diagnostic tool (e.g. "100 – 360 million UGX")')
+    diag_employees_ft_male    = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Full-time male employees at diagnostic baseline')
+    diag_employees_ft_female  = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Full-time female employees at diagnostic baseline')
+    diag_employees_pt_male    = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Part-time male employees at diagnostic baseline')
+    diag_employees_pt_female  = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Part-time female employees at diagnostic baseline')
+    diag_has_tin              = models.BooleanField(null=True, blank=True,
+        help_text='Has a Tax Identification Number (TIN)')
+    diag_has_unbs             = models.BooleanField(null=True, blank=True,
+        help_text='Has products registered with Uganda National Bureau of Standards')
+    diag_has_business_bank    = models.BooleanField(null=True, blank=True,
+        help_text='Has a business bank account')
+    diag_has_mobile_money     = models.BooleanField(null=True, blank=True,
+        help_text='Has a mobile money account')
+    diag_is_green_business    = models.BooleanField(null=True, blank=True,
+        help_text='Falls into at least one green business category')
+    diag_green_categories     = models.JSONField(default=list, blank=True,
+        help_text='List of green business categories the MSME falls into')
+    diag_owner_sex            = models.CharField(max_length=20, blank=True,
+        help_text='Owner sex as reported in diagnostic tool')
+    diag_owner_age            = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Owner age at time of diagnostic')
+    diag_owner_education      = models.CharField(max_length=100, blank=True,
+        help_text='Owner education level from diagnostic tool')
+    diag_years_operating      = models.CharField(max_length=50, blank=True,
+        help_text='How long the business has been operating (as reported)')
+    diag_district             = models.CharField(max_length=100, blank=True,
+        help_text='District from diagnostic tool (District_clean column)')
+    diag_imported_at          = models.DateTimeField(null=True, blank=True,
+        help_text='When the diagnostic baseline was imported')
+
     def __str__(self):
         return f"{self.business_name} - {self.business_type} ({self.sector})"
     
@@ -240,6 +278,79 @@ class MSME(models.Model):
         verbose_name = "MSME"
         verbose_name_plural = "MSMEs"
         ordering = ['-created_at']
+
+
+class MSMEGrowthSnapshot(models.Model):
+    """
+    Point-in-time measurement of key business metrics for growth tracking.
+    The first snapshot (source='diagnostic') is imported from the application
+    diagnostics data.  Subsequent snapshots are captured during BGE deployments
+    so growth can be measured over time.
+    """
+    SOURCE_CHOICES = [
+        ('diagnostic', 'Application Diagnostic (Baseline)'),
+        ('bge_visit',  'BGE Visit'),
+        ('quarterly',  'Quarterly Review'),
+        ('annual',     'Annual Review'),
+        ('other',      'Other'),
+    ]
+
+    msme            = models.ForeignKey(MSME, on_delete=models.CASCADE, related_name='growth_snapshots')
+    snapshot_date   = models.DateField()
+    source          = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='bge_visit')
+    collected_by    = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='collected_snapshots',
+        help_text='BGE who collected this data (leave blank for imported baselines)',
+    )
+
+    # Financials
+    annual_turnover  = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+        help_text='Total sales/turnover in last 12 months (UGX)')
+    total_assets     = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+        help_text='Investment in total assets (UGX)')
+
+    # Workforce
+    employees_ft_male    = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_ft_female  = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_pt_male    = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_pt_female  = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    # Compliance & access
+    has_tin           = models.BooleanField(null=True, blank=True)
+    has_unbs          = models.BooleanField(null=True, blank=True)
+    has_business_bank = models.BooleanField(null=True, blank=True)
+    has_mobile_money  = models.BooleanField(null=True, blank=True)
+
+    # Narrative / context
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['msme', 'snapshot_date']
+        verbose_name        = 'Growth Snapshot'
+        verbose_name_plural = 'Growth Snapshots'
+
+    def __str__(self):
+        return f"{self.msme.business_name} — {self.snapshot_date} ({self.get_source_display()})"
+
+    # ── Computed helpers ──────────────────────────────────────────────────────
+
+    @property
+    def total_employees(self):
+        ft = (self.employees_ft_male or 0) + (self.employees_ft_female or 0)
+        pt = (self.employees_pt_male or 0) + (self.employees_pt_female or 0)
+        return ft + pt
+
+    @property
+    def female_employee_ratio(self):
+        total = self.total_employees
+        if not total:
+            return None
+        female = (self.employees_ft_female or 0) + (self.employees_pt_female or 0)
+        return round(female / total, 4)
+
 
 class BusinessGrowthExpert(models.Model):
     STATUS_CHOICES = [

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup
+from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
 admin.site.site_header = "PRUDEV II — Portfolio Manager"
@@ -160,3 +160,29 @@ class CohortAdminAdmin(admin.ModelAdmin):
     def group_list(self, obj):
         return ', '.join(g.name for g in obj.managed_groups.all()) or '—'
     group_list.short_description = 'Managed Groups'
+
+
+class GrowthSnapshotInline(admin.TabularInline):
+    model  = MSMEGrowthSnapshot
+    extra  = 0
+    fields = ('snapshot_date', 'source', 'collected_by', 'annual_turnover', 'total_assets',
+              'employees_ft_male', 'employees_ft_female', 'employees_pt_male', 'employees_pt_female',
+              'has_tin', 'has_business_bank', 'has_mobile_money', 'notes')
+    readonly_fields = ('snapshot_date', 'source', 'collected_by')
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(MSMEGrowthSnapshot)
+class MSMEGrowthSnapshotAdmin(admin.ModelAdmin):
+    list_display  = ('msme', 'snapshot_date', 'source', 'annual_turnover', 'total_assets',
+                     'total_employees', 'collected_by')
+    list_filter   = ('source', 'snapshot_date')
+    search_fields = ('msme__business_name',)
+    readonly_fields = ('created_at',)
+
+    def total_employees(self, obj):
+        return obj.total_employees
+    total_employees.short_description = 'Total staff'

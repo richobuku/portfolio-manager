@@ -6,7 +6,7 @@ from .api_views import (
     TrainingSessionViewSet, AttendanceViewSet, TrainingTopicViewSet,
     CohortViewSet, BGEGroupViewSet, MSMEReportViewSet, GroupReportViewSet,
     GroupReportContributionViewSet, BGEUserViewSet, WorkOrderViewSet,
-    GroupReportAttendanceViewSet, ProgrammeGroupViewSet,
+    GroupReportAttendanceViewSet, ProgrammeGroupViewSet, MSMEGrowthSnapshotViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset
@@ -24,6 +24,7 @@ router.register(r'experts', BusinessGrowthExpertViewSet)
 router.register(r'cohorts', CohortViewSet)
 router.register(r'bge-groups', BGEGroupViewSet)
 router.register(r'programme-groups', ProgrammeGroupViewSet)
+router.register(r'growth-snapshots', MSMEGrowthSnapshotViewSet, basename='growth-snapshot')
 router.register(r'support-requests', SupportRequestViewSet)
 router.register(r'training-sessions', TrainingSessionViewSet, basename='training-session')
 router.register(r'attendance', AttendanceViewSet)
