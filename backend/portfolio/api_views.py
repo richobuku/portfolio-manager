@@ -17,7 +17,7 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
-    GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot,
+    GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
 )
 
 
@@ -72,6 +72,7 @@ from .serializers import (
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
     GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
+    VisitReportTemplateSerializer,
     GroupReportAttendanceSerializer, MSMEGrowthSnapshotSerializer,
 )
 
@@ -1750,6 +1751,34 @@ class TrainingTopicViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
+class VisitReportTemplateViewSet(viewsets.ModelViewSet):
+    """CRUD for visit report templates. List is public (authenticated); CUD is admin-only."""
+    serializer_class = VisitReportTemplateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = VisitReportTemplate.objects.all()
+        if self.request.query_params.get('active_only') == '1':
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def _require_admin(self):
+        if not (self.request.user.is_staff or self.request.user.is_superuser):
+            raise PermissionDenied("Only admins can manage report templates.")
+
+    def create(self, request, *args, **kwargs):
+        self._require_admin(); return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self._require_admin(); return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        self._require_admin(); return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._require_admin(); return super().destroy(request, *args, **kwargs)
+
+
 class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     serializer_class = MSMEReportSerializer
     permission_classes = [IsAuthenticated]
@@ -1794,19 +1823,62 @@ class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         instance = serializer.instance
         new_status = serializer.validated_data.get('status', instance.status)
         report = serializer.save()
-        # Snapshot the PDF when the report is first submitted so the BGE's
-        # signature and report content are frozen at submission time.
+
         if instance.status != 'submitted' and new_status == 'submitted':
-            if not report.submitted_pdf:
-                try:
-                    from .pdf_reports import render_msme_report
-                    from django.core.files.base import ContentFile
-                    pdf_bytes = render_msme_report(report).read()
-                    safe_name = report.msme.business_name[:30].replace(' ', '_')
-                    fname = f"MSMEReport_{safe_name}_{report.visit_date}.pdf"
-                    report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=True)
-                except Exception:
-                    pass
+            # Freeze a PDF copy on first submission
+            try:
+                from .pdf_reports import render_msme_report
+                from django.core.files.base import ContentFile
+                pdf_bytes = render_msme_report(report).read()
+                safe_name = report.msme.business_name[:30].replace(' ', '_')
+                fname = f"MSMEReport_{safe_name}_{report.visit_date}.pdf"
+                report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=False)
+                report.submitted_pdf_data = pdf_bytes
+                report.save(update_fields=['submitted_pdf', 'submitted_pdf_data'])
+            except Exception:
+                pass
+
+            # Auto-create a growth snapshot from the quantitative fields
+            self._create_snapshot_from_report(report)
+
+    @staticmethod
+    def _create_snapshot_from_report(report):
+        """Create or update a MSMEGrowthSnapshot from a submitted visit report."""
+        has_quant = any([
+            report.revenue_ugx, report.total_assets_ugx,
+            report.employees_ft_male is not None, report.employees_ft_female is not None,
+            report.employees_pt_male is not None, report.employees_pt_female is not None,
+            report.has_tin is not None, report.has_unbs is not None,
+            report.has_business_bank is not None, report.has_mobile_money is not None,
+        ])
+        if not has_quant:
+            return
+        try:
+            bge = report.bge
+        except Exception:
+            bge = None
+        notes_parts = []
+        if report.key_achievement:
+            notes_parts.append(f'Achievement: {report.key_achievement}')
+        if report.growth_rating:
+            notes_parts.append(f'Growth rating: {report.growth_rating}/5')
+        MSMEGrowthSnapshot.objects.create(
+            msme                = report.msme,
+            snapshot_date       = report.visit_date,
+            source              = 'bge_visit',
+            collected_by        = bge,
+            annual_turnover     = report.revenue_ugx,
+            total_assets        = report.total_assets_ugx,
+            employees_ft_male   = report.employees_ft_male,
+            employees_ft_female = report.employees_ft_female,
+            employees_pt_male   = report.employees_pt_male,
+            employees_pt_female = report.employees_pt_female,
+            has_tin             = report.has_tin,
+            has_unbs            = report.has_unbs,
+            has_business_bank   = report.has_business_bank,
+            has_mobile_money    = report.has_mobile_money,
+            notes               = '\n'.join(notes_parts),
+        )
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):

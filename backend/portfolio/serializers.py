@@ -4,7 +4,7 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
-    GroupReportAttendance, ProgrammeGroup, MSMEGrowthSnapshot,
+    GroupReportAttendance, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
 )
 
 
@@ -204,10 +204,17 @@ class AttendanceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class VisitReportTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VisitReportTemplate
+        fields = '__all__'
+
+
 class MSMEReportSerializer(serializers.ModelSerializer):
-    msme_name = serializers.CharField(source='msme.business_name', read_only=True)
-    msme_code = serializers.CharField(source='msme.msme_code', read_only=True)
-    bge_name = serializers.CharField(source='bge.name', read_only=True)
+    msme_name     = serializers.CharField(source='msme.business_name', read_only=True)
+    msme_code     = serializers.CharField(source='msme.msme_code',     read_only=True)
+    bge_name      = serializers.CharField(source='bge.name',           read_only=True)
+    template_name = serializers.CharField(source='template.name',      read_only=True)
 
     class Meta:
         model = MSMEReport

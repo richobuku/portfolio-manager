@@ -503,6 +503,29 @@ class Attendance(models.Model):
         return f"{name} — {self.session}"
 
 
+class VisitReportTemplate(models.Model):
+    """Admin-defined template that controls which sections appear on a BGE visit report."""
+    name        = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    is_active   = models.BooleanField(default=True)
+
+    # Section toggles — each controls a group of form fields
+    include_financials    = models.BooleanField(default=True,  help_text='Revenue, profit, total assets')
+    include_workforce     = models.BooleanField(default=True,  help_text='FT/PT employee counts by gender')
+    include_compliance    = models.BooleanField(default=True,  help_text='TIN, UNBS, bank, mobile money, NSSF')
+    include_market        = models.BooleanField(default=False, help_text='Customer base, exporting, new products')
+    include_business_mgmt = models.BooleanField(default=False, help_text='Business plan, digital accounting, HR policy')
+    include_growth_rating = models.BooleanField(default=True,  help_text='BGE 1-5 growth score + key achievement')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class MSMEReport(models.Model):
     VISIT_TYPES = [
         ('initial', 'Initial Assessment'),
@@ -519,24 +542,63 @@ class MSMEReport(models.Model):
 
     msme = models.ForeignKey('MSME', on_delete=models.CASCADE, related_name='reports')
     bge = models.ForeignKey('BusinessGrowthExpert', on_delete=models.CASCADE, related_name='reports')
+    template = models.ForeignKey(
+        VisitReportTemplate, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reports', help_text='Report template chosen at visit time',
+    )
     visit_type = models.CharField(max_length=20, choices=VISIT_TYPES, default='followup')
     visit_date = models.DateField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
 
-    # Template sections
-    business_overview = models.TextField(blank=True, help_text='Brief overview of the business current state')
-    challenges_identified = models.TextField(blank=True, help_text='Key challenges observed during the visit')
-    support_provided = models.TextField(blank=True, help_text='Support and guidance provided during this visit')
-    recommendations = models.TextField(blank=True, help_text='Recommendations for business improvement')
-    action_plan = models.TextField(blank=True, help_text='Agreed action plan with the MSME owner')
-    next_steps = models.TextField(blank=True, help_text='Next steps and follow-up actions')
-    additional_notes = models.TextField(blank=True, help_text='Any additional observations or notes')
+    # ── Qualitative narrative ─────────────────────────────────────────────────
+    business_overview     = models.TextField(blank=True)
+    challenges_identified = models.TextField(blank=True)
+    support_provided      = models.TextField(blank=True)
+    recommendations       = models.TextField(blank=True)
+    action_plan           = models.TextField(blank=True)
+    next_steps            = models.TextField(blank=True)
+    additional_notes      = models.TextField(blank=True)
+    key_achievement       = models.TextField(blank=True, help_text='Main growth achievement since last visit')
+
+    # ── Financials (template section: include_financials) ─────────────────────
+    revenue_ugx       = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+                            help_text='Total sales/turnover last 12 months (UGX)')
+    monthly_profit_ugx = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+                            help_text='Average monthly profit (UGX)')
+    total_assets_ugx   = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+                            help_text='Total business assets (UGX)')
+
+    # ── Workforce (template section: include_workforce) ───────────────────────
+    employees_ft_male    = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_ft_female  = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_pt_male    = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_pt_female  = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    # ── Compliance & access (template section: include_compliance) ────────────
+    has_tin           = models.BooleanField(null=True, blank=True)
+    has_unbs          = models.BooleanField(null=True, blank=True)
+    has_business_bank = models.BooleanField(null=True, blank=True)
+    has_mobile_money  = models.BooleanField(null=True, blank=True)
+    has_nssf          = models.BooleanField(null=True, blank=True, help_text='Making NSSF contributions')
+
+    # ── Market access (template section: include_market) ─────────────────────
+    is_exporting           = models.BooleanField(null=True, blank=True)
+    introduced_new_product = models.BooleanField(null=True, blank=True)
+    active_customers_count = models.PositiveIntegerField(null=True, blank=True)
+
+    # ── Business management (template section: include_business_mgmt) ─────────
+    has_business_plan       = models.BooleanField(null=True, blank=True)
+    uses_digital_accounting = models.BooleanField(null=True, blank=True)
+    has_hr_policy           = models.BooleanField(null=True, blank=True)
+    accepts_digital_payments = models.BooleanField(null=True, blank=True)
+
+    # ── BGE rating (template section: include_growth_rating) ─────────────────
+    growth_rating = models.PositiveSmallIntegerField(null=True, blank=True,
+                        help_text='BGE growth assessment score 1–5')
 
     # Frozen PDF snapshot generated when the report is submitted.
-    # Served instead of regenerating so the submitted copy is immutable.
-    submitted_pdf = models.FileField(
-        upload_to='reports/submitted/', null=True, blank=True,
-    )
+    submitted_pdf = models.FileField(upload_to='reports/submitted/', null=True, blank=True)
+    submitted_pdf_data = models.BinaryField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

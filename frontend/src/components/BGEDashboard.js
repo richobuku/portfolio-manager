@@ -18,6 +18,7 @@ import axios from 'axios';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
+import VisitReportForm from './VisitReportForm';
 
 const DRAWER_WIDTH = 220;
 const ROWS_PER_PAGE = 15;
@@ -159,9 +160,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // pagination
   const [reportPage, setReportPage] = useState(0);
 
-  // report dialog
+  // VisitReportForm (new full-screen form)
+  const [visitReportOpen, setVisitReportOpen]   = useState(false);
+  const [visitReportMsme, setVisitReportMsme]   = useState(null);
+  const [visitReportEdit, setVisitReportEdit]   = useState(null);
+
+  // Legacy report dialog state (kept for fallback)
   const [reportDialog, setReportDialog] = useState(false);
-  const [editingReport, setEditingReport] = useState(null);
   const [reportForm, setReportForm] = useState(EMPTY_REPORT);
   const [reportSaving, setReportSaving] = useState(false);
   const [reportErrors, setReportErrors] = useState('');
@@ -321,29 +326,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSessions, token]);
 
   const openNewReport = (msmeId = '') => {
-    setEditingReport(null);
-    setReportForm({ ...EMPTY_REPORT, msme: msmeId });
-    setReportErrors('');
-    setReportDialog(true);
+    const msme = msmes.find(x => x.id === msmeId || x.id === Number(msmeId)) || null;
+    setVisitReportMsme(msme);
+    setVisitReportEdit(null);
+    setVisitReportOpen(true);
   };
 
   const openEditReport = (report) => {
-    setEditingReport(report);
-    setReportForm({
-      msme: report.msme,
-      visit_type: report.visit_type,
-      visit_date: report.visit_date,
-      business_overview: report.business_overview || '',
-      challenges_identified: report.challenges_identified || '',
-      support_provided: report.support_provided || '',
-      recommendations: report.recommendations || '',
-      action_plan: report.action_plan || '',
-      next_steps: report.next_steps || '',
-      additional_notes: report.additional_notes || '',
-      status: report.status,
-    });
-    setReportErrors('');
-    setReportDialog(true);
+    const msme = msmes.find(x => x.id === report.msme || x.id === Number(report.msme)) || null;
+    setVisitReportMsme(msme);
+    setVisitReportEdit(report);
+    setVisitReportOpen(true);
   };
 
   const saveReport = async (statusOverride) => {
@@ -353,8 +346,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setReportErrors('');
     const payload = statusOverride ? { ...reportForm, status: statusOverride } : reportForm;
     try {
-      if (editingReport) {
-        await axios.patch(`${API_ENDPOINTS.REPORTS}${editingReport.id}/`, payload, { headers });
+      if (visitReportEdit) {
+        await axios.patch(`${API_ENDPOINTS.REPORTS}${visitReportEdit.id}/`, payload, { headers });
         notify(statusOverride === 'submitted' ? 'Report submitted' : 'Draft saved');
       } else {
         await axios.post(API_ENDPOINTS.REPORTS, payload, { headers });
@@ -1810,10 +1803,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         </DialogActions>
       </Dialog>
 
-      {/* ── Report form dialog ── */}
+      {/* ── New full-screen visit report form ── */}
+      <VisitReportForm
+        open={visitReportOpen}
+        onClose={() => setVisitReportOpen(false)}
+        onSaved={() => { fetchMsmes(); fetchReports(); notify('Report saved.'); }}
+        msme={visitReportMsme}
+        msmes={msmes}
+        token={token}
+        bgeProfile={currentUser?.bge_profile}
+        visitReportEdit={visitReportEdit}
+      />
+
+      {/* ── Legacy report form dialog (kept for fallback) ── */}
       <Dialog open={reportDialog} onClose={() => setReportDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingReport ? 'Edit Report' : 'New Visit Report'}
+          {visitReportEdit ? 'Edit Report' : 'New Visit Report'}
         </DialogTitle>
         <DialogContent dividers>
           {reportErrors && <Alert severity="error" sx={{ mb: 2 }}>{reportErrors}</Alert>}
