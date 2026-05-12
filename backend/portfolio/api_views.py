@@ -17,8 +17,19 @@ from .models import (
     MSME, BusinessGrowthExpert, SupportRequest,
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
-    GroupReportAttendance,
+    GroupReportAttendance, CohortAdmin,
 )
+
+
+def _managed_cohorts(user):
+    """Return the cohorts a programme manager (cohort_admin) can access,
+    or None for superusers/staff (no restriction)."""
+    if user.is_staff or user.is_superuser:
+        return None
+    try:
+        return list(user.cohort_admin_profile.managed_cohorts.values_list('id', flat=True))
+    except CohortAdmin.DoesNotExist:
+        return None
 from pywebpush import webpush, WebPushException
 import json as _json
 from .serializers import (
@@ -121,9 +132,13 @@ class MSMEViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = MSME.objects.filter(is_active=True)
 
-        # BGE users only see their own assigned MSMEs — directly OR via any group they belong to
         user = self.request.user
-        if not (user.is_staff or user.is_superuser):
+        cohort_ids = _managed_cohorts(user)
+        if cohort_ids is not None:
+            # Cohort admin — scope to their managed cohorts
+            qs = qs.filter(cohort_id__in=cohort_ids)
+        elif not (user.is_staff or user.is_superuser):
+            # BGE users only see their own assigned MSMEs — directly OR via any group they belong to
             try:
                 bge = user.bge_profile
                 from django.db.models import Q
@@ -165,14 +180,20 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
         return qs.select_related('cohort', 'assigned_bge').order_by('-created_at')
 
+    def _is_admin_or_cohort_admin(self, request):
+        u = request.user
+        if u.is_staff or u.is_superuser:
+            return True
+        return _managed_cohorts(u) is not None
+
     def destroy(self, request, *args, **kwargs):
-        if not request.user.is_staff and not request.user.is_superuser:
+        if not self._is_admin_or_cohort_admin(request):
             raise PermissionDenied("Only admins can delete MSMEs.")
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['patch'])
     def assign_bge(self, request, pk=None):
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not self._is_admin_or_cohort_admin(request):
             raise PermissionDenied("Only admins can assign BGEs.")
         msme = self.get_object()
         bge_id = request.data.get('bge_id')
@@ -1503,8 +1524,11 @@ class MSMEReportViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        cohort_ids = _managed_cohorts(user)
         if user.is_staff or user.is_superuser:
             qs = MSMEReport.objects.all()
+        elif cohort_ids is not None:
+            qs = MSMEReport.objects.filter(msme__cohort_id__in=cohort_ids)
         else:
             try:
                 bge = user.bge_profile
@@ -1592,8 +1616,13 @@ class GroupReportViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        cohort_ids = _managed_cohorts(user)
         if user.is_staff or user.is_superuser:
             qs = GroupReport.objects.all()
+        elif cohort_ids is not None:
+            qs = GroupReport.objects.filter(
+                group__assigned_msmes__cohort_id__in=cohort_ids
+            ).distinct()
         else:
             try:
                 bge = user.bge_profile
@@ -1615,6 +1644,8 @@ class GroupReportViewSet(viewsets.ModelViewSet):
     def _user_can_write_for_group(self, user, group):
         if user.is_staff or user.is_superuser:
             return True
+        if _managed_cohorts(user) is not None:
+            return True  # cohort admin can edit reports in their groups
         try:
             bge = user.bge_profile
         except Exception:

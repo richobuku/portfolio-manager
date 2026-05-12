@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution
+from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
 admin.site.site_header = "PRUDEV II — Portfolio Manager"
@@ -134,3 +134,19 @@ class GroupReportContributionAdmin(admin.ModelAdmin):
     search_fields = ('group_report__group__name', 'bge__name', 'notes')
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('msmes_observed',)
+
+
+@admin.register(CohortAdminModel)
+class CohortAdminAdmin(admin.ModelAdmin):
+    list_display = ('user', 'email', 'cohort_list')
+    search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
+    filter_horizontal = ('managed_cohorts',)
+    raw_id_fields = ('user',)
+
+    def email(self, obj):
+        return obj.user.email
+    email.short_description = 'Email'
+
+    def cohort_list(self, obj):
+        return ', '.join(c.name for c in obj.managed_cohorts.all()) or '—'
+    cohort_list.short_description = 'Managed Cohorts'

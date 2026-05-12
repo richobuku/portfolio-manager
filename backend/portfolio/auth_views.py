@@ -28,7 +28,7 @@ except ImportError:
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from .models import BusinessGrowthExpert
+from .models import BusinessGrowthExpert, CohortAdmin
 
 # Stateless password-reset tokens. Survive process restarts and work across
 # gunicorn workers (the previous in-memory dict failed on both counts).
@@ -46,16 +46,28 @@ def _build_user_response(user):
     from .authentication import sign_token
     token = sign_token(user.id, user.username)
     bge_profile = None
-    role = 'admin' if (user.is_staff or user.is_superuser) else 'bge'
+    managed_cohort_ids = None
+
+    if user.is_staff or user.is_superuser:
+        role = 'admin'
+    else:
+        # Check for scoped programme-manager role before falling back to BGE/viewer
+        try:
+            ca = user.cohort_admin_profile
+            role = 'cohort_admin'
+            managed_cohort_ids = list(ca.managed_cohorts.values_list('id', flat=True))
+        except CohortAdmin.DoesNotExist:
+            role = 'viewer'
+
     try:
         profile = user.bge_profile
         bge_profile = {'id': profile.id, 'name': profile.name, 'status': profile.status}
-        if not (user.is_staff or user.is_superuser):
+        if role == 'viewer':
             role = 'bge'
     except Exception:
-        if not (user.is_staff or user.is_superuser):
-            role = 'viewer'
-    return {
+        pass
+
+    payload = {
         'token': token,
         'user': {
             'id': user.id,
@@ -67,6 +79,9 @@ def _build_user_response(user):
             'bge_profile': bge_profile,
         }
     }
+    if managed_cohort_ids is not None:
+        payload['user']['managed_cohort_ids'] = managed_cohort_ids
+    return payload
 
 
 def _try_auto_link_bge(user, google_name, google_email):

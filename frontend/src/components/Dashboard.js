@@ -44,7 +44,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Dashboard({ token, currentUser, onLogout }) {
-  const isAdmin = currentUser?.is_staff || currentUser?.is_superuser || false;
+  const isAdmin = currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'cohort_admin' || false;
   const headers = { Authorization: `Bearer ${token}` };
 
   const [section, setSection] = useState('msmes');

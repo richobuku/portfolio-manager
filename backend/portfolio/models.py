@@ -644,3 +644,27 @@ class WorkOrder(models.Model):
             seq = WorkOrder.objects.filter(bge=self.bge).count() + 1
             self.work_order_number = f"PRUDEV II-BGE-{short}-{seq:02d}"
         super().save(*args, **kwargs)
+
+
+class CohortAdmin(models.Model):
+    """A programme manager who has full admin-level access but only for
+    the cohorts listed in `managed_cohorts`.  All data queries for MSMEs,
+    reports, attendance etc. are automatically scoped to those cohorts.
+
+    Superusers/staff see everything regardless of this model.
+    """
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='cohort_admin_profile',
+    )
+    managed_cohorts = models.ManyToManyField(
+        'Cohort', blank=True, related_name='cohort_admins',
+        help_text='Cohorts this programme manager can see and manage.',
+    )
+
+    class Meta:
+        verbose_name = "Programme Manager"
+        verbose_name_plural = "Programme Managers"
+
+    def __str__(self):
+        names = ', '.join(c.name for c in self.managed_cohorts.all()) or '(no cohorts)'
+        return f"{self.user.get_full_name() or self.user.username} → {names}"
