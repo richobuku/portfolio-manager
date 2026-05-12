@@ -110,7 +110,7 @@ class Command(BaseCommand):
         ))
 
     def _send_welcome(self, user, temp_pw):
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://bds.glowi.africa')
         html = f"""
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px">
           <h2 style="color:#1A2F4B">Welcome to PRUDEV II — Programme Manager Access</h2>

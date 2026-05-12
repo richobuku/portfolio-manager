@@ -230,7 +230,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Expose as a proper settings attribute so auth_views can use it
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://bds.glowi.africa')
 
 # Add canonical frontend URL to CORS allow-list
 if FRONTEND_URL not in CORS_ALLOWED_ORIGINS:

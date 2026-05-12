@@ -182,7 +182,7 @@ def request_password_reset(request):
         # Carry the user id alongside so confirm_password_reset can look up.
         uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
         token  = _reset_token_gen.make_token(user)
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://bds.glowi.africa')
         reset_link = f"{frontend_url}/reset-password?uid={uidb64}&token={token}"
         reply_to = getattr(settings, 'EMAIL_REPLY_TO', settings.DEFAULT_FROM_EMAIL)
         html = f"""

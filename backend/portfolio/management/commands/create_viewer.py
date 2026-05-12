@@ -80,7 +80,7 @@ class Command(BaseCommand):
             pass
 
     def _send_welcome(self, user, temp_pw):
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://bds.glowi.africa')
         name = f'{user.first_name} {user.last_name}'.strip() or user.username
         html = f"""
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px">
