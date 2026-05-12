@@ -1018,6 +1018,46 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             'diag_districts':       diag_districts,
         })
 
+    @action(detail=False, methods=['post'], url_path='import-diagnostics')
+    def import_diagnostics(self, request):
+        """Admin-only: upload the diagnostics Excel and run the import in-process.
+        POST /api/msmes/import-diagnostics/  multipart field: file
+        Returns a JSON summary of matched/unmatched counts.
+        """
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can import diagnostic data.")
+
+        uploaded = request.FILES.get('file')
+        if not uploaded:
+            return Response({'error': 'No file provided. Send multipart field "file".'}, status=400)
+
+        import tempfile, os
+        from .management.commands.import_diagnostics import Command as ImportCmd
+
+        # Write to a temp file so openpyxl can open it by path
+        suffix = os.path.splitext(uploaded.name)[1] or '.xlsx'
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            for chunk in uploaded.chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        try:
+            cmd = ImportCmd()
+            import io as _io
+            cmd.stdout = _io.StringIO()
+            cmd.style = type('S', (), {
+                'SUCCESS': staticmethod(lambda s: s),
+                'WARNING': staticmethod(lambda s: s),
+            })()
+            cmd.handle(excel_path=tmp_path, dry_run=False, snapshot_date=None,
+                       verbosity=1, settings=None, pythonpath=None, traceback=False,
+                       no_color=False, force_color=False, skip_checks=False)
+            output = cmd.stdout.getvalue()
+        finally:
+            os.unlink(tmp_path)
+
+        return Response({'detail': output or 'Import complete.'})
+
 
 class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
     queryset = BusinessGrowthExpert.objects.all()

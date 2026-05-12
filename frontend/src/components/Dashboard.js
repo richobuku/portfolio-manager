@@ -1406,6 +1406,44 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const pieData = (rows, labelKey) =>
     (rows || []).map(r => ({ name: r[labelKey] || 'Unspecified', value: r.count }));
 
+  const DiagnosticImporter = ({ token: tok, onImported, isAdmin: admin }) => {
+    const [file, setFile] = React.useState(null);
+    const [loading, setLoading] = React.useState(false);
+    const [result, setResult] = React.useState(null);
+    const [error, setError] = React.useState(null);
+    const doImport = () => {
+      if (!file) return;
+      setLoading(true); setResult(null); setError(null);
+      const fd = new FormData(); fd.append('file', file);
+      axios.post(`${API_ENDPOINTS.MSMES}import-diagnostics/`, fd,
+        { headers: { Authorization: `Token ${tok}`, 'Content-Type': 'multipart/form-data' } })
+        .then(r => { setResult(r.data.detail); setLoading(false); onImported(); })
+        .catch(e => { setError(e.response?.data?.error || 'Import failed'); setLoading(false); });
+    };
+    if (!admin) return (
+      <Alert severity="info">No diagnostic baseline data yet. Contact an admin to import the diagnostics Excel.</Alert>
+    );
+    return (
+      <Box sx={{ p: 3, border: '1px dashed #ccc', borderRadius: 2, maxWidth: 480 }}>
+        <Typography variant="subtitle1" fontWeight={700} gutterBottom>Import Diagnostic Baseline</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Upload the <em>PRUDEV_II_MSMEs_Categorized_Output.xlsx</em> file to populate the diagnostic dashboard.
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button variant="outlined" component="label" size="small">
+            {file ? file.name : 'Choose Excel file'}
+            <input type="file" hidden accept=".xlsx,.xls" onChange={e => setFile(e.target.files[0])} />
+          </Button>
+          <Button variant="contained" size="small" disabled={!file || loading} onClick={doImport}>
+            {loading ? 'Importing…' : 'Import'}
+          </Button>
+        </Box>
+        {result && <Alert severity="success" sx={{ mt: 2 }}><pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>{result}</pre></Alert>}
+        {error  && <Alert severity="error"   sx={{ mt: 2 }}>{error}</Alert>}
+      </Box>
+    );
+  };
+
   const renderAnalytics = () => {
     const monthlyData = (A.time_series || []).map(t => ({
       month: t.month ? new Date(t.month).toLocaleString('en', { month: 'short', year: '2-digit' }) : '?',
@@ -1626,9 +1664,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         {analyticTab === 1 && (
           <Box>
             {diagTotal === 0 ? (
-              <Alert severity="info">
-                No diagnostic baseline data yet. Run <code>python manage.py import_diagnostics &lt;excel&gt;</code> to import.
-              </Alert>
+              <DiagnosticImporter token={token} onImported={() => {
+                axios.get(`${API_ENDPOINTS.MSMES}analytics/`, { headers: { Authorization: `Token ${token}` } })
+                  .then(r => setAnalytics(r.data)).catch(() => {});
+              }} isAdmin={isAdmin} />
             ) : (
               <>
                 <SectionLabel>Baseline Summary — {diagTotal} MSMEs with diagnostic data</SectionLabel>
