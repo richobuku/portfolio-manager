@@ -33,8 +33,9 @@ MANAGERS = [
 ]
 
 PROGRAMME_GROUPS = [
+    {'name': 'Main',           'color': '#1A2F4B'},
     {'name': 'Green MSMEs',    'color': '#2E7D32'},
-    {'name': 'Agroprocessors', 'color': '#E65100'},
+    {'name': 'Agroprocessing', 'color': '#E65100'},
 ]
 
 
