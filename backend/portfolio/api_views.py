@@ -227,6 +227,8 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if group_ids is not None:
             # Programme manager — scope to MSMEs in their managed programme groups
             qs = qs.filter(programme_groups__in=group_ids).distinct()
+        elif _is_viewer(user):
+            pass  # viewers see all MSMEs read-only (ViewerReadOnlyMixin blocks writes)
         elif not (user.is_staff or user.is_superuser):
             # BGE users only see their own assigned MSMEs — directly OR via any group they belong to
             try:
@@ -1791,6 +1793,8 @@ class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             qs = MSMEReport.objects.all()
         elif group_ids is not None:
             qs = MSMEReport.objects.filter(msme__programme_groups__in=group_ids).distinct()
+        elif _is_viewer(user):
+            qs = MSMEReport.objects.all()
         else:
             try:
                 bge = user.bge_profile
@@ -1928,6 +1932,8 @@ class GroupReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             qs = GroupReport.objects.filter(
                 group__assigned_msmes__programme_groups__in=group_ids
             ).distinct()
+        elif _is_viewer(user):
+            qs = GroupReport.objects.all()
         else:
             try:
                 bge = user.bge_profile
@@ -2232,6 +2238,14 @@ class BGEUserViewSet(viewsets.ViewSet):
                 bge_info = {'id': profile.id, 'name': profile.name, 'status': profile.status}
             except Exception:
                 bge_info = None
+            # Determine role
+            try:
+                ca = u.cohort_admin_profile
+                role = 'cohort_admin'
+                managed_groups = list(ca.managed_groups.values('id', 'name'))
+            except CohortAdmin.DoesNotExist:
+                managed_groups = []
+                role = 'bge' if bge_info else 'viewer'
             data.append({
                 'id': u.id,
                 'username': u.username,
@@ -2239,6 +2253,8 @@ class BGEUserViewSet(viewsets.ViewSet):
                 'is_active': u.is_active,
                 'date_joined': u.date_joined,
                 'bge_profile': bge_info,
+                'role': role,
+                'managed_groups': managed_groups,
             })
         return Response(data)
 
@@ -2288,6 +2304,33 @@ class BGEUserViewSet(viewsets.ViewSet):
             else:
                 skipped += 1
         return Response({'created': created, 'skipped': skipped, 'names': names})
+
+    @action(detail=True, methods=['patch'], url_path='set-role')
+    def set_role(self, request, pk=None):
+        """Set or clear a user's programme-manager role and managed groups.
+
+        Body:
+          role        : 'viewer' | 'cohort_admin'
+          group_ids   : [1, 2, ...]   (required when role='cohort_admin')
+        """
+        self._require_admin(request)
+        user, err = self._get_target_non_admin_user(pk, request)
+        if err:
+            return err
+
+        role = request.data.get('role', 'viewer')
+        group_ids = request.data.get('group_ids', [])
+
+        if role == 'cohort_admin':
+            ca, _ = CohortAdmin.objects.get_or_create(user=user)
+            ca.managed_groups.set(ProgrammeGroup.objects.filter(id__in=group_ids))
+            ca.save()
+            names = list(ca.managed_groups.values_list('name', flat=True))
+            return Response({'role': 'cohort_admin', 'managed_groups': names})
+        else:
+            # viewer — remove cohort_admin if it exists
+            CohortAdmin.objects.filter(user=user).delete()
+            return Response({'role': 'viewer'})
 
     def _get_target_non_admin_user(self, pk, request):
         """Resolve a target user that is NOT a staff/superuser. Raises 403 if it
@@ -2423,6 +2466,9 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             bge_id = self.request.query_params.get('bge')
             if bge_id:
                 qs = qs.filter(bge_id=bge_id)
+            return qs
+        # Programme managers and viewers see all work orders read-only
+        if _managed_groups(user) is not None or _is_viewer(user):
             return qs
         # BGE users: their own issued/signed orders only
         try:

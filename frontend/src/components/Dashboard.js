@@ -45,9 +45,10 @@ const NAV_ITEMS = [
 ];
 
 export default function Dashboard({ token, currentUser, onLogout }) {
-  const isViewer = currentUser?.role === 'viewer';
-  const isAdmin  = !isViewer && (currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'cohort_admin' || false);
-  const headers  = { Authorization: `Bearer ${token}` };
+  const isViewer  = currentUser?.role === 'viewer';
+  const isStaff   = !!(currentUser?.is_staff || currentUser?.is_superuser);
+  const isAdmin   = !isViewer && (isStaff || currentUser?.role === 'cohort_admin');
+  const headers   = { Authorization: `Bearer ${token}` };
 
   const [section, setSection] = useState('msmes');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -60,7 +61,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } catch {}
     return NAV_ITEMS.map(n => n.key);
   });
-  const orderedNav = navOrder.map(k => NAV_ITEMS.find(n => n.key === k)).filter(Boolean);
+  // Staff-only tabs hidden from programme managers and viewers
+  const STAFF_ONLY_TABS = isStaff ? [] : ['users'];
+  const orderedNav = navOrder.map(k => NAV_ITEMS.find(n => n.key === k)).filter(n => n && !STAFF_ONLY_TABS.includes(n.key));
   const [dragKey, setDragKey] = useState(null);
   const [navLocked, setNavLocked] = useState(true);
 
@@ -178,6 +181,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [pwdUser, setPwdUser] = useState(null);
   const [newPwd, setNewPwd] = useState('');
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [roleDialog, setRoleDialog] = useState(false);
+  const [roleUser, setRoleUser] = useState(null);
+  const [roleForm, setRoleForm] = useState({ role: 'viewer', group_ids: [] });
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   // Heavy initial load — runs once after login and after explicit refreshes
@@ -825,6 +831,27 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setNewPwd('');
     } catch (e) { notify(e.response?.data?.error || 'Failed to reset password', 'error'); }
     finally { setPwdLoading(false); }
+  };
+
+  const openRoleDialog = (u) => {
+    setRoleUser(u);
+    setRoleForm({
+      role: u.role === 'cohort_admin' ? 'cohort_admin' : 'viewer',
+      group_ids: u.managed_groups?.map(g => g.id) || [],
+    });
+    setRoleDialog(true);
+  };
+
+  const saveRole = async () => {
+    if (!roleUser) return;
+    setUserLoading(true);
+    try {
+      await axios.patch(`${API_ENDPOINTS.BGE_USERS}${roleUser.id}/set-role/`, roleForm, { headers });
+      notify(`Role updated for ${roleUser.username}`);
+      setRoleDialog(false);
+      fetchAll();
+    } catch (e) { notify(e.response?.data?.error || 'Failed to update role', 'error'); }
+    finally { setUserLoading(false); }
   };
 
   const toggleUserActive = async (user) => {
@@ -2001,6 +2028,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <TableCell>Username</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Linked BGE Expert</TableCell>
+                <TableCell>Role</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -2023,9 +2051,30 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     )}
                   </TableCell>
                   <TableCell>
+                    {u.role === 'cohort_admin' ? (
+                      <Box>
+                        <Chip label="Programme Manager" size="small" color="primary" variant="outlined" />
+                        {u.managed_groups?.map(g => (
+                          <Chip key={g.id} label={g.name} size="small" sx={{ ml: 0.5, fontSize: 10 }} />
+                        ))}
+                      </Box>
+                    ) : u.role === 'bge' ? (
+                      <Chip label="BGE" size="small" color="success" variant="outlined" />
+                    ) : (
+                      <Chip label="Viewer" size="small" color="default" variant="outlined" />
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Chip label={u.is_active ? 'Active' : 'Disabled'} size="small" color={u.is_active ? 'success' : 'default'} />
                   </TableCell>
                   <TableCell align="right">
+                    {!u.bge_profile && (
+                      <Tooltip title="Set role / managed groups">
+                        <IconButton size="small" color="secondary" onClick={() => openRoleDialog(u)}>
+                          <ManageAccounts fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title="Reset password">
                       <IconButton size="small" onClick={() => { setPwdUser(u); setPwdDialog(true); }}>
                         <LockReset fontSize="small" />
@@ -3838,6 +3887,42 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             onClick={resetPassword}
             disabled={pwdLoading || newPwd.length < 6}>
             {pwdLoading ? <CircularProgress size={18} /> : 'Reset Password'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Set Role ──────────────────────────────────────────────────────── */}
+      <Dialog open={roleDialog} onClose={() => setRoleDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Set Role — {roleUser?.username}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Choose whether this account can only view data, or can manage a specific set of programme groups.
+          </Typography>
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>Role</InputLabel>
+            <Select value={roleForm.role} label="Role"
+              onChange={e => setRoleForm(f => ({ ...f, role: e.target.value, group_ids: [] }))}>
+              <MenuItem value="viewer">Viewer — read-only access to all data</MenuItem>
+              <MenuItem value="cohort_admin">Programme Manager — manage specific groups</MenuItem>
+            </Select>
+          </FormControl>
+          {roleForm.role === 'cohort_admin' && (
+            <FormControl fullWidth size="small">
+              <InputLabel>Managed Programme Groups</InputLabel>
+              <Select multiple value={roleForm.group_ids} label="Managed Programme Groups"
+                onChange={e => setRoleForm(f => ({ ...f, group_ids: e.target.value }))}>
+                {programmeGroups.map(g => (
+                  <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRoleDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveRole} disabled={userLoading ||
+            (roleForm.role === 'cohort_admin' && roleForm.group_ids.length === 0)}>
+            {userLoading ? <CircularProgress size={18} /> : 'Save Role'}
           </Button>
         </DialogActions>
       </Dialog>

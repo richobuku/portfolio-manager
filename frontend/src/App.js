@@ -57,7 +57,10 @@ export default function App() {
     setCurrentUser(null);
   }, []);
 
-  const isAdmin = !!(currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'admin');
+  const isAdmin = !!(currentUser?.is_staff || currentUser?.is_superuser ||
+                     currentUser?.role === 'admin' ||
+                     currentUser?.role === 'cohort_admin' ||
+                     currentUser?.role === 'viewer');
   const isBGE   = !!(currentUser?.role === 'bge');
 
   // If token exists but user role is unrecognised, clear (in an effect, not the
