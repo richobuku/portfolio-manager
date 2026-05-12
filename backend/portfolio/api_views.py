@@ -2461,7 +2461,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
 
     def _is_admin(self):
         u = self.request.user
-        return u.is_staff or u.is_superuser
+        return u.is_staff or u.is_superuser or _managed_groups(u) is not None
 
     def get_queryset(self):
         user = self.request.user
@@ -2471,7 +2471,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             if bge_id:
                 qs = qs.filter(bge_id=bge_id)
             return qs
-        # Programme managers and viewers see all work orders read-only
+        # Programme managers and viewers see all work orders
         if _managed_groups(user) is not None or _is_viewer(user):
             return qs
         # BGE users: their own issued/signed orders only
@@ -2503,9 +2503,9 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         from django.utils import timezone
         work_order = self.get_object()
 
-        # Only the BGE this work order belongs to (or an admin) may sign it
+        # Only the BGE this work order belongs to (or an admin/programme manager) may sign it
         user = request.user
-        is_admin = user.is_staff or user.is_superuser
+        is_admin = user.is_staff or user.is_superuser or _managed_groups(user) is not None
         is_owner = hasattr(user, 'bge_profile') and user.bge_profile == work_order.bge
         if not (is_admin or is_owner):
             raise PermissionDenied("You can only sign your own work orders.")
