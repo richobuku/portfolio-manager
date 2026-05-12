@@ -1213,7 +1213,7 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], url_path='set-objectives')
     def set_objectives(self, request, pk=None):
         """Save shared deployment objectives for this BGE."""
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not (request.user.is_staff or request.user.is_superuser or _managed_groups(request.user) is not None):
             raise PermissionDenied("Only admins can set deployment objectives.")
         bge = self.get_object()
         bge.deployment_objectives = request.data.get('deployment_objectives', '').strip()
@@ -1223,7 +1223,7 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='preview-email')
     def preview_email(self, request, pk=None):
         """Return the email that would be sent without actually sending it."""
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not (request.user.is_staff or request.user.is_superuser or _managed_groups(request.user) is not None):
             raise PermissionDenied("Only admins can preview assignment emails.")
         bge = self.get_object()
         if not bge.email:
@@ -1235,7 +1235,7 @@ class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='send-email')
     def send_assignment_email(self, request, pk=None):
         """Send BGE their MSME assignment via Microsoft Office 365 (richard.obuku@gopa.eu)."""
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not (request.user.is_staff or request.user.is_superuser or _managed_groups(request.user) is not None):
             raise PermissionDenied("Only admins can send assignment emails.")
 
         bge = self.get_object()
@@ -1573,7 +1573,11 @@ class TrainingSessionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = TrainingSession.objects.select_related('topic', 'work_order').all()
         user = self.request.user
-        if not (user.is_staff or user.is_superuser):
+        if user.is_staff or user.is_superuser:
+            pass  # see everything
+        elif _managed_groups(user) is not None or _is_viewer(user):
+            pass  # programme managers and viewers see all sessions
+        else:
             # BGEs see only sessions linked to their own work orders (or unlinked ones)
             try:
                 bge = user.bge_profile
