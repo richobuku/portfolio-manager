@@ -867,6 +867,77 @@ class MSMEViewSet(viewsets.ModelViewSet):
               .order_by('business_type', 'gender')
         )
 
+        # ── Diagnostic analytics ──────────────────────────────────────────────
+        diag_qs = qs.filter(diag_imported_at__isnull=False)
+        diag_total = diag_qs.count()
+
+        # Compliance & financial access flags
+        diag_compliance = {
+            'has_tin':           diag_qs.filter(diag_has_tin=True).count(),
+            'has_unbs':          diag_qs.filter(diag_has_unbs=True).count(),
+            'has_business_bank': diag_qs.filter(diag_has_business_bank=True).count(),
+            'has_mobile_money':  diag_qs.filter(diag_has_mobile_money=True).count(),
+            'total':             diag_total,
+        }
+
+        # Green business breakdown
+        green_count = diag_qs.filter(diag_is_green_business=True).count()
+        diag_green = {'green': green_count, 'non_green': diag_total - green_count, 'total': diag_total}
+
+        # Turnover bands (count per band)
+        diag_turnover_bands = list(
+            diag_qs.exclude(diag_annual_turnover='')
+                   .values('diag_annual_turnover')
+                   .annotate(count=Count('id'))
+                   .order_by('diag_annual_turnover')
+        )
+
+        # Total assets bands
+        diag_asset_bands = list(
+            diag_qs.exclude(diag_total_assets='')
+                   .values('diag_total_assets')
+                   .annotate(count=Count('id'))
+                   .order_by('diag_total_assets')
+        )
+
+        # Employee aggregates (only rows that have values)
+        from django.db.models import Sum as DSum
+        emp_agg = diag_qs.aggregate(
+            ft_male=DSum('diag_employees_ft_male'),
+            ft_female=DSum('diag_employees_ft_female'),
+            pt_male=DSum('diag_employees_pt_male'),
+            pt_female=DSum('diag_employees_pt_female'),
+        )
+        diag_employees = {
+            'ft_male':   emp_agg['ft_male']   or 0,
+            'ft_female': emp_agg['ft_female'] or 0,
+            'pt_male':   emp_agg['pt_male']   or 0,
+            'pt_female': emp_agg['pt_female'] or 0,
+        }
+
+        # Owner sex from diagnostic
+        diag_owner_sex = list(
+            diag_qs.exclude(diag_owner_sex='')
+                   .values('diag_owner_sex')
+                   .annotate(count=Count('id'))
+        )
+
+        # Years operating distribution
+        diag_years_operating = list(
+            diag_qs.exclude(diag_years_operating='')
+                   .values('diag_years_operating')
+                   .annotate(count=Count('id'))
+                   .order_by('diag_years_operating')
+        )
+
+        # Top districts from diagnostic (often more complete than `state`)
+        diag_districts = list(
+            diag_qs.exclude(diag_district='')
+                   .values('diag_district')
+                   .annotate(count=Count('id'))
+                   .order_by('-count')[:12]
+        )
+
         return Response({
             # KPIs
             'total_msmes': qs.count(),
@@ -900,6 +971,17 @@ class MSMEViewSet(viewsets.ModelViewSet):
 
             # Time series
             'time_series':         time_series,
+
+            # Diagnostic baseline analytics
+            'diag_total':           diag_total,
+            'diag_compliance':      diag_compliance,
+            'diag_green':           diag_green,
+            'diag_turnover_bands':  diag_turnover_bands,
+            'diag_asset_bands':     diag_asset_bands,
+            'diag_employees':       diag_employees,
+            'diag_owner_sex':       diag_owner_sex,
+            'diag_years_operating': diag_years_operating,
+            'diag_districts':       diag_districts,
         })
 
 

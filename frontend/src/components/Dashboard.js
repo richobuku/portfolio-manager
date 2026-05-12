@@ -1660,7 +1660,182 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </Grid>
         </Grid>
 
-        {/* ── Row 5: Reports status mini-pies ─────────────────────────────── */}
+        {/* ── Row 5: Diagnostic Intelligence ──────────────────────────────── */}
+        {(A.diag_total || 0) > 0 && (() => {
+          const D = A;
+          const diagTotal = D.diag_total || 0;
+
+          // Compliance bar data
+          const compData = [
+            { name: 'Has TIN',          count: D.diag_compliance?.has_tin           || 0 },
+            { name: 'UNBS Registered',  count: D.diag_compliance?.has_unbs          || 0 },
+            { name: 'Business Bank',    count: D.diag_compliance?.has_business_bank || 0 },
+            { name: 'Mobile Money',     count: D.diag_compliance?.has_mobile_money  || 0 },
+          ];
+
+          // Employee stacked bar
+          const empData = [
+            { name: 'Full-time',  Male: D.diag_employees?.ft_male || 0, Female: D.diag_employees?.ft_female || 0 },
+            { name: 'Part-time',  Male: D.diag_employees?.pt_male || 0, Female: D.diag_employees?.pt_female || 0 },
+          ];
+
+          // Turnover bands — sort by natural order
+          const bandOrder = ['Up to 10 million UGX', '10 – 100 million UGX', '100 – 360 million UGX', 'More than 360 million UGX'];
+          const turnoverData = [...(D.diag_turnover_bands || [])].sort(
+            (a, b) => bandOrder.indexOf(a.diag_annual_turnover) - bandOrder.indexOf(b.diag_annual_turnover)
+          ).map(b => ({ name: b.diag_annual_turnover.replace(' million UGX', 'M').replace('More than ', '>').replace('Up to ', '<'), count: b.count }));
+
+          const assetData = [...(D.diag_asset_bands || [])].sort(
+            (a, b) => bandOrder.indexOf(a.diag_total_assets) - bandOrder.indexOf(b.diag_total_assets)
+          ).map(b => ({ name: b.diag_total_assets.replace(' million UGX', 'M').replace('More than ', '>').replace('Up to ', '<'), count: b.count }));
+
+          const greenData = [
+            { name: 'Green Business', value: D.diag_green?.green     || 0 },
+            { name: 'Non-Green',      value: D.diag_green?.non_green || 0 },
+          ];
+
+          return (
+            <>
+              <Box sx={{ mt: 3, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                  Diagnostic Baseline
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  — from PRUDEV II application diagnostics · {diagTotal} MSMEs with data
+                </Typography>
+              </Box>
+
+              {/* Diagnostic KPIs */}
+              <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                {[
+                  { label: 'Green Businesses',  val: D.diag_green?.green || 0,                           color: '#2E7D32' },
+                  { label: 'Have TIN',           val: D.diag_compliance?.has_tin || 0,                   color: '#1565C0' },
+                  { label: 'Business Bank Acct', val: D.diag_compliance?.has_business_bank || 0,         color: '#00695C' },
+                  { label: 'UNBS Registered',    val: D.diag_compliance?.has_unbs || 0,                  color: '#4527A0' },
+                  { label: 'Total FT Employees', val: (D.diag_employees?.ft_male || 0) + (D.diag_employees?.ft_female || 0), color: '#5D4037' },
+                  { label: 'Total PT Employees', val: (D.diag_employees?.pt_male || 0) + (D.diag_employees?.pt_female || 0), color: '#827717' },
+                ].map((k, i) => (
+                  <Grid item xs={6} sm={4} md={2} key={i}>
+                    <Card sx={{ bgcolor: k.color, color: '#fff', height: '100%' }}>
+                      <CardContent sx={{ pb: '12px !important', pt: '12px !important' }}>
+                        <Typography variant="h6" fontWeight={800}>{k.val}</Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.85 }}>{k.label}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+
+              {/* Row: Compliance + Green pie */}
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={8}>
+                  <ChartCard title="Compliance & Financial Access" subtitle={`Out of ${diagTotal} MSMEs with diagnostic data`} height={220}>
+                    <ResponsiveContainer>
+                      <BarChart data={compData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, diagTotal]} />
+                        <YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 11 }} />
+                        <ReTooltip formatter={(v) => [`${v} (${diagTotal ? Math.round(v / diagTotal * 100) : 0}%)`, 'MSMEs']} />
+                        <Bar dataKey="count" fill="#1A2F4B" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <ChartCard title="Green vs Non-Green" subtitle="Green business classification" height={220}>
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie data={greenData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80}>
+                          <Cell fill="#2E7D32" />
+                          <Cell fill="#CFD8DC" />
+                        </Pie>
+                        <ReTooltip />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+              </Grid>
+
+              {/* Row: Turnover + Assets bands */}
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={6}>
+                  <ChartCard title="Annual Turnover Bands" subtitle="Self-reported at diagnostic (UGX)" height={220}>
+                    <ResponsiveContainer>
+                      <BarChart data={turnoverData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <ReTooltip />
+                        <Bar dataKey="count" fill="#0288D1" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <ChartCard title="Total Assets Bands" subtitle="Self-reported at diagnostic (UGX)" height={220}>
+                    <ResponsiveContainer>
+                      <BarChart data={assetData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <ReTooltip />
+                        <Bar dataKey="count" fill="#00695C" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+              </Grid>
+
+              {/* Row: Employees breakdown + Years operating + Districts */}
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={4}>
+                  <ChartCard title="Workforce Breakdown" subtitle="Full-time vs part-time, by gender" height={200}>
+                    <ResponsiveContainer>
+                      <BarChart data={empData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <ReTooltip />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="Male"   stackId="a" fill="#1A2F4B" radius={[0, 0, 0, 0]} />
+                        <Bar dataKey="Female" stackId="a" fill="#C8102E" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <ChartCard title="Years in Business" subtitle="How long MSMEs have been operating" height={200}>
+                    <ResponsiveContainer>
+                      <BarChart data={(D.diag_years_operating || []).map(y => ({ name: y.diag_years_operating?.trim(), count: y.count }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <ReTooltip />
+                        <Bar dataKey="count" fill="#E65100" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <ChartCard title="Districts (Diagnostic)" subtitle="Geographic distribution from diagnostics" height={200}>
+                    <ResponsiveContainer>
+                      <BarChart layout="vertical" data={(D.diag_districts || []).map(d => ({ name: d.diag_district, count: d.count }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis type="number" tick={{ fontSize: 11 }} />
+                        <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 10 }} />
+                        <ReTooltip />
+                        <Bar dataKey="count" fill="#4527A0" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+              </Grid>
+            </>
+          );
+        })()}
+
+        {/* ── Row 6: Reports status mini-pies ─────────────────────────────── */}
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
             <ChartCard title="MSME Reports — by status" subtitle={`${A.total_reports || 0} reports total`} height={220}>
