@@ -1418,7 +1418,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       axios.post(`${API_ENDPOINTS.MSMES}import-diagnostics/`, fd,
         { headers: { Authorization: `Token ${tok}`, 'Content-Type': 'multipart/form-data' } })
         .then(r => { setResult(r.data.detail); setLoading(false); onImported(); })
-        .catch(e => { setError(e.response?.data?.error || 'Import failed'); setLoading(false); });
+        .catch(e => {
+          const data = e.response?.data;
+          setError(data?.error || data?.detail || JSON.stringify(data) || `HTTP ${e.response?.status}: Import failed`);
+          setLoading(false);
+        });
     };
     if (!admin) return (
       <Alert severity="info">No diagnostic baseline data yet. Contact an admin to import the diagnostics Excel.</Alert>
@@ -1439,7 +1443,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </Button>
         </Box>
         {result && <Alert severity="success" sx={{ mt: 2 }}><pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>{result}</pre></Alert>}
-        {error  && <Alert severity="error"   sx={{ mt: 2 }}>{error}</Alert>}
+        {error  && <Alert severity="error"   sx={{ mt: 2 }}><pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 11, maxHeight: 200, overflow: 'auto' }}>{error}</pre></Alert>}
       </Box>
     );
   };

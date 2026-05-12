@@ -1031,10 +1031,9 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if not uploaded:
             return Response({'error': 'No file provided. Send multipart field "file".'}, status=400)
 
-        import tempfile, os
-        from .management.commands.import_diagnostics import Command as ImportCmd
+        import tempfile, os, io as _io, traceback as _tb
+        from django.core.management import call_command
 
-        # Write to a temp file so openpyxl can open it by path
         suffix = os.path.splitext(uploaded.name)[1] or '.xlsx'
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             for chunk in uploaded.chunks():
@@ -1042,19 +1041,17 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             tmp_path = tmp.name
 
         try:
-            cmd = ImportCmd()
-            import io as _io
-            cmd.stdout = _io.StringIO()
-            cmd.style = type('S', (), {
-                'SUCCESS': staticmethod(lambda s: s),
-                'WARNING': staticmethod(lambda s: s),
-            })()
-            cmd.handle(excel_path=tmp_path, dry_run=False, snapshot_date=None,
-                       verbosity=1, settings=None, pythonpath=None, traceback=False,
-                       no_color=False, force_color=False, skip_checks=False)
-            output = cmd.stdout.getvalue()
-        finally:
+            out = _io.StringIO()
+            call_command('import_diagnostics', tmp_path, stdout=out, stderr=out)
+            output = out.getvalue()
+        except Exception as exc:
             os.unlink(tmp_path)
+            return Response({'error': f'{type(exc).__name__}: {exc}\n\n{_tb.format_exc()}'}, status=500)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except FileNotFoundError:
+                pass
 
         return Response({'detail': output or 'Import complete.'})
 
