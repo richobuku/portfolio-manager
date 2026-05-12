@@ -1460,57 +1460,146 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       </Dialog>
 
       {/* ── MSME detail dialog ── */}
-      <Dialog open={msmeDetailDialog} onClose={() => setMsmeDetailDialog(false)} maxWidth="sm" fullWidth>
-        {selectedMsme && (
-          <>
-            <DialogTitle>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography fontWeight={700}>{selectedMsme.business_name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{selectedMsme.msme_code}</Typography>
-                </Box>
-                <Button variant="contained" size="small" startIcon={<Add />} onClick={() => { setMsmeDetailDialog(false); openNewReport(selectedMsme.id); }}>
-                  New Report
-                </Button>
-              </Box>
-            </DialogTitle>
-            <DialogContent dividers>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                {selectedMsme.sector && <Grid item xs={6}><Typography variant="caption" color="text.secondary">Sector</Typography><Typography fontSize={13}>{selectedMsme.sector}</Typography></Grid>}
-                {selectedMsme.business_type && <Grid item xs={6}><Typography variant="caption" color="text.secondary">Type</Typography><Typography fontSize={13}>{selectedMsme.business_type}</Typography></Grid>}
-                {(selectedMsme.district || selectedMsme.town) && <Grid item xs={6}><Typography variant="caption" color="text.secondary">Location</Typography><Typography fontSize={13}>{[selectedMsme.town, selectedMsme.district].filter(Boolean).join(', ')}</Typography></Grid>}
-                {selectedMsme.owner_name && <Grid item xs={6}><Typography variant="caption" color="text.secondary">Owner</Typography><Typography fontSize={13}>{selectedMsme.owner_name}</Typography></Grid>}
-                {selectedMsme.phone && <Grid item xs={6}><Typography variant="caption" color="text.secondary">Phone</Typography><Typography fontSize={13}>{selectedMsme.phone}</Typography></Grid>}
-                {selectedMsme.cohort_name && <Grid item xs={6}><Typography variant="caption" color="text.secondary">Cohort</Typography><Typography fontSize={13}>{selectedMsme.cohort_name}</Typography></Grid>}
-              </Grid>
-              <Divider sx={{ mb: 2 }} />
-              <Typography fontWeight={600} sx={{ mb: 1 }}>Reports ({msmeReports.length})</Typography>
-              {msmeReports.length === 0 ? (
-                <Typography color="text.secondary" fontSize={13}>No reports yet for this MSME.</Typography>
-              ) : (
-                msmeReports.map((r) => (
-                  <Box key={r.id} sx={{ border: '1px solid #E8EDF2', borderRadius: 2, p: 1.5, mb: 1 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box>
-                        <Typography fontSize={13} fontWeight={600}>{VISIT_TYPE_LABELS[r.visit_type] || r.visit_type}</Typography>
-                        <Typography fontSize={11} color="text.secondary">{r.visit_date}</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                        <Chip label={r.status} size="small" color={STATUS_COLORS[r.status] || 'default'} />
-                        {r.status === 'draft' && (
-                          <IconButton size="small" onClick={() => { setMsmeDetailDialog(false); openEditReport(r); }}><Edit fontSize="small" /></IconButton>
-                        )}
-                      </Box>
-                    </Box>
+      <Dialog open={msmeDetailDialog} onClose={() => setMsmeDetailDialog(false)} maxWidth="md" fullWidth>
+        {selectedMsme && (() => {
+          const m = selectedMsme;
+          const hasDiag = !!m.diag_imported_at;
+          const Field = ({ label, value, xs = 6 }) => value ? (
+            <Grid item xs={xs}>
+              <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
+              <Typography fontSize={13} fontWeight={500}>{value}</Typography>
+            </Grid>
+          ) : null;
+          const BoolBadge = ({ label, value }) => value == null ? null : (
+            <Chip size="small" label={label}
+              color={value ? 'success' : 'default'} variant={value ? 'filled' : 'outlined'}
+              sx={{ mr: 0.5, mb: 0.5, fontSize: 11 }} />
+          );
+          return (
+            <>
+              <DialogTitle sx={{ pb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography fontWeight={700} fontSize={17}>{m.business_name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{m.msme_code}</Typography>
+                    {(m.programme_groups_detail || []).map(g => (
+                      <Chip key={g.id} size="small" label={g.name} sx={{ ml: 0.5, fontSize: 10, bgcolor: g.color, color: '#fff' }} />
+                    ))}
                   </Box>
-                ))
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setMsmeDetailDialog(false)}>Close</Button>
-            </DialogActions>
-          </>
-        )}
+                  <Button variant="contained" size="small" startIcon={<Add />}
+                    onClick={() => { setMsmeDetailDialog(false); openNewReport(m.id); }}>
+                    New Report
+                  </Button>
+                </Box>
+              </DialogTitle>
+
+              <DialogContent dividers sx={{ p: 0 }}>
+                {/* ── Core info ── */}
+                <Box sx={{ p: 2, bgcolor: '#F8F9FA', borderBottom: '1px solid #E8EDF2' }}>
+                  <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Business Profile</Typography>
+                  <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+                    <Field label="Owner"         value={m.owner_name} />
+                    <Field label="Phone"          value={m.phone} />
+                    <Field label="Email"          value={m.email || m.business_email} />
+                    <Field label="Sector"         value={m.sector} />
+                    <Field label="Business Type"  value={m.business_type} />
+                    <Field label="Cohort"         value={m.cohort_name} />
+                    <Field label="District"       value={m.state || m.diag_district} />
+                    <Field label="City / Town"    value={m.city} />
+                    <Field label="Assigned BGE"   value={m.assigned_bge_name} />
+                    <Field label="Registration #" value={m.registration_number} />
+                  </Grid>
+                </Box>
+
+                {/* ── Diagnostic baseline ── */}
+                {hasDiag && (
+                  <Box sx={{ p: 2, borderBottom: '1px solid #E8EDF2' }}>
+                    <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>
+                      Diagnostic Baseline
+                    </Typography>
+                    <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+                      <Field label="Annual Turnover (band)" value={m.diag_annual_turnover} />
+                      <Field label="Total Assets (band)"    value={m.diag_total_assets} />
+                      <Field label="Years Operating"        value={m.diag_years_operating} />
+                      <Field label="Owner Sex"              value={m.diag_owner_sex} />
+                      <Field label="Owner Age"              value={m.diag_owner_age} />
+                      <Field label="Owner Education"        value={m.diag_owner_education} />
+                    </Grid>
+
+                    <Box sx={{ mt: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>Workforce at baseline</Typography>
+                      <Grid container spacing={1}>
+                        {[
+                          { label: 'FT Male',   val: m.diag_employees_ft_male },
+                          { label: 'FT Female', val: m.diag_employees_ft_female },
+                          { label: 'PT Male',   val: m.diag_employees_pt_male },
+                          { label: 'PT Female', val: m.diag_employees_pt_female },
+                        ].map(({ label, val }) => val != null ? (
+                          <Grid item key={label}>
+                            <Box sx={{ textAlign: 'center', px: 1.5, py: 0.75, bgcolor: '#E8EDF2', borderRadius: 1 }}>
+                              <Typography fontWeight={700} fontSize={16}>{val}</Typography>
+                              <Typography variant="caption" color="text.secondary">{label}</Typography>
+                            </Box>
+                          </Grid>
+                        ) : null)}
+                      </Grid>
+                    </Box>
+
+                    <Box sx={{ mt: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>Compliance & Access</Typography>
+                      <BoolBadge label="TIN"               value={m.diag_has_tin} />
+                      <BoolBadge label="UNBS"              value={m.diag_has_unbs} />
+                      <BoolBadge label="Business Bank"     value={m.diag_has_business_bank} />
+                      <BoolBadge label="Mobile Money"      value={m.diag_has_mobile_money} />
+                    </Box>
+
+                    {m.diag_is_green_business && (
+                      <Box sx={{ mt: 1.5 }}>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>Green Categories</Typography>
+                        {(m.diag_green_categories || []).map((cat, i) => (
+                          <Chip key={i} size="small" label={cat} color="success" variant="outlined" sx={{ mr: 0.5, mb: 0.5, fontSize: 10 }} />
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                )}
+
+                {/* ── Reports ── */}
+                <Box sx={{ p: 2 }}>
+                  <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+                    Visit Reports ({msmeReports.length})
+                  </Typography>
+                  {msmeReports.length === 0 ? (
+                    <Typography color="text.secondary" fontSize={13}>No reports yet.</Typography>
+                  ) : (
+                    msmeReports.map(r => (
+                      <Box key={r.id} sx={{ border: '1px solid #E8EDF2', borderRadius: 2, p: 1.5, mb: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box>
+                            <Typography fontSize={13} fontWeight={600}>{VISIT_TYPE_LABELS[r.visit_type] || r.visit_type}</Typography>
+                            <Typography fontSize={11} color="text.secondary">{r.visit_date}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <Chip label={r.status} size="small" color={STATUS_COLORS[r.status] || 'default'} />
+                            {r.status === 'draft' && (
+                              <IconButton size="small" onClick={() => { setMsmeDetailDialog(false); openEditReport(r); }}>
+                                <Edit fontSize="small" />
+                              </IconButton>
+                            )}
+                          </Box>
+                        </Box>
+                      </Box>
+                    ))
+                  )}
+                </Box>
+              </DialogContent>
+
+              <DialogActions>
+                <Button onClick={() => setMsmeDetailDialog(false)}>Close</Button>
+              </DialogActions>
+            </>
+          );
+        })()}
       </Dialog>
 
       {/* ── Report form dialog ── */}

@@ -30,6 +30,40 @@ def _managed_groups(user):
         return list(user.cohort_admin_profile.managed_groups.values_list('id', flat=True))
     except CohortAdmin.DoesNotExist:
         return None
+
+
+def _is_viewer(user):
+    """True for accounts that have no BGE profile and no programme-manager role — read-only."""
+    if user.is_staff or user.is_superuser:
+        return False
+    if hasattr(user, 'cohort_admin_profile'):
+        return False
+    if hasattr(user, 'bge_profile'):
+        return False
+    return True
+
+
+class ViewerReadOnlyMixin:
+    """Block create/update/delete for viewer accounts."""
+    def _check_not_viewer(self):
+        if _is_viewer(self.request.user):
+            raise PermissionDenied("Viewer accounts have read-only access.")
+
+    def create(self, request, *args, **kwargs):
+        self._check_not_viewer()
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self._check_not_viewer()
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        self._check_not_viewer()
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._check_not_viewer()
+        return super().destroy(request, *args, **kwargs)
 from pywebpush import webpush, WebPushException
 import json as _json
 from .serializers import (
@@ -178,7 +212,7 @@ class MSMEGrowthSnapshotViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-class MSMEViewSet(viewsets.ModelViewSet):
+class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     queryset = MSME.objects.filter(is_active=True)
     serializer_class = MSMESerializer
     permission_classes = [IsAuthenticated]
@@ -1676,7 +1710,7 @@ class TrainingTopicViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-class MSMEReportViewSet(viewsets.ModelViewSet):
+class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     serializer_class = MSMEReportSerializer
     permission_classes = [IsAuthenticated]
 
@@ -1755,7 +1789,7 @@ class MSMEReportViewSet(viewsets.ModelViewSet):
         return resp
 
 
-class GroupReportViewSet(viewsets.ModelViewSet):
+class GroupReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """Group-level reports.
 
     Visibility:
@@ -2233,7 +2267,7 @@ def _notify_bge(bge, title, body, url='/'):
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated as _IsAuth, AllowAny as _AllowAny
 
-class WorkOrderViewSet(viewsets.ModelViewSet):
+class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """Work Order management.
 
     Visibility:
