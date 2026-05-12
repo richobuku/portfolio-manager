@@ -13,7 +13,7 @@ import {
 import {
   Business, People, School, Assessment, ChevronRight,
   Add, Upload, Visibility, Edit, Delete, Search, CheckCircle,
-  TrendingUp, Support, LocationOn, EventNote, Group,
+  TrendingUp, LocationOn, EventNote, Group,
   AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
