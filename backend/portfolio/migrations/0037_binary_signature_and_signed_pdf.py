@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name='bgeprofile',
+            model_name='businessgrowthexpert',
             name='signature_data',
             field=models.BinaryField(blank=True, null=True),
         ),
