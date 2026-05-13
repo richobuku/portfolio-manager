@@ -18,7 +18,7 @@ from .models import (
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
     GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
-    TrainingFacilitationAssignment,
+    TrainingFacilitationAssignment, TrainingReport,
 )
 from .account_setup import ensure_bge_account, send_welcome_email
 
@@ -72,7 +72,7 @@ from .serializers import (
     PortfolioSerializer, InvestmentSerializer, TransactionSerializer,
     MSMESerializer, BusinessGrowthExpertSerializer, SupportRequestSerializer,
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
-    TrainingFacilitationAssignmentSerializer,
+    TrainingFacilitationAssignmentSerializer, TrainingReportSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
     GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
     VisitReportTemplateSerializer,
@@ -2705,3 +2705,38 @@ def push_unsubscribe(request):
 def push_vapid_key(request):
     """Return the VAPID public key so the frontend can subscribe. Public endpoint."""
     return Response({'publicKey': settings.VAPID_PUBLIC_KEY})
+
+
+class TrainingReportViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for training session reports.
+    - BGEs can create/edit reports for sessions linked to their assignments.
+    - Admins and programme managers see everything.
+    """
+    serializer_class   = TrainingReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = TrainingReport.objects.select_related('session', 'bge')
+        if not (user.is_staff or user.is_superuser or hasattr(user, 'cohort_admin_profile')):
+            try:
+                return qs.filter(bge=user.bge_profile)
+            except Exception:
+                return qs.none()
+        return qs
+
+    def perform_create(self, serializer):
+        bge = None
+        try:
+            bge = self.request.user.bge_profile
+        except Exception:
+            pass
+        serializer.save(bge=bge)
+
+    def perform_update(self, serializer):
+        from django.utils import timezone
+        data = {}
+        if serializer.validated_data.get('status') == 'submitted':
+            data['submitted_at'] = timezone.now()
+        serializer.save(**data)

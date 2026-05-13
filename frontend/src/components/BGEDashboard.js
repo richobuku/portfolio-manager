@@ -130,6 +130,23 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   // Facilitation assignments (for Training tab)
   const [facilitationAssignments, setFacilitationAssignments] = useState([]);
+  // Training report dialog (detailed report per session)
+  const [trainingReportDialog, setTrainingReportDialog] = useState(false);
+  const [trainingReportSession, setTrainingReportSession] = useState(null);
+  const [trainingReportData, setTrainingReportData] = useState(null);
+  const [trainingReportSaving, setTrainingReportSaving] = useState(false);
+  const [trainingReportForm, setTrainingReportForm] = useState({});
+
+  const EMPTY_TRAINING_REPORT = {
+    training_title: '', training_dates: '', venue: '', district: '',
+    time_allocation: '', facilitation_team: '',
+    participants_male_youth: 0, participants_female_youth: 0,
+    participants_adult_male: 0, participants_adult_female: 0,
+    training_purpose: '', session_objectives: '', activities_delivered: '',
+    key_lessons: '', growth_support_areas: '', key_findings: '',
+    bge_contributions: '', bds_actions: '', recommendations: '',
+    next_steps: '', conclusion: '', status: 'draft',
+  };
 
   // Training sessions (for Work Orders section attendance recording)
   const [sessions, setSessions] = useState([]);
@@ -305,11 +322,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const fetchSessions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
     try {
-      const [sRes, faRes] = await Promise.all([
+      const [sRes, faRes, trRes] = await Promise.all([
         axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
         axios.get(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, { headers: h }).catch(() => ({ data: [] })),
+        axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
       ]);
-      setSessions(Array.isArray(sRes.data) ? sRes.data : sRes.data.results || []);
+      const sessData = Array.isArray(sRes.data) ? sRes.data : sRes.data.results || [];
+      const reportsData = Array.isArray(trRes.data) ? trRes.data : trRes.data.results || [];
+      // Annotate each session with whether a report exists
+      const reportBySession = {};
+      reportsData.forEach(r => { reportBySession[r.session] = r; });
+      setSessions(sessData.map(s => ({ ...s, has_training_report: !!reportBySession[s.id], _training_report: reportBySession[s.id] || null })));
       setFacilitationAssignments(Array.isArray(faRes.data) ? faRes.data : faRes.data.results || []);
     } catch {
       // silent
@@ -473,6 +496,51 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const isTeamLeadOf = (group) => group?.team_lead === myBgeId;
 
   // ── Training session attendance (BGE side) ───────────────────────────────
+  const openTrainingReport = (session) => {
+    setTrainingReportSession(session);
+    const existing = session._training_report;
+    if (existing) {
+      const { id, session: _s, bge: _b, created_at, updated_at, submitted_at,
+              session_title, session_date, session_location, bge_name, total_participants,
+              ...rest } = existing;
+      setTrainingReportData(existing);
+      setTrainingReportForm({ ...EMPTY_TRAINING_REPORT, ...rest });
+    } else {
+      setTrainingReportData(null);
+      setTrainingReportForm({
+        ...EMPTY_TRAINING_REPORT,
+        training_title: session.title || '',
+        venue: session.location || '',
+        training_dates: session.date || '',
+      });
+    }
+    setTrainingReportDialog(true);
+  };
+
+  const saveTrainingReport = async (submitNow = false) => {
+    if (!trainingReportSession) return;
+    setTrainingReportSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    const payload = {
+      ...trainingReportForm,
+      session: trainingReportSession.id,
+      status: submitNow ? 'submitted' : trainingReportForm.status,
+    };
+    try {
+      if (trainingReportData?.id) {
+        await axios.patch(`${API_ENDPOINTS.TRAINING_REPORTS}${trainingReportData.id}/`, payload, { headers: h });
+      } else {
+        await axios.post(API_ENDPOINTS.TRAINING_REPORTS, payload, { headers: h });
+      }
+      setTrainingReportDialog(false);
+      fetchSessions();
+    } catch (err) {
+      alert('Could not save report: ' + (err.response?.data ? JSON.stringify(err.response.data) : err.message));
+    } finally {
+      setTrainingReportSaving(false);
+    }
+  };
+
   const openSessionAtt = async (session) => {
     setSelectedSession(session);
     setSessionAttLoading(true);
@@ -1387,10 +1455,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
       {/* ── Training facilitation section ────────────────────────────────── */}
       {section === 'training' && (
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 3, maxWidth: 900 }}>
           <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>My Training Assignments</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Modules and topics you are assigned to facilitate.
+            Modules you are assigned to facilitate. For each session below you can record attendance
+            or write a full training report.
           </Typography>
 
           {facilitationAssignments.length === 0 ? (
@@ -1400,79 +1469,275 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           ) : facilitationAssignments.map(a => {
             const topicSessions = sessions.filter(s => s.topic === a.topic);
             return (
-              <Card key={a.id} variant="outlined" sx={{ mb: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1.5 }}>
-                    <Box sx={{
-                      minWidth: 44, height: 44, borderRadius: 1.5, bgcolor: '#E3F2FD',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <School sx={{ color: '#1565C0' }} />
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Chip label={`Module ${a.topic_module_number}`} size="small"
-                        sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, mb: 0.5 }} />
-                      <Typography variant="subtitle1" fontWeight={700}>
+              <Paper key={a.id} variant="outlined" sx={{ mb: 3, overflow: 'hidden' }}>
+                {/* Assignment header band */}
+                <Box sx={{
+                  px: 2.5, py: 1.5,
+                  borderLeft: '5px solid #1565C0',
+                  bgcolor: '#EFF6FF',
+                  display: 'flex', alignItems: 'center', gap: 1.5,
+                }}>
+                  <School sx={{ color: '#1565C0', fontSize: 22 }} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip
+                        label={`Module ${a.topic_module_number}`}
+                        size="small"
+                        sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, fontSize: 11 }}
+                      />
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.3 }}>
                         {a.topic_section_number ? `${a.topic_section_number} – ` : ''}{a.topic_name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {a.topic_module_name} · Assigned {a.assigned_date}
-                      </Typography>
-                      {a.notes && (
-                        <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic', color: 'text.secondary' }}>
-                          {a.notes}
-                        </Typography>
-                      )}
                     </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.3, display: 'block' }}>
+                      {a.topic_module_name} &nbsp;·&nbsp; Assigned {a.assigned_date}
+                      {a.notes && ` · ${a.notes}`}
+                    </Typography>
                   </Box>
+                </Box>
 
-                  {/* Sessions under this topic */}
+                {/* Sessions table */}
+                <Box sx={{ px: 2.5, py: 1.5 }}>
                   <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                     Training Sessions ({topicSessions.length})
                   </Typography>
                   {topicSessions.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ pl: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       No sessions recorded for this topic yet.
                     </Typography>
                   ) : (
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: '#F8FAFC' }}>
-                        <TableRow>
-                          <TableCell>Title</TableCell>
-                          <TableCell>Date</TableCell>
-                          <TableCell>Location</TableCell>
-                          <TableCell>Attendance</TableCell>
-                          <TableCell>Report</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {topicSessions.map(s => (
-                          <TableRow key={s.id} hover>
-                            <TableCell fontWeight={500}>{s.title}</TableCell>
-                            <TableCell>{s.date}</TableCell>
-                            <TableCell>{s.location || '—'}</TableCell>
-                            <TableCell>
-                              <Chip icon={<EventNote />} label={`${s.attendance_count ?? 0} present`}
-                                size="small" color="info" />
-                            </TableCell>
-                            <TableCell>
-                              <Tooltip title="View / record attendance">
-                                <IconButton size="small" color="primary" onClick={() => openSessionAtt(s)}>
-                                  <HowToReg fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
+                    <TableContainer>
+                      <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                            <TableCell sx={{ width: '28%', fontWeight: 600 }}>Session title</TableCell>
+                            <TableCell sx={{ width: '14%', fontWeight: 600 }}>Date</TableCell>
+                            <TableCell sx={{ width: '20%', fontWeight: 600 }}>Location</TableCell>
+                            <TableCell sx={{ width: '15%', fontWeight: 600 }}>Attendance</TableCell>
+                            <TableCell sx={{ width: '11%', fontWeight: 600 }}>Report</TableCell>
+                            <TableCell sx={{ width: '12%', fontWeight: 600 }}>Participants</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHead>
+                        <TableBody>
+                          {topicSessions.map(s => (
+                            <TableRow key={s.id} hover>
+                              <TableCell sx={{ fontWeight: 500 }}>{s.title}</TableCell>
+                              <TableCell>{s.date}</TableCell>
+                              <TableCell sx={{ color: s.location ? 'inherit' : 'text.secondary' }}>
+                                {s.location || '—'}
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  icon={<EventNote sx={{ fontSize: '14px !important' }} />}
+                                  label={`${s.attendance_count ?? 0} present`}
+                                  size="small"
+                                  color={s.attendance_count > 0 ? 'success' : 'default'}
+                                  variant="outlined"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  icon={<Description sx={{ fontSize: '14px !important' }} />}
+                                  label={s.has_training_report ? 'Filed' : 'Pending'}
+                                  size="small"
+                                  color={s.has_training_report ? 'success' : 'warning'}
+                                  variant="outlined"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                  <Tooltip title="Record / view attendance">
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={<HowToReg sx={{ fontSize: '14px !important' }} />}
+                                      onClick={() => openSessionAtt(s)}
+                                      sx={{ fontSize: 11, px: 1, py: 0.3, minWidth: 0 }}
+                                    >
+                                      Attend
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip title="Write training report">
+                                    <Button
+                                      size="small"
+                                      variant={s.has_training_report ? 'outlined' : 'contained'}
+                                      color={s.has_training_report ? 'success' : 'primary'}
+                                      startIcon={<Description sx={{ fontSize: '14px !important' }} />}
+                                      onClick={() => openTrainingReport(s)}
+                                      sx={{ fontSize: 11, px: 1, py: 0.3, minWidth: 0 }}
+                                    >
+                                      Report
+                                    </Button>
+                                  </Tooltip>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )}
-                </CardContent>
-              </Card>
+                </Box>
+              </Paper>
             );
           })}
         </Box>
       )}
+
+      {/* ── Training report dialog (detailed report) ─────────────────────── */}
+      <Dialog open={trainingReportDialog} onClose={() => setTrainingReportDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ pb: 0.5 }}>
+          {trainingReportData ? 'Edit Training Report' : 'Write Training Report'}
+          {trainingReportSession && (
+            <Typography variant="caption" display="block" color="text.secondary">
+              {trainingReportSession.title} · {trainingReportSession.date}
+              {trainingReportData?.status === 'submitted' && (
+                <Chip label="Submitted" size="small" color="success" sx={{ ml: 1, fontSize: 10 }} />
+              )}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent dividers sx={{ pt: 2 }}>
+          {/* ── Section 1: Header metadata ── */}
+          <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>
+            1. Training Details
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12}>
+              <TextField fullWidth size="small" label="Training Title"
+                value={trainingReportForm.training_title || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, training_title: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Date(s)"
+                placeholder="e.g. 17–19 Feb 2026"
+                value={trainingReportForm.training_dates || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, training_dates: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={5}>
+              <TextField fullWidth size="small" label="Venue / Location"
+                value={trainingReportForm.venue || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, venue: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <TextField fullWidth size="small" label="District"
+                value={trainingReportForm.district || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, district: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth size="small" label="Total Time Allocation"
+                placeholder="e.g. 2 hours / 3 days"
+                value={trainingReportForm.time_allocation || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, time_allocation: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={8}>
+              <TextField fullWidth size="small" label="Facilitation Team"
+                placeholder="Names of co-facilitators, guest trainers"
+                value={trainingReportForm.facilitation_team || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, facilitation_team: e.target.value }))} />
+            </Grid>
+          </Grid>
+
+          {/* ── Section 2: Participant demographics ── */}
+          <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>
+            2. Participant Demographics
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            {[
+              { key: 'participants_male_youth',   label: 'Male Youth (15–35)' },
+              { key: 'participants_female_youth', label: 'Female Youth (15–35)' },
+              { key: 'participants_adult_male',   label: 'Adult Male (36+)' },
+              { key: 'participants_adult_female', label: 'Adult Female (36+)' },
+            ].map(({ key, label }) => (
+              <Grid item xs={6} sm={3} key={key}>
+                <TextField fullWidth size="small" label={label} type="number"
+                  inputProps={{ min: 0 }}
+                  value={trainingReportForm[key] ?? 0}
+                  onChange={e => setTrainingReportForm(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))} />
+              </Grid>
+            ))}
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary">
+                Total: <strong>{
+                  (trainingReportForm.participants_male_youth || 0) +
+                  (trainingReportForm.participants_female_youth || 0) +
+                  (trainingReportForm.participants_adult_male || 0) +
+                  (trainingReportForm.participants_adult_female || 0)
+                } participants</strong>
+              </Typography>
+            </Grid>
+          </Grid>
+
+          {/* ── Section 3: Core content ── */}
+          <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>
+            3. Session Content
+          </Typography>
+          {[
+            { key: 'training_purpose',    label: 'Training Purpose / Background',
+              hint: 'Why was this training conducted? What problem does it address?' },
+            { key: 'session_objectives',  label: 'Session Objectives',
+              hint: 'What were the objectives of this session?' },
+            { key: 'activities_delivered', label: 'Activities / Tasks Delivered',
+              hint: 'What activities, exercises, or sessions were run?' },
+          ].map(({ key, label, hint }) => (
+            <TextField key={key} fullWidth multiline minRows={2} size="small"
+              label={label} placeholder={hint} sx={{ mb: 2 }}
+              value={trainingReportForm[key] || ''}
+              onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+          ))}
+
+          {/* ── Section 4: Findings & lessons ── */}
+          <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>
+            4. Findings &amp; Lessons
+          </Typography>
+          {[
+            { key: 'key_lessons',          label: 'Key Lessons Learnt',
+              hint: 'What were the main takeaways for participants?' },
+            { key: 'growth_support_areas', label: 'Growth Support Areas Observed',
+              hint: 'What BDS / growth support needs emerged from the session?' },
+            { key: 'key_findings',         label: 'Key Findings / Critical Issues',
+              hint: 'Any critical observations, compliance issues, or concerns raised?' },
+            { key: 'bge_contributions',    label: 'BGE Contributions & Capacity Notes',
+              hint: 'How did BGEs contribute? Any capacity gaps or strengths noted?' },
+          ].map(({ key, label, hint }) => (
+            <TextField key={key} fullWidth multiline minRows={2} size="small"
+              label={label} placeholder={hint} sx={{ mb: 2 }}
+              value={trainingReportForm[key] || ''}
+              onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+          ))}
+
+          {/* ── Section 5: Recommendations & next steps ── */}
+          <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>
+            5. Recommendations &amp; Next Steps
+          </Typography>
+          {[
+            { key: 'bds_actions',      label: 'Proposed BDS Actions (next 3 months)',
+              hint: 'What follow-up business development actions do you recommend?' },
+            { key: 'recommendations',  label: 'General Recommendations',
+              hint: 'Recommendations for future training deployments or programme adjustments' },
+            { key: 'next_steps',       label: 'Agreed Next Steps',
+              hint: 'Specific actions agreed with participants or the programme team' },
+            { key: 'conclusion',       label: 'Conclusion',
+              hint: 'Brief summary conclusion for the report' },
+          ].map(({ key, label, hint }) => (
+            <TextField key={key} fullWidth multiline minRows={2} size="small"
+              label={label} placeholder={hint} sx={{ mb: 2 }}
+              value={trainingReportForm[key] || ''}
+              onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+          ))}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+          <Button onClick={() => setTrainingReportDialog(false)} disabled={trainingReportSaving}>
+            Cancel
+          </Button>
+          <Button variant="outlined" onClick={() => saveTrainingReport(false)} disabled={trainingReportSaving}>
+            {trainingReportSaving ? 'Saving…' : 'Save Draft'}
+          </Button>
+          <Button variant="contained" color="success" onClick={() => saveTrainingReport(true)} disabled={trainingReportSaving}>
+            {trainingReportSaving ? 'Submitting…' : 'Submit Report'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Training session attendance dialog (BGE side) ────────────────── */}
       <Dialog open={sessionAttDialog} onClose={() => setSessionAttDialog(false)} maxWidth="xl" fullWidth>

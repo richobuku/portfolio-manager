@@ -499,6 +499,67 @@ class TrainingFacilitationAssignment(models.Model):
         return f"{self.bge.name} → {self.topic}"
 
 
+class TrainingReport(models.Model):
+    STATUS_CHOICES = [('draft', 'Draft'), ('submitted', 'Submitted')]
+
+    session      = models.OneToOneField(
+        TrainingSession, on_delete=models.CASCADE, related_name='training_report',
+    )
+    bge          = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='training_reports',
+    )
+    status       = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    # ── Header metadata ───────────────────────────────────────────────────────
+    training_title   = models.CharField(max_length=300, blank=True)
+    training_dates   = models.CharField(max_length=100, blank=True,
+                                        help_text='e.g. "17–19 February 2026"')
+    venue            = models.CharField(max_length=200, blank=True)
+    district         = models.CharField(max_length=100, blank=True)
+    time_allocation  = models.CharField(max_length=100, blank=True,
+                                        help_text='e.g. "2 hours" or "3 days"')
+    facilitation_team = models.TextField(blank=True,
+                                         help_text='Names of co-facilitators, guest trainers, etc.')
+
+    # ── Participant demographics ──────────────────────────────────────────────
+    participants_male_youth    = models.PositiveIntegerField(default=0, help_text='Male, age 15–35')
+    participants_female_youth  = models.PositiveIntegerField(default=0, help_text='Female, age 15–35')
+    participants_adult_male    = models.PositiveIntegerField(default=0, help_text='Male, age 36+')
+    participants_adult_female  = models.PositiveIntegerField(default=0, help_text='Female, age 36+')
+
+    # ── Core report content ───────────────────────────────────────────────────
+    training_purpose    = models.TextField(blank=True, help_text='Background and purpose of the session')
+    session_objectives  = models.TextField(blank=True, help_text='What was the objective of the session?')
+    activities_delivered = models.TextField(blank=True, help_text='What activities/tasks were delivered?')
+    key_lessons         = models.TextField(blank=True, help_text='What key lessons were learnt?')
+    growth_support_areas = models.TextField(blank=True, help_text='What growth support areas were observed?')
+    key_findings        = models.TextField(blank=True,
+                                           help_text='Key findings and critical issues from the session')
+    bge_contributions   = models.TextField(blank=True,
+                                           help_text='BGE contributions and development needs observed')
+    bds_actions         = models.TextField(blank=True,
+                                           help_text='What BDS actions would you propose for the next 3 months?')
+    recommendations     = models.TextField(blank=True, help_text='Recommendations for future sessions')
+    next_steps          = models.TextField(blank=True, help_text='Agreed next steps')
+    conclusion          = models.TextField(blank=True, help_text='Summary conclusion')
+
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Report: {self.session} ({self.status})"
+
+    @property
+    def total_participants(self):
+        return (self.participants_male_youth + self.participants_female_youth
+                + self.participants_adult_male + self.participants_adult_female)
+
+
 class Attendance(models.Model):
     AGE_GROUP_CHOICES = [
         ('18-34', '18–34 (Youth)'),

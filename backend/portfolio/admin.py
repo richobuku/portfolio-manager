@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate, TrainingFacilitationAssignment
+from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate, TrainingFacilitationAssignment, TrainingReport
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
 admin.site.site_header = "PRUDEV II — Portfolio Manager"
@@ -206,3 +206,35 @@ class MSMEGrowthSnapshotAdmin(admin.ModelAdmin):
     def total_employees(self, obj):
         return obj.total_employees
     total_employees.short_description = 'Total staff'
+
+
+@admin.register(TrainingReport)
+class TrainingReportAdmin(admin.ModelAdmin):
+    list_display  = ('session', 'bge', 'status', 'total_participants', 'created_at')
+    list_filter   = ('status', 'created_at')
+    search_fields = ('session__title', 'bge__name', 'training_title')
+    readonly_fields = ('created_at', 'updated_at', 'submitted_at', 'total_participants')
+    fieldsets = (
+        ('Session', {
+            'fields': ('session', 'bge', 'status', 'training_title', 'training_dates',
+                       'venue', 'district', 'time_allocation', 'facilitation_team'),
+        }),
+        ('Participant Demographics', {
+            'fields': ('participants_male_youth', 'participants_female_youth',
+                       'participants_adult_male', 'participants_adult_female', 'total_participants'),
+        }),
+        ('Report Content', {
+            'fields': ('training_purpose', 'session_objectives', 'activities_delivered',
+                       'key_lessons', 'growth_support_areas', 'key_findings',
+                       'bge_contributions', 'bds_actions', 'recommendations',
+                       'next_steps', 'conclusion'),
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at', 'submitted_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def total_participants(self, obj):
+        return obj.total_participants
+    total_participants.short_description = 'Total participants'

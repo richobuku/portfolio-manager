@@ -30,6 +30,7 @@ export const API_ENDPOINTS = {
   GROWTH_SNAPSHOTS:   `${API_BASE_URL}/api/growth-snapshots/`,
   VISIT_TEMPLATES:            `${API_BASE_URL}/api/visit-templates/`,
   FACILITATION_ASSIGNMENTS:  `${API_BASE_URL}/api/facilitation-assignments/`,
+  TRAINING_REPORTS:          `${API_BASE_URL}/api/training-reports/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
