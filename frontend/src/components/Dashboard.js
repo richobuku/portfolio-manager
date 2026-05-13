@@ -86,6 +86,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [workOrders, setWorkOrders] = useState([]);
   const [woFilterBge, setWoFilterBge] = useState('');
   const [woFilterStatus, setWoFilterStatus] = useState('');
+  const [woFilterType, setWoFilterType] = useState('');
   const [woDialog, setWoDialog] = useState(false);
   const [woEditing, setWoEditing] = useState(null);
   const [woForm, setWoForm] = useState({});
@@ -251,6 +252,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     const params = new URLSearchParams();
     if (woFilterBge) params.append('bge', woFilterBge);
     if (woFilterStatus) params.append('status', woFilterStatus);
+    if (woFilterType) params.append('work_order_type', woFilterType);
     try {
       const res = await axios.get(`${API_ENDPOINTS.WORK_ORDERS}?${params}`, { headers: h });
       setWorkOrders(Array.isArray(res.data) ? res.data : res.data.results || []);
@@ -258,7 +260,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setWorkOrders([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, woFilterBge, woFilterStatus]);
+  }, [token, woFilterBge, woFilterStatus, woFilterType]);
 
   useEffect(() => { fetchWorkOrders(); }, [fetchWorkOrders]);
 
@@ -2655,6 +2657,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session' },
       ],
     },
+    training_facilitation: {
+      objective: `To lead the design and facilitation of structured training for MSMEs and Business Growth Experts (BGEs) under the Prudev II programme. The Senior BGE will work alongside the BDS Expert to develop training content, deliver sessions, co-facilitate with the broader BGE team, monitor active participation, collect participant feedback, and share lessons learnt with the programme team.`,
+      key_tasks: `1. Collaborate with the BDS Expert to design and develop training content, materials, and session plans in line with PRUDEV II programme standards.
+2. Lead the delivery of assigned training modules for MSME cohorts and/or BGE capacity-building sessions.
+3. Co-facilitate training sessions alongside the Lead Facilitator and guest trainers, ensuring structured and effective delivery.
+4. Brief and prepare assigned BGEs before each session to ensure active, confident participation in facilitation.
+5. Monitor BGE engagement during sessions and provide real-time coaching and support where needed.
+6. Design and administer participant feedback forms at the end of each training session.
+7. Consolidate and analyse participant feedback, identifying trends, strengths, and areas for improvement.
+8. Conduct a structured post-training review with the delivery team within 3 days of each session.
+9. Compile and share a detailed Training Report and Lessons Learnt document with the programme team after each training.
+10. Maintain training records, attendance sheets, and all programme documentation in the required PRUDEV II formats.`,
+      deliverables_json: [
+        { task_num: 1, description: 'Training Content Package – session plans, facilitator guides, and participant materials approved by the BDS Expert', due_date: 'Before first training session' },
+        { task_num: 2, description: 'Signed attendance sheets – collected and submitted for every session', due_date: 'Day of each session' },
+        { task_num: 3, description: 'Participant Feedback Summary – consolidated analysis of feedback forms from each training', due_date: 'Within 3 days of each session' },
+        { task_num: 4, description: 'Post-Training Review Notes – documented debrief with the facilitation team', due_date: 'Within 3 days of each session' },
+        { task_num: 5, description: 'Detailed Training Report – covering objectives, activities, key findings, observations, and recommendations', due_date: 'Within 5 days of each session' },
+        { task_num: 6, description: 'Lessons Learnt Report – structured document capturing insights for future training design and delivery', due_date: 'End of assignment' },
+        { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Monthly, with report submission' },
+      ],
+    },
     other: { objective: '', key_tasks: '', deliverables_json: [] },
   };
 
@@ -2792,6 +2816,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="signed">Signed</MenuItem>
           </Select>
         </FormControl>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Type</InputLabel>
+          <Select value={woFilterType || ''} label="Type" onChange={e => setWoFilterType(e.target.value)}>
+            <MenuItem value="">All Types</MenuItem>
+            <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
+            <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
+            <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
+            <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
+            <MenuItem value="other">Other</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
       {workOrders.length === 0 ? (
@@ -2802,11 +2837,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {workOrders.map(wo => (
-            <Card variant="outlined" key={wo.id}>
+            <Card variant="outlined" key={wo.id}
+              sx={wo.work_order_type === 'training_facilitation' ? { borderLeft: '4px solid #7B1FA2' } : {}}>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
                   <Box>
-                    <Typography fontWeight={700}>{wo.work_order_number}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3 }}>
+                      <Typography fontWeight={700}>{wo.work_order_number}</Typography>
+                      {wo.work_order_type === 'training_facilitation' && (
+                        <Chip label="Senior BGE" size="small"
+                          sx={{ bgcolor: '#7B1FA2', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                      )}
+                    </Box>
                     <Typography variant="caption" color="text.secondary">
                       {wo.work_order_type_display} · {wo.bge_name} ({wo.bge_code_display})
                     </Typography>
@@ -2893,18 +2935,31 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <FormControl fullWidth size="small" required>
                 <InputLabel>BGE</InputLabel>
                 <Select value={woForm.bge} label="BGE" onChange={e => setWoForm(f => ({ ...f, bge: e.target.value }))}>
-                  {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)}
+                  {woForm.work_order_type === 'training_facilitation' ? (
+                    experts.filter(e => e.is_senior).length > 0
+                      ? experts.filter(e => e.is_senior).map(e =>
+                          <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
+                      : <MenuItem disabled value="">No Senior BGEs found</MenuItem>
+                  ) : (
+                    experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
+                  )}
                 </Select>
               </FormControl>
+              {woForm.work_order_type === 'training_facilitation' && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  Only Senior BGEs are listed for this work order type.
+                </Typography>
+              )}
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small">
                 <InputLabel>Work Order Type</InputLabel>
                 <Select value={woForm.work_order_type} label="Work Order Type"
                   onChange={e => applyWoDefaults(e.target.value)}>
-                  <MenuItem value="msme_support">MSME CRM & Business Support</MenuItem>
+                  <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
                   <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                   <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
+                  <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
               </FormControl>

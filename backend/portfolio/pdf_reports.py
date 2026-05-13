@@ -454,17 +454,34 @@ def render_work_order(work_order):
 
     story.append(Spacer(1, 8))
 
-    CONDITIONS = [
-        'The BGE shall carry out the assignment with due diligence and in accordance with GOPA AFC and GIZ standards.',
-        'The BGE shall submit field visit reports within 5 working days of each visit.',
-        'Fees are conditional on satisfactory delivery of reports and approved deliverables.',
-        'Transport will be reimbursed upon submission of receipts / fuel log.',
-        'The BGE shall maintain confidentiality of all MSME and programme information.',
-        'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
-        'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
-        'Any changes to the scope require written approval from the Team Leader.',
-        '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
-    ]
+    if work_order.work_order_type == 'training_facilitation':
+        CONDITIONS = [
+            'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA AFC and GIZ quality standards.',
+            'All training content and session plans must be reviewed and approved by the BDS Expert before delivery.',
+            'The Senior BGE shall submit a Training Report within 5 working days of each training session.',
+            'A Lessons Learnt document must be submitted at the conclusion of the assignment.',
+            'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of every session.',
+            'The Senior BGE is responsible for briefing and preparing assigned BGEs before each session and for monitoring their active participation throughout.',
+            'Fees are conditional on satisfactory delivery of reports, approved training content, and completed feedback analysis.',
+            'Transport will be reimbursed upon submission of receipts / fuel log.',
+            'The Senior BGE shall maintain confidentiality of all MSME, BGE, and programme information.',
+            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
+            'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            'Any changes to the scope or training schedule require written approval from the Team Leader.',
+            '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+        ]
+    else:
+        CONDITIONS = [
+            'The BGE shall carry out the assignment with due diligence and in accordance with GOPA AFC and GIZ standards.',
+            'The BGE shall submit field visit reports within 5 working days of each visit.',
+            'Fees are conditional on satisfactory delivery of reports and approved deliverables.',
+            'Transport will be reimbursed upon submission of receipts / fuel log.',
+            'The BGE shall maintain confidentiality of all MSME and programme information.',
+            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
+            'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            'Any changes to the scope require written approval from the Team Leader.',
+            '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+        ]
     story.append(Paragraph('CONDITIONS', s['sectiontitle']))
     for i, cond in enumerate(CONDITIONS, start=1):
         story.append(Paragraph(
