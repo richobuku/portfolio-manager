@@ -174,14 +174,15 @@ class SupportRequestSerializer(serializers.ModelSerializer):
 class TrainingTopicSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainingTopic
-        fields = '__all__'
+        fields = ['id', 'module_number', 'module_name', 'section_number', 'name', 'description']
 
 
 class TrainingSessionSerializer(serializers.ModelSerializer):
-    topic_name        = serializers.CharField(source='topic.name', read_only=True)
-    work_order_number = serializers.CharField(source='work_order.work_order_number', read_only=True, allow_null=True)
-    work_order_bge    = serializers.CharField(source='work_order.bge.name', read_only=True, allow_null=True)
-    attendance_count  = serializers.SerializerMethodField()
+    topic_name           = serializers.CharField(source='topic.name', read_only=True)
+    topic_section_number = serializers.CharField(source='topic.section_number', read_only=True, allow_null=True)
+    work_order_number    = serializers.CharField(source='work_order.work_order_number', read_only=True, allow_null=True)
+    work_order_bge       = serializers.CharField(source='work_order.bge.name', read_only=True, allow_null=True)
+    attendance_count     = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession

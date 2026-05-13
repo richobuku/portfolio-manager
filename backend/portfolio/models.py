@@ -442,10 +442,18 @@ class SupportRequest(models.Model):
         return f"{self.msme_name} - {self.business_need[:30]}..."
 
 class TrainingTopic(models.Model):
-    name = models.CharField(max_length=200, unique=True)
-    description = models.TextField(blank=True)
+    module_number  = models.PositiveSmallIntegerField(default=0)
+    module_name    = models.CharField(max_length=200, blank=True)
+    section_number = models.CharField(max_length=10, blank=True)
+    name           = models.CharField(max_length=200, unique=True)
+    description    = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['module_number', 'section_number']
 
     def __str__(self):
+        if self.section_number:
+            return f"Section {self.section_number} – {self.name}"
         return self.name
 
 class TrainingSession(models.Model):
