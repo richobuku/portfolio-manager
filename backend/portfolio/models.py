@@ -847,10 +847,11 @@ class GroupReportAttendance(models.Model):
 
 class WorkOrder(models.Model):
     TYPE_CHOICES = [
-        ('msme_support', 'MSME CRM & Business Support'),
-        ('mobilisation', 'Mobilisation / Outreach'),
-        ('group_session', 'Peer-to-Peer Group Session'),
-        ('other', 'Other'),
+        ('msme_support',          'MSME CRM & Business Support'),
+        ('mobilisation',          'Mobilisation / Outreach'),
+        ('group_session',         'Peer-to-Peer Group Session'),
+        ('training_facilitation', 'Training Facilitation — Senior BGE'),
+        ('other',                 'Other'),
     ]
     STATUS_CHOICES = [
         ('draft', 'Draft'),
@@ -919,7 +920,8 @@ class WorkOrder(models.Model):
             m = re.search(r'BGE-([A-Z0-9]+)-', code)
             short = m.group(1) if m else str(self.bge_id)
             seq = WorkOrder.objects.filter(bge=self.bge).count() + 1
-            self.work_order_number = f"PRUDEV II-BGE-{short}-{seq:02d}"
+            prefix = 'TF' if self.work_order_type == 'training_facilitation' else 'BGE'
+            self.work_order_number = f"PRUDEV II-{prefix}-{short}-{seq:02d}"
         super().save(*args, **kwargs)
 
 

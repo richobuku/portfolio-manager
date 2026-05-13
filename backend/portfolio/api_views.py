@@ -2510,6 +2510,13 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = WorkOrder.objects.select_related('bge', 'group')
+        # Common filters regardless of role
+        status_filter = self.request.query_params.get('status')
+        type_filter   = self.request.query_params.get('work_order_type')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if type_filter:
+            qs = qs.filter(work_order_type=type_filter)
         if user.is_staff or user.is_superuser:
             bge_id = self.request.query_params.get('bge')
             if bge_id:
