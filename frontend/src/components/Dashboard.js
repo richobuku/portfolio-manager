@@ -76,9 +76,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [trainingSessions, setTrainingSessions] = useState([]);
   const [trainingTopics, setTrainingTopics] = useState([]);
   const [facilitationAssignments, setFacilitationAssignments] = useState([]);
-  const [assignDialog, setAssignDialog] = useState(false);
-  const [assignForm, setAssignForm] = useState({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
-  const [assignSaving, setAssignSaving] = useState(false);
+  const [facilitationDialog, setFacilitationDialog] = useState(false);
+  const [facilitationForm, setFacilitationForm] = useState({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [facilitationSaving, setFacilitationSaving] = useState(false);
   const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -678,17 +678,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   // ── facilitation assignments ───────────────────────────────────────────────
-  const saveAssignment = async () => {
-    setAssignSaving(true);
+  const saveFacilitationAssignment = async () => {
+    setFacilitationSaving(true);
     try {
-      await axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, assignForm, { headers });
+      await axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, facilitationForm, { headers });
       notify('Facilitator assigned');
-      setAssignDialog(false);
-      setAssignForm({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
+      setFacilitationDialog(false);
+      setFacilitationForm({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
       fetchAll();
     } catch (e) {
       notify(e.response?.data?.non_field_errors?.[0] || e.response?.data?.detail || 'Failed to assign facilitator', 'error');
-    } finally { setAssignSaving(false); }
+    } finally { setFacilitationSaving(false); }
   };
 
   const removeAssignment = async (id) => {
@@ -1410,7 +1410,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     <Box>
       {/* ── Facilitation Assignments ── */}
       <SectionHeader title="Facilitation Assignments" subtitle={`${facilitationAssignments.length} assigned`}>
-        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => setAssignDialog(true)}>
+        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => setFacilitationDialog(true)}>
           Assign Facilitator
         </Button>
       </SectionHeader>
@@ -3786,14 +3786,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Dialog>
 
       {/* ── Assign Facilitator dialog ──────────────────────────────────────── */}
-      <Dialog open={assignDialog} onClose={() => setAssignDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={facilitationDialog} onClose={() => setFacilitationDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Assign Training Facilitator</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ pt: 1 }}>
             <Grid item xs={12}>
               <FormControl fullWidth size="small" required>
                 <InputLabel>Senior BGE</InputLabel>
-                <Select value={assignForm.bge} onChange={e => setAssignForm({ ...assignForm, bge: e.target.value })} label="Senior BGE">
+                <Select value={facilitationForm.bge} onChange={e => setFacilitationForm({ ...facilitationForm, bge: e.target.value })} label="Senior BGE">
                   <MenuItem value="">— Select BGE —</MenuItem>
                   {experts.filter(e => e.is_senior).map(e => (
                     <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` (${e.bge_code})` : ''}</MenuItem>
@@ -3810,7 +3810,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Grid item xs={12}>
               <FormControl fullWidth size="small" required>
                 <InputLabel>Training Module / Topic</InputLabel>
-                <Select value={assignForm.topic} onChange={e => setAssignForm({ ...assignForm, topic: e.target.value })} label="Training Module / Topic">
+                <Select value={facilitationForm.topic} onChange={e => setFacilitationForm({ ...facilitationForm, topic: e.target.value })} label="Training Module / Topic">
                   <MenuItem value="">— Select topic —</MenuItem>
                   {(() => {
                     const grouped = trainingTopics.reduce((acc, t) => {
@@ -3836,23 +3836,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Grid item xs={12}>
               <TextField fullWidth size="small" required label="Assignment Date" type="date"
                 InputLabelProps={{ shrink: true }}
-                value={assignForm.assigned_date}
-                onChange={e => setAssignForm({ ...assignForm, assigned_date: e.target.value })}
+                value={facilitationForm.assigned_date}
+                onChange={e => setFacilitationForm({ ...facilitationForm, assigned_date: e.target.value })}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField fullWidth size="small" multiline rows={2} label="Notes (optional)"
-                value={assignForm.notes}
-                onChange={e => setAssignForm({ ...assignForm, notes: e.target.value })}
+                value={facilitationForm.notes}
+                onChange={e => setFacilitationForm({ ...facilitationForm, notes: e.target.value })}
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAssignDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveAssignment}
-            disabled={assignSaving || !assignForm.bge || !assignForm.topic || !assignForm.assigned_date}>
-            {assignSaving ? <CircularProgress size={18} /> : 'Assign'}
+          <Button onClick={() => setFacilitationDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveFacilitationAssignment}
+            disabled={facilitationSaving || !facilitationForm.bge || !facilitationForm.topic || !facilitationForm.assigned_date}>
+            {facilitationSaving ? <CircularProgress size={18} /> : 'Assign'}
           </Button>
         </DialogActions>
       </Dialog>
