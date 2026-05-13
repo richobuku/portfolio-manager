@@ -6,13 +6,13 @@ import {
   TextField, FormControl, InputLabel, Select, MenuItem, Alert,
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
-  ListItemText, AppBar, Toolbar, Tooltip, Checkbox,
+  ListItemText, AppBar, Toolbar, Tooltip, Checkbox, Badge,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
-  Delete, HowToReg,
+  Delete, HowToReg, School, EventNote,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
@@ -127,6 +127,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     id: null, msme: '', attendee_name: '', attendee_phone: '',
     gender: '', age_group: '', refugee_status: 'H', consent_photo: true, consent_contact: true,
   });
+
+  // Facilitation assignments (for Training tab)
+  const [facilitationAssignments, setFacilitationAssignments] = useState([]);
 
   // Training sessions (for Work Orders section attendance recording)
   const [sessions, setSessions] = useState([]);
@@ -302,8 +305,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const fetchSessions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
     try {
-      const res = await axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h });
-      setSessions(Array.isArray(res.data) ? res.data : res.data.results || []);
+      const [sRes, faRes] = await Promise.all([
+        axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
+        axios.get(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, { headers: h }).catch(() => ({ data: [] })),
+      ]);
+      setSessions(Array.isArray(sRes.data) ? sRes.data : sRes.data.results || []);
+      setFacilitationAssignments(Array.isArray(faRes.data) ? faRes.data : faRes.data.results || []);
     } catch {
       // silent
     }
@@ -703,6 +710,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'groups',      label: 'My Groups',      icon: <GroupIcon /> },
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
+    ...(facilitationAssignments.length > 0
+      ? [{ key: 'training', label: 'Training', icon: <School />, badge: facilitationAssignments.length }]
+      : []),
   ];
 
   const SidebarContent = () => (
@@ -729,7 +739,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
 
       <List sx={{ flex: 1, px: 1, pt: 1 }}>
-        {navItems.map(({ key, label, icon }) => (
+        {navItems.map(({ key, label, icon, badge }) => (
           <ListItemButton
             key={key}
             selected={section === key}
@@ -740,7 +750,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
             }}
           >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>{icon}</ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
+              {badge ? <Badge badgeContent={badge} color="warning">{icon}</Badge> : icon}
+            </ListItemIcon>
             <ListItemText primary={label} primaryTypographyProps={{ fontSize: 14, fontWeight: 500 }} />
           </ListItemButton>
         ))}
@@ -1372,6 +1384,95 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </Box>
         )}
       </Box>
+
+      {/* ── Training facilitation section ────────────────────────────────── */}
+      {section === 'training' && (
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>My Training Assignments</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Modules and topics you are assigned to facilitate.
+          </Typography>
+
+          {facilitationAssignments.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+              No facilitation assignments yet.
+            </Paper>
+          ) : facilitationAssignments.map(a => {
+            const topicSessions = sessions.filter(s => s.topic === a.topic);
+            return (
+              <Card key={a.id} variant="outlined" sx={{ mb: 2 }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1.5 }}>
+                    <Box sx={{
+                      minWidth: 44, height: 44, borderRadius: 1.5, bgcolor: '#E3F2FD',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <School sx={{ color: '#1565C0' }} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Chip label={`Module ${a.topic_module_number}`} size="small"
+                        sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, mb: 0.5 }} />
+                      <Typography variant="subtitle1" fontWeight={700}>
+                        {a.topic_section_number ? `${a.topic_section_number} – ` : ''}{a.topic_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {a.topic_module_name} · Assigned {a.assigned_date}
+                      </Typography>
+                      {a.notes && (
+                        <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic', color: 'text.secondary' }}>
+                          {a.notes}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+
+                  {/* Sessions under this topic */}
+                  <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                    Training Sessions ({topicSessions.length})
+                  </Typography>
+                  {topicSessions.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ pl: 1 }}>
+                      No sessions recorded for this topic yet.
+                    </Typography>
+                  ) : (
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                        <TableRow>
+                          <TableCell>Title</TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell>Location</TableCell>
+                          <TableCell>Attendance</TableCell>
+                          <TableCell>Report</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {topicSessions.map(s => (
+                          <TableRow key={s.id} hover>
+                            <TableCell fontWeight={500}>{s.title}</TableCell>
+                            <TableCell>{s.date}</TableCell>
+                            <TableCell>{s.location || '—'}</TableCell>
+                            <TableCell>
+                              <Chip icon={<EventNote />} label={`${s.attendance_count ?? 0} present`}
+                                size="small" color="info" />
+                            </TableCell>
+                            <TableCell>
+                              <Tooltip title="View / record attendance">
+                                <IconButton size="small" color="primary" onClick={() => openSessionAtt(s)}>
+                                  <HowToReg fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Box>
+      )}
 
       {/* ── Training session attendance dialog (BGE side) ────────────────── */}
       <Dialog open={sessionAttDialog} onClose={() => setSessionAttDialog(false)} maxWidth="xl" fullWidth>

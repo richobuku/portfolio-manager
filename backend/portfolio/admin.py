@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate
+from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate, TrainingFacilitationAssignment
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
 admin.site.site_header = "PRUDEV II — Portfolio Manager"
@@ -69,9 +69,9 @@ class MSMEAdmin(admin.ModelAdmin):
 
 @admin.register(BusinessGrowthExpert)
 class BusinessGrowthExpertAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'email', 'phone', 'location', 'status', 'years_of_experience', 'created_at')
+    list_display = ('name', 'user', 'email', 'phone', 'location', 'status', 'is_senior', 'years_of_experience', 'created_at')
     search_fields = ('name', 'email', 'location', 'user__username')
-    list_filter = ('status', 'location')
+    list_filter = ('status', 'is_senior', 'location')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('user',)
 
@@ -91,6 +91,14 @@ class TrainingSessionAdmin(admin.ModelAdmin):
     filter_horizontal = ('businesses',)
 
 admin.site.register(TrainingSession, TrainingSessionAdmin)
+
+
+@admin.register(TrainingFacilitationAssignment)
+class TrainingFacilitationAssignmentAdmin(admin.ModelAdmin):
+    list_display  = ('bge', 'topic', 'assigned_date', 'assigned_by')
+    list_filter   = ('topic__module_number', 'assigned_date')
+    search_fields = ('bge__name', 'topic__name')
+    raw_id_fields = ('bge', 'assigned_by')
 
 
 @admin.register(Cohort)
