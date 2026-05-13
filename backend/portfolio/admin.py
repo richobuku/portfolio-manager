@@ -81,7 +81,11 @@ class SupportRequestAdmin(admin.ModelAdmin):
     search_fields = ('msme_name', 'business_need', 'location')
     list_filter = ('location',)
 
-admin.site.register(TrainingTopic)
+@admin.register(TrainingTopic)
+class TrainingTopicAdmin(admin.ModelAdmin):
+    list_display  = ('section_number', 'name', 'module_number', 'module_name')
+    list_filter   = ('module_number',)
+    ordering      = ('module_number', 'section_number')
 
 class TrainingSessionAdmin(admin.ModelAdmin):
     filter_horizontal = ('businesses',)

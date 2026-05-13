@@ -8,7 +8,7 @@ import {
   Tooltip, Checkbox, Card, CardContent, Grid, Drawer, List,
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
   Badge, Accordion, AccordionSummary, AccordionDetails,
-  Tab, Tabs,
+  Tab, Tabs, ListSubheader,
 } from '@mui/material';
 import {
   Business, People, School, Assessment, ChevronRight,
@@ -1406,7 +1406,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <TableCell sx={{ fontWeight: 500 }}>{s.title}</TableCell>
                 <TableCell>{s.date}</TableCell>
                 <TableCell>{s.location || '—'}</TableCell>
-                <TableCell>{s.topic_name || '—'}</TableCell>
+                <TableCell>{s.topic_name ? `${s.topic_section_number ? s.topic_section_number + ' – ' : ''}${s.topic_name}` : '—'}</TableCell>
                 <TableCell><Chip icon={<EventNote />} label={`${s.attendance_count ?? 0} present`} size="small" color="info" /></TableCell>
                 <TableCell>
                   <Tooltip title="Mark attendance">
@@ -3666,7 +3666,24 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <FormControl fullWidth size="small"><InputLabel>Topic</InputLabel>
                 <Select value={sessionForm.topic} onChange={e => setSessionForm({...sessionForm, topic: e.target.value})} label="Topic">
                   <MenuItem value="">None</MenuItem>
-                  {trainingTopics.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                  {(() => {
+                    const grouped = trainingTopics.reduce((acc, t) => {
+                      const key = t.module_number || 0;
+                      if (!acc[key]) acc[key] = { label: t.module_name || 'Other', items: [] };
+                      acc[key].items.push(t);
+                      return acc;
+                    }, {});
+                    return Object.entries(grouped).map(([modNum, { label, items }]) => [
+                      <ListSubheader key={`mod-${modNum}`} sx={{ fontWeight: 700, lineHeight: '2em', bgcolor: 'grey.100' }}>
+                        {modNum > 0 ? `Module ${modNum}: ${label}` : label}
+                      </ListSubheader>,
+                      ...items.map(t => (
+                        <MenuItem key={t.id} value={t.id} sx={{ pl: 3 }}>
+                          {t.section_number ? `${t.section_number} – ` : ''}{t.name}
+                        </MenuItem>
+                      )),
+                    ]);
+                  })()}
                 </Select>
               </FormControl>
             </Grid>
