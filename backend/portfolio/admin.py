@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot
+from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
 admin.site.site_header = "PRUDEV II — Portfolio Manager"
@@ -112,6 +112,14 @@ class BGEGroupAdmin(admin.ModelAdmin):
     def member_count(self, obj):
         return obj.members.count()
     member_count.short_description = 'Members'
+
+
+@admin.register(VisitReportTemplate)
+class VisitReportTemplateAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'is_active', 'include_financials', 'include_workforce',
+                     'include_compliance', 'include_market', 'include_business_mgmt', 'include_growth_rating')
+    list_filter   = ('is_active',)
+    search_fields = ('name',)
 
 
 @admin.register(MSMEReport)
