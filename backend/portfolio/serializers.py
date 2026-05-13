@@ -5,6 +5,7 @@ from .models import (
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
     GroupReportAttendance, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
+    TrainingFacilitationAssignment,
 )
 
 
@@ -306,3 +307,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         model = WorkOrder
         fields = '__all__'
         read_only_fields = ['work_order_number', 'created_at', 'updated_at']
+
+
+class TrainingFacilitationAssignmentSerializer(serializers.ModelSerializer):
+    bge_name            = serializers.CharField(source='bge.name', read_only=True)
+    bge_code            = serializers.CharField(source='bge.bge_code', read_only=True)
+    topic_name          = serializers.CharField(source='topic.name', read_only=True)
+    topic_section_number = serializers.CharField(source='topic.section_number', read_only=True)
+    topic_module_number  = serializers.IntegerField(source='topic.module_number', read_only=True)
+    topic_module_name    = serializers.CharField(source='topic.module_name', read_only=True)
+    assigned_by_name    = serializers.CharField(source='assigned_by.get_full_name', read_only=True, allow_null=True)
+
+    class Meta:
+        model = TrainingFacilitationAssignment
+        fields = '__all__'
+        read_only_fields = ['created_at']

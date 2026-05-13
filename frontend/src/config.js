@@ -28,7 +28,8 @@ export const API_ENDPOINTS = {
   UPLOAD_EXPERTS:     `${API_BASE_URL}/api/experts/upload/`,
   PROGRAMME_GROUPS:   `${API_BASE_URL}/api/programme-groups/`,
   GROWTH_SNAPSHOTS:   `${API_BASE_URL}/api/growth-snapshots/`,
-  VISIT_TEMPLATES:    `${API_BASE_URL}/api/visit-templates/`,
+  VISIT_TEMPLATES:            `${API_BASE_URL}/api/visit-templates/`,
+  FACILITATION_ASSIGNMENTS:  `${API_BASE_URL}/api/facilitation-assignments/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;

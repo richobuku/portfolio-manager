@@ -384,6 +384,7 @@ class BusinessGrowthExpert(models.Model):
     )
     # Signature bytes stored in DB — survives filesystem wipes on Render deploys.
     signature_data = models.BinaryField(null=True, blank=True)
+    is_senior = models.BooleanField(default=False, help_text='Designate as Senior BGE (can be assigned training facilitation)')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -471,6 +472,32 @@ class TrainingSession(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.date})"
+
+
+class TrainingFacilitationAssignment(models.Model):
+    bge           = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.CASCADE,
+        related_name='facilitation_assignments',
+    )
+    topic         = models.ForeignKey(
+        TrainingTopic, on_delete=models.CASCADE,
+        related_name='facilitation_assignments',
+    )
+    assigned_by   = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='training_assignments_made',
+    )
+    assigned_date = models.DateField()
+    notes         = models.TextField(blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('bge', 'topic')
+        ordering = ['topic__module_number', 'topic__section_number', 'bge__name']
+
+    def __str__(self):
+        return f"{self.bge.name} → {self.topic}"
+
 
 class Attendance(models.Model):
     AGE_GROUP_CHOICES = [

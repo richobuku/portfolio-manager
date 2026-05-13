@@ -18,6 +18,7 @@ from .models import (
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
     GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
+    TrainingFacilitationAssignment,
 )
 from .account_setup import ensure_bge_account, send_welcome_email
 
@@ -71,6 +72,7 @@ from .serializers import (
     PortfolioSerializer, InvestmentSerializer, TransactionSerializer,
     MSMESerializer, BusinessGrowthExpertSerializer, SupportRequestSerializer,
     TrainingSessionSerializer, AttendanceSerializer, TrainingTopicSerializer,
+    TrainingFacilitationAssignmentSerializer,
     CohortSerializer, BGEGroupSerializer, MSMEReportSerializer,
     GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
     VisitReportTemplateSerializer,
@@ -1756,6 +1758,48 @@ class TrainingTopicViewSet(viewsets.ModelViewSet):
     queryset = TrainingTopic.objects.all()
     serializer_class = TrainingTopicSerializer
     permission_classes = [IsAuthenticated]
+
+
+class TrainingFacilitationAssignmentViewSet(viewsets.ModelViewSet):
+    """
+    Manage training facilitation assignments.
+    - Admins/programme managers: full CRUD.
+    - BGEs: read-only, scoped to their own assignments.
+    """
+    serializer_class = TrainingFacilitationAssignmentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = TrainingFacilitationAssignment.objects.select_related(
+            'bge', 'topic', 'assigned_by'
+        )
+        # BGEs only see their own assignments
+        if not (user.is_staff or user.is_superuser or hasattr(user, 'cohort_admin_profile')):
+            try:
+                bge = user.bge_profile
+                return qs.filter(bge=bge)
+            except Exception:
+                return qs.none()
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(assigned_by=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
+            raise PermissionDenied("Only programme managers can create facilitation assignments.")
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
+            raise PermissionDenied("Only programme managers can edit facilitation assignments.")
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
+            raise PermissionDenied("Only programme managers can remove facilitation assignments.")
+        return super().destroy(request, *args, **kwargs)
 
 
 class VisitReportTemplateViewSet(viewsets.ModelViewSet):

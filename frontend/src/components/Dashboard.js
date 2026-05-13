@@ -75,6 +75,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [programmeGroups, setProgrammeGroups] = useState([]);
   const [trainingSessions, setTrainingSessions] = useState([]);
   const [trainingTopics, setTrainingTopics] = useState([]);
+  const [facilitationAssignments, setFacilitationAssignments] = useState([]);
+  const [assignDialog, setAssignDialog] = useState(false);
+  const [assignForm, setAssignForm] = useState({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [assignSaving, setAssignSaving] = useState(false);
   const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -203,7 +207,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (reportFilterBge) reportParams.append('bge', reportFilterBge);
       if (reportFilterStatus) reportParams.append('status', reportFilterStatus);
 
-      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes] = await Promise.all([
+      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes, faRes] = await Promise.all([
         axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
         axios.get(API_ENDPOINTS.EXPERTS, { headers: h }),
         axios.get(API_ENDPOINTS.COHORTS, { headers: h }),
@@ -215,6 +219,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         axios.get(`${API_ENDPOINTS.REPORTS}?${reportParams}`, { headers: h }),
         axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h }).catch(() => ({ data: [] })),
         axios.get(API_ENDPOINTS.PROGRAMME_GROUPS, { headers: h }).catch(() => ({ data: [] })),
+        axios.get(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, { headers: h }).catch(() => ({ data: [] })),
       ]);
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
@@ -225,6 +230,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setProgrammeGroups(toArr(pgRes.data));
       setTrainingSessions(toArr(sRes.data));
       setTrainingTopics(toArr(tRes.data));
+      setFacilitationAssignments(toArr(faRes.data));
       setAnalytics(aRes.data);
       setBgeUsers(Array.isArray(uRes.data) ? uRes.data : []);
       setGroupReports(toArr(grRes.data));
@@ -669,6 +675,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } finally {
       setGroupMsmeSaving(false);
     }
+  };
+
+  // ── facilitation assignments ───────────────────────────────────────────────
+  const saveAssignment = async () => {
+    setAssignSaving(true);
+    try {
+      await axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, assignForm, { headers });
+      notify('Facilitator assigned');
+      setAssignDialog(false);
+      setAssignForm({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
+      fetchAll();
+    } catch (e) {
+      notify(e.response?.data?.non_field_errors?.[0] || e.response?.data?.detail || 'Failed to assign facilitator', 'error');
+    } finally { setAssignSaving(false); }
+  };
+
+  const removeAssignment = async (id) => {
+    try {
+      await axios.delete(`${API_ENDPOINTS.FACILITATION_ASSIGNMENTS}${id}/`, { headers });
+      notify('Assignment removed');
+      fetchAll();
+    } catch { notify('Failed to remove assignment', 'error'); }
   };
 
   // ── training ───────────────────────────────────────────────────────────────
@@ -1380,6 +1408,53 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   const renderTraining = () => (
     <Box>
+      {/* ── Facilitation Assignments ── */}
+      <SectionHeader title="Facilitation Assignments" subtitle={`${facilitationAssignments.length} assigned`}>
+        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => setAssignDialog(true)}>
+          Assign Facilitator
+        </Button>
+      </SectionHeader>
+
+      {facilitationAssignments.length === 0 ? (
+        <Paper variant="outlined" sx={{ p: 3, mb: 3, textAlign: 'center', color: 'text.secondary' }}>
+          No facilitators assigned yet. Click "Assign Facilitator" to get started.
+        </Paper>
+      ) : (
+        <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+              <TableRow>
+                <TableCell>Senior BGE</TableCell>
+                <TableCell>Module</TableCell>
+                <TableCell>Topic / Section</TableCell>
+                <TableCell>Assigned Date</TableCell>
+                <TableCell>Notes</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {facilitationAssignments.map(a => (
+                <TableRow key={a.id} hover>
+                  <TableCell sx={{ fontWeight: 600 }}>{a.bge_name}</TableCell>
+                  <TableCell>
+                    <Chip label={`Module ${a.topic_module_number}`} size="small" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 700 }} />
+                  </TableCell>
+                  <TableCell>{a.topic_section_number ? `${a.topic_section_number} – ` : ''}{a.topic_name}</TableCell>
+                  <TableCell>{a.assigned_date}</TableCell>
+                  <TableCell sx={{ color: 'text.secondary' }}>{a.notes || '—'}</TableCell>
+                  <TableCell>
+                    <Tooltip title="Remove assignment">
+                      <IconButton size="small" color="error" onClick={() => removeAssignment(a.id)}><Delete fontSize="small" /></IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* ── Training Sessions ── */}
       <SectionHeader title="Training Sessions" subtitle={`${trainingSessions.length} sessions`}>
         <Button variant="contained" startIcon={<Add />} size="small" onClick={() => setSessionDialog(true)}>
           New Session
@@ -3706,6 +3781,78 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <Button onClick={() => setSessionDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={createSession} disabled={sessionLoading || !sessionForm.title || !sessionForm.date}>
             {sessionLoading ? <CircularProgress size={18} /> : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Assign Facilitator dialog ──────────────────────────────────────── */}
+      <Dialog open={assignDialog} onClose={() => setAssignDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Assign Training Facilitator</DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2} sx={{ pt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small" required>
+                <InputLabel>Senior BGE</InputLabel>
+                <Select value={assignForm.bge} onChange={e => setAssignForm({ ...assignForm, bge: e.target.value })} label="Senior BGE">
+                  <MenuItem value="">— Select BGE —</MenuItem>
+                  {experts.filter(e => e.is_senior).map(e => (
+                    <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` (${e.bge_code})` : ''}</MenuItem>
+                  ))}
+                  {experts.filter(e => !e.is_senior).length > 0 && [
+                    <ListSubheader key="other-hdr" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>Other BGEs</ListSubheader>,
+                    ...experts.filter(e => !e.is_senior).map(e => (
+                      <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` (${e.bge_code})` : ''}</MenuItem>
+                    )),
+                  ]}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small" required>
+                <InputLabel>Training Module / Topic</InputLabel>
+                <Select value={assignForm.topic} onChange={e => setAssignForm({ ...assignForm, topic: e.target.value })} label="Training Module / Topic">
+                  <MenuItem value="">— Select topic —</MenuItem>
+                  {(() => {
+                    const grouped = trainingTopics.reduce((acc, t) => {
+                      const key = t.module_number || 0;
+                      if (!acc[key]) acc[key] = { label: t.module_name || 'Other', items: [] };
+                      acc[key].items.push(t);
+                      return acc;
+                    }, {});
+                    return Object.entries(grouped).map(([modNum, { label, items }]) => [
+                      <ListSubheader key={`mod-${modNum}`} sx={{ fontWeight: 700, lineHeight: '2em', bgcolor: 'grey.100' }}>
+                        {modNum > 0 ? `Module ${modNum}: ${label}` : label}
+                      </ListSubheader>,
+                      ...items.map(t => (
+                        <MenuItem key={t.id} value={t.id} sx={{ pl: 3 }}>
+                          {t.section_number ? `${t.section_number} – ` : ''}{t.name}
+                        </MenuItem>
+                      )),
+                    ]);
+                  })()}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth size="small" required label="Assignment Date" type="date"
+                InputLabelProps={{ shrink: true }}
+                value={assignForm.assigned_date}
+                onChange={e => setAssignForm({ ...assignForm, assigned_date: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth size="small" multiline rows={2} label="Notes (optional)"
+                value={assignForm.notes}
+                onChange={e => setAssignForm({ ...assignForm, notes: e.target.value })}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveAssignment}
+            disabled={assignSaving || !assignForm.bge || !assignForm.topic || !assignForm.assigned_date}>
+            {assignSaving ? <CircularProgress size={18} /> : 'Assign'}
           </Button>
         </DialogActions>
       </Dialog>
