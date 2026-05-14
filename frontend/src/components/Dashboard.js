@@ -58,19 +58,27 @@ const NAV_ITEMS = [
 //     Set (O(1) per row) — turns the row-render from O(N²) into O(N).
 //  4. Stable onClick handlers via useCallback so React skips re-rendering
 //     unchanged rows.
-function AssignMsmesDialog({
+const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
   assignMsmeGroup, setAssignMsmeGroup, msmes,
-  groupMsmeSearch, setGroupMsmeSearch,
   groupMsmeSession, setGroupMsmeSession,
   assignedGroupMsmeIds, setAssignedGroupMsmeIds,
   toggleGroupMsme, saveGroupMsmeAssignments, groupMsmeSaving,
 }) {
-  // Debounced copy of the search text — what the filter actually reads.
+  // Search state lives INSIDE the dialog. This is critical — when it lived on
+  // the parent Dashboard component (a ~4500-line tree), every keystroke
+  // re-rendered the whole tree which blocked the main thread for ~230ms. Now
+  // keystrokes only re-render this dialog.
+  const [searchText, setSearchText] = React.useState('');
+
+  // Reset search when a different group's dialog opens.
+  React.useEffect(() => { setSearchText(''); }, [assignMsmeGroup?.id]);
+
+  // Debounced copy — the filter reads this.
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   React.useEffect(() => {
-    const h = setTimeout(() => setDebouncedSearch(groupMsmeSearch), 200);
+    const h = setTimeout(() => setDebouncedSearch(searchText), 200);
     return () => clearTimeout(h);
-  }, [groupMsmeSearch]);
+  }, [searchText]);
 
   // Defer mounting the (potentially huge) MSME list until *after* the dialog's
   // open animation finishes. Mounting 285 list items during the transition was
@@ -124,8 +132,8 @@ function AssignMsmesDialog({
         )}
         <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
-            size="small" placeholder="Search MSMEs..." value={groupMsmeSearch}
-            onChange={e => setGroupMsmeSearch(e.target.value)}
+            size="small" placeholder="Search MSMEs..." value={searchText}
+            onChange={e => setSearchText(e.target.value)}
             InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} /> }}
             sx={{ flex: 1, minWidth: 200 }}
           />
@@ -189,7 +197,7 @@ function AssignMsmesDialog({
       </DialogActions>
     </Dialog>
   );
-}
+});
 
 export default function Dashboard({ token, currentUser, onLogout }) {
   const isViewer  = currentUser?.role === 'viewer';
@@ -286,7 +294,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [assignMsmeGroup, setAssignMsmeGroup] = useState(null);  // group object or null
   const [assignedGroupMsmeIds, setAssignedGroupMsmeIds] = useState([]); // currently-assigned ids for the open group
   const [groupMsmeSession, setGroupMsmeSession] = useState('');
-  const [groupMsmeSearch, setGroupMsmeSearch] = useState('');
+  // groupMsmeSearch moved into AssignMsmesDialog itself (parent re-renders
+  // are too expensive to incur per keystroke — INP was 230ms+).
   const [groupMsmeSaving, setGroupMsmeSaving] = useState(false);
 
   // ── training dialogs ───────────────────────────────────────────────────────
@@ -799,7 +808,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const openAssignMsmeDialog = async (group) => {
     setAssignMsmeGroup(group);
     setGroupMsmeSession('');
-    setGroupMsmeSearch('');
+    // Search resets itself via useEffect inside AssignMsmesDialog
     try {
       const r = await axios.get(`${API_ENDPOINTS.BGE_GROUPS}${group.id}/msmes/`, { headers });
       const ids = (Array.isArray(r.data) ? r.data : (r.data.results || [])).map(m => m.id);
@@ -3939,8 +3948,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         assignMsmeGroup={assignMsmeGroup}
         setAssignMsmeGroup={setAssignMsmeGroup}
         msmes={msmes}
-        groupMsmeSearch={groupMsmeSearch}
-        setGroupMsmeSearch={setGroupMsmeSearch}
         groupMsmeSession={groupMsmeSession}
         setGroupMsmeSession={setGroupMsmeSession}
         assignedGroupMsmeIds={assignedGroupMsmeIds}
