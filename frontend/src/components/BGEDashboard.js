@@ -518,12 +518,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       setTrainingReportData(existing);
       setTrainingReportForm({ ...EMPTY_TRAINING_REPORT, ...rest });
     } else {
+      // Find the matching facilitation assignment to pre-fill context
+      const assignment = facilitationAssignments.find(a => a.topic === session.topic);
       setTrainingReportData(null);
       setTrainingReportForm({
         ...EMPTY_TRAINING_REPORT,
         training_title: session.title || '',
         venue: session.location || '',
         training_dates: session.date || '',
+        facilitation_team: currentUser?.bge_profile?.name || '',
+        session_objectives: assignment?.notes || '',
       });
     }
     setSessionDetailOpen(true);
@@ -1472,120 +1476,152 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       {/* ── Training facilitation section ────────────────────────────────── */}
       {section === 'training' && (
         <Box>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" fontWeight={700}>My Training Assignments</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Click any session to view registered MSMEs, record attendance, or submit a report.
-            </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>My Training Assignments</Typography>
+              <Typography variant="body2" color="text.secondary">
+                <Box component="span" sx={{ color: '#1565C0', fontWeight: 600 }}>
+                  {facilitationAssignments.length}
+                </Box>
+                {' '}module{facilitationAssignments.length !== 1 ? 's' : ''} assigned · click a session to record attendance or submit a report
+              </Typography>
+            </Box>
           </Box>
 
           {facilitationAssignments.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
-              No facilitation assignments yet.
+            <Paper sx={{ p: 6, textAlign: 'center' }}>
+              <School sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+              <Typography color="text.secondary">No facilitation assignments yet. Contact your programme administrator.</Typography>
             </Paper>
-          ) : facilitationAssignments.map(a => {
-            const topicSessions = sessions.filter(s => s.topic === a.topic);
-            const totalPresent  = topicSessions.reduce((n, s) => n + (s.attendance_count ?? 0), 0);
-            const reportsFiled  = topicSessions.filter(s => s.has_training_report).length;
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+              {facilitationAssignments.map((a) => {
+                const topicSessions = sessions.filter(s => s.topic === a.topic);
+                const totalPresent   = topicSessions.reduce((n, s) => n + (s.attendance_count ?? 0), 0);
+                const reportsFiled   = topicSessions.filter(s => s.has_training_report).length;
+                const totalRegistered = topicSessions.reduce((n, s) => n + (s.businesses_detail?.length ?? 0), 0);
+                return (
+                  <Card key={a.id} sx={{ '&:hover': { boxShadow: 3 }, borderLeft: '4px solid #1565C0', transition: 'box-shadow 0.2s' }}>
+                    <CardContent>
+                      {/* Row 1: module chip + topic name + summary chips */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, flex: 1, minWidth: 0 }}>
+                          <School sx={{ color: '#1565C0', fontSize: 20, flexShrink: 0, mt: 0.25 }} />
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                              <Chip label={`Module ${a.topic_module_number}`} size="small"
+                                sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                              <Typography fontWeight={700} fontSize={15}>
+                                {a.topic_section_number ? `${a.topic_section_number} – ` : ''}{a.topic_name}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">{a.topic_module_name}</Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <Chip icon={<HowToReg sx={{ fontSize: '13px !important' }} />}
+                            label={`${totalPresent} attended`} size="small" variant="outlined"
+                            color={totalPresent > 0 ? 'success' : 'default'} />
+                          <Chip icon={<Description sx={{ fontSize: '13px !important' }} />}
+                            label={`${reportsFiled}/${topicSessions.length} reports`} size="small" variant="outlined"
+                            color={reportsFiled === topicSessions.length && topicSessions.length > 0 ? 'success' : 'warning'} />
+                        </Box>
+                      </Box>
 
-            return (
-              <Paper key={a.id} variant="outlined" sx={{ mb: 2, overflow: 'hidden' }}>
+                      {/* Row 2: key info grid */}
+                      <Grid container spacing={1} sx={{ mb: topicSessions.length ? 1.5 : 0.5 }}>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary" display="block">Assigned</Typography>
+                          <Typography variant="body2" fontWeight={500}>{a.assigned_date || '—'}</Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary" display="block">Sessions</Typography>
+                          <Typography variant="body2" fontWeight={600} color={topicSessions.length > 0 ? 'primary.main' : 'text.secondary'}>
+                            {topicSessions.length}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary" display="block">Registered MSMEs</Typography>
+                          <Typography variant="body2" fontWeight={600} color={totalRegistered > 0 ? 'primary.main' : 'text.secondary'}>
+                            {totalRegistered}
+                          </Typography>
+                        </Grid>
+                        {a.notes && (
+                          <Grid item xs={12}>
+                            <Typography variant="caption" color="text.secondary" display="block">Notes</Typography>
+                            <Typography variant="body2">{a.notes}</Typography>
+                          </Grid>
+                        )}
+                      </Grid>
 
-                {/* ── Module header ── */}
-                <Box sx={{
-                  px: 2.5, py: 1.5, bgcolor: '#EFF6FF',
-                  borderBottom: '1px solid', borderColor: 'divider',
-                  display: 'flex', alignItems: 'center', gap: 1.5,
-                }}>
-                  <School sx={{ color: '#1565C0', flexShrink: 0 }} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      <Chip label={`Module ${a.topic_module_number}`} size="small"
-                        sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, fontSize: 11 }} />
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        {a.topic_section_number ? `${a.topic_section_number} – ` : ''}{a.topic_name}
-                      </Typography>
-                    </Box>
-                    <Typography variant="caption" color="text.secondary">
-                      {a.topic_module_name} · Assigned {a.assigned_date}
-                      {a.notes && ` · ${a.notes}`}
-                    </Typography>
-                  </Box>
-                  {/* summary badges */}
-                  <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
-                    <Chip icon={<People sx={{ fontSize: '14px !important' }} />}
-                      label={`${totalPresent} attended`} size="small" variant="outlined"
-                      color={totalPresent > 0 ? 'success' : 'default'} />
-                    <Chip icon={<Description sx={{ fontSize: '14px !important' }} />}
-                      label={`${reportsFiled}/${topicSessions.length} reports`} size="small" variant="outlined"
-                      color={reportsFiled === topicSessions.length && topicSessions.length > 0 ? 'success' : 'warning'} />
-                  </Box>
-                </Box>
+                      {/* Session list */}
+                      {topicSessions.length === 0 ? (
+                        <Typography variant="caption" color="text.secondary">
+                          No sessions recorded for this topic yet.
+                        </Typography>
+                      ) : (
+                        <>
+                          <Divider sx={{ mb: 1 }} />
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            {topicSessions.map((s) => (
+                              <Box key={s.id}
+                                onClick={() => openSessionDetail(s, 0)}
+                                sx={{
+                                  display: 'flex', alignItems: 'center', gap: 1.5,
+                                  px: 1, py: 0.75, borderRadius: 1, cursor: 'pointer',
+                                  '&:hover': { bgcolor: 'action.hover' },
+                                  transition: 'background 0.15s',
+                                }}
+                              >
+                                {/* date block */}
+                                <Box sx={{
+                                  minWidth: 38, textAlign: 'center', flexShrink: 0,
+                                  bgcolor: '#F1F5F9', borderRadius: 1, py: 0.25, px: 0.75,
+                                }}>
+                                  <Typography sx={{ display: 'block', lineHeight: 1.2, fontSize: 10, color: 'text.secondary' }}>
+                                    {s.date ? new Date(s.date).toLocaleDateString('en-GB', { month: 'short' }) : '—'}
+                                  </Typography>
+                                  <Typography fontWeight={700} sx={{ lineHeight: 1.2, fontSize: 13 }}>
+                                    {s.date ? new Date(s.date).getDate() : '—'}
+                                  </Typography>
+                                </Box>
 
-                {/* ── Session list ── */}
-                {topicSessions.length === 0 ? (
-                  <Box sx={{ px: 2.5, py: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No sessions recorded for this topic yet.
-                    </Typography>
-                  </Box>
-                ) : topicSessions.map((s, idx) => (
-                  <Box key={s.id}
-                    onClick={() => openSessionDetail(s, 0)}
-                    sx={{
-                      px: 2.5, py: 1.5, cursor: 'pointer',
-                      borderTop: idx === 0 ? 'none' : '1px solid',
-                      borderColor: 'divider',
-                      display: 'flex', alignItems: 'center', gap: 2,
-                      '&:hover': { bgcolor: 'action.hover' },
-                      transition: 'background 0.15s',
-                    }}
-                  >
-                    {/* date block */}
-                    <Box sx={{
-                      minWidth: 44, textAlign: 'center', flexShrink: 0,
-                      bgcolor: '#F1F5F9', borderRadius: 1.5, py: 0.5, px: 1,
-                    }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
-                        {s.date ? new Date(s.date).toLocaleDateString('en-GB', { month: 'short' }) : '—'}
-                      </Typography>
-                      <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>
-                        {s.date ? new Date(s.date).getDate() : '—'}
-                      </Typography>
-                    </Box>
+                                {/* session info */}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
+                                  <Typography variant="caption" color="text.secondary" noWrap>
+                                    {s.location || 'Location not set'}
+                                    {s.businesses_detail?.length > 0 && ` · ${s.businesses_detail.length} registered`}
+                                  </Typography>
+                                </Box>
 
-                    {/* main info */}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {s.location || 'Location not set'}
-                        {(s.businesses_detail?.length > 0) && ` · ${s.businesses_detail.length} registered`}
-                      </Typography>
-                    </Box>
-
-                    {/* status chips */}
-                    <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0, alignItems: 'center' }}>
-                      <Chip
-                        icon={<HowToReg sx={{ fontSize: '13px !important' }} />}
-                        label={`${s.attendance_count ?? 0} present`}
-                        size="small"
-                        color={s.attendance_count > 0 ? 'success' : 'default'}
-                        variant={s.attendance_count > 0 ? 'filled' : 'outlined'}
-                      />
-                      <Chip
-                        icon={<Description sx={{ fontSize: '13px !important' }} />}
-                        label={s.has_training_report ? 'Report filed' : 'No report'}
-                        size="small"
-                        color={s.has_training_report ? 'success' : 'warning'}
-                        variant={s.has_training_report ? 'filled' : 'outlined'}
-                      />
-                      <ChevronRight sx={{ color: 'text.disabled', fontSize: 20 }} />
-                    </Box>
-                  </Box>
-                ))}
-              </Paper>
-            );
-          })}
+                                {/* status chips */}
+                                <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
+                                  <Chip
+                                    icon={<HowToReg sx={{ fontSize: '12px !important' }} />}
+                                    label={s.attendance_count ?? 0} size="small"
+                                    color={s.attendance_count > 0 ? 'success' : 'default'}
+                                    variant={s.attendance_count > 0 ? 'filled' : 'outlined'}
+                                    sx={{ height: 22, fontSize: 11 }} />
+                                  <Chip
+                                    icon={<Description sx={{ fontSize: '12px !important' }} />}
+                                    label={s.has_training_report ? 'Filed' : 'Pending'} size="small"
+                                    color={s.has_training_report ? 'success' : 'warning'}
+                                    variant={s.has_training_report ? 'filled' : 'outlined'}
+                                    sx={{ height: 22, fontSize: 11 }} />
+                                  <ChevronRight sx={{ color: 'text.disabled', fontSize: 18 }} />
+                                </Box>
+                              </Box>
+                            ))}
+                          </Box>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Box>
+          )}
         </Box>
       )}
 
