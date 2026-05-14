@@ -7,12 +7,13 @@ import {
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
   ListItemText, AppBar, Toolbar, Tooltip, Checkbox, Badge,
+  Tabs, Tab, LinearProgress,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
-  Delete, HowToReg, School, EventNote,
+  Delete, HowToReg, School, EventNote, ChevronRight, People,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
@@ -130,7 +131,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   // Facilitation assignments (for Training tab)
   const [facilitationAssignments, setFacilitationAssignments] = useState([]);
-  // Training report dialog (detailed report per session)
+  // Unified session detail dialog (replaces separate attendance + report dialogs for Training tab)
+  const [sessionDetailOpen, setSessionDetailOpen] = useState(false);
+  const [sessionDetailSession, setSessionDetailSession] = useState(null);
+  const [sessionDetailTab, setSessionDetailTab] = useState(0);
+
+  // Training report state (used both in Training tab detail dialog and standalone)
   const [trainingReportDialog, setTrainingReportDialog] = useState(false);
   const [trainingReportSession, setTrainingReportSession] = useState(null);
   const [trainingReportData, setTrainingReportData] = useState(null);
@@ -496,6 +502,33 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const isTeamLeadOf = (group) => group?.team_lead === myBgeId;
 
   // ── Training session attendance (BGE side) ───────────────────────────────
+  const openSessionDetail = (session, tab = 0) => {
+    setSessionDetailSession(session);
+    setSessionDetailTab(tab);
+    // Pre-load attendance if opening on that tab
+    if (tab === 1) {
+      openSessionAtt(session);
+    }
+    // Pre-load report form
+    const existing = session._training_report;
+    if (existing) {
+      const { id, session: _s, bge: _b, created_at, updated_at, submitted_at,
+              session_title, session_date, session_location, bge_name, total_participants,
+              ...rest } = existing;
+      setTrainingReportData(existing);
+      setTrainingReportForm({ ...EMPTY_TRAINING_REPORT, ...rest });
+    } else {
+      setTrainingReportData(null);
+      setTrainingReportForm({
+        ...EMPTY_TRAINING_REPORT,
+        training_title: session.title || '',
+        venue: session.location || '',
+        training_dates: session.date || '',
+      });
+    }
+    setSessionDetailOpen(true);
+  };
+
   const openTrainingReport = (session) => {
     setTrainingReportSession(session);
     const existing = session._training_report;
@@ -518,13 +551,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   const saveTrainingReport = async (submitNow = false) => {
-    if (!trainingReportSession) return;
+    // Works from both the detail dialog and the standalone dialog
+    const targetSession = trainingReportSession || sessionDetailSession;
+    if (!targetSession) return;
     setTrainingReportSaving(true);
     const h = { Authorization: `Bearer ${token}` };
     const payload = {
       ...trainingReportForm,
-      session: trainingReportSession.id,
-      status: submitNow ? 'submitted' : trainingReportForm.status,
+      session: targetSession.id,
+      status: submitNow ? 'submitted' : (trainingReportForm.status || 'draft'),
     };
     try {
       if (trainingReportData?.id) {
@@ -533,6 +568,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         await axios.post(API_ENDPOINTS.TRAINING_REPORTS, payload, { headers: h });
       }
       setTrainingReportDialog(false);
+      setSessionDetailOpen(false);
       fetchSessions();
     } catch (err) {
       alert('Could not save report: ' + (err.response?.data ? JSON.stringify(err.response.data) : err.message));
@@ -1455,12 +1491,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
       {/* ── Training facilitation section ────────────────────────────────── */}
       {section === 'training' && (
-        <Box sx={{ p: 3, maxWidth: 900 }}>
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>My Training Assignments</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Modules you are assigned to facilitate. For each session below you can record attendance
-            or write a full training report.
-          </Typography>
+        <Box>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" fontWeight={700}>My Training Assignments</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Click any session to view registered MSMEs, record attendance, or submit a report.
+            </Typography>
+          </Box>
 
           {facilitationAssignments.length === 0 ? (
             <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
@@ -1468,121 +1505,420 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </Paper>
           ) : facilitationAssignments.map(a => {
             const topicSessions = sessions.filter(s => s.topic === a.topic);
+            const totalPresent  = topicSessions.reduce((n, s) => n + (s.attendance_count ?? 0), 0);
+            const reportsFiled  = topicSessions.filter(s => s.has_training_report).length;
+
             return (
-              <Paper key={a.id} variant="outlined" sx={{ mb: 3, overflow: 'hidden' }}>
-                {/* Assignment header band */}
+              <Paper key={a.id} variant="outlined" sx={{ mb: 2, overflow: 'hidden' }}>
+
+                {/* ── Module header ── */}
                 <Box sx={{
-                  px: 2.5, py: 1.5,
-                  borderLeft: '5px solid #1565C0',
-                  bgcolor: '#EFF6FF',
+                  px: 2.5, py: 1.5, bgcolor: '#EFF6FF',
+                  borderBottom: '1px solid', borderColor: 'divider',
                   display: 'flex', alignItems: 'center', gap: 1.5,
                 }}>
-                  <School sx={{ color: '#1565C0', fontSize: 22 }} />
+                  <School sx={{ color: '#1565C0', flexShrink: 0 }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      <Chip
-                        label={`Module ${a.topic_module_number}`}
-                        size="small"
-                        sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, fontSize: 11 }}
-                      />
-                      <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.3 }}>
+                      <Chip label={`Module ${a.topic_module_number}`} size="small"
+                        sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                      <Typography variant="subtitle2" fontWeight={700}>
                         {a.topic_section_number ? `${a.topic_section_number} – ` : ''}{a.topic_name}
                       </Typography>
                     </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.3, display: 'block' }}>
-                      {a.topic_module_name} &nbsp;·&nbsp; Assigned {a.assigned_date}
+                    <Typography variant="caption" color="text.secondary">
+                      {a.topic_module_name} · Assigned {a.assigned_date}
                       {a.notes && ` · ${a.notes}`}
                     </Typography>
                   </Box>
+                  {/* summary badges */}
+                  <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                    <Chip icon={<People sx={{ fontSize: '14px !important' }} />}
+                      label={`${totalPresent} attended`} size="small" variant="outlined"
+                      color={totalPresent > 0 ? 'success' : 'default'} />
+                    <Chip icon={<Description sx={{ fontSize: '14px !important' }} />}
+                      label={`${reportsFiled}/${topicSessions.length} reports`} size="small" variant="outlined"
+                      color={reportsFiled === topicSessions.length && topicSessions.length > 0 ? 'success' : 'warning'} />
+                  </Box>
                 </Box>
 
-                {/* Sessions table */}
-                <Box sx={{ px: 2.5, py: 1.5 }}>
-                  <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                    Training Sessions ({topicSessions.length})
-                  </Typography>
-                  {topicSessions.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {/* ── Session list ── */}
+                {topicSessions.length === 0 ? (
+                  <Box sx={{ px: 2.5, py: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
                       No sessions recorded for this topic yet.
                     </Typography>
-                  ) : (
-                    <TableContainer>
-                      <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
-                        <TableHead>
-                          <TableRow sx={{ bgcolor: '#F8FAFC' }}>
-                            <TableCell sx={{ width: '28%', fontWeight: 600 }}>Session title</TableCell>
-                            <TableCell sx={{ width: '14%', fontWeight: 600 }}>Date</TableCell>
-                            <TableCell sx={{ width: '20%', fontWeight: 600 }}>Location</TableCell>
-                            <TableCell sx={{ width: '15%', fontWeight: 600 }}>Attendance</TableCell>
-                            <TableCell sx={{ width: '11%', fontWeight: 600 }}>Report</TableCell>
-                            <TableCell sx={{ width: '12%', fontWeight: 600 }}>Participants</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {topicSessions.map(s => (
-                            <TableRow key={s.id} hover>
-                              <TableCell sx={{ fontWeight: 500 }}>{s.title}</TableCell>
-                              <TableCell>{s.date}</TableCell>
-                              <TableCell sx={{ color: s.location ? 'inherit' : 'text.secondary' }}>
-                                {s.location || '—'}
-                              </TableCell>
-                              <TableCell>
-                                <Chip
-                                  icon={<EventNote sx={{ fontSize: '14px !important' }} />}
-                                  label={`${s.attendance_count ?? 0} present`}
-                                  size="small"
-                                  color={s.attendance_count > 0 ? 'success' : 'default'}
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Chip
-                                  icon={<Description sx={{ fontSize: '14px !important' }} />}
-                                  label={s.has_training_report ? 'Filed' : 'Pending'}
-                                  size="small"
-                                  color={s.has_training_report ? 'success' : 'warning'}
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                  <Tooltip title="Record / view attendance">
-                                    <Button
-                                      size="small"
-                                      variant="outlined"
-                                      startIcon={<HowToReg sx={{ fontSize: '14px !important' }} />}
-                                      onClick={() => openSessionAtt(s)}
-                                      sx={{ fontSize: 11, px: 1, py: 0.3, minWidth: 0 }}
-                                    >
-                                      Attend
-                                    </Button>
-                                  </Tooltip>
-                                  <Tooltip title="Write training report">
-                                    <Button
-                                      size="small"
-                                      variant={s.has_training_report ? 'outlined' : 'contained'}
-                                      color={s.has_training_report ? 'success' : 'primary'}
-                                      startIcon={<Description sx={{ fontSize: '14px !important' }} />}
-                                      onClick={() => openTrainingReport(s)}
-                                      sx={{ fontSize: 11, px: 1, py: 0.3, minWidth: 0 }}
-                                    >
-                                      Report
-                                    </Button>
-                                  </Tooltip>
-                                </Box>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  )}
-                </Box>
+                  </Box>
+                ) : topicSessions.map((s, idx) => (
+                  <Box key={s.id}
+                    onClick={() => openSessionDetail(s, 0)}
+                    sx={{
+                      px: 2.5, py: 1.5, cursor: 'pointer',
+                      borderTop: idx === 0 ? 'none' : '1px solid',
+                      borderColor: 'divider',
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      '&:hover': { bgcolor: 'action.hover' },
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    {/* date block */}
+                    <Box sx={{
+                      minWidth: 44, textAlign: 'center', flexShrink: 0,
+                      bgcolor: '#F1F5F9', borderRadius: 1.5, py: 0.5, px: 1,
+                    }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+                        {s.date ? new Date(s.date).toLocaleDateString('en-GB', { month: 'short' }) : '—'}
+                      </Typography>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+                        {s.date ? new Date(s.date).getDate() : '—'}
+                      </Typography>
+                    </Box>
+
+                    {/* main info */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {s.location || 'Location not set'}
+                        {(s.businesses_detail?.length > 0) && ` · ${s.businesses_detail.length} registered`}
+                      </Typography>
+                    </Box>
+
+                    {/* status chips */}
+                    <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0, alignItems: 'center' }}>
+                      <Chip
+                        icon={<HowToReg sx={{ fontSize: '13px !important' }} />}
+                        label={`${s.attendance_count ?? 0} present`}
+                        size="small"
+                        color={s.attendance_count > 0 ? 'success' : 'default'}
+                        variant={s.attendance_count > 0 ? 'filled' : 'outlined'}
+                      />
+                      <Chip
+                        icon={<Description sx={{ fontSize: '13px !important' }} />}
+                        label={s.has_training_report ? 'Report filed' : 'No report'}
+                        size="small"
+                        color={s.has_training_report ? 'success' : 'warning'}
+                        variant={s.has_training_report ? 'filled' : 'outlined'}
+                      />
+                      <ChevronRight sx={{ color: 'text.disabled', fontSize: 20 }} />
+                    </Box>
+                  </Box>
+                ))}
               </Paper>
             );
           })}
         </Box>
       )}
+
+      {/* ── Unified session detail dialog (MSMEs · Attendance · Report) ───── */}
+      <Dialog open={sessionDetailOpen} onClose={() => setSessionDetailOpen(false)} maxWidth="lg" fullWidth
+        PaperProps={{ sx: { height: '90vh', display: 'flex', flexDirection: 'column' } }}>
+        <DialogTitle sx={{ pb: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Typography fontWeight={700} variant="h6" noWrap>{sessionDetailSession?.title}</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {sessionDetailSession?.date}
+            {sessionDetailSession?.location ? ` · ${sessionDetailSession.location}` : ''}
+          </Typography>
+          <Tabs value={sessionDetailTab} onChange={(_, v) => {
+            setSessionDetailTab(v);
+            if (v === 1 && sessionDetailSession) openSessionAtt(sessionDetailSession);
+          }} sx={{ mt: 1 }}>
+            <Tab label={`Registered MSMEs (${sessionDetailSession?.businesses_detail?.length ?? 0})`}
+              icon={<People fontSize="small" />} iconPosition="start" />
+            <Tab label={`Attendance (${sessionDetailSession?.attendance_count ?? 0} present)`}
+              icon={<HowToReg fontSize="small" />} iconPosition="start" />
+            <Tab label={sessionDetailSession?.has_training_report ? 'Edit Report' : 'Write Report'}
+              icon={<Description fontSize="small" />} iconPosition="start" />
+          </Tabs>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ flex: 1, overflow: 'auto', p: 0 }}>
+
+          {/* ── Tab 0: Registered MSMEs ── */}
+          {sessionDetailTab === 0 && (
+            <Box sx={{ p: 0 }}>
+              {(!sessionDetailSession?.businesses_detail?.length) ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <People sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+                  <Typography color="text.secondary" variant="body2">
+                    No MSMEs are registered for this session yet.
+                  </Typography>
+                  <Typography color="text.secondary" variant="caption">
+                    MSMEs are added to sessions by the programme administrator.
+                  </Typography>
+                </Box>
+              ) : (
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, width: 36 }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Business Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Owner</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Sector</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(sessionDetailSession?.businesses_detail || []).map((m, i) => (
+                      <TableRow key={m.id} hover>
+                        <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{i + 1}</TableCell>
+                        <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
+                        <TableCell>{m.owner_name}</TableCell>
+                        <TableCell>{m.phone || '—'}</TableCell>
+                        <TableCell>{m.sector || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Box>
+          )}
+
+          {/* ── Tab 1: Attendance ── */}
+          {sessionDetailTab === 1 && (
+            <Box>
+              {sessionAttLoading ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+              ) : (
+                <>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ minWidth: 30 }}>#</TableCell>
+                        <TableCell sx={{ minWidth: 150 }}>Name</TableCell>
+                        <TableCell sx={{ minWidth: 110 }}>Phone</TableCell>
+                        <TableCell sx={{ minWidth: 170 }}>MSME / Business</TableCell>
+                        <TableCell sx={{ minWidth: 55 }}>Sex</TableCell>
+                        <TableCell sx={{ minWidth: 85 }}>Age Group</TableCell>
+                        <TableCell sx={{ minWidth: 80 }}>Status</TableCell>
+                        <TableCell sx={{ minWidth: 50 }} align="center">Consent</TableCell>
+                        <TableCell />
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {sessionAttendees.map((att, idx) => (
+                        <TableRow key={att._key} hover>
+                          <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
+                          <TableCell>
+                            <TextField size="small" variant="standard"
+                              value={att.attendee_name}
+                              onChange={e => setSessionAttendees(rows => rows.map(r => r._key === att._key ? { ...r, attendee_name: e.target.value } : r))}
+                              placeholder="Full name" sx={{ minWidth: 130 }} />
+                          </TableCell>
+                          <TableCell>
+                            <TextField size="small" variant="standard"
+                              value={att.attendee_phone}
+                              onChange={e => setSessionAttendees(rows => rows.map(r => r._key === att._key ? { ...r, attendee_phone: e.target.value } : r))}
+                              placeholder="Phone" sx={{ minWidth: 100 }} />
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" value={att.msme || ''}
+                              onChange={e => setSessionAttendees(rows => rows.map(r => r._key === att._key ? { ...r, msme: e.target.value } : r))}
+                              displayEmpty sx={{ minWidth: 150 }}>
+                              <MenuItem value=""><em>— None —</em></MenuItem>
+                              {msmes.map(m => <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>)}
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" value={att.gender || ''}
+                              onChange={e => setSessionAttendees(rows => rows.map(r => r._key === att._key ? { ...r, gender: e.target.value } : r))}
+                              displayEmpty sx={{ minWidth: 50 }}>
+                              <MenuItem value=""><em>—</em></MenuItem>
+                              <MenuItem value="M">M</MenuItem>
+                              <MenuItem value="F">F</MenuItem>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" value={att.age_group || ''}
+                              onChange={e => setSessionAttendees(rows => rows.map(r => r._key === att._key ? { ...r, age_group: e.target.value } : r))}
+                              displayEmpty sx={{ minWidth: 80 }}>
+                              <MenuItem value=""><em>—</em></MenuItem>
+                              <MenuItem value="18-34">18–34</MenuItem>
+                              <MenuItem value="35-45">35–45</MenuItem>
+                              <MenuItem value="46-55">46–55</MenuItem>
+                              <MenuItem value="56+">56+</MenuItem>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select size="small" variant="standard" value={att.refugee_status || 'H'}
+                              onChange={e => setSessionAttendees(rows => rows.map(r => r._key === att._key ? { ...r, refugee_status: e.target.value } : r))}
+                              sx={{ minWidth: 70 }}>
+                              <MenuItem value="H">Host</MenuItem>
+                              <MenuItem value="R">Refugee</MenuItem>
+                              <MenuItem value="I">IDP</MenuItem>
+                            </Select>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Checkbox size="small" checked={!!att.consent_photo}
+                              onChange={e => setSessionAttendees(rows => rows.map(r => r._key === att._key ? { ...r, consent_photo: e.target.checked } : r))} />
+                          </TableCell>
+                          <TableCell>
+                            <IconButton size="small" color="error"
+                              onClick={() => setSessionAttendees(rows => rows.filter(r => r._key !== att._key))}>
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1 }}>
+                    <Button size="small" startIcon={<Add />}
+                      onClick={() => setSessionAttendees(rows => [...rows, newSessRow()])}>
+                      Add row
+                    </Button>
+                    <Button size="small" variant="contained"
+                      disabled={sessionAttLoading}
+                      onClick={async () => {
+                        await saveSessionAtt();
+                        // refresh session data to update attendance_count
+                        fetchSessions();
+                        setSessionDetailSession(prev => prev ? {
+                          ...prev, attendance_count: sessionAttendees.filter(r => r.attendee_name?.trim()).length
+                        } : prev);
+                      }}>
+                      {sessionAttLoading ? 'Saving…' : 'Save attendance'}
+                    </Button>
+                  </Box>
+                </>
+              )}
+            </Box>
+          )}
+
+          {/* ── Tab 2: Training Report ── */}
+          {sessionDetailTab === 2 && (
+            <Box sx={{ p: 2.5 }}>
+              {sessionDetailSession?.has_training_report && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Report already submitted for this session. You can update it below.
+                </Alert>
+              )}
+
+              {/* Section 1 */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>1. Training Details</Typography>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12}>
+                  <TextField fullWidth size="small" label="Training Title"
+                    value={trainingReportForm.training_title || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, training_title: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="Date(s)" placeholder="e.g. 17–19 Feb 2026"
+                    value={trainingReportForm.training_dates || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, training_dates: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={5}>
+                  <TextField fullWidth size="small" label="Venue / Location"
+                    value={trainingReportForm.venue || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, venue: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <TextField fullWidth size="small" label="District"
+                    value={trainingReportForm.district || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, district: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="Time Allocation" placeholder="e.g. 2 hours / 3 days"
+                    value={trainingReportForm.time_allocation || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, time_allocation: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={8}>
+                  <TextField fullWidth size="small" label="Facilitation Team"
+                    placeholder="Names of co-facilitators, guest trainers"
+                    value={trainingReportForm.facilitation_team || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, facilitation_team: e.target.value }))} />
+                </Grid>
+              </Grid>
+
+              {/* Section 2: Demographics */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>2. Participant Demographics</Typography>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                {[
+                  { key: 'participants_male_youth',   label: 'Male Youth (15–35)' },
+                  { key: 'participants_female_youth', label: 'Female Youth (15–35)' },
+                  { key: 'participants_adult_male',   label: 'Adult Male (36+)' },
+                  { key: 'participants_adult_female', label: 'Adult Female (36+)' },
+                ].map(({ key, label }) => (
+                  <Grid item xs={6} sm={3} key={key}>
+                    <TextField fullWidth size="small" label={label} type="number" inputProps={{ min: 0 }}
+                      value={trainingReportForm[key] ?? 0}
+                      onChange={e => setTrainingReportForm(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))} />
+                  </Grid>
+                ))}
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    Total: <strong>
+                      {(trainingReportForm.participants_male_youth || 0) +
+                       (trainingReportForm.participants_female_youth || 0) +
+                       (trainingReportForm.participants_adult_male || 0) +
+                       (trainingReportForm.participants_adult_female || 0)} participants
+                    </strong>
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              {/* Section 3: Content */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>3. Session Content</Typography>
+              {[
+                { key: 'training_purpose',    label: 'Training Purpose / Background' },
+                { key: 'session_objectives',  label: 'Session Objectives' },
+                { key: 'activities_delivered', label: 'Activities / Tasks Delivered' },
+              ].map(({ key, label }) => (
+                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
+                  value={trainingReportForm[key] || ''}
+                  onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+              ))}
+
+              {/* Section 4: Findings */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>4. Findings &amp; Lessons</Typography>
+              {[
+                { key: 'key_lessons',          label: 'Key Lessons Learnt' },
+                { key: 'growth_support_areas', label: 'Growth Support Areas Observed' },
+                { key: 'key_findings',         label: 'Key Findings / Critical Issues' },
+                { key: 'bge_contributions',    label: 'BGE Contributions & Capacity Notes' },
+              ].map(({ key, label }) => (
+                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
+                  value={trainingReportForm[key] || ''}
+                  onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+              ))}
+
+              {/* Section 5: Recommendations */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>5. Recommendations &amp; Next Steps</Typography>
+              {[
+                { key: 'bds_actions',     label: 'Proposed BDS Actions (next 3 months)' },
+                { key: 'recommendations', label: 'General Recommendations' },
+                { key: 'next_steps',      label: 'Agreed Next Steps' },
+                { key: 'conclusion',      label: 'Conclusion' },
+              ].map(({ key, label }) => (
+                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
+                  value={trainingReportForm[key] || ''}
+                  onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button onClick={() => setSessionDetailOpen(false)}>Close</Button>
+          {sessionDetailTab === 2 && (
+            <>
+              <Button variant="outlined" disabled={trainingReportSaving}
+                onClick={() => {
+                  setTrainingReportSession(sessionDetailSession);
+                  saveTrainingReport(false);
+                }}>
+                {trainingReportSaving ? 'Saving…' : 'Save Draft'}
+              </Button>
+              <Button variant="contained" color="success" disabled={trainingReportSaving}
+                onClick={() => {
+                  setTrainingReportSession(sessionDetailSession);
+                  saveTrainingReport(true);
+                }}>
+                {trainingReportSaving ? 'Submitting…' : 'Submit Report'}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* ── Training report dialog (detailed report) ─────────────────────── */}
       <Dialog open={trainingReportDialog} onClose={() => setTrainingReportDialog(false)} maxWidth="md" fullWidth>
