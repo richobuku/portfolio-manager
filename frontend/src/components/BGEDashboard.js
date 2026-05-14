@@ -7,7 +7,7 @@ import {
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
   ListItemText, AppBar, Toolbar, Tooltip, Checkbox, Badge,
-  Tabs, Tab, Fab,
+  Tabs, Tab,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
@@ -1002,6 +1002,20 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </Box>
         </Box>
         <Button
+          variant="outlined" size="small" startIcon={<HelpOutline />}
+          onClick={() => { setHelpSection(0); setHelpDialog(true); setMobileOpen(false); }}
+          fullWidth
+          sx={{
+            color: 'rgba(255,255,255,0.82)',
+            borderColor: 'rgba(255,255,255,0.22)',
+            mb: 1,
+            '&:hover': { borderColor: '#fff', color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
+            fontSize: 12,
+          }}
+        >
+          Help
+        </Button>
+        <Button
           variant="outlined" size="small" startIcon={<Logout />} onClick={onLogout} fullWidth
           sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)',
             '&:hover': { borderColor: '#fff', color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' }, fontSize: 12 }}
@@ -1021,7 +1035,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       <AppBar position="fixed" sx={{ display: { md: 'none' }, bgcolor: BRAND.sidebarBg, zIndex: (t) => t.zIndex.drawer + 1, boxShadow: 'none' }}>
         <Toolbar>
           <IconButton color="inherit" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 1 }}><MenuIcon /></IconButton>
-          <Typography fontWeight={700} fontSize={15} noWrap>PRUDEV II · BGE Portal</Typography>
+          <Typography fontWeight={700} fontSize={15} noWrap sx={{ flex: 1 }}>PRUDEV II · BGE Portal</Typography>
+          <Tooltip title="Help">
+            <IconButton color="inherit" onClick={() => { setHelpSection(0); setHelpDialog(true); }} edge="end">
+              <HelpOutline />
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
 
@@ -3774,15 +3793,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         </Dialog>
       )}
 
-      {/* ── Help Fab ────────────────────────────────────────────────────────── */}
-      <Fab size="medium" onClick={() => { setHelpSection(0); setHelpDialog(true); }}
-        sx={{
-          position: 'fixed', bottom: 24, left: 24, zIndex: 1200,
-          bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0d47a1' },
-          boxShadow: 3,
-        }}>
-        <HelpOutline />
-      </Fab>
     </Box>
   );
 }
