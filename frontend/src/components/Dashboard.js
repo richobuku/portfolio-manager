@@ -2640,6 +2640,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         { task_num: 9, description: 'Approved invoice and signed timesheet', due_date: 'With monthly report submission' },
       ],
     },
+    msme_data_update: {
+      objective: `To support the updating and validation of MSME records within the BDS system through field visits, ensuring that business profiles, operational data, and compliance information are accurate, complete, and up to date.`,
+      key_tasks: `1. Participate in orientation and training to fully understand the BDS system, data collection process, and reporting expectations.
+2. Receive field materials including branded T-shirts and assignment guidelines.
+3. Visit assigned MSMEs (approximately 10 per BGE) to conduct detailed data verification and updates.
+4. Review and update MSME business profiles including ownership, location, products/services, staffing, and operational status.
+5. Verify and update business registration and compliance information where applicable.
+6. Capture updated contact details, customer channels, and digital presence information.
+7. Update financial, production, and market-related information in the BDS system.
+8. Identify missing or inconsistent records and validate information directly with MSME owners/managers.
+9. Upload and synchronize all verified updates into the BDS system accurately and in a timely manner.
+10. Submit feedback on challenges, observations, and recommendations arising from the field verification process.`,
+      deliverables_json: [
+        { task_num: 1, description: 'Orientation on the BDS System and Assignment Expectations Completed',                 due_date: 'Day 1' },
+        { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                               due_date: 'Day 1' },
+        { task_num: 3, description: 'Assigned MSME Visit Plan',                                                            due_date: 'Day 1' },
+        { task_num: 4, description: 'MSME Field Visits and Data Collection Conducted',                                    due_date: 'Day 2 – Day 5' },
+        { task_num: 5, description: 'Verified and Updated MSME Records in the BDS System',                                due_date: 'Day 2 – Day 5' },
+        { task_num: 6, description: 'Summary Report on Key Findings, Gaps, and Recommendations',                          due_date: 'Final Day' },
+        { task_num: 7, description: 'Submission of Supporting Documentation and Completed Updates',                       due_date: 'Final Day' },
+      ],
+    },
     mobilisation: {
       objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
       key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
@@ -2850,6 +2872,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <Select value={woFilterType || ''} label="Type" onChange={e => setWoFilterType(e.target.value)}>
             <MenuItem value="">All Types</MenuItem>
             <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
+            <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
@@ -3003,6 +3026,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <Select value={woForm.work_order_type} label="Work Order Type"
                   onChange={e => applyWoDefaults(e.target.value)}>
                   <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
+                  <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
                   <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                   <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                   <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>

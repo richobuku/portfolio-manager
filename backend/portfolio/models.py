@@ -848,6 +848,7 @@ class GroupReportAttendance(models.Model):
 class WorkOrder(models.Model):
     TYPE_CHOICES = [
         ('msme_support',          'MSME CRM & Business Support'),
+        ('msme_data_update',      'MSME Data Update & Verification'),
         ('mobilisation',          'Mobilisation / Outreach'),
         ('group_session',         'Peer-to-Peer Group Session'),
         ('training_facilitation', 'Training Facilitation — Senior BGE'),
