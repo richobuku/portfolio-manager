@@ -184,6 +184,7 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
     work_order_number    = serializers.CharField(source='work_order.work_order_number', read_only=True, allow_null=True)
     work_order_bge       = serializers.CharField(source='work_order.bge.name', read_only=True, allow_null=True)
     attendance_count     = serializers.SerializerMethodField()
+    businesses_detail    = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession
@@ -191,6 +192,18 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
 
     def get_attendance_count(self, obj):
         return obj.attendances.filter(present=True).count()
+
+    def get_businesses_detail(self, obj):
+        return [
+            {
+                'id': m.id,
+                'business_name': m.business_name,
+                'owner_name': m.owner_name,
+                'phone': m.phone or '',
+                'sector': m.sector or '',
+            }
+            for m in obj.businesses.all()
+        ]
 
 
 class AttendanceSerializer(serializers.ModelSerializer):
