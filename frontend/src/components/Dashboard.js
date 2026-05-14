@@ -1034,37 +1034,39 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </SectionHeader>
 
       {/* filters */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
         <TextField
           size="small" placeholder="Search name, owner, sector…" value={msmeSearch}
           onChange={e => setMsmeSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchAll()}
           InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
-          sx={{ minWidth: 220 }}
+          sx={{ flex: '1 1 160px', minWidth: 0 }}
         />
-        <FormControl size="small" sx={{ minWidth: 120 }}>
+        <FormControl size="small" sx={{ flex: '1 1 100px', minWidth: 0 }}>
           <InputLabel>Type</InputLabel>
           <Select value={filterType} onChange={e => { setFilterType(e.target.value); setMsmePage(0); }} label="Type">
             <MenuItem value="">All</MenuItem>
             {['MICRO','SMALL','MEDIUM'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
           <InputLabel>Sector</InputLabel>
           <Select value={filterSector} onChange={e => { setFilterSector(e.target.value); setMsmePage(0); }} label="Sector">
             <MenuItem value="">All</MenuItem>
             {['MANUFACTURING','SERVICES','TRADE','AGRICULTURE','TECHNOLOGY','CONSTRUCTION','HEALTHCARE','EDUCATION','OTHER'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 130 }}>
+        <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
           <InputLabel>Cohort</InputLabel>
           <Select value={filterCohort} onChange={e => { setFilterCohort(e.target.value); setMsmePage(0); }} label="Cohort">
             <MenuItem value="">All</MenuItem>
             {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
           </Select>
         </FormControl>
-        <Button variant="contained" size="small" onClick={fetchAll}>Search</Button>
-        {(msmeSearch || filterType || filterSector || filterCohort) &&
-          <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); }}>Clear</Button>}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="contained" size="small" onClick={fetchAll}>Search</Button>
+          {(msmeSearch || filterType || filterSector || filterCohort) &&
+            <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); }}>Clear</Button>}
+        </Box>
       </Paper>
 
       <TableContainer component={Paper} variant="outlined">
@@ -1665,8 +1667,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         <Card variant="outlined" sx={{ mb: 2 }}>
           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Typography variant="caption" fontWeight={700} sx={{ color: 'text.secondary' }}>FILTER</Typography>
-              <FormControl size="small" sx={{ minWidth: 140 }}>
+              <Typography variant="caption" fontWeight={700} sx={{ color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>FILTER</Typography>
+              <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
                 <InputLabel>Cohort</InputLabel>
                 <Select label="Cohort" value={analyticsFilter.cohort}
                   onChange={e => setAnalyticsFilter(f => ({ ...f, cohort: e.target.value }))}>
@@ -1674,7 +1676,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                 </Select>
               </FormControl>
-              <FormControl size="small" sx={{ minWidth: 140 }}>
+              <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
                 <InputLabel>District</InputLabel>
                 <Select label="District" value={analyticsFilter.district}
                   onChange={e => setAnalyticsFilter(f => ({ ...f, district: e.target.value }))}>
@@ -1682,7 +1684,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   {(A.top_districts || []).map(d => <MenuItem key={d.state} value={d.state}>{d.state}</MenuItem>)}
                 </Select>
               </FormControl>
-              <FormControl size="small" sx={{ minWidth: 140 }}>
+              <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
                 <InputLabel>Sector</InputLabel>
                 <Select label="Sector" value={analyticsFilter.sector}
                   onChange={e => setAnalyticsFilter(f => ({ ...f, sector: e.target.value }))}>
@@ -1690,7 +1692,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   {(A.sector_stats || []).map(s => <MenuItem key={s.sector} value={s.sector}>{s.sector}</MenuItem>)}
                 </Select>
               </FormControl>
-              <FormControl size="small" sx={{ minWidth: 160 }}>
+              <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>
                 <InputLabel>BGE</InputLabel>
                 <Select label="BGE" value={analyticsFilter.bge}
                   onChange={e => setAnalyticsFilter(f => ({ ...f, bge: e.target.value }))}>
@@ -1729,7 +1731,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 { val: (A.total_reports||0)+(A.total_group_reports||0),                         label: 'Reports Filed',   sub: 'all time',           color: '#2E7D32' },
                 { val: A.total_employees || 0,                                                  label: 'Employees',       sub: 'manual entries',     color: '#5D4037' },
                 { val: fmt(A.total_annual_revenue),                                             label: 'Annual Revenue',  sub: 'manual entries',     color: '#7B1FA2' },
-              ].map((k, i) => <Grid item xs={6} md={4} lg={2} key={i}><KPI {...k} /></Grid>)}
+              ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
             </Grid>
 
             <SectionLabel>Business Profile</SectionLabel>
@@ -2202,8 +2204,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderReports = () => (
     <Box>
       <SectionHeader title="Visit Reports" subtitle={`${reports.length} reports`}>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>
             <InputLabel>Filter by BGE</InputLabel>
             <Select value={reportFilterBge} label="Filter by BGE"
               onChange={e => { setReportFilterBge(e.target.value); setReportPage(0); }}>
@@ -2211,7 +2213,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 130 }}>
+          <FormControl size="small" sx={{ flex: '1 1 110px', minWidth: 0 }}>
             <InputLabel>Status</InputLabel>
             <Select value={reportFilterStatus} label="Status"
               onChange={e => { setReportFilterStatus(e.target.value); setReportPage(0); }}>
@@ -2799,15 +2801,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </SectionHeader>
 
       {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+        <FormControl size="small" sx={{ flex: '1 1 160px', minWidth: 0 }}>
           <InputLabel>Filter by BGE</InputLabel>
           <Select value={woFilterBge} label="Filter by BGE" onChange={e => setWoFilterBge(e.target.value)}>
             <MenuItem value="">All BGEs</MenuItem>
             {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl size="small" sx={{ flex: '1 1 110px', minWidth: 0 }}>
           <InputLabel>Status</InputLabel>
           <Select value={woFilterStatus} label="Status" onChange={e => setWoFilterStatus(e.target.value)}>
             <MenuItem value="">All</MenuItem>
@@ -2816,7 +2818,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="signed">Signed</MenuItem>
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
+        <FormControl size="small" sx={{ flex: '1 1 160px', minWidth: 0 }}>
           <InputLabel>Type</InputLabel>
           <Select value={woFilterType || ''} label="Type" onChange={e => setWoFilterType(e.target.value)}>
             <MenuItem value="">All Types</MenuItem>
@@ -2827,7 +2829,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
-      </Box>
+      </Paper>
 
       {workOrders.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>

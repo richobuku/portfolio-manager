@@ -7,13 +7,13 @@ import {
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
   ListItemText, AppBar, Toolbar, Tooltip, Checkbox, Badge,
-  Tabs, Tab, LinearProgress,
+  Tabs, Tab,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
-  Delete, HowToReg, School, EventNote, ChevronRight, People,
+  Delete, HowToReg, School, ChevronRight, People,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
@@ -529,26 +529,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setSessionDetailOpen(true);
   };
 
-  const openTrainingReport = (session) => {
-    setTrainingReportSession(session);
-    const existing = session._training_report;
-    if (existing) {
-      const { id, session: _s, bge: _b, created_at, updated_at, submitted_at,
-              session_title, session_date, session_location, bge_name, total_participants,
-              ...rest } = existing;
-      setTrainingReportData(existing);
-      setTrainingReportForm({ ...EMPTY_TRAINING_REPORT, ...rest });
-    } else {
-      setTrainingReportData(null);
-      setTrainingReportForm({
-        ...EMPTY_TRAINING_REPORT,
-        training_title: session.title || '',
-        venue: session.location || '',
-        training_dates: session.date || '',
-      });
-    }
-    setTrainingReportDialog(true);
-  };
 
   const saveTrainingReport = async (submitNow = false) => {
     // Works from both the detail dialog and the standalone dialog
@@ -1611,7 +1591,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
       {/* ── Unified session detail dialog (MSMEs · Attendance · Report) ───── */}
       <Dialog open={sessionDetailOpen} onClose={() => setSessionDetailOpen(false)} maxWidth="lg" fullWidth
-        PaperProps={{ sx: { height: '90vh', display: 'flex', flexDirection: 'column' } }}>
+        PaperProps={{ sx: { height: { xs: '95dvh', md: '90vh' }, maxHeight: '100dvh', display: 'flex', flexDirection: 'column' } }}>
         <DialogTitle sx={{ pb: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Typography fontWeight={700} variant="h6" noWrap>{sessionDetailSession?.title}</Typography>
           <Typography variant="caption" color="text.secondary">
@@ -1621,12 +1601,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <Tabs value={sessionDetailTab} onChange={(_, v) => {
             setSessionDetailTab(v);
             if (v === 1 && sessionDetailSession) openSessionAtt(sessionDetailSession);
-          }} sx={{ mt: 1 }}>
-            <Tab label={`Registered MSMEs (${sessionDetailSession?.businesses_detail?.length ?? 0})`}
+          }} sx={{ mt: 1 }} variant="scrollable" scrollButtons="auto">
+            <Tab label={`MSMEs (${sessionDetailSession?.businesses_detail?.length ?? 0})`}
               icon={<People fontSize="small" />} iconPosition="start" />
-            <Tab label={`Attendance (${sessionDetailSession?.attendance_count ?? 0} present)`}
+            <Tab label={`Attendance (${sessionDetailSession?.attendance_count ?? 0})`}
               icon={<HowToReg fontSize="small" />} iconPosition="start" />
-            <Tab label={sessionDetailSession?.has_training_report ? 'Edit Report' : 'Write Report'}
+            <Tab label={sessionDetailSession?.has_training_report ? 'Edit Report' : 'Report'}
               icon={<Description fontSize="small" />} iconPosition="start" />
           </Tabs>
         </DialogTitle>
@@ -1647,28 +1627,30 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   </Typography>
                 </Box>
               ) : (
-                <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600, width: 36 }}>#</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Business Name</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Owner</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Sector</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(sessionDetailSession?.businesses_detail || []).map((m, i) => (
-                      <TableRow key={m.id} hover>
-                        <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{i + 1}</TableCell>
-                        <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
-                        <TableCell>{m.owner_name}</TableCell>
-                        <TableCell>{m.phone || '—'}</TableCell>
-                        <TableCell>{m.sector || '—'}</TableCell>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600, width: 36 }}>#</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Business Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Owner</TableCell>
+                        <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Phone</TableCell>
+                        <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Sector</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {(sessionDetailSession?.businesses_detail || []).map((m, i) => (
+                        <TableRow key={m.id} hover>
+                          <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{i + 1}</TableCell>
+                          <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
+                          <TableCell>{m.owner_name}</TableCell>
+                          <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{m.phone || '—'}</TableCell>
+                          <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{m.sector || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
               )}
             </Box>
           )}
@@ -1680,6 +1662,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
               ) : (
                 <>
+                  <Box sx={{ overflowX: 'auto' }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
@@ -1761,6 +1744,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       ))}
                     </TableBody>
                   </Table>
+                  </Box>{/* /overflowX auto */}
                   <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1 }}>
                     <Button size="small" startIcon={<Add />}
                       onClick={() => setSessionAttendees(rows => [...rows, newSessRow()])}>
@@ -1770,7 +1754,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       disabled={sessionAttLoading}
                       onClick={async () => {
                         await saveSessionAtt();
-                        // refresh session data to update attendance_count
                         fetchSessions();
                         setSessionDetailSession(prev => prev ? {
                           ...prev, attendance_count: sessionAttendees.filter(r => r.attendee_name?.trim()).length
