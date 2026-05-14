@@ -2668,6 +2668,54 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(work_order)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='withdraw')
+    def withdraw(self, request, pk=None):
+        """Admin-only: withdraw a work order (issued or signed) back to draft status.
+        Clears the signed PDF and emails the BGE to notify them."""
+        self._require_admin()
+        work_order = self.get_object()
+
+        if work_order.status == 'draft':
+            return Response({'detail': 'Work order is already in draft status.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = request.data.get('reason', '').strip()
+
+        work_order.status = 'draft'
+        work_order.bge_signed_date = None
+        # Clear any stored signed PDF so re-issue generates a fresh one
+        work_order.signed_pdf_data = None
+        if work_order.signed_pdf:
+            work_order.signed_pdf.delete(save=False)
+        work_order.save(update_fields=['status', 'bge_signed_date', 'signed_pdf', 'signed_pdf_data'])
+
+        bge = work_order.bge
+        recipient_email = bge.email or ''
+        admin_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
+        recipients = [r for r in [recipient_email, admin_email] if r]
+
+        if recipients:
+            subject = f'Work Order Withdrawn — {work_order.work_order_number}'
+            reason_line = f'\nReason: {reason}\n' if reason else ''
+            body = (
+                f'Dear {bge.name},\n\n'
+                f'Your work order ({work_order.work_order_number}) has been withdrawn and is under review.\n'
+                f'{reason_line}\n'
+                f'Work Order Type: {work_order.get_work_order_type_display()}\n'
+                f'You will be notified when a revised work order is re-issued to you.\n\n'
+                f'Regards,\nPRUDEV II Programme Team\nGOPA AFC / GIZ'
+            )
+            try:
+                msg = EmailMultiAlternatives(
+                    subject, body,
+                    getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
+                    recipients,
+                )
+                msg.send(fail_silently=True)
+            except Exception:
+                pass  # withdrawal succeeds even if email fails
+
+        return Response(self.get_serializer(work_order).data)
+
 
 @api_view(['POST'])
 @permission_classes([_IsAuth])
