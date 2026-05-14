@@ -3209,9 +3209,36 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       )}
 
       {/* Create / Edit Dialog */}
-      <Dialog open={woDialog} onClose={() => setWoDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle fontWeight={700}>{woEditing ? 'Edit Work Order' : 'New Work Order'}</DialogTitle>
-        <DialogContent dividers>
+      <Dialog
+        open={woDialog}
+        onClose={() => setWoDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            width: { xs: 'calc(100vw - 16px)', md: '100%' },
+            height: { xs: '96dvh', md: '90vh' },
+            maxHeight: '96dvh',
+            m: { xs: 1, md: 4 },
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        <DialogTitle fontWeight={700} sx={{ flexShrink: 0 }}>
+          {woEditing ? 'Edit Work Order' : 'New Work Order'}
+        </DialogTitle>
+        <DialogContent
+          dividers
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            px: { xs: 2, sm: 3 },
+          }}
+        >
           {woErrors && <Alert severity="error" sx={{ mb: 2 }}>{woErrors}</Alert>}
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
@@ -3289,23 +3316,36 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 }))}>Add row</Button>
               </Box>
               {(woForm.deliverables_json || []).map((d, i) => (
-                <Box key={i} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'flex-start' }}>
-                  <Typography variant="caption" sx={{ pt: 1.2, minWidth: 22, fontWeight: 700 }}>{d.task_num}.</Typography>
-                  <TextField size="small" sx={{ flex: 3 }} multiline label="Deliverable description"
+                <Box
+                  key={i}
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(170px, 220px) 40px' },
+                    gap: 1,
+                    mb: 1,
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
+                  <TextField size="small" fullWidth multiline minRows={1} label="Deliverable description"
                     value={d.description}
                     onChange={e => {
                       const upd = [...woForm.deliverables_json];
                       upd[i] = { ...d, description: e.target.value };
                       setWoForm(f => ({ ...f, deliverables_json: upd }));
                     }} />
-                  <TextField size="small" sx={{ flex: 1 }} label="Due date"
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label="Due date"
+                    sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
                     value={d.due_date}
                     onChange={e => {
                       const upd = [...woForm.deliverables_json];
                       upd[i] = { ...d, due_date: e.target.value };
                       setWoForm(f => ({ ...f, deliverables_json: upd }));
                     }} />
-                  <IconButton size="small" color="error" sx={{ mt: 0.5 }} onClick={() => {
+                  <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
                     const upd = woForm.deliverables_json.filter((_, j) => j !== i)
                       .map((x, j) => ({ ...x, task_num: j + 1 }));
                     setWoForm(f => ({ ...f, deliverables_json: upd }));
@@ -3334,8 +3374,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setWoDialog(false)}>Cancel</Button>
+        <DialogActions sx={{
+          flexShrink: 0,
+          px: { xs: 2, sm: 3 },
+          py: 1.5,
+          gap: 1,
+          flexWrap: 'wrap',
+        }}>
+          <Button onClick={() => setWoDialog(false)} sx={{ order: { xs: 2, sm: 0 } }}>Cancel</Button>
           <Button variant="contained" onClick={saveWo} disabled={woSaving}>
             {woSaving ? <CircularProgress size={18} /> : (woEditing ? 'Save Changes' : 'Create')}
           </Button>
