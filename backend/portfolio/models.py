@@ -849,6 +849,7 @@ class WorkOrder(models.Model):
     TYPE_CHOICES = [
         ('msme_support',          'MSME CRM & Business Support'),
         ('msme_data_update',      'MSME Data Update & Verification'),
+        ('msme_finance_survey',   'MSME Finance Survey (Google Forms)'),
         ('mobilisation',          'Mobilisation / Outreach'),
         ('group_session',         'Peer-to-Peer Group Session'),
         ('training_facilitation', 'Training Facilitation — Senior BGE'),

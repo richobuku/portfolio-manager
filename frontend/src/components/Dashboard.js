@@ -2662,6 +2662,29 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         { task_num: 7, description: 'Submission of Supporting Documentation and Completed Updates',                       due_date: 'Final Day' },
       ],
     },
+    msme_finance_survey: {
+      objective: `To support the collection and updating of MSME financial and business data through structured field visits using the Google Forms data collection tool, ensuring accurate and complete records within the BDS system.`,
+      key_tasks: `1. Participate in orientation and training on the finance questionnaire, Google Forms tool, and field data collection procedures.
+2. Receive assignment guidelines, field materials, and branded T-shirts.
+3. Conduct field visits to at least 25 assigned MSMEs over a 15-day period.
+4. Administer the finance questionnaire using the Google Forms platform.
+5. Verify and update key MSME data: business ownership and contact details, sales and revenue, employment and staffing, production and operational capacity, market access and customer information, and business registration / compliance status.
+6. Validate existing BDS records and correct any missing or inaccurate information.
+7. Upload and synchronize collected data accurately and on time.
+8. Provide daily progress updates and field feedback to the coordination team.
+9. Identify MSMEs requiring additional business development or financial support services.`,
+      deliverables_json: [
+        { task_num: 1, description: 'Orientation on Finance Questionnaire and Google Forms Tool Completed',  due_date: 'Monday, 18 May 2026' },
+        { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                  due_date: 'Monday, 18 May 2026' },
+        { task_num: 3, description: 'MSME Field Visit Schedule and Assignment Plan',                         due_date: 'Monday, 18 May 2026' },
+        { task_num: 4, description: 'Completion of Field Visits to at Least 25 MSMEs',                       due_date: '19 May – 31 May 2026' },
+        { task_num: 5, description: 'Completed Finance Questionnaires Submitted through Google Forms',       due_date: '19 May – 31 May 2026' },
+        { task_num: 6, description: 'Updated MSME Records in the BDS System',                                due_date: 'Throughout Assignment Period' },
+        { task_num: 7, description: 'Daily Progress Updates Submitted',                                      due_date: 'Daily' },
+        { task_num: 8, description: 'Final Summary Report with Key Findings and Recommendations',            due_date: 'Monday, 1 June 2026' },
+        { task_num: 9, description: 'Submission of All Verified and Updated MSME Data',                      due_date: 'Monday, 1 June 2026' },
+      ],
+    },
     mobilisation: {
       objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
       key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
@@ -2873,6 +2896,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="">All Types</MenuItem>
             <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
             <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
+            <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
@@ -3027,6 +3051,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   onChange={e => applyWoDefaults(e.target.value)}>
                   <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
                   <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
+                  <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
                   <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                   <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                   <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
