@@ -154,11 +154,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     next_steps: '', conclusion: '', status: 'draft',
   };
 
-  // New session creation (Training tab)
-  const [newSessionDialog, setNewSessionDialog] = useState(null); // holds assignment object
-  const [newSessionForm, setNewSessionForm] = useState({ title: '', date: '', location: '' });
-  const [newSessionSaving, setNewSessionSaving] = useState(false);
-
   // Training sessions (for Work Orders section attendance recording)
   const [sessions, setSessions] = useState([]);
   const [sessionAttDialog, setSessionAttDialog] = useState(false);
@@ -536,40 +531,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       });
     }
     setSessionDetailOpen(true);
-  };
-
-  const saveNewSession = async () => {
-    if (!newSessionForm.title.trim() || !newSessionForm.date) return;
-    setNewSessionSaving(true);
-    const h = { Authorization: `Bearer ${token}` };
-    // Auto-link to the BGE's active training_facilitation work order if one exists
-    const linkedWo = workOrders.find(wo =>
-      wo.work_order_type === 'training_facilitation' && (wo.status === 'issued' || wo.status === 'signed')
-    );
-    try {
-      await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, {
-        title: newSessionForm.title.trim(),
-        date: newSessionForm.date,
-        location: newSessionForm.location.trim(),
-        topic: newSessionDialog.topic,
-        work_order: linkedWo?.id || null,
-      }, { headers: h });
-      const [sRes, trRes] = await Promise.all([
-        axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
-        axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
-      ]);
-      const sessData = Array.isArray(sRes.data) ? sRes.data : sRes.data.results || [];
-      const reportsData = Array.isArray(trRes.data) ? trRes.data : trRes.data.results || [];
-      const reportBySession = {};
-      reportsData.forEach(r => { reportBySession[r.session] = r; });
-      setSessions(sessData.map(s => ({ ...s, has_training_report: !!reportBySession[s.id], _training_report: reportBySession[s.id] || null })));
-      setNewSessionDialog(null);
-      notify('Session created successfully');
-    } catch (err) {
-      notify(err.response?.data?.detail || 'Failed to create session', 'error');
-    } finally {
-      setNewSessionSaving(false);
-    }
   };
 
   const saveTrainingReport = async (submitNow = false) => {
@@ -1530,22 +1491,21 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             )}
           </Box>
         )}
-      </Box>
 
-      {/* ── Training facilitation section ────────────────────────────────── */}
-      {section === 'training' && (
-        <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Box>
-              <Typography variant="h6" fontWeight={700}>My Training Assignments</Typography>
-              <Typography variant="body2" color="text.secondary">
-                <Box component="span" sx={{ color: '#1565C0', fontWeight: 600 }}>
-                  {facilitationAssignments.length}
-                </Box>
-                {' '}module{facilitationAssignments.length !== 1 ? 's' : ''} assigned · click a session to record attendance or submit a report
-              </Typography>
+        {/* ── Training facilitation section ──────────────────────────────── */}
+        {section === 'training' && (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>My Training Assignments</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  <Box component="span" sx={{ color: '#1565C0', fontWeight: 600 }}>
+                    {facilitationAssignments.length}
+                  </Box>
+                  {' '}module{facilitationAssignments.length !== 1 ? 's' : ''} assigned · click a session to open attendance or submit a report
+                </Typography>
+              </Box>
             </Box>
-          </Box>
 
           {facilitationAssignments.length === 0 ? (
             <Paper sx={{ p: 6, textAlign: 'center' }}>
@@ -1618,74 +1578,62 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       {topicSessions.length === 0 ? (
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Typography variant="caption" color="text.secondary">
-                            No sessions recorded for this topic yet.
+                            No sessions scheduled for this topic yet. Sessions are added by your programme administrator.
                           </Typography>
-                          <Button size="small" startIcon={<Add />} variant="outlined"
-                            onClick={() => { setNewSessionDialog(a); setNewSessionForm({ title: a.topic_name || '', date: new Date().toISOString().slice(0, 10), location: '' }); }}>
-                            Add Session
-                          </Button>
                         </Box>
                       ) : (
-                        <>
-                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                            {topicSessions.map((s) => (
-                              <Box key={s.id}
-                                onClick={() => openSessionDetail(s, 0)}
-                                sx={{
-                                  display: 'flex', alignItems: 'center', gap: 1.5,
-                                  px: 1, py: 0.75, borderRadius: 1, cursor: 'pointer',
-                                  '&:hover': { bgcolor: 'action.hover' },
-                                  transition: 'background 0.15s',
-                                }}
-                              >
-                                {/* date block */}
-                                <Box sx={{
-                                  minWidth: 38, textAlign: 'center', flexShrink: 0,
-                                  bgcolor: '#F1F5F9', borderRadius: 1, py: 0.25, px: 0.75,
-                                }}>
-                                  <Typography sx={{ display: 'block', lineHeight: 1.2, fontSize: 10, color: 'text.secondary' }}>
-                                    {s.date ? new Date(s.date).toLocaleDateString('en-GB', { month: 'short' }) : '—'}
-                                  </Typography>
-                                  <Typography fontWeight={700} sx={{ lineHeight: 1.2, fontSize: 13 }}>
-                                    {s.date ? new Date(s.date).getDate() : '—'}
-                                  </Typography>
-                                </Box>
-
-                                {/* session info */}
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
-                                  <Typography variant="caption" color="text.secondary" noWrap>
-                                    {s.location || 'Location not set'}
-                                    {s.businesses_detail?.length > 0 && ` · ${s.businesses_detail.length} registered`}
-                                  </Typography>
-                                </Box>
-
-                                {/* status chips */}
-                                <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
-                                  <Chip
-                                    icon={<HowToReg sx={{ fontSize: '12px !important' }} />}
-                                    label={s.attendance_count ?? 0} size="small"
-                                    color={s.attendance_count > 0 ? 'success' : 'default'}
-                                    variant={s.attendance_count > 0 ? 'filled' : 'outlined'}
-                                    sx={{ height: 22, fontSize: 11 }} />
-                                  <Chip
-                                    icon={<Description sx={{ fontSize: '12px !important' }} />}
-                                    label={s.has_training_report ? 'Filed' : 'Pending'} size="small"
-                                    color={s.has_training_report ? 'success' : 'warning'}
-                                    variant={s.has_training_report ? 'filled' : 'outlined'}
-                                    sx={{ height: 22, fontSize: 11 }} />
-                                  <ChevronRight sx={{ color: 'text.disabled', fontSize: 18 }} />
-                                </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          {topicSessions.map((s) => (
+                            <Box key={s.id}
+                              onClick={() => openSessionDetail(s, 0)}
+                              sx={{
+                                display: 'flex', alignItems: 'center', gap: 1.5,
+                                px: 1, py: 0.75, borderRadius: 1, cursor: 'pointer',
+                                '&:hover': { bgcolor: 'action.hover' },
+                                transition: 'background 0.15s',
+                              }}
+                            >
+                              {/* date block */}
+                              <Box sx={{
+                                minWidth: 38, textAlign: 'center', flexShrink: 0,
+                                bgcolor: '#F1F5F9', borderRadius: 1, py: 0.25, px: 0.75,
+                              }}>
+                                <Typography sx={{ display: 'block', lineHeight: 1.2, fontSize: 10, color: 'text.secondary' }}>
+                                  {s.date ? new Date(s.date).toLocaleDateString('en-GB', { month: 'short' }) : '—'}
+                                </Typography>
+                                <Typography fontWeight={700} sx={{ lineHeight: 1.2, fontSize: 13 }}>
+                                  {s.date ? new Date(s.date).getDate() : '—'}
+                                </Typography>
                               </Box>
-                            ))}
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                            <Button size="small" startIcon={<Add />} variant="outlined"
-                              onClick={() => { setNewSessionDialog(a); setNewSessionForm({ title: a.topic_name || '', date: new Date().toISOString().slice(0, 10), location: '' }); }}>
-                              Add Session
-                            </Button>
-                          </Box>
-                        </>
+
+                              {/* session info */}
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
+                                <Typography variant="caption" color="text.secondary" noWrap>
+                                  {s.location || 'Location not set'}
+                                  {s.businesses_detail?.length > 0 && ` · ${s.businesses_detail.length} registered`}
+                                </Typography>
+                              </Box>
+
+                              {/* status chips */}
+                              <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
+                                <Chip
+                                  icon={<HowToReg sx={{ fontSize: '12px !important' }} />}
+                                  label={s.attendance_count ?? 0} size="small"
+                                  color={s.attendance_count > 0 ? 'success' : 'default'}
+                                  variant={s.attendance_count > 0 ? 'filled' : 'outlined'}
+                                  sx={{ height: 22, fontSize: 11 }} />
+                                <Chip
+                                  icon={<Description sx={{ fontSize: '12px !important' }} />}
+                                  label={s.has_training_report ? 'Filed' : 'Pending'} size="small"
+                                  color={s.has_training_report ? 'success' : 'warning'}
+                                  variant={s.has_training_report ? 'filled' : 'outlined'}
+                                  sx={{ height: 22, fontSize: 11 }} />
+                                <ChevronRight sx={{ color: 'text.disabled', fontSize: 18 }} />
+                              </Box>
+                            </Box>
+                          ))}
+                        </Box>
                       )}
                     </CardContent>
                   </Card>
@@ -1693,43 +1641,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               })}
             </Box>
           )}
-        </Box>
-      )}
-
-      {/* ── Add Session dialog ───────────────────────────────────────────── */}
-      {newSessionDialog && (
-        <Dialog open onClose={() => setNewSessionDialog(null)} maxWidth="xs" fullWidth>
-          <DialogTitle>
-            Add Training Session
-            <Typography variant="caption" display="block" color="text.secondary">
-              {newSessionDialog.topic_section_number ? `${newSessionDialog.topic_section_number} – ` : ''}{newSessionDialog.topic_name}
-            </Typography>
-          </DialogTitle>
-          <DialogContent sx={{ pt: '12px !important', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField required fullWidth label="Session Title" size="small"
-              value={newSessionForm.title}
-              onChange={e => setNewSessionForm(f => ({ ...f, title: e.target.value }))}
-              placeholder="e.g. Business Registration Training – Gulu" />
-            <TextField required fullWidth label="Date" type="date" size="small"
-              InputLabelProps={{ shrink: true }}
-              value={newSessionForm.date}
-              onChange={e => setNewSessionForm(f => ({ ...f, date: e.target.value }))} />
-            <TextField fullWidth label="Location / Venue" size="small"
-              value={newSessionForm.location}
-              onChange={e => setNewSessionForm(f => ({ ...f, location: e.target.value }))}
-              placeholder="e.g. Gulu District, Hotel ABC" />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setNewSessionDialog(null)}>Cancel</Button>
-            <Button variant="contained"
-              disabled={!newSessionForm.title.trim() || !newSessionForm.date || newSessionSaving}
-              startIcon={newSessionSaving ? <CircularProgress size={14} color="inherit" /> : <Add />}
-              onClick={saveNewSession}>
-              Create Session
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
+          </Box>
+        )}
+      </Box>
 
       {/* ── Unified session detail dialog (MSMEs · Attendance · Report) ───── */}
       <Dialog open={sessionDetailOpen} onClose={() => setSessionDetailOpen(false)} maxWidth="lg" fullWidth
