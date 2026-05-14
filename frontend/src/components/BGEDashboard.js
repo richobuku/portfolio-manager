@@ -1836,11 +1836,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       { label: 'Venue', val: trainingReportData?.venue },
                       { label: 'District', val: trainingReportData?.district },
                       { label: 'Time Allocation', val: trainingReportData?.time_allocation },
-                      { label: 'Total Participants', val: trainingReportData?.total_participants ?? (
+                      { label: 'Total Participants', val: (trainingReportData?.total_participants ?? (
                         (trainingReportData?.participants_male_youth || 0) +
                         (trainingReportData?.participants_female_youth || 0) +
                         (trainingReportData?.participants_adult_male || 0) +
-                        (trainingReportData?.participants_adult_female || 0)) || null },
+                        (trainingReportData?.participants_adult_female || 0))) || null },
                     ].filter(f => f.val).map(({ label, val }) => (
                       <Grid item xs={6} sm={4} key={label}>
                         <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
