@@ -1580,10 +1580,15 @@ class TrainingSessionViewSet(viewsets.ModelViewSet):
         elif _managed_groups(user) is not None or _is_viewer(user):
             pass  # programme managers and viewers see all sessions
         else:
-            # BGEs see only sessions linked to their own work orders (or unlinked ones)
+            # BGEs see sessions linked to their work orders, OR linked to topics
+            # they are assigned to facilitate (TrainingFacilitationAssignment)
             try:
                 bge = user.bge_profile
-                qs = qs.filter(Q(work_order__bge=bge) | Q(work_order__isnull=True))
+                assigned_topics = TrainingFacilitationAssignment.objects.filter(bge=bge).values_list('topic_id', flat=True)
+                qs = qs.filter(
+                    Q(work_order__bge=bge) |
+                    Q(topic_id__in=assigned_topics)
+                )
             except Exception:
                 return qs.none()
         work_order_id = self.request.query_params.get('work_order')

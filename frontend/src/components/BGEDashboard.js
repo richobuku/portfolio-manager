@@ -154,6 +154,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     next_steps: '', conclusion: '', status: 'draft',
   };
 
+  // New session creation (Training tab)
+  const [newSessionDialog, setNewSessionDialog] = useState(null); // holds assignment object
+  const [newSessionForm, setNewSessionForm] = useState({ title: '', date: '', location: '' });
+  const [newSessionSaving, setNewSessionSaving] = useState(false);
+
   // Training sessions (for Work Orders section attendance recording)
   const [sessions, setSessions] = useState([]);
   const [sessionAttDialog, setSessionAttDialog] = useState(false);
@@ -533,6 +538,39 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setSessionDetailOpen(true);
   };
 
+  const saveNewSession = async () => {
+    if (!newSessionForm.title.trim() || !newSessionForm.date) return;
+    setNewSessionSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    // Auto-link to the BGE's active training_facilitation work order if one exists
+    const linkedWo = workOrders.find(wo =>
+      wo.work_order_type === 'training_facilitation' && (wo.status === 'issued' || wo.status === 'signed')
+    );
+    try {
+      await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, {
+        title: newSessionForm.title.trim(),
+        date: newSessionForm.date,
+        location: newSessionForm.location.trim(),
+        topic: newSessionDialog.topic,
+        work_order: linkedWo?.id || null,
+      }, { headers: h });
+      const [sRes, trRes] = await Promise.all([
+        axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
+        axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+      ]);
+      const sessData = Array.isArray(sRes.data) ? sRes.data : sRes.data.results || [];
+      const reportsData = Array.isArray(trRes.data) ? trRes.data : trRes.data.results || [];
+      const reportBySession = {};
+      reportsData.forEach(r => { reportBySession[r.session] = r; });
+      setSessions(sessData.map(s => ({ ...s, has_training_report: !!reportBySession[s.id], _training_report: reportBySession[s.id] || null })));
+      setNewSessionDialog(null);
+      notify('Session created successfully');
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Failed to create session', 'error');
+    } finally {
+      setNewSessionSaving(false);
+    }
+  };
 
   const saveTrainingReport = async (submitNow = false) => {
     // Works from both the detail dialog and the standalone dialog
@@ -1576,13 +1614,19 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       </Grid>
 
                       {/* Session list */}
+                      <Divider sx={{ my: 1 }} />
                       {topicSessions.length === 0 ? (
-                        <Typography variant="caption" color="text.secondary">
-                          No sessions recorded for this topic yet.
-                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            No sessions recorded for this topic yet.
+                          </Typography>
+                          <Button size="small" startIcon={<Add />} variant="outlined"
+                            onClick={() => { setNewSessionDialog(a); setNewSessionForm({ title: a.topic_name || '', date: new Date().toISOString().slice(0, 10), location: '' }); }}>
+                            Add Session
+                          </Button>
+                        </Box>
                       ) : (
                         <>
-                          <Divider sx={{ mb: 1 }} />
                           <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                             {topicSessions.map((s) => (
                               <Box key={s.id}
@@ -1635,6 +1679,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                               </Box>
                             ))}
                           </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                            <Button size="small" startIcon={<Add />} variant="outlined"
+                              onClick={() => { setNewSessionDialog(a); setNewSessionForm({ title: a.topic_name || '', date: new Date().toISOString().slice(0, 10), location: '' }); }}>
+                              Add Session
+                            </Button>
+                          </Box>
                         </>
                       )}
                     </CardContent>
@@ -1644,6 +1694,41 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </Box>
           )}
         </Box>
+      )}
+
+      {/* ── Add Session dialog ───────────────────────────────────────────── */}
+      {newSessionDialog && (
+        <Dialog open onClose={() => setNewSessionDialog(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>
+            Add Training Session
+            <Typography variant="caption" display="block" color="text.secondary">
+              {newSessionDialog.topic_section_number ? `${newSessionDialog.topic_section_number} – ` : ''}{newSessionDialog.topic_name}
+            </Typography>
+          </DialogTitle>
+          <DialogContent sx={{ pt: '12px !important', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField required fullWidth label="Session Title" size="small"
+              value={newSessionForm.title}
+              onChange={e => setNewSessionForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. Business Registration Training – Gulu" />
+            <TextField required fullWidth label="Date" type="date" size="small"
+              InputLabelProps={{ shrink: true }}
+              value={newSessionForm.date}
+              onChange={e => setNewSessionForm(f => ({ ...f, date: e.target.value }))} />
+            <TextField fullWidth label="Location / Venue" size="small"
+              value={newSessionForm.location}
+              onChange={e => setNewSessionForm(f => ({ ...f, location: e.target.value }))}
+              placeholder="e.g. Gulu District, Hotel ABC" />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setNewSessionDialog(null)}>Cancel</Button>
+            <Button variant="contained"
+              disabled={!newSessionForm.title.trim() || !newSessionForm.date || newSessionSaving}
+              startIcon={newSessionSaving ? <CircularProgress size={14} color="inherit" /> : <Add />}
+              onClick={saveNewSession}>
+              Create Session
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {/* ── Unified session detail dialog (MSMEs · Attendance · Report) ───── */}
