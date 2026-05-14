@@ -74,6 +74,34 @@ const theme = createTheme({
         },
       },
     },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          maxWidth: '100%',
+        },
+      },
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 899.95px)': {
+            minWidth: 720,
+          },
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 599.95px)': {
+            paddingLeft: 10,
+            paddingRight: 10,
+          },
+        },
+      },
+    },
     MuiAppBar:    { styleOverrides: { root:     { backgroundColor: BRAND.headerBg,   boxShadow: 'none' } } },
     MuiCard:      { styleOverrides: { root:     { boxShadow: '0 1px 4px rgba(0,0,0,0.08)', border: '1px solid #E8EDF2' } } },
     MuiPaper:     { styleOverrides: { outlined: { border: '1px solid #E8EDF2' } } },

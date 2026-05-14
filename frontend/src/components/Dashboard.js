@@ -1127,8 +1127,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── sidebar ────────────────────────────────────────────────────────────────
   const drawerContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: BRAND.sidebarBg }}>
-      <Box sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh', minHeight: 0, bgcolor: BRAND.sidebarBg }}>
+      <Box sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box>
             <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.2 }}>
@@ -1146,7 +1146,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </Tooltip>
         </Box>
       </Box>
-      <List sx={{ flex: 1, py: 1 }}>
+      <List sx={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
+        py: 1,
+        WebkitOverflowScrolling: 'touch',
+        '&::-webkit-scrollbar': { width: 8 },
+        '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.24)', borderRadius: 8 },
+      }}>
         {orderedNav.map(({ key, label, icon }) => (
           <ListItemButton
             key={key}
@@ -1182,24 +1190,36 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </ListItemButton>
         ))}
       </List>
-      <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-          <Avatar sx={{ width: 30, height: 30, bgcolor: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+      <Box sx={{
+        p: 1.5,
+        borderTop: '1px solid rgba(255,255,255,0.12)',
+        bgcolor: 'rgba(0,0,0,0.12)',
+        flexShrink: 0,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1.25 }}>
+          <Avatar sx={{ width: 36, height: 36, bgcolor: 'rgba(255,255,255,0.18)', fontSize: 14, fontWeight: 700 }}>
             {currentUser?.username?.[0]?.toUpperCase()}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600, lineHeight: 1 }} noWrap>
+            <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.15 }} noWrap>
               {currentUser?.username}
             </Typography>
             {isAdmin && (
-              <Typography variant="caption" sx={{ color: '#ffd54f' }}>Admin</Typography>
+              <Typography variant="caption" sx={{ color: '#ffd54f', fontWeight: 600 }}>Admin</Typography>
             )}
           </Box>
         </Box>
         <Button
-          fullWidth size="small" startIcon={<Logout />}
+          fullWidth size="small" variant="outlined" startIcon={<Logout />}
           onClick={onLogout}
-          sx={{ color: 'rgba(255,255,255,0.7)', justifyContent: 'flex-start', textTransform: 'none' }}
+          sx={{
+            color: '#fff',
+            borderColor: 'rgba(255,255,255,0.28)',
+            justifyContent: 'center',
+            textTransform: 'none',
+            bgcolor: 'rgba(255,255,255,0.04)',
+            '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
+          }}
         >
           Sign out
         </Button>
@@ -3611,24 +3631,37 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 1 }}>
             <MenuIcon />
           </IconButton>
-          <Typography variant="subtitle1" fontWeight={700}>PRUDEV II</Typography>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle1" fontWeight={700} noWrap>PRUDEV II</Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.7)', lineHeight: 1 }} noWrap>
+              {orderedNav.find(item => item.key === section)?.label || 'Dashboard'}
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
 
       {/* sidebar — permanent on desktop, drawer on mobile */}
       <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
         <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)}
-          sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box', border: 'none' } }}>
+          sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: DRAWER_WIDTH, maxWidth: '86vw', height: '100dvh', boxSizing: 'border-box', border: 'none' } }}>
           {drawerContent}
         </Drawer>
         <Drawer variant="permanent"
-          sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box', border: 'none' } }}>
+          sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { width: DRAWER_WIDTH, height: '100dvh', boxSizing: 'border-box', border: 'none' } }}>
           {drawerContent}
         </Drawer>
       </Box>
 
       {/* main content */}
-      <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, mt: { xs: 7, md: 0 }, overflow: 'auto', minWidth: 0, overflowX: 'hidden' }}>
+      <Box component="main" sx={{
+        flex: 1,
+        width: { xs: '100%', md: `calc(100% - ${DRAWER_WIDTH}px)` },
+        p: { xs: 1.5, sm: 2, md: 3 },
+        mt: { xs: 7, md: 0 },
+        overflow: 'auto',
+        minWidth: 0,
+        overflowX: 'hidden',
+      }}>
         {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
         {sectionMap[section]?.()}
       </Box>
@@ -4772,12 +4805,29 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 // ── Shared section header ──────────────────────────────────────────────────
 function SectionHeader({ title, subtitle, children }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2.5 }}>
-      <Box>
+    <Box sx={{
+      display: 'flex',
+      flexDirection: { xs: 'column', sm: 'row' },
+      alignItems: { xs: 'stretch', sm: 'flex-start' },
+      justifyContent: 'space-between',
+      gap: { xs: 1.5, sm: 2 },
+      mb: 2.5,
+    }}>
+      <Box sx={{ minWidth: 0 }}>
         <Typography variant="h6" fontWeight={700}>{title}</Typography>
         {subtitle && <Typography variant="body2" color="text.secondary">{subtitle}</Typography>}
       </Box>
-      {children && <Box sx={{ display: 'flex', gap: 1 }}>{children}</Box>}
+      {children && (
+        <Box sx={{
+          display: 'flex',
+          gap: 1,
+          flexWrap: 'wrap',
+          justifyContent: { xs: 'stretch', sm: 'flex-end' },
+          '& > *': { flex: { xs: '1 1 150px', sm: '0 0 auto' } },
+        }}>
+          {children}
+        </Box>
+      )}
     </Box>
   );
 }
