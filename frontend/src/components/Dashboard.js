@@ -72,6 +72,18 @@ function AssignMsmesDialog({
     return () => clearTimeout(h);
   }, [groupMsmeSearch]);
 
+  // Defer mounting the (potentially huge) MSME list until *after* the dialog's
+  // open animation finishes. Mounting 285 list items during the transition was
+  // making the open feel sluggish on the first click. Wait one paint, then
+  // render the rows.
+  const [listReady, setListReady] = React.useState(false);
+  React.useEffect(() => {
+    if (!assignMsmeGroup) { setListReady(false); return; }
+    // ~one frame after the dialog mounts → animation has started, we won't fight it
+    const h = setTimeout(() => setListReady(true), 32);
+    return () => clearTimeout(h);
+  }, [assignMsmeGroup]);
+
   const groupId = assignMsmeGroup?.id;
 
   const filtered = React.useMemo(() => {
@@ -132,35 +144,41 @@ function AssignMsmesDialog({
           </Button>
         </Box>
         <Box sx={{ maxHeight: 480, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-          <List dense>
-            {filtered.map(m => {
-              const checked = selectedSet.has(m.id);
-              const otherGroup = m.assigned_group && m.assigned_group !== groupId;
-              return (
-                <ListItemButton key={m.id} onClick={() => onToggle(m.id)} dense>
-                  <ListItemIcon>
-                    <Checkbox checked={checked} size="small" disableRipple tabIndex={-1} />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={m.business_name}
-                    secondary={`${m.owner_name || '—'} · ${m.city || m.state || '—'}${otherGroup ? ` · already in ${m.assigned_group_name}` : ''}`}
-                  />
-                  {m.assigned_group_name && (
-                    <Chip label={m.assigned_group_name} size="small"
-                          color={m.assigned_group === groupId ? 'success' : 'default'} />
-                  )}
-                </ListItemButton>
-              );
-            })}
-            {msmes.length === 0 && (
-              <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>No MSMEs available</Box>
-            )}
-            {msmes.length > 0 && filtered.length === 0 && (
-              <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
-                No MSMEs match “{debouncedSearch}”
-              </Box>
-            )}
-          </List>
+          {!listReady ? (
+            <Box sx={{ p: 6, textAlign: 'center', color: 'text.secondary' }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : (
+            <List dense>
+              {filtered.map(m => {
+                const checked = selectedSet.has(m.id);
+                const otherGroup = m.assigned_group && m.assigned_group !== groupId;
+                return (
+                  <ListItemButton key={m.id} onClick={() => onToggle(m.id)} dense>
+                    <ListItemIcon>
+                      <Checkbox checked={checked} size="small" disableRipple tabIndex={-1} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={m.business_name}
+                      secondary={`${m.owner_name || '—'} · ${m.city || m.state || '—'}${otherGroup ? ` · already in ${m.assigned_group_name}` : ''}`}
+                    />
+                    {m.assigned_group_name && (
+                      <Chip label={m.assigned_group_name} size="small"
+                            color={m.assigned_group === groupId ? 'success' : 'default'} />
+                    )}
+                  </ListItemButton>
+                );
+              })}
+              {msmes.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>No MSMEs available</Box>
+              )}
+              {msmes.length > 0 && filtered.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
+                  No MSMEs match “{debouncedSearch}”
+                </Box>
+              )}
+            </List>
+          )}
         </Box>
       </DialogContent>
       <DialogActions>
