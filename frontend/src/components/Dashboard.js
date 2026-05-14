@@ -44,6 +44,53 @@ const NAV_ITEMS = [
   { key: 'analytics',      label: 'Analytics',      icon: <Assessment /> },
 ];
 
+// Each row is its own memoised component. With React.memo, a row only
+// re-renders when its specific props change (its msme, its checked state, or
+// the onToggle callback). So when the user types into the search box and only
+// `searchText` changes (not `filtered`, not `selectedSet`), zero rows re-render.
+const AssignMsmeRow = React.memo(function AssignMsmeRow({
+  msme, checked, otherGroup, otherGroupName, groupId, onToggle,
+}) {
+  return (
+    <ListItemButton onClick={() => onToggle(msme.id)} dense>
+      <ListItemIcon>
+        <Checkbox checked={checked} size="small" disableRipple tabIndex={-1} />
+      </ListItemIcon>
+      <ListItemText
+        primary={msme.business_name}
+        secondary={`${msme.owner_name || '—'} · ${msme.city || msme.state || '—'}${otherGroup ? ` · already in ${otherGroupName || ''}` : ''}`}
+      />
+      {msme.assigned_group_name && (
+        <Chip label={msme.assigned_group_name} size="small"
+              color={msme.assigned_group === groupId ? 'success' : 'default'} />
+      )}
+    </ListItemButton>
+  );
+});
+
+// Wrap the entire row list in its own memo'd component so the parent dialog's
+// keystroke-driven re-renders don't re-create the row array unless its inputs
+// (filtered, selectedSet, groupId, onToggle) actually changed.
+const AssignMsmeRows = React.memo(function AssignMsmeRows({
+  filtered, selectedSet, groupId, onToggle,
+}) {
+  return (
+    <>
+      {filtered.map(m => (
+        <AssignMsmeRow
+          key={m.id}
+          msme={m}
+          checked={selectedSet.has(m.id)}
+          otherGroup={!!(m.assigned_group && m.assigned_group !== groupId)}
+          otherGroupName={m.assigned_group_name}
+          groupId={groupId}
+          onToggle={onToggle}
+        />
+      ))}
+    </>
+  );
+});
+
 // ── AssignMsmesDialog ─────────────────────────────────────────────────────
 // Extracted as a memoised component because rendering 200+ MSMEs inside the
 // Dashboard's main render cycle made the search input lock up (browser fired
@@ -158,25 +205,12 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
             </Box>
           ) : (
             <List dense>
-              {filtered.map(m => {
-                const checked = selectedSet.has(m.id);
-                const otherGroup = m.assigned_group && m.assigned_group !== groupId;
-                return (
-                  <ListItemButton key={m.id} onClick={() => onToggle(m.id)} dense>
-                    <ListItemIcon>
-                      <Checkbox checked={checked} size="small" disableRipple tabIndex={-1} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={m.business_name}
-                      secondary={`${m.owner_name || '—'} · ${m.city || m.state || '—'}${otherGroup ? ` · already in ${m.assigned_group_name}` : ''}`}
-                    />
-                    {m.assigned_group_name && (
-                      <Chip label={m.assigned_group_name} size="small"
-                            color={m.assigned_group === groupId ? 'success' : 'default'} />
-                    )}
-                  </ListItemButton>
-                );
-              })}
+              <AssignMsmeRows
+                filtered={filtered}
+                selectedSet={selectedSet}
+                groupId={groupId}
+                onToggle={onToggle}
+              />
               {msmes.length === 0 && (
                 <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>No MSMEs available</Box>
               )}
