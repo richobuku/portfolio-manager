@@ -154,6 +154,19 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     next_steps: '', conclusion: '', status: 'draft',
   };
 
+  // Report wizard — combined session + attendance + narrative form opened from training card
+  const [reportWizard, setReportWizard] = useState(null);         // assignment object
+  const [reportWizardTab, setReportWizardTab] = useState(0);
+  const [reportWizardSessionForm, setReportWizardSessionForm] = useState({ date: '', location: '' });
+  const [reportWizardAttendees, setReportWizardAttendees] = useState([]);
+  const [reportWizardSaving, setReportWizardSaving] = useState(false);
+  const _rwKey = useRef(0);
+  const newRwRow = () => ({
+    _key: ++_rwKey.current,
+    attendee_name: '', attendee_phone: '', msme: '',
+    gender: '', age_group: '', refugee_status: 'H',
+  });
+
   // Training sessions (for Work Orders section attendance recording)
   const [sessions, setSessions] = useState([]);
   const [sessionAttDialog, setSessionAttDialog] = useState(false);
@@ -531,6 +544,92 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       });
     }
     setSessionDetailOpen(true);
+  };
+
+  const openReportWizard = (assignment) => {
+    // If sessions already exist for this topic, open the session detail dialog instead
+    const existingSessions = sessions.filter(s => s.topic === assignment.topic);
+    if (existingSessions.length === 1) {
+      openSessionDetail(existingSessions[0], 0);
+      return;
+    }
+    // No sessions yet (or multiple) — open combined wizard
+    setReportWizardTab(0);
+    setReportWizardSessionForm({
+      date: new Date().toISOString().slice(0, 10),
+      location: '',
+    });
+    setReportWizardAttendees([newRwRow(), newRwRow(), newRwRow()]);
+    setTrainingReportForm({
+      ...EMPTY_TRAINING_REPORT,
+      training_title: assignment.topic_name || '',
+      facilitation_team: currentUser?.bge_profile?.name || '',
+      session_objectives: assignment.notes || '',
+    });
+    setTrainingReportData(null);
+    setReportWizard(assignment);
+  };
+
+  const saveReportWizard = async (submitNow = false) => {
+    if (!reportWizard || !reportWizardSessionForm.date) return;
+    setReportWizardSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      // 1. Find linked work order if any
+      const linkedWo = workOrders.find(wo =>
+        wo.work_order_type === 'training_facilitation' && (wo.status === 'issued' || wo.status === 'signed')
+      );
+      // 2. Create the session
+      const sessRes = await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, {
+        title: trainingReportForm.training_title || reportWizard.topic_name,
+        date: reportWizardSessionForm.date,
+        location: reportWizardSessionForm.location,
+        topic: reportWizard.topic,
+        work_order: linkedWo?.id || null,
+      }, { headers: h });
+      const sessionId = sessRes.data.id;
+      // 3. Create the training report
+      await axios.post(API_ENDPOINTS.TRAINING_REPORTS, {
+        ...trainingReportForm,
+        session: sessionId,
+        venue: reportWizardSessionForm.location || trainingReportForm.venue,
+        status: submitNow ? 'submitted' : 'draft',
+      }, { headers: h });
+      // 4. Create attendance records (only rows with a name)
+      const filledRows = reportWizardAttendees.filter(r => r.attendee_name.trim());
+      await Promise.all(filledRows.map(r =>
+        axios.post(API_ENDPOINTS.ATTENDANCE, {
+          session: sessionId,
+          msme: r.msme || null,
+          attendee_name: r.attendee_name.trim(),
+          attendee_phone: r.attendee_phone.trim(),
+          gender: r.gender,
+          age_group: r.age_group,
+          refugee_status: r.refugee_status || 'H',
+          present: true,
+        }, { headers: h })
+      ));
+      // 5. Refresh sessions
+      const [sRes, trRes] = await Promise.all([
+        axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
+        axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+      ]);
+      const sessData = Array.isArray(sRes.data) ? sRes.data : sRes.data.results || [];
+      const reportsData = Array.isArray(trRes.data) ? trRes.data : trRes.data.results || [];
+      const reportBySession = {};
+      reportsData.forEach(r => { reportBySession[r.session] = r; });
+      setSessions(sessData.map(s => ({
+        ...s,
+        has_training_report: !!reportBySession[s.id],
+        _training_report: reportBySession[s.id] || null,
+      })));
+      setReportWizard(null);
+      notify(submitNow ? 'Training report submitted!' : 'Training report saved as draft');
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Failed to save report', 'error');
+    } finally {
+      setReportWizardSaving(false);
+    }
   };
 
   const saveTrainingReport = async (submitNow = false) => {
@@ -1537,7 +1636,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             <Typography variant="caption" color="text.secondary">{a.topic_module_name}</Typography>
                           </Box>
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <Button size="small" variant="contained" startIcon={<Edit />}
+                            onClick={() => openReportWizard(a)}
+                            sx={{ bgcolor: '#1565C0', '&:hover': { bgcolor: '#0d47a1' }, fontSize: 12, whiteSpace: 'nowrap' }}>
+                            Write Report
+                          </Button>
                           <Chip icon={<HowToReg sx={{ fontSize: '13px !important' }} />}
                             label={`${totalPresent} attended`} size="small" variant="outlined"
                             color={totalPresent > 0 ? 'success' : 'default'} />
@@ -1644,6 +1748,199 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </Box>
         )}
       </Box>
+
+      {/* ── Training Report Wizard (combined attendance + narrative) ────────── */}
+      {reportWizard && (
+        <Dialog open onClose={() => setReportWizard(null)} maxWidth="lg" fullWidth
+          PaperProps={{ sx: { height: { xs: '95dvh', md: '92vh' }, display: 'flex', flexDirection: 'column' } }}>
+          <DialogTitle sx={{ pb: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Typography fontWeight={700} variant="h6">Training Report</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {reportWizard.topic_section_number ? `${reportWizard.topic_section_number} – ` : ''}{reportWizard.topic_name}
+              {' · '}{reportWizard.topic_module_name}
+            </Typography>
+            {/* Session date + venue row */}
+            <Box sx={{ display: 'flex', gap: 1.5, mt: 1, flexWrap: 'wrap' }}>
+              <TextField required size="small" label="Training Date" type="date" InputLabelProps={{ shrink: true }}
+                value={reportWizardSessionForm.date}
+                onChange={e => setReportWizardSessionForm(f => ({ ...f, date: e.target.value }))}
+                sx={{ flex: '1 1 140px' }} />
+              <TextField size="small" label="Venue / Location"
+                value={reportWizardSessionForm.location}
+                onChange={e => setReportWizardSessionForm(f => ({ ...f, location: e.target.value }))}
+                placeholder="e.g. Gulu District Hall" sx={{ flex: '1 1 220px' }} />
+              <TextField size="small" label="District"
+                value={trainingReportForm.district || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, district: e.target.value }))}
+                sx={{ flex: '1 1 140px' }} />
+              <TextField size="small" label="Facilitation Team"
+                value={trainingReportForm.facilitation_team || ''}
+                onChange={e => setTrainingReportForm(f => ({ ...f, facilitation_team: e.target.value }))}
+                sx={{ flex: '1 1 200px' }} />
+            </Box>
+            <Tabs value={reportWizardTab} onChange={(_, v) => setReportWizardTab(v)} sx={{ mt: 1 }} variant="scrollable" scrollButtons="auto">
+              <Tab label="Attendance Register" icon={<HowToReg fontSize="small" />} iconPosition="start" />
+              <Tab label="Training Report" icon={<Description fontSize="small" />} iconPosition="start" />
+            </Tabs>
+          </DialogTitle>
+
+          <DialogContent dividers sx={{ flex: 1, overflow: 'auto', p: 0 }}>
+
+            {/* ── Tab 0: Attendance Register ─────────────────────────────── */}
+            {reportWizardTab === 0 && (
+              <Box>
+                <Box sx={{ px: 2, py: 1, bgcolor: '#F8FAFC', borderBottom: '1px solid', borderColor: 'divider',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Add each participant. Rows without a name are ignored on save.
+                  </Typography>
+                  <Button size="small" startIcon={<Add />} onClick={() => setReportWizardAttendees(prev => [...prev, newRwRow()])}>
+                    Add Row
+                  </Button>
+                </Box>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#F1F5F9' }}>
+                      <TableCell sx={{ width: 36, color: 'text.secondary', fontSize: 11 }}>#</TableCell>
+                      <TableCell sx={{ minWidth: 160 }}>Name</TableCell>
+                      <TableCell sx={{ minWidth: 120 }}>Phone</TableCell>
+                      <TableCell sx={{ minWidth: 160 }}>MSME / Business</TableCell>
+                      <TableCell sx={{ minWidth: 70 }}>Sex</TableCell>
+                      <TableCell sx={{ minWidth: 100 }}>Age Group</TableCell>
+                      <TableCell sx={{ minWidth: 90 }}>Status</TableCell>
+                      <TableCell sx={{ width: 36 }} />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {reportWizardAttendees.map((row, idx) => (
+                      <TableRow key={row._key} hover>
+                        <TableCell sx={{ color: 'text.secondary', fontSize: 11 }}>{idx + 1}</TableCell>
+                        <TableCell>
+                          <TextField size="small" variant="standard" placeholder="Full name"
+                            value={row.attendee_name}
+                            onChange={e => setReportWizardAttendees(p => p.map(r => r._key === row._key ? { ...r, attendee_name: e.target.value } : r))}
+                            sx={{ minWidth: 140 }} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" variant="standard" placeholder="Phone"
+                            value={row.attendee_phone}
+                            onChange={e => setReportWizardAttendees(p => p.map(r => r._key === row._key ? { ...r, attendee_phone: e.target.value } : r))}
+                            sx={{ minWidth: 100 }} />
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" displayEmpty value={row.msme || ''}
+                            onChange={e => {
+                              const m = msmes.find(x => x.id === e.target.value);
+                              setReportWizardAttendees(p => p.map(r => r._key === row._key
+                                ? { ...r, msme: e.target.value, attendee_name: r.attendee_name || (m?.owner_name || '') }
+                                : r));
+                            }}
+                            sx={{ minWidth: 140 }}>
+                            <MenuItem value=""><em>— walk-in —</em></MenuItem>
+                            {msmes.map(m => <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>)}
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" displayEmpty value={row.gender || ''}
+                            onChange={e => setReportWizardAttendees(p => p.map(r => r._key === row._key ? { ...r, gender: e.target.value } : r))}
+                            sx={{ minWidth: 60 }}>
+                            <MenuItem value=""><em>—</em></MenuItem>
+                            <MenuItem value="M">M</MenuItem>
+                            <MenuItem value="F">F</MenuItem>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" displayEmpty value={row.age_group || ''}
+                            onChange={e => setReportWizardAttendees(p => p.map(r => r._key === row._key ? { ...r, age_group: e.target.value } : r))}
+                            sx={{ minWidth: 90 }}>
+                            <MenuItem value=""><em>—</em></MenuItem>
+                            <MenuItem value="18-34">18–34</MenuItem>
+                            <MenuItem value="35-45">35–45</MenuItem>
+                            <MenuItem value="46-55">46–55</MenuItem>
+                            <MenuItem value="56+">56+</MenuItem>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" displayEmpty value={row.refugee_status || 'H'}
+                            onChange={e => setReportWizardAttendees(p => p.map(r => r._key === row._key ? { ...r, refugee_status: e.target.value } : r))}
+                            sx={{ minWidth: 80 }}>
+                            <MenuItem value="H">Host</MenuItem>
+                            <MenuItem value="R">Refugee</MenuItem>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <IconButton size="small" onClick={() => setReportWizardAttendees(p => p.filter(r => r._key !== row._key))}>
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            )}
+
+            {/* ── Tab 1: Training Report Narrative ───────────────────────── */}
+            {reportWizardTab === 1 && (
+              <Box sx={{ p: 2.5 }}>
+                <TextField fullWidth size="small" label="Training Title" sx={{ mb: 2 }}
+                  value={trainingReportForm.training_title || ''}
+                  onChange={e => setTrainingReportForm(f => ({ ...f, training_title: e.target.value }))} />
+
+                {/* Participant demographics */}
+                <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1 }}>Participant Demographics</Typography>
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                  {[
+                    ['participants_male_youth',   'Male Youth (15–35)'],
+                    ['participants_female_youth', 'Female Youth (15–35)'],
+                    ['participants_adult_male',   'Adult Male (36+)'],
+                    ['participants_adult_female', 'Adult Female (36+)'],
+                  ].map(([key, label]) => (
+                    <Grid item xs={6} sm={3} key={key}>
+                      <TextField fullWidth size="small" label={label} type="number" inputProps={{ min: 0 }}
+                        value={trainingReportForm[key] ?? 0}
+                        onChange={e => setTrainingReportForm(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))} />
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {/* Narrative sections */}
+                {[
+                  ['training_purpose',     'Background & Purpose',          'Why was this training conducted?'],
+                  ['session_objectives',   'Session Objectives',             'What were the learning outcomes?'],
+                  ['activities_delivered', 'Activities Delivered',           'Describe the activities, exercises and tasks.'],
+                  ['key_lessons',          'Key Lessons Learnt',             'What did participants learn?'],
+                  ['growth_support_areas', 'Growth Support Areas Observed',  'What support areas were identified?'],
+                  ['key_findings',         'Key Findings & Critical Issues', 'Findings and any critical issues raised.'],
+                  ['bge_contributions',    'BGE Contributions & Needs',      'BGE contributions and development needs observed.'],
+                  ['bds_actions',          'Proposed BDS Actions (3 months)','What BDS actions do you propose?'],
+                  ['recommendations',      'Recommendations',                'Recommendations for future sessions.'],
+                  ['next_steps',           'Agreed Next Steps',              'What actions were agreed with participants?'],
+                  ['conclusion',           'Conclusion',                     'Overall summary of the session.'],
+                ].map(([key, label, hint]) => (
+                  <TextField key={key} fullWidth multiline minRows={2} size="small"
+                    label={label} placeholder={hint} sx={{ mb: 2 }}
+                    value={trainingReportForm[key] || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+                ))}
+              </Box>
+            )}
+          </DialogContent>
+
+          <DialogActions sx={{ px: 3, py: 1.5, borderTop: '1px solid', borderColor: 'divider', gap: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+              {reportWizardAttendees.filter(r => r.attendee_name.trim()).length} attendee{reportWizardAttendees.filter(r => r.attendee_name.trim()).length !== 1 ? 's' : ''} entered
+            </Typography>
+            <Button onClick={() => setReportWizard(null)} disabled={reportWizardSaving}>Cancel</Button>
+            <Button variant="outlined" onClick={() => saveReportWizard(false)} disabled={reportWizardSaving || !reportWizardSessionForm.date}>
+              {reportWizardSaving ? 'Saving…' : 'Save Draft'}
+            </Button>
+            <Button variant="contained" color="success" onClick={() => saveReportWizard(true)} disabled={reportWizardSaving || !reportWizardSessionForm.date}>
+              {reportWizardSaving ? 'Submitting…' : 'Submit Report'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       {/* ── Unified session detail dialog (MSMEs · Attendance · Report) ───── */}
       <Dialog open={sessionDetailOpen} onClose={() => setSessionDetailOpen(false)} maxWidth="lg" fullWidth
