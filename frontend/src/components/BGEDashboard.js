@@ -552,8 +552,24 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         await axios.post(API_ENDPOINTS.TRAINING_REPORTS, payload, { headers: h });
       }
       setTrainingReportDialog(false);
-      setSessionDetailOpen(false);
-      fetchSessions();
+      // refresh sessions then update the session detail state so the summary reflects the new report
+      const [sRes, trRes] = await Promise.all([
+        axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
+        axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+      ]);
+      const sessData = Array.isArray(sRes.data) ? sRes.data : sRes.data.results || [];
+      const reportsData = Array.isArray(trRes.data) ? trRes.data : trRes.data.results || [];
+      const reportBySession = {};
+      reportsData.forEach(r => { reportBySession[r.session] = r; });
+      setSessions(sessData.map(s => ({ ...s, has_training_report: !!reportBySession[s.id], _training_report: reportBySession[s.id] || null })));
+      if (sessionDetailSession) {
+        const updated = sessData.find(s => s.id === sessionDetailSession.id);
+        if (updated) {
+          const rep = reportBySession[updated.id] || null;
+          setSessionDetailSession({ ...updated, has_training_report: !!rep, _training_report: rep });
+          setTrainingReportData(rep);
+        }
+      }
     } catch (err) {
       alert('Could not save report: ' + (err.response?.data ? JSON.stringify(err.response.data) : err.message));
     } finally {
@@ -1803,139 +1819,61 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </Box>
           )}
 
-          {/* ── Tab 2: Training Report ── */}
+          {/* ── Tab 2: Training Report gateway ── */}
           {sessionDetailTab === 2 && (
-            <Box sx={{ p: 2.5 }}>
-              {sessionDetailSession?.has_training_report && (
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  Report already submitted for this session. You can update it below.
-                </Alert>
-              )}
-
-              {/* Section 1 */}
-              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>1. Training Details</Typography>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={12}>
-                  <TextField fullWidth size="small" label="Training Title"
-                    value={trainingReportForm.training_title || ''}
-                    onChange={e => setTrainingReportForm(f => ({ ...f, training_title: e.target.value }))} />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField fullWidth size="small" label="Date(s)" placeholder="e.g. 17–19 Feb 2026"
-                    value={trainingReportForm.training_dates || ''}
-                    onChange={e => setTrainingReportForm(f => ({ ...f, training_dates: e.target.value }))} />
-                </Grid>
-                <Grid item xs={12} sm={5}>
-                  <TextField fullWidth size="small" label="Venue / Location"
-                    value={trainingReportForm.venue || ''}
-                    onChange={e => setTrainingReportForm(f => ({ ...f, venue: e.target.value }))} />
-                </Grid>
-                <Grid item xs={12} sm={3}>
-                  <TextField fullWidth size="small" label="District"
-                    value={trainingReportForm.district || ''}
-                    onChange={e => setTrainingReportForm(f => ({ ...f, district: e.target.value }))} />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField fullWidth size="small" label="Time Allocation" placeholder="e.g. 2 hours / 3 days"
-                    value={trainingReportForm.time_allocation || ''}
-                    onChange={e => setTrainingReportForm(f => ({ ...f, time_allocation: e.target.value }))} />
-                </Grid>
-                <Grid item xs={12} sm={8}>
-                  <TextField fullWidth size="small" label="Facilitation Team"
-                    placeholder="Names of co-facilitators, guest trainers"
-                    value={trainingReportForm.facilitation_team || ''}
-                    onChange={e => setTrainingReportForm(f => ({ ...f, facilitation_team: e.target.value }))} />
-                </Grid>
-              </Grid>
-
-              {/* Section 2: Demographics */}
-              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>2. Participant Demographics</Typography>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                {[
-                  { key: 'participants_male_youth',   label: 'Male Youth (15–35)' },
-                  { key: 'participants_female_youth', label: 'Female Youth (15–35)' },
-                  { key: 'participants_adult_male',   label: 'Adult Male (36+)' },
-                  { key: 'participants_adult_female', label: 'Adult Female (36+)' },
-                ].map(({ key, label }) => (
-                  <Grid item xs={6} sm={3} key={key}>
-                    <TextField fullWidth size="small" label={label} type="number" inputProps={{ min: 0 }}
-                      value={trainingReportForm[key] ?? 0}
-                      onChange={e => setTrainingReportForm(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))} />
+            <Box sx={{ p: 3 }}>
+              {sessionDetailSession?.has_training_report ? (
+                /* Report already exists — show summary + edit button */
+                <Box>
+                  <Alert severity="success" sx={{ mb: 2.5 }}>
+                    Training report filed for this session.
+                    {trainingReportData?.status === 'submitted' && ' Status: Submitted.'}
+                  </Alert>
+                  <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+                    {[
+                      { label: 'Training Title', val: trainingReportData?.training_title },
+                      { label: 'Date(s)', val: trainingReportData?.training_dates },
+                      { label: 'Venue', val: trainingReportData?.venue },
+                      { label: 'District', val: trainingReportData?.district },
+                      { label: 'Time Allocation', val: trainingReportData?.time_allocation },
+                      { label: 'Total Participants', val: trainingReportData?.total_participants ?? (
+                        (trainingReportData?.participants_male_youth || 0) +
+                        (trainingReportData?.participants_female_youth || 0) +
+                        (trainingReportData?.participants_adult_male || 0) +
+                        (trainingReportData?.participants_adult_female || 0)) || null },
+                    ].filter(f => f.val).map(({ label, val }) => (
+                      <Grid item xs={6} sm={4} key={label}>
+                        <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
+                        <Typography variant="body2" fontWeight={500}>{val}</Typography>
+                      </Grid>
+                    ))}
                   </Grid>
-                ))}
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="text.secondary">
-                    Total: <strong>
-                      {(trainingReportForm.participants_male_youth || 0) +
-                       (trainingReportForm.participants_female_youth || 0) +
-                       (trainingReportForm.participants_adult_male || 0) +
-                       (trainingReportForm.participants_adult_female || 0)} participants
-                    </strong>
+                  <Button variant="outlined" startIcon={<Edit />}
+                    onClick={() => { setTrainingReportSession(sessionDetailSession); setTrainingReportDialog(true); }}>
+                    Edit Report
+                  </Button>
+                </Box>
+              ) : (
+                /* No report yet — invite BGE to write one */
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Description sx={{ fontSize: 52, color: 'text.disabled', mb: 1.5 }} />
+                  <Typography variant="h6" fontWeight={600} gutterBottom>No report filed yet</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 420, mx: 'auto' }}>
+                    Write a training report covering session objectives, participant demographics,
+                    key findings, lessons learnt, and recommended next steps.
                   </Typography>
-                </Grid>
-              </Grid>
-
-              {/* Section 3: Content */}
-              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>3. Session Content</Typography>
-              {[
-                { key: 'training_purpose',    label: 'Training Purpose / Background' },
-                { key: 'session_objectives',  label: 'Session Objectives' },
-                { key: 'activities_delivered', label: 'Activities / Tasks Delivered' },
-              ].map(({ key, label }) => (
-                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
-                  value={trainingReportForm[key] || ''}
-                  onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
-              ))}
-
-              {/* Section 4: Findings */}
-              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>4. Findings &amp; Lessons</Typography>
-              {[
-                { key: 'key_lessons',          label: 'Key Lessons Learnt' },
-                { key: 'growth_support_areas', label: 'Growth Support Areas Observed' },
-                { key: 'key_findings',         label: 'Key Findings / Critical Issues' },
-                { key: 'bge_contributions',    label: 'BGE Contributions & Capacity Notes' },
-              ].map(({ key, label }) => (
-                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
-                  value={trainingReportForm[key] || ''}
-                  onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
-              ))}
-
-              {/* Section 5: Recommendations */}
-              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>5. Recommendations &amp; Next Steps</Typography>
-              {[
-                { key: 'bds_actions',     label: 'Proposed BDS Actions (next 3 months)' },
-                { key: 'recommendations', label: 'General Recommendations' },
-                { key: 'next_steps',      label: 'Agreed Next Steps' },
-                { key: 'conclusion',      label: 'Conclusion' },
-              ].map(({ key, label }) => (
-                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
-                  value={trainingReportForm[key] || ''}
-                  onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
-              ))}
+                  <Button variant="contained" size="large" startIcon={<Add />}
+                    onClick={() => { setTrainingReportSession(sessionDetailSession); setTrainingReportDialog(true); }}>
+                    Write Training Report
+                  </Button>
+                </Box>
+              )}
             </Box>
           )}
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
           <Button onClick={() => setSessionDetailOpen(false)}>Close</Button>
-          {sessionDetailTab === 2 && (
-            <>
-              <Button variant="outlined" disabled={trainingReportSaving}
-                onClick={() => {
-                  setTrainingReportSession(sessionDetailSession);
-                  saveTrainingReport(false);
-                }}>
-                {trainingReportSaving ? 'Saving…' : 'Save Draft'}
-              </Button>
-              <Button variant="contained" color="success" disabled={trainingReportSaving}
-                onClick={() => {
-                  setTrainingReportSession(sessionDetailSession);
-                  saveTrainingReport(true);
-                }}>
-                {trainingReportSaving ? 'Submitting…' : 'Submit Report'}
-              </Button>
-            </>
-          )}
         </DialogActions>
       </Dialog>
 
