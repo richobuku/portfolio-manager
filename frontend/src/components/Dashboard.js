@@ -2878,6 +2878,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <Typography variant="caption" color="text.secondary" display="block">
                       Issued: {wo.issue_date}{wo.start_date ? ` · Start: ${wo.start_date}` : ''}{wo.end_date ? ` – ${wo.end_date}` : ''}
                     </Typography>
+                    {wo.status === 'signed' && wo.bge_signed_date && (
+                      <Typography variant="caption" color="success.main" display="block" fontWeight={600}>
+                        Signed by BGE: {wo.bge_signed_date}
+                      </Typography>
+                    )}
                     <Typography variant="caption" color="text.secondary" display="block">{wo.location}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>

@@ -1380,10 +1380,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         <Box>
                           <Typography fontWeight={700}>{wo.work_order_number}</Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {wo.work_order_type_display} · {wo.issue_date}
+                            {wo.work_order_type_display} · Issued: {wo.issue_date}
                             {wo.start_date && ` · ${wo.start_date}`}
                             {wo.end_date && ` – ${wo.end_date}`}
                           </Typography>
+                          {wo.status === 'signed' && wo.bge_signed_date && (
+                            <Typography variant="caption" color="success.main" display="block" fontWeight={600}>
+                              Signed: {wo.bge_signed_date}
+                            </Typography>
+                          )}
                           <Typography variant="caption" color="text.secondary" display="block">{wo.location}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -1546,18 +1551,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
                       {/* Row 2: key info grid */}
                       <Grid container spacing={1} sx={{ mb: topicSessions.length ? 1.5 : 0.5 }}>
-                        <Grid item xs={6} sm={3}>
+                        <Grid item xs={6} sm={4}>
                           <Typography variant="caption" color="text.secondary" display="block">Assigned</Typography>
                           <Typography variant="body2" fontWeight={500}>{a.assigned_date || '—'}</Typography>
                         </Grid>
-                        <Grid item xs={6} sm={3}>
+                        <Grid item xs={3} sm={4}>
                           <Typography variant="caption" color="text.secondary" display="block">Sessions</Typography>
                           <Typography variant="body2" fontWeight={600} color={topicSessions.length > 0 ? 'primary.main' : 'text.secondary'}>
                             {topicSessions.length}
                           </Typography>
                         </Grid>
-                        <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" color="text.secondary" display="block">Registered MSMEs</Typography>
+                        <Grid item xs={3} sm={4}>
+                          <Typography variant="caption" color="text.secondary" display="block">MSMEs</Typography>
                           <Typography variant="body2" fontWeight={600} color={totalRegistered > 0 ? 'primary.main' : 'text.secondary'}>
                             {totalRegistered}
                           </Typography>
