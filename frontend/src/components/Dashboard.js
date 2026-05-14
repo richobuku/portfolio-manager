@@ -251,6 +251,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  useEffect(() => {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', 'page_view', { page_title: `Admin - ${section}`, page_path: `/admin/${section}` });
+    }
+  }, [section]);
+
   const fetchWorkOrders = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
     const params = new URLSearchParams();
@@ -3337,7 +3343,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Box>
 
       {/* main content */}
-      <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, mt: { xs: 7, md: 0 }, overflow: 'auto' }}>
+      <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, mt: { xs: 7, md: 0 }, overflow: 'auto', minWidth: 0, overflowX: 'hidden' }}>
         {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
         {sectionMap[section]?.()}
       </Box>

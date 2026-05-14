@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Chip,
@@ -7,13 +7,14 @@ import {
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
   ListItemText, AppBar, Toolbar, Tooltip, Checkbox, Badge,
-  Tabs, Tab,
+  Tabs, Tab, Fab,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
   Delete, HowToReg, School, ChevronRight, People,
+  HelpOutline, Close,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
@@ -135,6 +136,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [sessionDetailOpen, setSessionDetailOpen] = useState(false);
   const [sessionDetailSession, setSessionDetailSession] = useState(null);
   const [sessionDetailTab, setSessionDetailTab] = useState(0);
+  const [helpDialog, setHelpDialog] = useState(false);
+  const [helpSection, setHelpSection] = useState(0);
 
   // Training report state (used both in Training tab detail dialog and standalone)
   const [trainingReportDialog, setTrainingReportDialog] = useState(false);
@@ -166,6 +169,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     attendee_name: '', attendee_phone: '', msme: '',
     gender: '', age_group: '', refugee_status: 'H',
   });
+
+  const rwDemographics = useMemo(() => {
+    const filled = reportWizardAttendees.filter(r => r.attendee_name.trim());
+    const ADULT = ['35-45', '46-55', '56+'];
+    return {
+      participants_male_youth:   filled.filter(r => r.gender === 'M' && r.age_group === '18-34').length,
+      participants_female_youth: filled.filter(r => r.gender === 'F' && r.age_group === '18-34').length,
+      participants_adult_male:   filled.filter(r => r.gender === 'M' && ADULT.includes(r.age_group)).length,
+      participants_adult_female: filled.filter(r => r.gender === 'F' && ADULT.includes(r.age_group)).length,
+    };
+  }, [reportWizardAttendees]);
 
   // Training sessions (for Work Orders section attendance recording)
   const [sessions, setSessions] = useState([]);
@@ -373,6 +387,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       subscribePush(`Bearer ${token}`);
     }
   }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSessions, token]);
+
+  useEffect(() => {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', 'page_view', { page_title: `BGE - ${section}`, page_path: `/bge/${section}` });
+    }
+  }, [section]);
 
   const openNewReport = (msmeId = '') => {
     const msme = msmes.find(x => x.id === msmeId || x.id === Number(msmeId)) || null;
@@ -591,6 +611,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       // 3. Create the training report
       await axios.post(API_ENDPOINTS.TRAINING_REPORTS, {
         ...trainingReportForm,
+        ...rwDemographics,
         session: sessionId,
         venue: reportWizardSessionForm.location || trainingReportForm.venue,
         status: submitNow ? 'submitted' : 'draft',
@@ -986,7 +1007,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const paged = (arr, page) => arr.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE);
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default', overflowX: 'hidden' }}>
       {/* mobile appbar */}
       <AppBar position="fixed" sx={{ display: { md: 'none' }, bgcolor: BRAND.sidebarBg, zIndex: (t) => t.zIndex.drawer + 1, boxShadow: 'none' }}>
         <Toolbar>
@@ -1003,7 +1024,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       </Box>
 
       {/* main */}
-      <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, mt: { xs: 7, md: 0 } }}>
+      <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, mt: { xs: 7, md: 0 }, minWidth: 0, overflowX: 'hidden', pb: { xs: 10, md: 4 } }}>
         {loading && <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 4 }} />}
 
         {/* ── My MSMEs (direct assignments only) ── */}
@@ -1798,6 +1819,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     Add Row
                   </Button>
                 </Box>
+                <Box sx={{ overflowX: 'auto' }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow sx={{ bgcolor: '#F1F5F9' }}>
@@ -1877,6 +1899,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     ))}
                   </TableBody>
                 </Table>
+                </Box>
               </Box>
             )}
 
@@ -1887,21 +1910,30 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   value={trainingReportForm.training_title || ''}
                   onChange={e => setTrainingReportForm(f => ({ ...f, training_title: e.target.value }))} />
 
-                {/* Participant demographics */}
-                <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1 }}>Participant Demographics</Typography>
+                {/* Participant demographics — auto-computed from attendance register */}
+                <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 0.5 }}>Participant Demographics</Typography>
+                <Alert severity="info" icon={false} sx={{ mb: 1.5, py: 0.5 }}>
+                  <Typography variant="caption">Auto-calculated from the Attendance Register tab. Fill in names + gender + age there to populate these totals.</Typography>
+                </Alert>
                 <Grid container spacing={1.5} sx={{ mb: 2 }}>
                   {[
-                    ['participants_male_youth',   'Male Youth (15–35)'],
-                    ['participants_female_youth', 'Female Youth (15–35)'],
-                    ['participants_adult_male',   'Adult Male (36+)'],
-                    ['participants_adult_female', 'Adult Female (36+)'],
-                  ].map(([key, label]) => (
+                    ['participants_male_youth',   'Male Youth (15–35)',   rwDemographics.participants_male_youth],
+                    ['participants_female_youth', 'Female Youth (15–35)', rwDemographics.participants_female_youth],
+                    ['participants_adult_male',   'Adult Male (36+)',     rwDemographics.participants_adult_male],
+                    ['participants_adult_female', 'Adult Female (36+)',   rwDemographics.participants_adult_female],
+                  ].map(([key, label, val]) => (
                     <Grid item xs={6} sm={3} key={key}>
-                      <TextField fullWidth size="small" label={label} type="number" inputProps={{ min: 0 }}
-                        value={trainingReportForm[key] ?? 0}
-                        onChange={e => setTrainingReportForm(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))} />
+                      <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderColor: val > 0 ? 'primary.main' : 'divider' }}>
+                        <Typography variant="h5" fontWeight={700} color={val > 0 ? 'primary.main' : 'text.disabled'}>{val}</Typography>
+                        <Typography variant="caption" color="text.secondary">{label}</Typography>
+                      </Paper>
                     </Grid>
                   ))}
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">
+                      Total: <strong>{rwDemographics.participants_male_youth + rwDemographics.participants_female_youth + rwDemographics.participants_adult_male + rwDemographics.participants_adult_female}</strong> participants
+                    </Typography>
+                  </Grid>
                 </Grid>
 
                 {/* Narrative sections */}
@@ -3602,6 +3634,104 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       >
         <Alert severity={snack.severity} onClose={() => setSnack({ ...snack, open: false })}>{snack.msg}</Alert>
       </Snackbar>
+
+      {/* ── Help dialog ──────────────────────────────────────────────────── */}
+      {helpDialog && (
+        <Dialog open onClose={() => setHelpDialog(false)} maxWidth="sm" fullWidth
+          PaperProps={{ sx: { height: { xs: '90dvh', md: '80vh' }, display: 'flex', flexDirection: 'column' } }}>
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 0 }}>
+            How to use the BGE Portal
+            <IconButton onClick={() => setHelpDialog(false)}><Close /></IconButton>
+          </DialogTitle>
+          <Box sx={{ px: 3, pb: 0 }}>
+            <Tabs value={helpSection} onChange={(_, v) => setHelpSection(v)} variant="scrollable" scrollButtons="auto">
+              <Tab label="My MSMEs" />
+              <Tab label="My Groups" />
+              <Tab label="Work Orders" />
+              <Tab label="Training" />
+              <Tab label="My Reports" />
+            </Tabs>
+          </Box>
+          <DialogContent sx={{ pt: 2 }}>
+            {[
+              {
+                title: 'My MSMEs',
+                steps: [
+                  { n: 1, text: 'Your directly assigned MSMEs appear as cards. Each card shows the business name, sector, last support date, and total reports filed.' },
+                  { n: 2, text: 'Click any MSME card to open its full profile — including contact details, assignment objectives, group membership, and growth history.' },
+                  { n: 3, text: 'Click "New Report" (top-right) to write a visit report. Fill in visit type, date, findings, and recommendations, then save as draft or submit.' },
+                  { n: 4, text: 'Submitted reports are reviewed by the programme administrator. Approved reports are final.' },
+                ],
+              },
+              {
+                title: 'My Groups',
+                steps: [
+                  { n: 1, text: 'Groups are clusters of MSMEs supported together in collective sessions.' },
+                  { n: 2, text: 'Expand a group card to see all member MSMEs and recent group support reports.' },
+                  { n: 3, text: 'Click "New Group Report" to record a group session — add the date, objectives, attending MSMEs, and findings.' },
+                  { n: 4, text: 'As team lead you can see contributions from other BGEs in your group.' },
+                ],
+              },
+              {
+                title: 'Work Orders',
+                steps: [
+                  { n: 1, text: 'Work Orders are contracts issued by the programme administrator that define your assignment, rate, and duration.' },
+                  { n: 2, text: 'Upload your signature once using the "My Signature" panel — it will be embedded in every signed document.' },
+                  { n: 3, text: 'When a work order is issued, use the eye icon to review the full PDF before signing.' },
+                  { n: 4, text: 'Click the green "Sign" button to digitally accept the work order. The date is recorded automatically and the signed PDF is stored.' },
+                  { n: 5, text: 'You can download or print any work order using the icons on the right of each card.' },
+                ],
+              },
+              {
+                title: 'Training',
+                steps: [
+                  { n: 1, text: 'Your training facilitation assignments are shown as cards — each linked to a specific module and topic.' },
+                  { n: 2, text: 'Click "Write Report" on any card to open the Training Report Wizard.' },
+                  { n: 3, text: 'In the Attendance Register tab, add each participant\'s name, phone, gender, and age group. Use the MSME picker to link to known businesses, or leave blank for walk-ins.' },
+                  { n: 4, text: 'Switch to the Training Report tab to complete the narrative — the participant demographics are automatically totalled from your attendance register.' },
+                  { n: 5, text: 'Use "Save Draft" to continue later, or "Submit Report" when the report is complete.' },
+                  { n: 6, text: 'If sessions are already scheduled by the administrator, click any session row to view MSMEs, record attendance, or edit the report.' },
+                ],
+              },
+              {
+                title: 'My Reports',
+                steps: [
+                  { n: 1, text: 'All your individual and group support reports are listed here with their status (Draft / Submitted / Approved).' },
+                  { n: 2, text: 'Use the date and type filters at the top to narrow down the list.' },
+                  { n: 3, text: 'Click any report to view its full content and the programme manager\'s feedback.' },
+                  { n: 4, text: 'Draft reports can be edited and resubmitted. Approved reports are locked.' },
+                ],
+              },
+            ][helpSection].steps.map(step => (
+              <Box key={step.n} sx={{ display: 'flex', gap: 2, mb: 2.5, alignItems: 'flex-start' }}>
+                <Box sx={{
+                  minWidth: 28, height: 28, borderRadius: '50%', bgcolor: '#1565C0', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {step.n}
+                </Box>
+                <Typography variant="body2" sx={{ pt: 0.4 }}>{step.text}</Typography>
+              </Box>
+            ))}
+          </DialogContent>
+          <DialogActions sx={{ px: 3 }}>
+            <Button disabled={helpSection === 0} onClick={() => setHelpSection(s => s - 1)}>← Previous</Button>
+            <Box sx={{ flex: 1 }} />
+            <Button disabled={helpSection === 4} variant="contained" onClick={() => setHelpSection(s => s + 1)}>Next →</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* ── Help Fab ────────────────────────────────────────────────────────── */}
+      <Fab size="medium" onClick={() => { setHelpSection(0); setHelpDialog(true); }}
+        sx={{
+          position: 'fixed', bottom: 24, left: 24, zIndex: 1200,
+          bgcolor: '#1565C0', color: '#fff', '&:hover': { bgcolor: '#0d47a1' },
+          boxShadow: 3,
+        }}>
+        <HelpOutline />
+      </Fab>
     </Box>
   );
 }
