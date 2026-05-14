@@ -17,14 +17,14 @@ import {
   AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
-  Lock, LockOpen, Star, StarBorder, Download,
+  Lock, LockOpen, Star, StarBorder, Download, Undo,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, MSME_SET_GROUPS_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -93,6 +93,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [woSaving, setWoSaving] = useState(false);
   const [woErrors, setWoErrors] = useState('');
   const [woIssuing, setWoIssuing] = useState(null);
+  const [woWithdrawing, setWoWithdrawing] = useState(null);
+  const [woWithdrawDialog, setWoWithdrawDialog] = useState(false);
+  const [woWithdrawTarget, setWoWithdrawTarget] = useState(null);
+  const [woWithdrawReason, setWoWithdrawReason] = useState('');
 
   // ── filters ────────────────────────────────────────────────────────────────
   const [msmeSearch, setMsmeSearch] = useState('');
@@ -2780,6 +2784,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const withdrawWo = async () => {
+    if (!woWithdrawTarget) return;
+    setWoWithdrawing(woWithdrawTarget.id);
+    try {
+      await axios.post(WORK_ORDER_WITHDRAW_URL(woWithdrawTarget.id), { reason: woWithdrawReason }, { headers });
+      setSuccess(`Work order ${woWithdrawTarget.work_order_number} withdrawn. BGE has been notified by email.`);
+      setWoWithdrawDialog(false);
+      setWoWithdrawTarget(null);
+      setWoWithdrawReason('');
+      fetchWorkOrders();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to withdraw work order.');
+    } finally {
+      setWoWithdrawing(null);
+    }
+  };
+
   const downloadWoPdf = async (wo) => {
     try {
       const res = await axios.get(WORK_ORDER_PDF_URL(wo.id), {
@@ -2877,6 +2898,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             Issue
                           </Button>
                         </span>
+                      </Tooltip>
+                    )}
+                    {(wo.status === 'issued' || wo.status === 'signed') && (
+                      <Tooltip title="Withdraw work order back to draft">
+                        <Button
+                          variant="outlined" size="small" color="warning"
+                          startIcon={woWithdrawing === wo.id ? <CircularProgress size={14} color="inherit" /> : <Undo />}
+                          disabled={woWithdrawing === wo.id}
+                          onClick={() => { setWoWithdrawTarget(wo); setWoWithdrawReason(''); setWoWithdrawDialog(true); }}
+                        >
+                          Withdraw
+                        </Button>
                       </Tooltip>
                     )}
                     {wo.status !== 'draft' && (
@@ -3055,6 +3088,39 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <Button onClick={() => setWoDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={saveWo} disabled={woSaving}>
             {woSaving ? <CircularProgress size={18} /> : (woEditing ? 'Save Changes' : 'Create')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Withdraw confirmation dialog */}
+      <Dialog open={woWithdrawDialog} onClose={() => setWoWithdrawDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Withdraw Work Order</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Withdrawing <strong>{woWithdrawTarget?.work_order_number}</strong> will reset it to draft status
+            and notify <strong>{woWithdrawTarget?.bge_name}</strong> by email. You can then edit and re-issue it.
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            label="Reason for withdrawal (optional)"
+            multiline
+            rows={3}
+            value={woWithdrawReason}
+            onChange={e => setWoWithdrawReason(e.target.value)}
+            placeholder="e.g. Budget revision required, dates need updating..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setWoWithdrawDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={withdrawWo}
+            disabled={woWithdrawing === woWithdrawTarget?.id}
+            startIcon={woWithdrawing === woWithdrawTarget?.id ? <CircularProgress size={14} color="inherit" /> : null}
+          >
+            Withdraw & Notify BGE
           </Button>
         </DialogActions>
       </Dialog>
