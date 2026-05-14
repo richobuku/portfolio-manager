@@ -1571,33 +1571,40 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         )}
                       </Box>
 
-                      {/* Training sessions linked to this work order */}
+                      {/* Training sessions linked to this work order — click to open Training page */}
                       {(() => {
                         const linked = sessions.filter(s => s.work_order === wo.id);
                         if (!linked.length) return null;
                         return (
                           <>
                             <Divider sx={{ my: 1.5 }} />
-                            <Typography variant="caption" fontWeight={700} display="block" sx={{ mb: 0.75 }}>
-                              Training sessions ({linked.length})
-                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                              <Typography variant="caption" fontWeight={700}>
+                                Training sessions ({linked.length})
+                              </Typography>
+                              <Tooltip title="Go to Training page to record attendance and submit reports">
+                                <Button size="small" startIcon={<School />} onClick={() => setSection('training')}
+                                  sx={{ fontSize: 11 }}>
+                                  Open Training
+                                </Button>
+                              </Tooltip>
+                            </Box>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                               {linked.map(s => (
-                                <Box key={s.id} sx={{
-                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                  p: 1, borderRadius: 1, bgcolor: 'background.default',
-                                }}>
+                                <Box key={s.id}
+                                  onClick={() => setSection('training')}
+                                  sx={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    p: 1, borderRadius: 1, bgcolor: 'background.default',
+                                    cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' },
+                                  }}>
                                   <Box>
                                     <Typography variant="body2" fontWeight={500}>{s.title}</Typography>
                                     <Typography variant="caption" color="text.secondary">
                                       {s.date}{s.location ? ` · ${s.location}` : ''} · {s.attendance_count ?? 0} present
                                     </Typography>
                                   </Box>
-                                  <Tooltip title="Record attendance">
-                                    <IconButton size="small" color="primary" onClick={() => openSessionAtt(s)}>
-                                      <HowToReg fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
+                                  <ChevronRight sx={{ color: 'text.disabled', fontSize: 18 }} />
                                 </Box>
                               ))}
                             </Box>
