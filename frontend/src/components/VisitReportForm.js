@@ -223,7 +223,16 @@ export default function VisitReportForm({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
-      PaperProps={{ sx: { height: '92vh', display: 'flex', flexDirection: 'column' } }}>
+      PaperProps={{
+        sx: {
+          width: { xs: 'calc(100vw - 16px)', md: '100%' },
+          height: { xs: '96dvh', md: '92vh' },
+          m: { xs: 1, md: 4 },
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        },
+      }}>
 
       {/* ── Header ── */}
       <DialogTitle sx={{ pb: 1, bgcolor: '#1A2F4B', color: '#fff' }}>
@@ -238,12 +247,35 @@ export default function VisitReportForm({
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 0, display: 'flex', overflow: 'hidden' }}>
-        <Grid container sx={{ height: '100%' }}>
+      <DialogContent sx={{ p: 0, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        <Grid
+          container
+          sx={{
+            height: '100%',
+            minHeight: 0,
+            flexDirection: { xs: 'column', md: 'row' },
+            flexWrap: 'nowrap',
+          }}
+        >
 
           {/* ── Left sidebar: metadata + baseline ── */}
           <Grid item xs={12} md={3.5}
-            sx={{ borderRight: '1px solid #E8EDF2', overflowY: 'auto', p: 2, bgcolor: '#F8F9FA' }}>
+            sx={{
+              width: { xs: '100%', md: 'auto' },
+              flexBasis: { xs: 'auto', md: '29.166667%' },
+              maxWidth: { xs: '100%', md: '29.166667%' },
+              flexShrink: 0,
+              maxHeight: { xs: '38dvh', md: 'none' },
+              borderRight: { xs: 0, md: '1px solid #E8EDF2' },
+              borderBottom: { xs: '1px solid #E8EDF2', md: 0 },
+              overflowY: 'auto',
+              overscrollBehavior: 'contain',
+              p: { xs: 1.5, sm: 2 },
+              bgcolor: '#F8F9FA',
+              WebkitOverflowScrolling: 'touch',
+              '&::-webkit-scrollbar': { width: 8 },
+              '&::-webkit-scrollbar-thumb': { bgcolor: '#C8D2DD', borderRadius: 8 },
+            }}>
 
             {/* MSME selector */}
             {!preselectedMsme && (
@@ -344,7 +376,15 @@ export default function VisitReportForm({
           </Grid>
 
           {/* ── Main content panel ── */}
-          <Grid item xs={12} md={8.5} sx={{ overflowY: 'auto', p: 3 }}>
+          <Grid item xs={12} md={8.5}
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              maxWidth: { xs: '100%', md: '70.833333%' },
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              p: { xs: 2, sm: 3 },
+            }}>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
             {/* NARRATIVE */}
@@ -591,16 +631,23 @@ export default function VisitReportForm({
       </DialogContent>
 
       {/* ── Footer ── */}
-      <DialogActions sx={{ borderTop: '1px solid #E8EDF2', px: 3, py: 1.5, gap: 1 }}>
-        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+      <DialogActions sx={{
+        borderTop: '1px solid #E8EDF2',
+        px: { xs: 1.5, sm: 3 },
+        py: 1.5,
+        gap: 1,
+        flexWrap: 'wrap',
+      }}>
+        <Button onClick={onClose} disabled={saving} sx={{ order: { xs: 2, sm: 0 } }}>Cancel</Button>
         <Box sx={{ flex: 1 }} />
         <Button variant="outlined" startIcon={<Save />} disabled={saving}
+          sx={{ flex: { xs: '1 1 140px', sm: '0 0 auto' } }}
           onClick={() => save(false)}>
           {saving ? <CircularProgress size={16} /> : 'Save Draft'}
         </Button>
         <Button variant="contained" startIcon={<Send />} disabled={saving}
           onClick={() => save(true)}
-          sx={{ bgcolor: '#1A2F4B' }}>
+          sx={{ bgcolor: '#1A2F4B', flex: { xs: '1 1 150px', sm: '0 0 auto' } }}>
           {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Submit Report'}
         </Button>
       </DialogActions>

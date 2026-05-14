@@ -939,7 +939,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   ];
 
   const SidebarContent = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: BRAND.sidebarBg }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, bgcolor: BRAND.sidebarBg }}>
       <Box sx={{ px: 2.5, py: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
           <Box sx={{
@@ -961,7 +961,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
 
-      <List sx={{ flex: 1, px: 1, pt: 1 }}>
+      <List sx={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
+        px: 1,
+        pt: 1,
+        WebkitOverflowScrolling: 'touch',
+        '&::-webkit-scrollbar': { width: 8 },
+        '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.25)', borderRadius: 8 },
+      }}>
         {navItems.map(({ key, label, icon, badge }) => (
           <ListItemButton
             key={key}
@@ -1012,7 +1021,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       <AppBar position="fixed" sx={{ display: { md: 'none' }, bgcolor: BRAND.sidebarBg, zIndex: (t) => t.zIndex.drawer + 1, boxShadow: 'none' }}>
         <Toolbar>
           <IconButton color="inherit" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 1 }}><MenuIcon /></IconButton>
-          <Typography fontWeight={700} fontSize={15}>PRUDEV II · BGE Portal</Typography>
+          <Typography fontWeight={700} fontSize={15} noWrap>PRUDEV II · BGE Portal</Typography>
         </Toolbar>
       </AppBar>
 
@@ -1032,8 +1041,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           const directMsmes = msmes.filter(m => m.assigned_bge === myBgeId);
           return (
             <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box>
+              {/* Responsive header: stacks vertically on phones so the
+                  "New Report" button gets full width and the subtitle has
+                  room to breathe instead of being squeezed against the button. */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: 'space-between',
+                alignItems: { xs: 'stretch', sm: 'center' },
+                gap: { xs: 1.5, sm: 2 },
+                mb: 2,
+              }}>
+                <Box sx={{ minWidth: 0 }}>
                   <Typography variant="h6" fontWeight={700}>My MSMEs</Typography>
                   <Typography variant="body2" color="text.secondary">
                     <Box component="span" sx={{ color: BRAND.primaryMain, fontWeight: 600 }}>
@@ -1047,11 +1066,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     </Box>
                   </Typography>
                 </Box>
-                <Button variant="contained" startIcon={<Add />} onClick={() => openNewReport()}>New Report</Button>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => openNewReport()}
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    alignSelf: { xs: 'stretch', sm: 'auto' },
+                    flexShrink: 0,
+                  }}
+                >
+                  New Report
+                </Button>
               </Box>
 
               {directMsmes.length === 0 ? (
-                <Paper sx={{ p: 6, textAlign: 'center' }}>
+                <Paper sx={{ p: { xs: 3, sm: 6 }, textAlign: 'center' }}>
                   <Business sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
                   <Typography color="text.secondary">No MSMEs directly assigned yet. Contact your programme administrator.</Typography>
                 </Paper>
@@ -1350,12 +1380,26 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         {/* ── My Reports ── */}
         {section === 'reports' && (
           <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Box>
+            <Box sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              alignItems: { xs: 'stretch', sm: 'center' },
+              gap: { xs: 1.5, sm: 2 },
+              mb: 3,
+            }}>
+              <Box sx={{ minWidth: 0 }}>
                 <Typography variant="h6" fontWeight={700}>My Reports</Typography>
                 <Typography variant="body2" color="text.secondary">{reports.length} report{reports.length !== 1 ? 's' : ''} submitted</Typography>
               </Box>
-              <Button variant="contained" startIcon={<Add />} onClick={() => openNewReport()}>New Report</Button>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => openNewReport()}
+                sx={{ alignSelf: { xs: 'stretch', sm: 'auto' }, flexShrink: 0 }}
+              >
+                New Report
+              </Button>
             </Box>
 
             {reports.length === 0 ? (
@@ -1364,8 +1408,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 <Typography color="text.secondary">No reports yet. Start by writing a report for one of your MSMEs.</Typography>
               </Paper>
             ) : (
-              <TableContainer component={Paper}>
-                <Table size="small">
+              <TableContainer component={Paper} sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <Table size="small" sx={{ minWidth: 680 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>MSME</TableCell>
