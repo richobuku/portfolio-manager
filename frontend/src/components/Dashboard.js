@@ -239,7 +239,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const isAdmin   = !isViewer && (isStaff || currentUser?.role === 'cohort_admin');
   const headers   = { Authorization: `Bearer ${token}` };
 
-  const [section, setSection] = useState('msmes');
+  const [section, setSection] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('section');
+    return NAV_ITEMS.some((item) => item.key === requested) ? requested : 'msmes';
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // ── nav drag-and-drop ──────────────────────────────────────────────────────

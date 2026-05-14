@@ -94,7 +94,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const headers = { Authorization: `Bearer ${token}` };
   const bgeName = currentUser?.bge_profile?.name || currentUser?.username || 'BGE';
 
-  const [section, setSection] = useState('msmes');
+  const [section, setSection] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('section');
+    return ['msmes', 'groups', 'reports', 'workorders', 'training'].includes(requested) ? requested : 'msmes';
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const [msmes, setMsmes] = useState([]);

@@ -16,8 +16,22 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/service-worker.js')
-      .then(() => {})
+      .then((registration) => {
+        registration.addEventListener('updatefound', () => {
+          const worker = registration.installing;
+          if (!worker) return;
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              window.dispatchEvent(new Event('pwa-update-available'));
+            }
+          });
+        });
+      })
       .catch(() => {});
+  });
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.dispatchEvent(new Event('pwa-controller-changed'));
   });
 }
 

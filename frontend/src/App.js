@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import BGEDashboard from './components/BGEDashboard';
 import ResetPassword from './components/ResetPassword';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -112,6 +113,7 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<Navigate to={(token && (isAdmin || isBGE)) ? '/dashboard' : '/login'} replace />} />
         </Routes>
+        <PWAInstallPrompt />
       </Router>
     </ErrorBoundary>
   );
