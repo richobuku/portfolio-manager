@@ -22,7 +22,6 @@ import {
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
-  LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL } from '../config';
@@ -2357,9 +2356,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <Typography variant="body2" color="text.secondary">BGEs need to fill in "Record Growth Update" for their MSMEs before analytics appear here.</Typography>
             </Box>
           );
+          /* ── print CSS injected once ──────────────────────────────── */
+          if (!document.getElementById('prudev2-print-css')) {
+            const s = document.createElement('style');
+            s.id = 'prudev2-print-css';
+            s.textContent = `@media print{body>*{display:none!important}.prudev2-printable{display:block!important;position:fixed;top:0;left:0;width:100%;background:#fff;z-index:99999;padding:24px}}`;
+            document.head.appendChild(s);
+          }
 
           // ── Core data derivations ─────────────────────────────────────────
-          // First and latest snapshot per MSME (for before/after)
           const firstByMsme = {};
           const latestByMsme = {};
           adminSnapshots.forEach(s => {
@@ -2369,24 +2374,65 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           const msmeIds = Object.keys(latestByMsme).map(Number);
           const latestList = msmeIds.map(id => ({ ...latestByMsme[id], _first: firstByMsme[id] }))
             .sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date));
-          const paired = latestList.filter(s => s._first && s._first.id !== s.id); // MSMEs with ≥2 snapshots
+          const paired = latestList.filter(s => s._first && s._first.id !== s.id);
 
-          // ── Before/after deltas (revenue & staff) ────────────────────────
-          const revDelta   = paired.map(s => ({
-            name: (s.msme_name || `MSME ${s.msme}`).slice(0, 20),
-            Before: s._first.annual_turnover  ? Number(s._first.annual_turnover)  : null,
-            After:  s.annual_turnover         ? Number(s.annual_turnover)          : null,
-          })).filter(d => d.Before != null && d.After != null);
+          // ── Helpers ───────────────────────────────────────────────────────
+          const fmtUGX = v => v == null || v === '' ? '—' : `UGX ${Number(v).toLocaleString()}`;
+          const compFields = [
+            { label: 'URSB',         key: 'has_ursb',          color: '#4527A0' },
+            { label: 'TIN',          key: 'has_tin',           color: '#1565C0' },
+            { label: 'Bank Account', key: 'has_business_bank', color: '#00695C' },
+            { label: 'Mobile Money', key: 'has_mobile_money',  color: '#E65100' },
+            { label: 'MOMO Pay',     key: 'has_momo_pay',      color: '#F57C00' },
+            { label: 'SACCO',        key: 'has_sacco',         color: '#2E7D32' },
+          ];
+          const compBefore = (key) => paired.filter(s => s._first[key]).length;
+          const compAfter  = (key) => paired.filter(s => s[key]).length;
 
-          const staffDelta = paired.map(s => {
-            const bFT = (s._first.employees_ft_male||0)+(s._first.employees_ft_female||0);
-            const bPT = (s._first.employees_pt_male||0)+(s._first.employees_pt_female||0);
-            const aFT = (s.employees_ft_male||0)+(s.employees_ft_female||0);
-            const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
-            return { name: (s.msme_name || `MSME ${s.msme}`).slice(0, 20), BeforeStaff: bFT+bPT, AfterStaff: aFT+aPT };
-          }).filter(d => d.BeforeStaff > 0 || d.AfterStaff > 0);
+          // ── Summary stats ─────────────────────────────────────────────────
+          const withRev = latestList.filter(s => s.annual_turnover);
+          const withRevFirst = paired.filter(s => s._first.annual_turnover && s.annual_turnover);
+          const avgRevBefore = withRevFirst.length
+            ? withRevFirst.reduce((a,s) => a+Number(s._first.annual_turnover), 0) / withRevFirst.length : 0;
+          const avgRevAfter  = withRevFirst.length
+            ? withRevFirst.reduce((a,s) => a+Number(s.annual_turnover), 0) / withRevFirst.length : 0;
+          const avgRevLatest = withRev.length
+            ? withRev.reduce((a,x) => a+Number(x.annual_turnover), 0) / withRev.length : 0;
+          const totalRevGrowth = withRevFirst.reduce((acc, s) =>
+            acc + (Number(s.annual_turnover) - Number(s._first.annual_turnover)), 0);
+          const pctRevGrowth = withRevFirst.length
+            ? ((withRevFirst.reduce((a,s) =>
+                a + (Number(s.annual_turnover)/Number(s._first.annual_turnover)-1), 0)
+              / withRevFirst.length) * 100).toFixed(0)
+            : null;
 
-          // ── Quarterly aggregation ─────────────────────────────────────────
+          const totalStaffBefore = paired.reduce((a,s) =>
+            a + (s._first.employees_ft_male||0)+(s._first.employees_ft_female||0)
+              + (s._first.employees_pt_male||0)+(s._first.employees_pt_female||0), 0);
+          const totalStaffAfter  = paired.reduce((a,s) =>
+            a + (s.employees_ft_male||0)+(s.employees_ft_female||0)
+              + (s.employees_pt_male||0)+(s.employees_pt_female||0), 0);
+
+          const now = new Date();
+          const fresh = latestList.filter(s => (now - new Date(s.snapshot_date)) / 86400000 <= 30).length;
+
+          // ── Programme summary chart data ──────────────────────────────────
+          // Financial chart: avg revenue before vs after (in thousands)
+          const financialChart = withRevFirst.length ? [
+            { metric: 'Avg Annual Revenue (K)', Before: Math.round(avgRevBefore/1000), After: Math.round(avgRevAfter/1000) },
+          ] : [];
+          if (paired.length) {
+            financialChart.push({ metric: 'Total Staff', Before: totalStaffBefore, After: totalStaffAfter });
+          }
+
+          // Compliance chart: before vs after % for each flag
+          const complianceChart = compFields.map(({ label, key }) => ({
+            metric: label,
+            Before: compBefore(key),
+            After: compAfter(key),
+          }));
+
+          // ── Quarterly trend ───────────────────────────────────────────────
           const currentYear = new Date().getFullYear();
           const qData = {};
           adminSnapshots.forEach(s => {
@@ -2394,46 +2440,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             const q = `Q${Math.floor(new Date(s.snapshot_date).getMonth()/3)+1}`;
             if (y !== currentYear && y !== currentYear - 1) return;
             const key = `${y} ${q}`;
-            if (!qData[key]) qData[key] = { period: key, revenue: 0, count: 0, staff: 0 };
+            if (!qData[key]) qData[key] = { period: key, revenue: 0, count: 0 };
             if (s.annual_turnover) { qData[key].revenue += Number(s.annual_turnover); qData[key].count++; }
-            const ft = (s.employees_ft_male||0)+(s.employees_ft_female||0);
-            const pt = (s.employees_pt_male||0)+(s.employees_pt_female||0);
-            qData[key].staff += ft+pt;
           });
           const quarterlyChart = Object.values(qData)
-            .sort((a, b) => a.period.localeCompare(b.period))
-            .map(q => ({ ...q, avgRevenue: q.count ? Math.round(q.revenue/q.count/1000) : 0, avgStaff: q.count ? Math.round(q.staff/q.count) : 0 }));
-
-          // ── Revenue trend (chronological) ─────────────────────────────────
-          const revenueTrend = [...adminSnapshots]
-            .filter(s => s.annual_turnover)
-            .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
-            .map(s => ({ date: s.snapshot_date, Revenue: Math.round(Number(s.annual_turnover)/1000) }));
-
-          // ── Compliance (paired MSMEs — first vs latest) ───────────────────
-          const compFields = [
-            { label: 'URSB Registered',    key: 'has_ursb',          color: '#4527A0' },
-            { label: 'Has TIN',            key: 'has_tin',           color: '#1565C0' },
-            { label: 'Business Bank Acct', key: 'has_business_bank', color: '#00695C' },
-            { label: 'Mobile Money',       key: 'has_mobile_money',  color: '#E65100' },
-            { label: 'MOMO Pay Code',      key: 'has_momo_pay',      color: '#F57C00' },
-            { label: 'SACCO Member',       key: 'has_sacco',         color: '#2E7D32' },
-          ];
-          // Compliance before vs after (paired MSMEs only)
-          const compBefore = (key) => paired.filter(s => s._first[key]).length;
-          const compAfter  = (key) => paired.filter(s => s[key]).length;
-
-          // ── Summary stats ─────────────────────────────────────────────────
-          const withRev = latestList.filter(s => s.annual_turnover);
-          const avgRevLatest = withRev.length ? withRev.reduce((s,x) => s+Number(x.annual_turnover),0)/withRev.length : 0;
-          const withRevFirst = paired.filter(s => s._first.annual_turnover && s.annual_turnover);
-          const totalRevGrowth = withRevFirst.reduce((acc, s) => acc + (Number(s.annual_turnover) - Number(s._first.annual_turnover)), 0);
-          const pctRevGrowth   = withRevFirst.length
-            ? ((withRevFirst.reduce((a,s) => a + (Number(s.annual_turnover)/Number(s._first.annual_turnover)-1), 0) / withRevFirst.length) * 100).toFixed(0)
-            : null;
-
-          const now = new Date();
-          const fresh = latestList.filter(s => (now - new Date(s.snapshot_date)) / 86400000 <= 30).length;
+            .sort((a,b) => a.period.localeCompare(b.period))
+            .map(q => ({ period: q.period, 'Avg Revenue (K)': q.count ? Math.round(q.revenue/q.count/1000) : 0 }));
 
           // ── CSV Export ────────────────────────────────────────────────────
           const exportCSV = () => {
@@ -2458,8 +2470,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   `"${s.msme_name||''}"`, m?.msme_code||'', `"${m?.assigned_bge_name||''}"`,
                   f.snapshot_date||'', s.snapshot_date,
                   adminSnapshots.filter(x => x.msme === s.msme).length,
-                  f.annual_turnover||'', s.annual_turnover||'', revPct,
-                  s.last_month_revenue||'',
+                  f.annual_turnover||'', s.annual_turnover||'', revPct, s.last_month_revenue||'',
                   bFT, aFT, bPT, aPT,
                   f.has_tin?'Yes':'No', s.has_tin?'Yes':'No',
                   f.has_ursb?'Yes':'No', s.has_ursb?'Yes':'No',
@@ -2477,70 +2488,174 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             a.click(); URL.revokeObjectURL(url);
           };
 
-          const fmtUGX = v => v == null ? '—' : `UGX ${Number(v).toLocaleString()}`;
-          const Dot = ({ val }) => val == null
-            ? <Typography fontSize={11} color="text.disabled">—</Typography>
-            : <Chip size="small" label={val ? '✓' : '✗'} color={val ? 'success' : 'default'}
-                variant={val ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />;
-
           return (
             <Box>
-              {/* ── Header with export button ── */}
+              {/* ── Header ── */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Box>
                   <Typography variant="h6" fontWeight={700}>Growth Analytics</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Before/after comparison across {msmeIds.length} MSMEs · {adminSnapshots.length} total updates
+                    Before/after comparison · {msmeIds.length} MSMEs · {adminSnapshots.length} total updates · {paired.length} paired
                   </Typography>
                 </Box>
-                <Button variant="outlined" size="small" startIcon={<Download />} onClick={exportCSV}>
-                  Export Report (CSV)
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button variant="outlined" size="small" startIcon={<Download />} onClick={exportCSV}>
+                    Export CSV
+                  </Button>
+                  <Button variant="contained" size="small" startIcon={<Assessment />}
+                    onClick={() => window.print()}
+                    sx={{ bgcolor: BRAND.primaryMain }}>
+                    Export Chart (PDF)
+                  </Button>
+                </Box>
               </Box>
 
-              {/* ── KPIs ── */}
-              <SectionLabel>Programme Growth Summary</SectionLabel>
+              {/* ════════════════════════════════════════════════════════════
+                  PRINTABLE SUMMARY REPORT (hidden on screen, shown on print)
+                  ════════════════════════════════════════════════════════════ */}
+              <Box className="prudev2-printable" sx={{ display: 'none' }}>
+                <Box sx={{ mb: 3, pb: 2, borderBottom: '2px solid #1A2F4B' }}>
+                  <Typography variant="h5" fontWeight={800} color="#1A2F4B">PRUDEV II — Growth Impact Report</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Generated {new Date().toLocaleDateString('en-UG', { day: 'numeric', month: 'long', year: 'numeric' })} ·
+                    {msmeIds.length} MSMEs · {paired.length} with before/after comparison
+                  </Typography>
+                </Box>
+
+                {/* KPI summary row */}
+                <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Avg Revenue (After)',  val: `UGX ${(avgRevLatest/1000).toFixed(0)}K` },
+                    { label: 'Revenue Growth',       val: pctRevGrowth != null ? `+${pctRevGrowth}%` : '—' },
+                    { label: 'Total Revenue Uplift', val: `UGX ${(totalRevGrowth/1000).toFixed(0)}K` },
+                    { label: 'Staff Change',         val: totalStaffAfter > totalStaffBefore ? `+${totalStaffAfter - totalStaffBefore}` : String(totalStaffAfter - totalStaffBefore) },
+                  ].map(({ label, val }) => (
+                    <Box key={label} sx={{ textAlign: 'center', minWidth: 110 }}>
+                      <Typography fontSize={22} fontWeight={800} color="#1A2F4B">{val}</Typography>
+                      <Typography fontSize={11} color="#555">{label}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+
+                {/* Printable financial chart */}
+                {financialChart.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography fontWeight={700} fontSize={13} sx={{ mb: 1 }}>Financial Impact — Before vs After</Typography>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={financialChart} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF2"/>
+                        <XAxis dataKey="metric" tick={{ fontSize: 11 }}/>
+                        <YAxis tick={{ fontSize: 10 }}/>
+                        <ReTooltip/>
+                        <Legend wrapperStyle={{ fontSize: 11 }}/>
+                        <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
+                        <Bar dataKey="After"  fill="#1A2F4B" radius={[3,3,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                )}
+
+                {/* Printable compliance chart */}
+                {paired.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography fontWeight={700} fontSize={13} sx={{ mb: 1 }}>Compliance Improvements — Before vs After (# MSMEs)</Typography>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={complianceChart} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF2"/>
+                        <XAxis dataKey="metric" tick={{ fontSize: 11 }}/>
+                        <YAxis allowDecimals={false} tick={{ fontSize: 10 }}/>
+                        <ReTooltip/>
+                        <Legend wrapperStyle={{ fontSize: 11 }}/>
+                        <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
+                        <Bar dataKey="After"  fill="#C8102E" radius={[3,3,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                )}
+
+                {/* Quarterly trend */}
+                {quarterlyChart.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography fontWeight={700} fontSize={13} sx={{ mb: 1 }}>
+                      Quarterly Average Revenue — {currentYear-1}/{currentYear} (UGX thousands)
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={quarterlyChart} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF2"/>
+                        <XAxis dataKey="period" tick={{ fontSize: 11 }}/>
+                        <YAxis tickFormatter={v => `${v}K`} tick={{ fontSize: 10 }}/>
+                        <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, 'Avg Revenue']}/>
+                        <Bar dataKey="Avg Revenue (K)" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                )}
+              </Box>
+
+              {/* ════════════════════════════════════════════════════════════
+                  PROGRAMME SUMMARY KPIs (screen view)
+                  ════════════════════════════════════════════════════════════ */}
+              <SectionLabel>Programme Summary</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
-                  { val: msmeIds.length,                                               label: 'MSMEs with Data',    sub: `of ${msmes.length} total`,       color: BRAND.primaryMain },
-                  { val: paired.length,                                                label: 'Before/After Pairs', sub: '≥2 snapshots',                   color: '#0288D1' },
-                  { val: `UGX ${(avgRevLatest/1000).toFixed(0)}K`,                    label: 'Avg Annual Revenue', sub: 'latest snapshot',                 color: '#2E7D32' },
-                  { val: pctRevGrowth != null ? `+${pctRevGrowth}%` : '—',            label: 'Avg Revenue Growth', sub: 'first vs latest',                 color: pctRevGrowth > 0 ? '#2E7D32' : '#C8102E' },
-                  { val: `UGX ${(totalRevGrowth/1000).toFixed(0)}K`,                  label: 'Total Rev Uplift',   sub: 'across paired MSMEs',             color: '#7B1FA2' },
-                  { val: fresh,                                                        label: 'Updated ≤30 days',   sub: 'recently active',                 color: '#2E7D32' },
+                  { val: msmeIds.length,                                    label: 'MSMEs with Data',    sub: `of ${msmes.length} total`,   color: BRAND.primaryMain },
+                  { val: paired.length,                                     label: 'Paired (Before/After)', sub: '≥2 snapshots',            color: '#0288D1' },
+                  { val: `UGX ${(avgRevLatest/1000).toFixed(0)}K`,         label: 'Avg Annual Revenue', sub: 'latest snapshot',            color: '#2E7D32' },
+                  { val: pctRevGrowth != null ? `+${pctRevGrowth}%` : '—', label: 'Avg Revenue Growth', sub: 'first → latest',            color: Number(pctRevGrowth) > 0 ? '#2E7D32' : '#C8102E' },
+                  { val: `UGX ${(totalRevGrowth/1000).toFixed(0)}K`,       label: 'Total Revenue Uplift', sub: 'across paired MSMEs',     color: '#7B1FA2' },
+                  { val: fresh, label: 'Updated ≤30 days', sub: 'recently active', color: '#2E7D32' },
                 ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
               </Grid>
 
-              {/* ── Revenue trend + quarterly comparison ── */}
-              <SectionLabel>Revenue Trends</SectionLabel>
+              {/* ════════════════════════════════════════════════════════════
+                  PROGRAMME SUMMARY CHARTS (screen view)
+                  ════════════════════════════════════════════════════════════ */}
+              <SectionLabel>Programme Before / After Charts</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
-                {revenueTrend.length > 1 && (
-                  <Grid item xs={12} md={7}>
-                    <ChartCard title="Annual Revenue Over Time" subtitle="All updates chronologically (UGX thousands)" height={260}>
+                {financialChart.length > 0 && (
+                  <Grid item xs={12} md={5}>
+                    <ChartCard title="Financial Impact" subtitle="Avg revenue (UGX K) & total staff — first vs latest" height={240}>
                       <ResponsiveContainer>
-                        <LineChart data={revenueTrend}>
+                        <BarChart data={financialChart}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
-                          <XAxis dataKey="date" tick={{fontSize:10}}/>
-                          <YAxis tickFormatter={v => `${v}K`} tick={{fontSize:10}} width={48}/>
-                          <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, 'Revenue']}/>
-                          <Line type="monotone" dataKey="Revenue" stroke="#1A2F4B" strokeWidth={2} dot={{ r: 3 }}/>
-                        </LineChart>
+                          <XAxis dataKey="metric" tick={{ fontSize: 10 }}/>
+                          <YAxis tick={{ fontSize: 10 }}/>
+                          <ReTooltip/>
+                          <Legend wrapperStyle={{ fontSize: 11 }}/>
+                          <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
+                          <Bar dataKey="After"  fill="#1A2F4B" radius={[3,3,0,0]}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </Grid>
+                )}
+                {paired.length > 0 && (
+                  <Grid item xs={12} md={financialChart.length > 0 ? 7 : 12}>
+                    <ChartCard title="Compliance Improvements" subtitle={`# MSMEs (of ${paired.length} paired) — first vs latest update`} height={240}>
+                      <ResponsiveContainer>
+                        <BarChart data={complianceChart}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                          <XAxis dataKey="metric" tick={{ fontSize: 10 }}/>
+                          <YAxis allowDecimals={false} tick={{ fontSize: 10 }}/>
+                          <ReTooltip/>
+                          <Legend wrapperStyle={{ fontSize: 11 }}/>
+                          <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
+                          <Bar dataKey="After"  fill="#C8102E" radius={[3,3,0,0]}/>
+                        </BarChart>
                       </ResponsiveContainer>
                     </ChartCard>
                   </Grid>
                 )}
                 {quarterlyChart.length > 0 && (
-                  <Grid item xs={12} md={revenueTrend.length > 1 ? 5 : 12}>
-                    <ChartCard title={`Quarterly Avg Revenue — ${currentYear-1} vs ${currentYear}`} subtitle="Average across updates per quarter (UGX thousands)" height={260}>
+                  <Grid item xs={12}>
+                    <ChartCard title="Quarterly Average Revenue" subtitle={`${currentYear-1} / ${currentYear} — UGX thousands`} height={220}>
                       <ResponsiveContainer>
                         <BarChart data={quarterlyChart}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
-                          <XAxis dataKey="period" tick={{fontSize:10}}/>
-                          <YAxis tickFormatter={v => `${v}K`} tick={{fontSize:10}} width={48}/>
+                          <XAxis dataKey="period" tick={{ fontSize: 11 }}/>
+                          <YAxis tickFormatter={v => `${v}K`} tick={{ fontSize: 10 }} width={48}/>
                           <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, 'Avg Revenue']}/>
-                          <Legend wrapperStyle={{fontSize:11}}/>
-                          <Bar dataKey="avgRevenue" name="Avg Revenue (K)" fill="#1A2F4B" radius={[3,3,0,0]}/>
-                          <Bar dataKey="avgStaff"   name="Avg Total Staff" fill="#F9A825"  radius={[3,3,0,0]}/>
+                          <Bar dataKey="Avg Revenue (K)" fill="#1A2F4B" radius={[3,3,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartCard>
@@ -2548,116 +2663,162 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 )}
               </Grid>
 
-              {/* ── Before/After revenue per MSME ── */}
-              {revDelta.length > 0 && (
-                <>
-                  <SectionLabel>Before / After — Revenue by MSME</SectionLabel>
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={12}>
-                      <ChartCard title="Annual Revenue: First vs Latest Update" subtitle="UGX thousands — MSMEs with ≥2 snapshots" height={Math.max(280, revDelta.length * 32)}>
-                        <ResponsiveContainer>
-                          <BarChart layout="vertical" data={revDelta.map(d => ({ ...d, Before: Math.round(d.Before/1000), After: Math.round(d.After/1000) }))}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
-                            <XAxis type="number" tickFormatter={v => `${v}K`} tick={{fontSize:10}}/>
-                            <YAxis dataKey="name" type="category" width={130} tick={{fontSize:10}}/>
-                            <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, '']}/>
-                            <Legend wrapperStyle={{fontSize:11}}/>
-                            <Bar dataKey="Before" fill="#90A4AE" radius={[0,3,3,0]}/>
-                            <Bar dataKey="After"  fill="#1A2F4B" radius={[0,3,3,0]}/>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </ChartCard>
-                    </Grid>
-                  </Grid>
-                </>
-              )}
+              {/* ════════════════════════════════════════════════════════════
+                  PER-MSME BEFORE / AFTER CARDS
+                  ════════════════════════════════════════════════════════════ */}
+              <SectionLabel>Per-MSME Before / After</SectionLabel>
+              {latestList.length === 0 ? (
+                <Typography color="text.secondary">No data yet.</Typography>
+              ) : (
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  {latestList.map(s => {
+                    const f = s._first || {};
+                    const hasPair = f.id && f.id !== s.id;
+                    const m = msmes.find(x => x.id === s.msme);
+                    const updateCount = adminSnapshots.filter(x => x.msme === s.msme).length;
 
-              {/* ── Before/After staff per MSME ── */}
-              {staffDelta.length > 0 && (
-                <>
-                  <SectionLabel>Before / After — Workforce by MSME</SectionLabel>
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={12}>
-                      <ChartCard title="Total Staff: First vs Latest Update" subtitle="MSMEs with ≥2 snapshots" height={Math.max(260, staffDelta.length * 30)}>
-                        <ResponsiveContainer>
-                          <BarChart layout="vertical" data={staffDelta}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
-                            <XAxis type="number" tick={{fontSize:10}}/>
-                            <YAxis dataKey="name" type="category" width={130} tick={{fontSize:10}}/>
-                            <ReTooltip/>
-                            <Legend wrapperStyle={{fontSize:11}}/>
-                            <Bar dataKey="BeforeStaff" name="Before" fill="#FFCC80" radius={[0,3,3,0]}/>
-                            <Bar dataKey="AfterStaff"  name="After"  fill="#E65100" radius={[0,3,3,0]}/>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </ChartCard>
-                    </Grid>
-                  </Grid>
-                </>
-              )}
+                    const bFT = (f.employees_ft_male||0)+(f.employees_ft_female||0);
+                    const bPT = (f.employees_pt_male||0)+(f.employees_pt_female||0);
+                    const aFT = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+                    const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
 
-              {/* ── Compliance before vs after ── */}
-              {paired.length > 0 && (
-                <>
-                  <SectionLabel>Before / After — Compliance Rates</SectionLabel>
-                  <Card variant="outlined" sx={{ mb: 3 }}>
-                    <CardContent>
-                      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
-                        Comparing first vs latest snapshot — {paired.length} MSMEs
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {compFields.map(({ label, key, color }) => {
-                          const before = compBefore(key);
-                          const after  = compAfter(key);
-                          const pairTotal = paired.length;
-                          const diff = after - before;
-                          return (
-                            <Grid item xs={12} sm={6} md={4} key={key}>
-                              <Box sx={{ mb: 0.5 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <Typography variant="body2" fontWeight={600}>{label}</Typography>
-                                  <Typography variant="caption" color={diff > 0 ? 'success.main' : diff < 0 ? 'error.main' : 'text.secondary'} fontWeight={700}>
-                                    {diff > 0 ? `+${diff}` : diff < 0 ? diff : '—'}
-                                  </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-                                  <Box sx={{ flex: 1 }}>
-                                    <Typography variant="caption" color="text.secondary">Before</Typography>
-                                    <LinearProgress variant="determinate" value={pairTotal ? (before/pairTotal*100) : 0}
-                                      sx={{ height: 6, borderRadius: 3, bgcolor: '#E8EDF2', '& .MuiLinearProgress-bar': { bgcolor: '#90A4AE' } }} />
-                                    <Typography variant="caption">{before}/{pairTotal}</Typography>
-                                  </Box>
-                                  <Box sx={{ flex: 1 }}>
-                                    <Typography variant="caption" color="text.secondary">After</Typography>
-                                    <LinearProgress variant="determinate" value={pairTotal ? (after/pairTotal*100) : 0}
-                                      sx={{ height: 6, borderRadius: 3, bgcolor: '#E8EDF2', '& .MuiLinearProgress-bar': { bgcolor: color } }} />
-                                    <Typography variant="caption" color={color} fontWeight={700}>{after}/{pairTotal}</Typography>
-                                  </Box>
-                                </Box>
+                    const revPct = hasPair && f.annual_turnover && s.annual_turnover
+                      ? ((Number(s.annual_turnover)/Number(f.annual_turnover)-1)*100).toFixed(0) : null;
+
+
+                    // Count compliance gains
+                    const compGains = hasPair
+                      ? compFields.filter(({ key }) => !f[key] && s[key]).length : 0;
+
+                    // Row helper: shows before → after with change indicator
+                    const Row = ({ label, before, after, fmt = v => v, isComp = false }) => {
+                      const bVal = hasPair ? fmt(before) : null;
+                      const aVal = fmt(after);
+                      const changed = hasPair && String(before) !== String(after);
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', py: 0.6, borderBottom: '1px solid #F0F4F8' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 110, pt: 0.3 }}>{label}</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                            {bVal != null && (
+                              <>
+                                <Typography variant="caption" color="text.disabled"
+                                  sx={{ textDecoration: changed ? 'line-through' : 'none', fontSize: 11 }}>
+                                  {isComp ? (before ? '✓' : '✗') : bVal}
+                                </Typography>
+                                {changed && <Typography variant="caption" color="text.secondary">→</Typography>}
+                              </>
+                            )}
+                            <Typography variant="caption" fontWeight={changed ? 700 : 400}
+                              color={!changed ? 'text.primary'
+                                : isComp ? (after ? 'success.main' : 'error.main')
+                                : (Number(after) > Number(before) ? 'success.main' : 'error.main')}>
+                              {isComp ? (after ? '✓' : '✗') : aVal}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    };
+
+                    return (
+                      <Grid item xs={12} sm={6} lg={4} key={s.id}>
+                        <Card variant="outlined" sx={{
+                          height: '100%',
+                          borderLeft: `3px solid ${hasPair ? (compGains > 0 || revPct > 0 ? '#2E7D32' : '#1A2F4B') : '#90A4AE'}`,
+                        }}>
+                          <CardContent sx={{ pb: '12px !important' }}>
+                            {/* Card header */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="subtitle2" fontWeight={700} noWrap>{s.msme_name || `MSME ${s.msme}`}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {m?.assigned_bge_name || '—'} · {updateCount} update{updateCount !== 1 ? 's' : ''}
+                                </Typography>
                               </Box>
-                            </Grid>
-                          );
-                        })}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end', flexShrink: 0, ml: 1 }}>
+                                {revPct != null && (
+                                  <Chip size="small" label={`Rev ${revPct > 0 ? '+' : ''}${revPct}%`}
+                                    sx={{ fontSize: 10, height: 18, bgcolor: revPct > 0 ? '#E8F5E9' : '#FFEBEE',
+                                      color: revPct > 0 ? '#2E7D32' : '#C8102E', fontWeight: 700 }} />
+                                )}
+                                {compGains > 0 && (
+                                  <Chip size="small" label={`+${compGains} compliance`}
+                                    sx={{ fontSize: 10, height: 18, bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 700 }} />
+                                )}
+                                {!hasPair && (
+                                  <Chip size="small" label="Baseline only"
+                                    sx={{ fontSize: 10, height: 18, bgcolor: '#F5F5F5', color: '#9E9E9E' }} />
+                                )}
+                              </Box>
+                            </Box>
+
+                            {/* Date range */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, px: 0.5 }}>
+                              <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" display="block">First update</Typography>
+                                <Typography variant="caption" fontWeight={600}>{hasPair ? f.snapshot_date : '—'}</Typography>
+                              </Box>
+                              {hasPair && <Typography variant="caption" color="text.secondary" sx={{ pt: 1.5 }}>→</Typography>}
+                              <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" display="block">Latest update</Typography>
+                                <Typography variant="caption" fontWeight={600}>{s.snapshot_date}</Typography>
+                              </Box>
+                            </Box>
+
+                            {/* Key areas */}
+                            <Box>
+                              <Row label="Annual Revenue"
+                                before={f.annual_turnover ? Number(f.annual_turnover).toLocaleString() : '—'}
+                                after={s.annual_turnover ? Number(s.annual_turnover).toLocaleString() : '—'}
+                                fmt={v => v === '—' ? '—' : `UGX ${v}`}
+                              />
+                              <Row label="Last Month Rev."
+                                before={f.last_month_revenue ? Number(f.last_month_revenue).toLocaleString() : '—'}
+                                after={s.last_month_revenue ? Number(s.last_month_revenue).toLocaleString() : '—'}
+                                fmt={v => v === '—' ? '—' : `UGX ${v}`}
+                              />
+                              <Row label="Full-time Staff"
+                                before={bFT}
+                                after={aFT}
+                                fmt={v => `${v}`}
+                              />
+                              <Row label="Part-time Staff"
+                                before={bPT}
+                                after={aPT}
+                                fmt={v => `${v}`}
+                              />
+                              {compFields.map(({ label, key }) => (
+                                <Row key={key} label={label} before={f[key]} after={s[key]} isComp />
+                              ))}
+                              {s.bank_name && (
+                                <Box sx={{ pt: 0.5 }}>
+                                  <Typography variant="caption" color="text.secondary">Bank: </Typography>
+                                  <Typography variant="caption" fontWeight={600}>{s.bank_name}</Typography>
+                                </Box>
+                              )}
+                            </Box>
+                          </CardContent>
+                        </Card>
                       </Grid>
-                    </CardContent>
-                  </Card>
-                </>
+                    );
+                  })}
+                </Grid>
               )}
 
-              {/* ── Per-MSME detail table ── */}
-              <SectionLabel>Per-MSME Growth Detail</SectionLabel>
+              {/* ════════════════════════════════════════════════════════════
+                  RAW DATA TABLE (scrollable)
+                  ════════════════════════════════════════════════════════════ */}
+              <SectionLabel>Full Data Table</SectionLabel>
               <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
                 <Table size="small" sx={{ minWidth: 900 }}>
                   <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                     <TableRow>
                       <TableCell>MSME</TableCell>
                       <TableCell>BGE</TableCell>
-                      <TableCell>First Update</TableCell>
-                      <TableCell>Latest Update</TableCell>
                       <TableCell># Updates</TableCell>
                       <TableCell>Annual Revenue (Before → After)</TableCell>
                       <TableCell>Last Month Rev.</TableCell>
-                      <TableCell>Total Staff (Before → After)</TableCell>
+                      <TableCell>FT Staff</TableCell>
+                      <TableCell>PT Staff</TableCell>
                       <TableCell>TIN</TableCell>
                       <TableCell>URSB</TableCell>
                       <TableCell>Bank</TableCell>
@@ -2668,57 +2829,67 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <TableBody>
                     {latestList.map(s => {
                       const f = s._first || {};
+                      const m = msmes.find(x => x.id === s.msme);
+                      const hasPair = f.id && f.id !== s.id;
                       const bFT = (f.employees_ft_male||0)+(f.employees_ft_female||0);
                       const bPT = (f.employees_pt_male||0)+(f.employees_pt_female||0);
                       const aFT = (s.employees_ft_male||0)+(s.employees_ft_female||0);
                       const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
-                      const m = msmes.find(x => x.id === s.msme);
                       const updateCount = adminSnapshots.filter(x => x.msme === s.msme).length;
-                      const hasPair = f.id && f.id !== s.id;
                       const revPct = hasPair && f.annual_turnover && s.annual_turnover
-                        ? ((Number(s.annual_turnover)/Number(f.annual_turnover)-1)*100).toFixed(0)
-                        : null;
+                        ? ((Number(s.annual_turnover)/Number(f.annual_turnover)-1)*100).toFixed(0) : null;
+
+                      const DotCell = ({ before, after }) => (
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                            {hasPair && <Typography fontSize={10} color="text.disabled">{before ? '✓' : '✗'}</Typography>}
+                            <Typography fontSize={11} fontWeight={hasPair && after !== before ? 700 : 400}
+                              color={hasPair && after !== before ? (after ? 'success.main' : 'error.main') : 'text.primary'}>
+                              {after ? '✓' : '✗'}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      );
+
                       return (
                         <TableRow key={s.id} hover>
                           <TableCell sx={{ fontWeight: 600, fontSize: 12 }}>{s.msme_name || `MSME ${s.msme}`}</TableCell>
                           <TableCell sx={{ fontSize: 11 }}>{m?.assigned_bge_name || '—'}</TableCell>
-                          <TableCell sx={{ fontSize: 11 }}>{f.snapshot_date || '—'}</TableCell>
-                          <TableCell sx={{ fontSize: 11 }}>{s.snapshot_date}</TableCell>
                           <TableCell align="center">
                             <Chip label={updateCount} size="small" variant="outlined" sx={{ fontSize: 10 }} />
                           </TableCell>
                           <TableCell sx={{ fontSize: 11 }}>
                             {hasPair ? (
                               <Box>
-                                <Typography fontSize={10} color="text.secondary">{fmtUGX(f.annual_turnover)}</Typography>
+                                <Typography fontSize={10} color="text.disabled">{fmtUGX(f.annual_turnover)}</Typography>
                                 <Typography fontSize={11} fontWeight={600}>→ {fmtUGX(s.annual_turnover)}</Typography>
                                 {revPct != null && (
                                   <Chip size="small" label={`${revPct > 0 ? '+' : ''}${revPct}%`}
-                                    sx={{ fontSize: 9, height: 16, bgcolor: revPct > 0 ? '#E8F5E9' : '#FFEBEE', color: revPct > 0 ? '#2E7D32' : '#C8102E', fontWeight: 700 }} />
+                                    sx={{ fontSize: 9, height: 15, bgcolor: revPct > 0 ? '#E8F5E9' : '#FFEBEE',
+                                      color: revPct > 0 ? '#2E7D32' : '#C8102E', fontWeight: 700 }} />
                                 )}
                               </Box>
-                            ) : fmtUGX(s.annual_turnover)}
+                            ) : <Typography fontSize={11}>{fmtUGX(s.annual_turnover)}</Typography>}
                           </TableCell>
                           <TableCell sx={{ fontSize: 11 }}>{s.last_month_revenue ? fmtUGX(s.last_month_revenue) : '—'}</TableCell>
                           <TableCell sx={{ fontSize: 11 }}>
-                            {hasPair ? (
-                              <Box>
-                                <Typography fontSize={10} color="text.secondary">{bFT+bPT} staff</Typography>
-                                <Typography fontSize={11} fontWeight={600}>→ {aFT+aPT} staff</Typography>
-                              </Box>
-                            ) : (aFT+aPT > 0 ? `${aFT+aPT} (${aFT} FT)` : '—')}
+                            {hasPair ? <><Typography fontSize={10} color="text.disabled">{bFT}</Typography><Typography fontSize={11} fontWeight={600}>→ {aFT}</Typography></> : aFT || '—'}
                           </TableCell>
-                          <TableCell><Dot val={s.has_tin} /></TableCell>
-                          <TableCell><Dot val={s.has_ursb} /></TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>
+                            {hasPair ? <><Typography fontSize={10} color="text.disabled">{bPT}</Typography><Typography fontSize={11} fontWeight={600}>→ {aPT}</Typography></> : aPT || '—'}
+                          </TableCell>
+                          <DotCell before={f.has_tin} after={s.has_tin} />
+                          <DotCell before={f.has_ursb} after={s.has_ursb} />
                           <TableCell>
+                            {hasPair && <Typography fontSize={10} color="text.disabled">{f.has_business_bank ? '✓' : '✗'}</Typography>}
                             {s.has_business_bank == null
                               ? <Typography fontSize={11} color="text.disabled">—</Typography>
                               : <Chip size="small" label={s.bank_name || (s.has_business_bank ? '✓' : '✗')}
                                   color={s.has_business_bank ? 'success' : 'default'}
                                   variant={s.has_business_bank ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />}
                           </TableCell>
-                          <TableCell><Dot val={s.has_sacco} /></TableCell>
-                          <TableCell><Dot val={s.has_mobile_money} /></TableCell>
+                          <DotCell before={f.has_sacco} after={s.has_sacco} />
+                          <DotCell before={f.has_mobile_money} after={s.has_mobile_money} />
                         </TableRow>
                       );
                     })}
