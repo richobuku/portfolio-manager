@@ -325,6 +325,8 @@ class MSMEGrowthSnapshot(models.Model):
     has_unbs          = models.BooleanField(null=True, blank=True)
     has_business_bank = models.BooleanField(null=True, blank=True)
     has_mobile_money  = models.BooleanField(null=True, blank=True)
+    has_momo_pay      = models.BooleanField(null=True, blank=True,
+        help_text='Business has a MOMO Pay merchant code')
     momo_pay_code     = models.CharField(max_length=50, blank=True, default='',
         help_text='MTN/Airtel MOMO Pay merchant code')
 

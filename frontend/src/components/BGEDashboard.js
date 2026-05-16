@@ -245,7 +245,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     employees_ft_male: '', employees_ft_female: '',
     employees_pt_male: '', employees_pt_female: '',
     has_tin: '', has_unbs: '', has_business_bank: '', has_mobile_money: '',
-    momo_pay_code: '',
+    has_momo_pay: '', momo_pay_code: '',
     employees_ft_refugee: '', employees_pt_refugee: '',
     notes: '',
   };
@@ -283,7 +283,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       has_unbs:          growthForm.has_unbs          === '' ? null : growthForm.has_unbs === 'true',
       has_business_bank: growthForm.has_business_bank === '' ? null : growthForm.has_business_bank === 'true',
       has_mobile_money:  growthForm.has_mobile_money  === '' ? null : growthForm.has_mobile_money === 'true',
-      momo_pay_code: growthForm.momo_pay_code || '',
+      has_momo_pay:      growthForm.has_momo_pay      === '' ? null : growthForm.has_momo_pay === 'true',
+      momo_pay_code: growthForm.has_momo_pay === 'true' ? (growthForm.momo_pay_code || '') : '',
       employees_ft_refugee: growthForm.employees_ft_refugee !== '' ? Number(growthForm.employees_ft_refugee) : null,
       employees_pt_refugee: growthForm.employees_pt_refugee !== '' ? Number(growthForm.employees_pt_refugee) : null,
       notes: growthForm.notes,
@@ -2835,6 +2836,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               { key: 'has_unbs',          label: 'Registered with UNBS' },
               { key: 'has_business_bank', label: 'Business Bank Account' },
               { key: 'has_mobile_money',  label: 'Mobile Money Account' },
+              { key: 'has_momo_pay',      label: 'MOMO Pay Code' },
             ].map(({ key, label }) => (
               <Grid item xs={6} key={key}>
                 <FormControl fullWidth size="small">
@@ -2849,12 +2851,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Grid>
             ))}
 
-            {/* MOMO Pay code — only shown when mobile money is Yes */}
-            {growthForm.has_mobile_money === 'true' && (
+            {/* MOMO Pay merchant code — only shown when has_momo_pay is Yes */}
+            {growthForm.has_momo_pay === 'true' && (
               <Grid item xs={12}>
-                <TextField fullWidth size="small" label="MOMO Pay Code"
+                <TextField fullWidth size="small" label="MOMO Pay Merchant Code"
                   placeholder="e.g. 123456"
-                  helperText="MTN / Airtel MOMO Pay merchant code"
+                  helperText="MTN / Airtel MOMO Pay merchant code number"
                   value={growthForm.momo_pay_code}
                   onChange={e => setGrowthForm(f => ({ ...f, momo_pay_code: e.target.value }))} />
               </Grid>
@@ -2896,7 +2898,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         </Typography>
                       </Grid>
                     )}
-                    {s.momo_pay_code && <Grid item xs={12}><Typography fontSize={11} color="text.secondary">MOMO Pay: <strong>{s.momo_pay_code}</strong></Typography></Grid>}
+                    {s.has_momo_pay != null && (
+                      <Grid item xs={12}>
+                        <Typography fontSize={11} color="text.secondary">
+                          MOMO Pay Code: <strong>{s.has_momo_pay ? 'Yes' : 'No'}</strong>
+                          {s.has_momo_pay && s.momo_pay_code ? ` · ${s.momo_pay_code}` : ''}
+                        </Typography>
+                      </Grid>
+                    )}
                     {s.notes && <Grid item xs={12}><Typography fontSize={11} color="text.secondary" sx={{ fontStyle: 'italic' }}>{s.notes}</Typography></Grid>}
                   </Grid>
                 </Box>
