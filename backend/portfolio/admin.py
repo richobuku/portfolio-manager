@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from django.utils import timezone
 from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate, TrainingFacilitationAssignment, TrainingReport
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
@@ -36,12 +38,37 @@ class TransactionAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
     date_hierarchy = 'transaction_date'
 
+
+class GrowthSnapshotInline(admin.TabularInline):
+    model            = MSMEGrowthSnapshot
+    extra            = 0
+    ordering         = ('-snapshot_date',)
+    can_delete       = False
+    show_change_link = True
+    fields = (
+        'snapshot_date', 'source', 'collected_by',
+        'annual_turnover', 'last_month_revenue', 'total_assets',
+        'employees_ft_male', 'employees_ft_female', 'employees_pt_male', 'employees_pt_female',
+        'employees_ft_refugee', 'employees_pt_refugee',
+        'has_tin', 'tin_number', 'has_ursb', 'ursb_reg_number',
+        'has_business_bank', 'bank_name', 'has_sacco',
+        'has_mobile_money', 'has_momo_pay', 'momo_pay_code',
+        'notes',
+    )
+    readonly_fields = ('snapshot_date', 'source', 'collected_by')
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(MSME)
 class MSMEAdmin(admin.ModelAdmin):
-    list_display = ('business_name', 'business_type', 'sector', 'owner_name', 'city', 'cohort', 'assigned_bge', 'employee_count')
-    list_filter = ('business_type', 'sector', 'cohort', 'is_active', 'created_at')
+    list_display  = ('business_name', 'business_type', 'sector', 'owner_name', 'city',
+                     'cohort', 'assigned_bge', 'latest_growth_update', 'growth_status')
+    list_filter   = ('business_type', 'sector', 'cohort', 'is_active', 'created_at')
     search_fields = ('business_name', 'owner_name', 'email', 'phone', 'address')
     readonly_fields = ('created_at', 'updated_at')
+    inlines       = [GrowthSnapshotInline]
     fieldsets = (
         ('Basic Information', {
             'fields': ('business_name', 'business_type', 'sector', 'registration_number')
@@ -60,12 +87,24 @@ class MSMEAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
-    def annual_revenue_display(self, obj):
-        if obj.annual_revenue:
-            return f"UGX {obj.annual_revenue:,.2f}"
-        return "N/A"
-    annual_revenue_display.short_description = 'Annual Revenue (UGX)'
+
+    def latest_growth_update(self, obj):
+        snap = obj.growth_snapshots.order_by('-snapshot_date').first()
+        return snap.snapshot_date if snap else '—'
+    latest_growth_update.short_description = 'Last Growth Update'
+    latest_growth_update.admin_order_field = 'growth_snapshots__snapshot_date'
+
+    def growth_status(self, obj):
+        snap = obj.growth_snapshots.order_by('-snapshot_date').first()
+        if not snap:
+            return format_html('<span style="color:#c62828;font-weight:600">No data</span>')
+        days = (timezone.now().date() - snap.snapshot_date).days
+        if days <= 30:
+            return format_html('<span style="color:#2e7d32;font-weight:600">✔ {d}d ago</span>', d=days)
+        if days <= 90:
+            return format_html('<span style="color:#f57c00;font-weight:600">⚠ {d}d ago</span>', d=days)
+        return format_html('<span style="color:#c62828;font-weight:600">✘ {d}d ago</span>', d=days)
+    growth_status.short_description = 'Data Freshness'
 
 @admin.register(BusinessGrowthExpert)
 class BusinessGrowthExpertAdmin(admin.ModelAdmin):
@@ -182,30 +221,51 @@ class CohortAdminAdmin(admin.ModelAdmin):
     group_list.short_description = 'Managed Groups'
 
 
-class GrowthSnapshotInline(admin.TabularInline):
-    model  = MSMEGrowthSnapshot
-    extra  = 0
-    fields = ('snapshot_date', 'source', 'collected_by', 'annual_turnover', 'total_assets',
-              'employees_ft_male', 'employees_ft_female', 'employees_pt_male', 'employees_pt_female',
-              'has_tin', 'has_business_bank', 'has_mobile_money', 'notes')
-    readonly_fields = ('snapshot_date', 'source', 'collected_by')
-    can_delete = False
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-
 @admin.register(MSMEGrowthSnapshot)
 class MSMEGrowthSnapshotAdmin(admin.ModelAdmin):
-    list_display  = ('msme', 'snapshot_date', 'source', 'annual_turnover', 'total_assets',
-                     'total_employees', 'collected_by')
-    list_filter   = ('source', 'snapshot_date')
-    search_fields = ('msme__business_name',)
-    readonly_fields = ('created_at',)
+    list_display  = ('msme', 'snapshot_date', 'source', 'collected_by',
+                     'annual_turnover', 'last_month_revenue', 'total_employees_display',
+                     'has_tin', 'has_ursb', 'has_business_bank', 'bank_name',
+                     'has_sacco', 'has_mobile_money', 'has_momo_pay')
+    list_filter   = ('source', 'snapshot_date', 'has_tin', 'has_ursb',
+                     'has_business_bank', 'has_sacco', 'has_mobile_money', 'has_momo_pay',
+                     'msme__cohort')
+    search_fields = ('msme__business_name', 'msme__msme_code', 'tin_number',
+                     'ursb_reg_number', 'bank_name', 'momo_pay_code')
+    readonly_fields = ('created_at', 'total_employees_display', 'female_employee_ratio')
+    date_hierarchy = 'snapshot_date'
+    fieldsets = (
+        ('MSME & Date', {
+            'fields': ('msme', 'snapshot_date', 'source', 'collected_by'),
+        }),
+        ('Financials (UGX)', {
+            'fields': ('annual_turnover', 'last_month_revenue', 'total_assets'),
+        }),
+        ('Workforce', {
+            'fields': (
+                ('employees_ft_male', 'employees_ft_female'),
+                ('employees_pt_male', 'employees_pt_female'),
+                ('employees_ft_refugee', 'employees_pt_refugee'),
+                'total_employees_display', 'female_employee_ratio',
+            ),
+        }),
+        ('Compliance & Financial Access', {
+            'fields': (
+                ('has_tin', 'tin_number'),
+                ('has_ursb', 'ursb_reg_number'),
+                ('has_business_bank', 'bank_name'),
+                'has_sacco',
+                ('has_mobile_money', 'has_momo_pay', 'momo_pay_code'),
+            ),
+        }),
+        ('Notes', {
+            'fields': ('notes', 'created_at'),
+        }),
+    )
 
-    def total_employees(self, obj):
+    def total_employees_display(self, obj):
         return obj.total_employees
-    total_employees.short_description = 'Total staff'
+    total_employees_display.short_description = 'Total staff'
 
 
 @admin.register(TrainingReport)
