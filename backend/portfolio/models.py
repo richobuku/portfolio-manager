@@ -311,16 +311,22 @@ class MSMEGrowthSnapshot(models.Model):
         help_text='Investment in total assets (UGX)')
 
     # Workforce
-    employees_ft_male    = models.PositiveSmallIntegerField(null=True, blank=True)
-    employees_ft_female  = models.PositiveSmallIntegerField(null=True, blank=True)
-    employees_pt_male    = models.PositiveSmallIntegerField(null=True, blank=True)
-    employees_pt_female  = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_ft_male      = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_ft_female    = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_pt_male      = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_pt_female    = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_ft_refugee   = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Full-time staff who are refugees')
+    employees_pt_refugee   = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Part-time staff who are refugees')
 
     # Compliance & access
     has_tin           = models.BooleanField(null=True, blank=True)
     has_unbs          = models.BooleanField(null=True, blank=True)
     has_business_bank = models.BooleanField(null=True, blank=True)
     has_mobile_money  = models.BooleanField(null=True, blank=True)
+    momo_pay_code     = models.CharField(max_length=50, blank=True, default='',
+        help_text='MTN/Airtel MOMO Pay merchant code')
 
     # Narrative / context
     notes = models.TextField(blank=True)

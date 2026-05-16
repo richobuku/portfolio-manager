@@ -7,7 +7,7 @@ import {
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
   ListItemText, AppBar, Toolbar, Tooltip, Checkbox, Badge,
-  Tabs, Tab,
+  Tabs, Tab, Drawer,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
@@ -245,6 +245,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     employees_ft_male: '', employees_ft_female: '',
     employees_pt_male: '', employees_pt_female: '',
     has_tin: '', has_unbs: '', has_business_bank: '', has_mobile_money: '',
+    momo_pay_code: '',
+    employees_ft_refugee: '', employees_pt_refugee: '',
     notes: '',
   };
   const [growthForm, setGrowthForm] = useState(EMPTY_GROWTH);
@@ -281,6 +283,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       has_unbs:          growthForm.has_unbs          === '' ? null : growthForm.has_unbs === 'true',
       has_business_bank: growthForm.has_business_bank === '' ? null : growthForm.has_business_bank === 'true',
       has_mobile_money:  growthForm.has_mobile_money  === '' ? null : growthForm.has_mobile_money === 'true',
+      momo_pay_code: growthForm.momo_pay_code || '',
+      employees_ft_refugee: growthForm.employees_ft_refugee !== '' ? Number(growthForm.employees_ft_refugee) : null,
+      employees_pt_refugee: growthForm.employees_pt_refugee !== '' ? Number(growthForm.employees_pt_refugee) : null,
       notes: growthForm.notes,
     };
     try {
@@ -1046,6 +1051,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </Tooltip>
         </Toolbar>
       </AppBar>
+
+      {/* mobile drawer */}
+      <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)}
+        sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: DRAWER_WIDTH, maxWidth: '86vw', height: '100dvh', boxSizing: 'border-box', border: 'none' } }}>
+        <SidebarContent />
+      </Drawer>
 
       {/* desktop sidebar */}
       <Box sx={{ width: DRAWER_WIDTH, flexShrink: 0, display: { xs: 'none', md: 'block' } }}>
@@ -2796,6 +2807,25 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Grid>
             ))}
 
+            {/* Refugee employees sub-section */}
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Refugee Staff</Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField fullWidth size="small" label="FT Refugees" type="number"
+                inputProps={{ min: 0 }}
+                helperText="Full-time refugee staff"
+                value={growthForm.employees_ft_refugee}
+                onChange={e => setGrowthForm(f => ({ ...f, employees_ft_refugee: e.target.value }))} />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField fullWidth size="small" label="PT Refugees" type="number"
+                inputProps={{ min: 0 }}
+                helperText="Part-time refugee staff"
+                value={growthForm.employees_pt_refugee}
+                onChange={e => setGrowthForm(f => ({ ...f, employees_pt_refugee: e.target.value }))} />
+            </Grid>
+
             {/* Compliance */}
             <Grid item xs={12}>
               <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Compliance & Financial Access</Typography>
@@ -2818,6 +2848,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 </FormControl>
               </Grid>
             ))}
+
+            {/* MOMO Pay code — only shown when mobile money is Yes */}
+            {growthForm.has_mobile_money === 'true' && (
+              <Grid item xs={12}>
+                <TextField fullWidth size="small" label="MOMO Pay Code"
+                  placeholder="e.g. 123456"
+                  helperText="MTN / Airtel MOMO Pay merchant code"
+                  value={growthForm.momo_pay_code}
+                  onChange={e => setGrowthForm(f => ({ ...f, momo_pay_code: e.target.value }))} />
+              </Grid>
+            )}
 
             {/* Notes */}
             <Grid item xs={12}>
@@ -2850,9 +2891,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           {(s.employees_pt_male != null || s.employees_pt_female != null)
                             ? ` · ${(s.employees_pt_male||0)+(s.employees_pt_female||0)} PT` : ''}
                           {' '}({s.employees_ft_female||0} female FT)
+                          {(s.employees_ft_refugee != null || s.employees_pt_refugee != null)
+                            ? ` · ${(s.employees_ft_refugee||0)+(s.employees_pt_refugee||0)} refugees` : ''}
                         </Typography>
                       </Grid>
                     )}
+                    {s.momo_pay_code && <Grid item xs={12}><Typography fontSize={11} color="text.secondary">MOMO Pay: <strong>{s.momo_pay_code}</strong></Typography></Grid>}
                     {s.notes && <Grid item xs={12}><Typography fontSize={11} color="text.secondary" sx={{ fontStyle: 'italic' }}>{s.notes}</Typography></Grid>}
                   </Grid>
                 </Box>
