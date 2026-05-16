@@ -2664,145 +2664,140 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               </Grid>
 
               {/* ════════════════════════════════════════════════════════════
-                  PER-MSME BEFORE / AFTER CARDS
+                  PER-METRIC SIDE-BY-SIDE BAR CHARTS (paired MSMEs only)
                   ════════════════════════════════════════════════════════════ */}
-              <SectionLabel>Per-MSME Before / After</SectionLabel>
-              {latestList.length === 0 ? (
-                <Typography color="text.secondary">No data yet.</Typography>
-              ) : (
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  {latestList.map(s => {
-                    const f = s._first || {};
-                    const hasPair = f.id && f.id !== s.id;
-                    const m = msmes.find(x => x.id === s.msme);
-                    const updateCount = adminSnapshots.filter(x => x.msme === s.msme).length;
+              {paired.length > 0 && (() => {
+                // Build per-MSME rows for every chart — name truncated to 22 chars
+                const name = s => (s.msme_name || `MSME ${s.msme}`).slice(0, 22);
 
-                    const bFT = (f.employees_ft_male||0)+(f.employees_ft_female||0);
-                    const bPT = (f.employees_pt_male||0)+(f.employees_pt_female||0);
-                    const aFT = (s.employees_ft_male||0)+(s.employees_ft_female||0);
-                    const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+                // Revenue data (UGX thousands, to keep axis numbers readable)
+                const revRows = paired
+                  .filter(s => s._first.annual_turnover || s.annual_turnover)
+                  .map(s => ({
+                    name: name(s),
+                    Before: s._first.annual_turnover ? Math.round(Number(s._first.annual_turnover)/1000) : 0,
+                    After:  s.annual_turnover        ? Math.round(Number(s.annual_turnover)/1000)        : 0,
+                  }));
 
-                    const revPct = hasPair && f.annual_turnover && s.annual_turnover
-                      ? ((Number(s.annual_turnover)/Number(f.annual_turnover)-1)*100).toFixed(0) : null;
+                // Last-month revenue (UGX thousands)
+                const lmrRows = paired
+                  .filter(s => s._first.last_month_revenue || s.last_month_revenue)
+                  .map(s => ({
+                    name: name(s),
+                    Before: s._first.last_month_revenue ? Math.round(Number(s._first.last_month_revenue)/1000) : 0,
+                    After:  s.last_month_revenue        ? Math.round(Number(s.last_month_revenue)/1000)        : 0,
+                  }));
 
+                // FT Staff
+                const ftRows = paired.map(s => ({
+                  name: name(s),
+                  Before: (s._first.employees_ft_male||0)+(s._first.employees_ft_female||0),
+                  After:  (s.employees_ft_male||0)+(s.employees_ft_female||0),
+                })).filter(r => r.Before > 0 || r.After > 0);
 
-                    // Count compliance gains
-                    const compGains = hasPair
-                      ? compFields.filter(({ key }) => !f[key] && s[key]).length : 0;
+                // PT Staff
+                const ptRows = paired.map(s => ({
+                  name: name(s),
+                  Before: (s._first.employees_pt_male||0)+(s._first.employees_pt_female||0),
+                  After:  (s.employees_pt_male||0)+(s.employees_pt_female||0),
+                })).filter(r => r.Before > 0 || r.After > 0);
 
-                    // Row helper: shows before → after with change indicator
-                    const Row = ({ label, before, after, fmt = v => v, isComp = false }) => {
-                      const bVal = hasPair ? fmt(before) : null;
-                      const aVal = fmt(after);
-                      const changed = hasPair && String(before) !== String(after);
-                      return (
-                        <Box sx={{ display: 'flex', alignItems: 'flex-start', py: 0.6, borderBottom: '1px solid #F0F4F8' }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 110, pt: 0.3 }}>{label}</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                            {bVal != null && (
-                              <>
-                                <Typography variant="caption" color="text.disabled"
-                                  sx={{ textDecoration: changed ? 'line-through' : 'none', fontSize: 11 }}>
-                                  {isComp ? (before ? '✓' : '✗') : bVal}
-                                </Typography>
-                                {changed && <Typography variant="caption" color="text.secondary">→</Typography>}
-                              </>
-                            )}
-                            <Typography variant="caption" fontWeight={changed ? 700 : 400}
-                              color={!changed ? 'text.primary'
-                                : isComp ? (after ? 'success.main' : 'error.main')
-                                : (Number(after) > Number(before) ? 'success.main' : 'error.main')}>
-                              {isComp ? (after ? '✓' : '✗') : aVal}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      );
-                    };
+                // Per-compliance flag — show 0 or 1 per MSME
+                const compRows = compFields.map(({ label, key, color }) => ({
+                  label, key, color,
+                  rows: paired.map(s => ({
+                    name: name(s),
+                    Before: s._first[key] ? 1 : 0,
+                    After:  s[key]        ? 1 : 0,
+                  })),
+                }));
 
-                    return (
-                      <Grid item xs={12} sm={6} lg={4} key={s.id}>
-                        <Card variant="outlined" sx={{
-                          height: '100%',
-                          borderLeft: `3px solid ${hasPair ? (compGains > 0 || revPct > 0 ? '#2E7D32' : '#1A2F4B') : '#90A4AE'}`,
-                        }}>
-                          <CardContent sx={{ pb: '12px !important' }}>
-                            {/* Card header */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-                              <Box sx={{ minWidth: 0 }}>
-                                <Typography variant="subtitle2" fontWeight={700} noWrap>{s.msme_name || `MSME ${s.msme}`}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {m?.assigned_bge_name || '—'} · {updateCount} update{updateCount !== 1 ? 's' : ''}
-                                </Typography>
-                              </Box>
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end', flexShrink: 0, ml: 1 }}>
-                                {revPct != null && (
-                                  <Chip size="small" label={`Rev ${revPct > 0 ? '+' : ''}${revPct}%`}
-                                    sx={{ fontSize: 10, height: 18, bgcolor: revPct > 0 ? '#E8F5E9' : '#FFEBEE',
-                                      color: revPct > 0 ? '#2E7D32' : '#C8102E', fontWeight: 700 }} />
-                                )}
-                                {compGains > 0 && (
-                                  <Chip size="small" label={`+${compGains} compliance`}
-                                    sx={{ fontSize: 10, height: 18, bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 700 }} />
-                                )}
-                                {!hasPair && (
-                                  <Chip size="small" label="Baseline only"
-                                    sx={{ fontSize: 10, height: 18, bgcolor: '#F5F5F5', color: '#9E9E9E' }} />
-                                )}
-                              </Box>
-                            </Box>
+                const rowH = 28; // px per MSME row in horizontal charts
+                const minH = 160;
+                const h = (rows) => Math.max(minH, rows.length * rowH + 40);
 
-                            {/* Date range */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, px: 0.5 }}>
-                              <Box sx={{ textAlign: 'center' }}>
-                                <Typography variant="caption" color="text.secondary" display="block">First update</Typography>
-                                <Typography variant="caption" fontWeight={600}>{hasPair ? f.snapshot_date : '—'}</Typography>
-                              </Box>
-                              {hasPair && <Typography variant="caption" color="text.secondary" sx={{ pt: 1.5 }}>→</Typography>}
-                              <Box sx={{ textAlign: 'center' }}>
-                                <Typography variant="caption" color="text.secondary" display="block">Latest update</Typography>
-                                <Typography variant="caption" fontWeight={600}>{s.snapshot_date}</Typography>
-                              </Box>
-                            </Box>
+                const HorizChart = ({ data, xLabel, tooltip }) => (
+                  <ResponsiveContainer width="100%" height={h(data)}>
+                    <BarChart layout="vertical" data={data} margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
+                      <XAxis type="number" tick={{ fontSize: 10 }} label={xLabel ? { value: xLabel, position: 'insideBottomRight', offset: -4, fontSize: 10 } : undefined}/>
+                      <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10 }}/>
+                      <ReTooltip formatter={tooltip || ((v, n) => [v, n])}/>
+                      <Legend wrapperStyle={{ fontSize: 11 }}/>
+                      <Bar dataKey="Before" fill="#90A4AE" radius={[0,3,3,0]}/>
+                      <Bar dataKey="After"  fill="#1A2F4B" radius={[0,3,3,0]}/>
+                    </BarChart>
+                  </ResponsiveContainer>
+                );
 
-                            {/* Key areas */}
-                            <Box>
-                              <Row label="Annual Revenue"
-                                before={f.annual_turnover ? Number(f.annual_turnover).toLocaleString() : '—'}
-                                after={s.annual_turnover ? Number(s.annual_turnover).toLocaleString() : '—'}
-                                fmt={v => v === '—' ? '—' : `UGX ${v}`}
-                              />
-                              <Row label="Last Month Rev."
-                                before={f.last_month_revenue ? Number(f.last_month_revenue).toLocaleString() : '—'}
-                                after={s.last_month_revenue ? Number(s.last_month_revenue).toLocaleString() : '—'}
-                                fmt={v => v === '—' ? '—' : `UGX ${v}`}
-                              />
-                              <Row label="Full-time Staff"
-                                before={bFT}
-                                after={aFT}
-                                fmt={v => `${v}`}
-                              />
-                              <Row label="Part-time Staff"
-                                before={bPT}
-                                after={aPT}
-                                fmt={v => `${v}`}
-                              />
-                              {compFields.map(({ label, key }) => (
-                                <Row key={key} label={label} before={f[key]} after={s[key]} isComp />
-                              ))}
-                              {s.bank_name && (
-                                <Box sx={{ pt: 0.5 }}>
-                                  <Typography variant="caption" color="text.secondary">Bank: </Typography>
-                                  <Typography variant="caption" fontWeight={600}>{s.bank_name}</Typography>
-                                </Box>
-                              )}
-                            </Box>
-                          </CardContent>
-                        </Card>
+                return (
+                  <>
+                    <SectionLabel>Per-MSME Side-by-Side Comparison — Before vs After</SectionLabel>
+
+                    {/* Financial metrics row */}
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                      {revRows.length > 0 && (
+                        <Grid item xs={12} md={lmrRows.length > 0 ? 6 : 12}>
+                          <ChartCard title="Annual Revenue" subtitle="UGX thousands — first vs latest update" height={h(revRows)}>
+                            <HorizChart data={revRows} xLabel="UGX (K)"
+                              tooltip={(v) => [`UGX ${(v*1000).toLocaleString()}`, '']}/>
+                          </ChartCard>
+                        </Grid>
+                      )}
+                      {lmrRows.length > 0 && (
+                        <Grid item xs={12} md={revRows.length > 0 ? 6 : 12}>
+                          <ChartCard title="Last Month Revenue" subtitle="UGX thousands — first vs latest update" height={h(lmrRows)}>
+                            <HorizChart data={lmrRows} xLabel="UGX (K)"
+                              tooltip={(v) => [`UGX ${(v*1000).toLocaleString()}`, '']}/>
+                          </ChartCard>
+                        </Grid>
+                      )}
+                    </Grid>
+
+                    {/* Workforce metrics row */}
+                    {(ftRows.length > 0 || ptRows.length > 0) && (
+                      <Grid container spacing={2} sx={{ mb: 2 }}>
+                        {ftRows.length > 0 && (
+                          <Grid item xs={12} md={ptRows.length > 0 ? 6 : 12}>
+                            <ChartCard title="Full-Time Staff" subtitle="Headcount — first vs latest update" height={h(ftRows)}>
+                              <HorizChart data={ftRows}/>
+                            </ChartCard>
+                          </Grid>
+                        )}
+                        {ptRows.length > 0 && (
+                          <Grid item xs={12} md={ftRows.length > 0 ? 6 : 12}>
+                            <ChartCard title="Part-Time Staff" subtitle="Headcount — first vs latest update" height={h(ptRows)}>
+                              <HorizChart data={ptRows}/>
+                            </ChartCard>
+                          </Grid>
+                        )}
                       </Grid>
-                    );
-                  })}
-                </Grid>
-              )}
+                    )}
+
+                    {/* One chart per compliance flag */}
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                      {compRows.map(({ label, key, color, rows }) => (
+                        <Grid item xs={12} sm={6} md={4} key={key}>
+                          <ChartCard title={label} subtitle="0 = No, 1 = Yes — first vs latest update" height={h(rows)}>
+                            <ResponsiveContainer width="100%" height={h(rows)}>
+                              <BarChart layout="vertical" data={rows} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
+                                <XAxis type="number" domain={[0, 1]} ticks={[0, 1]} tick={{ fontSize: 10 }}
+                                  tickFormatter={v => v === 1 ? 'Yes' : 'No'}/>
+                                <YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 10 }}/>
+                                <ReTooltip formatter={v => [v === 1 ? 'Yes' : 'No', '']}/>
+                                <Legend wrapperStyle={{ fontSize: 11 }}/>
+                                <Bar dataKey="Before" fill="#90A4AE" radius={[0,3,3,0]}/>
+                                <Bar dataKey="After"  fill={color}   radius={[0,3,3,0]}/>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </ChartCard>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </>
+                );
+              })()}
 
               {/* ════════════════════════════════════════════════════════════
                   RAW DATA TABLE (scrollable)
