@@ -2414,11 +2414,31 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               + (s.employees_pt_male||0)+(s.employees_pt_female||0), 0);
 
           // ── Compliance counts from latest snapshots ───────────────────────
-          const bankCount  = latestList.filter(s => s.has_business_bank).length;
-          const momoCount  = latestList.filter(s => s.has_momo_pay).length;
-          const tinCount   = latestList.filter(s => s.has_tin).length;
-          const ursbCount  = latestList.filter(s => s.has_ursb).length;
-          const saccoCount = latestList.filter(s => s.has_sacco).length;
+          const bankCount        = latestList.filter(s => s.has_business_bank).length;
+          const momoCount        = latestList.filter(s => s.has_momo_pay).length;
+          const tinCount         = latestList.filter(s => s.has_tin).length;
+          const ursbCount        = latestList.filter(s => s.has_ursb).length;
+          const saccoCount       = latestList.filter(s => s.has_sacco).length;
+          const mobileMoneyCount = latestList.filter(s => s.has_mobile_money).length;
+
+          // ── Diagnostic Baseline vs Growth Update comparison ───────────────
+          const diagTotal = A.diag_total || 0;
+          const diagComp  = A.diag_compliance || {};
+          const diagEmp   = A.diag_employees  || {};
+
+          const diagVsGrowthCompliance = [
+            { metric: 'TIN',           Diagnostic: diagTotal ? Math.round((diagComp.has_tin||0)/diagTotal*100)            : 0, GrowthUpdate: latestList.length ? Math.round(tinCount/latestList.length*100)         : 0, diagRaw: diagComp.has_tin||0,            growthRaw: tinCount },
+            { metric: 'Business Bank', Diagnostic: diagTotal ? Math.round((diagComp.has_business_bank||0)/diagTotal*100)  : 0, GrowthUpdate: latestList.length ? Math.round(bankCount/latestList.length*100)        : 0, diagRaw: diagComp.has_business_bank||0,  growthRaw: bankCount },
+            { metric: 'Mobile Money',  Diagnostic: diagTotal ? Math.round((diagComp.has_mobile_money||0)/diagTotal*100)   : 0, GrowthUpdate: latestList.length ? Math.round(mobileMoneyCount/latestList.length*100) : 0, diagRaw: diagComp.has_mobile_money||0,   growthRaw: mobileMoneyCount },
+            { metric: 'URSB/UNBS',    Diagnostic: diagTotal ? Math.round((diagComp.has_unbs||0)/diagTotal*100)            : 0, GrowthUpdate: latestList.length ? Math.round(ursbCount/latestList.length*100)        : 0, diagRaw: diagComp.has_unbs||0,           growthRaw: ursbCount },
+          ];
+
+          const diagVsGrowthEmployees = [
+            { category: 'FT Male',   Diagnostic: diagEmp.ft_male||0,   GrowthUpdate: latestList.reduce((a,s) => a+(s.employees_ft_male||0),    0) },
+            { category: 'FT Female', Diagnostic: diagEmp.ft_female||0, GrowthUpdate: latestList.reduce((a,s) => a+(s.employees_ft_female||0),  0) },
+            { category: 'PT Male',   Diagnostic: diagEmp.pt_male||0,   GrowthUpdate: latestList.reduce((a,s) => a+(s.employees_pt_male||0),    0) },
+            { category: 'PT Female', Diagnostic: diagEmp.pt_female||0, GrowthUpdate: latestList.reduce((a,s) => a+(s.employees_pt_female||0),  0) },
+          ].filter(r => r.Diagnostic > 0 || r.GrowthUpdate > 0);
 
           // ── Employee breakdown by category (before vs after, paired only) ─
           const empCats = [
@@ -2702,6 +2722,69 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Grid>
                 )}
               </Grid>
+
+              {/* ════════════════════════════════════════════════════════════
+                  DIAGNOSTIC BASELINE vs GROWTH UPDATE COMPARISON
+                  ════════════════════════════════════════════════════════════ */}
+              {(diagTotal > 0 || latestList.length > 0) && (
+                <>
+                  <SectionLabel>Diagnostic Baseline vs Growth Update</SectionLabel>
+                  <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F3F6FA', borderRadius: 2, border: '1px solid #DDE4EE' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      <strong>Diagnostic Baseline</strong> — data collected during the initial diagnostic assessment
+                      ({diagTotal} MSMEs). &nbsp;
+                      <strong>Growth Update</strong> — latest update submitted by BGEs
+                      ({latestList.length} MSMEs). &nbsp;
+                      Compliance shown as % of each respective population.
+                    </Typography>
+                  </Box>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {diagVsGrowthCompliance.some(r => r.Diagnostic > 0 || r.GrowthUpdate > 0) && (
+                      <Grid item xs={12} md={6}>
+                        <ChartCard
+                          title="Compliance — Diagnostic vs Growth Update"
+                          subtitle="% of each population with the compliance flag"
+                          height={260}>
+                          <ResponsiveContainer>
+                            <BarChart data={diagVsGrowthCompliance} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                              <XAxis dataKey="metric" tick={{ fontSize: 10 }}/>
+                              <YAxis unit="%" domain={[0,100]} tick={{ fontSize: 10 }}/>
+                              <ReTooltip formatter={(val, name, props) => [
+                                `${val}% (${name === 'Diagnostic' ? props.payload.diagRaw : props.payload.growthRaw} MSMEs)`,
+                                name,
+                              ]}/>
+                              <Legend wrapperStyle={{ fontSize: 11 }}/>
+                              <Bar dataKey="Diagnostic"   fill="#C8102E" radius={[3,3,0,0]}/>
+                              <Bar dataKey="GrowthUpdate" name="Growth Update" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ChartCard>
+                      </Grid>
+                    )}
+                    {diagVsGrowthEmployees.length > 0 && (
+                      <Grid item xs={12} md={6}>
+                        <ChartCard
+                          title="Employees — Diagnostic vs Growth Update"
+                          subtitle="Total headcount per category across all MSMEs"
+                          height={260}>
+                          <ResponsiveContainer>
+                            <BarChart data={diagVsGrowthEmployees} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                              <XAxis dataKey="category" tick={{ fontSize: 10 }}/>
+                              <YAxis allowDecimals={false} tick={{ fontSize: 10 }}/>
+                              <ReTooltip/>
+                              <Legend wrapperStyle={{ fontSize: 11 }}/>
+                              <Bar dataKey="Diagnostic"   fill="#C8102E" radius={[3,3,0,0]}/>
+                              <Bar dataKey="GrowthUpdate" name="Growth Update" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ChartCard>
+                      </Grid>
+                    )}
+                  </Grid>
+                </>
+              )}
 
               <SectionLabel>Programme Before / After Charts</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
