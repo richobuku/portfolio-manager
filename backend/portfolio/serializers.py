@@ -95,6 +95,7 @@ class MSMESerializer(serializers.ModelSerializer):
 
 class MSMEGrowthSnapshotSerializer(serializers.ModelSerializer):
     collected_by_name = serializers.CharField(source='collected_by.name', read_only=True)
+    msme_name         = serializers.CharField(source='msme.business_name', read_only=True)
     total_employees   = serializers.ReadOnlyField()
     female_employee_ratio = serializers.ReadOnlyField()
 

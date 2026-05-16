@@ -17,6 +17,10 @@ import {
   HelpOutline, Close,
 } from '@mui/icons-material';
 import axios from 'axios';
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip as ReTooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -200,6 +204,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // Work orders
   const [workOrders, setWorkOrders] = useState([]);
   const [workOrderPreview, setWorkOrderPreview] = useState(null);
+  const [allSnapshots, setAllSnapshots] = useState([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [woReview, setWoReview] = useState(null);       // WO being reviewed in dialog
   const [woSigning, setWoSigning] = useState(null);     // id of WO being signed
   const [woPdfBlob, setWoPdfBlob] = useState(null);     // blob URL for PDF preview
@@ -231,6 +237,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [msmeDetailDialog, setMsmeDetailDialog] = useState(false);
   const [selectedMsme, setSelectedMsme] = useState(null);
   const [msmeReports, setMsmeReports] = useState([]);
+  const [msmeDetailTab, setMsmeDetailTab] = useState(0);
+  const [msmeDetailSnapshots, setMsmeDetailSnapshots] = useState([]);
 
   // Growth update form
   const [growthDialog, setGrowthDialog] = useState(false);
@@ -411,7 +419,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     if (typeof window.gtag === 'function') {
       window.gtag('event', 'page_view', { page_title: `BGE - ${section}`, page_path: `/bge/${section}` });
     }
-  }, [section]);
+    if (section === 'analytics' && allSnapshots.length === 0) {
+      const bgeId = currentUser?.bge_profile?.id;
+      if (!bgeId) return;
+      setAnalyticsLoading(true);
+      axios.get(`${API_ENDPOINTS.GROWTH_SNAPSHOTS}?bge=${bgeId}`, { headers })
+        .then(res => setAllSnapshots(Array.isArray(res.data) ? res.data : res.data.results || []))
+        .catch(() => setAllSnapshots([]))
+        .finally(() => setAnalyticsLoading(false));
+    }
+  }, [section]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openNewReport = (msmeId = '') => {
     const msme = msmes.find(x => x.id === msmeId || x.id === Number(msmeId)) || null;
@@ -872,9 +889,19 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const openMsmeDetail = async (msme) => {
     setSelectedMsme(msme);
     setMsmeDetailDialog(true);
+    setMsmeDetailTab(0);
+    setMsmeDetailSnapshots([]);
     try {
-      const res = await axios.get(`${API_ENDPOINTS.REPORTS}?msme=${msme.id}`, { headers });
-      setMsmeReports(Array.isArray(res.data) ? res.data : res.data.results || []);
+      const [rptRes, snapRes] = await Promise.allSettled([
+        axios.get(`${API_ENDPOINTS.REPORTS}?msme=${msme.id}`, { headers }),
+        axios.get(`${API_ENDPOINTS.GROWTH_SNAPSHOTS}?msme=${msme.id}`, { headers }),
+      ]);
+      setMsmeReports(rptRes.status === 'fulfilled'
+        ? (Array.isArray(rptRes.value.data) ? rptRes.value.data : rptRes.value.data.results || [])
+        : []);
+      setMsmeDetailSnapshots(snapRes.status === 'fulfilled'
+        ? (Array.isArray(snapRes.value.data) ? snapRes.value.data : snapRes.value.data.results || [])
+        : []);
     } catch {
       setMsmeReports([]);
     }
@@ -952,6 +979,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'groups',      label: 'My Groups',      icon: <GroupIcon /> },
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
+    { key: 'analytics',   label: 'Analytics',      icon: <People /> },
     ...(facilitationAssignments.length > 0
       ? [{ key: 'training', label: 'Training', icon: <School />, badge: facilitationAssignments.length }]
       : []),
@@ -1459,12 +1487,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       <TableCell>MSME</TableCell>
                       <TableCell>Visit Type</TableCell>
                       <TableCell>Visit Date</TableCell>
+                      <TableCell>Latest Growth Update</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paged(reports, reportPage).map((r) => (
+                    {paged(reports, reportPage).map((r) => {
+                      const msmeSnaps = msmes.find(m => m.id === r.msme);
+                      const lastSnap = msmeSnaps?.last_growth_snapshot;
+                      return (
                       <TableRow key={r.id} hover>
                         <TableCell>
                           <Typography fontSize={13} fontWeight={600}>{r.msme_name || r.msme}</Typography>
@@ -1472,6 +1504,20 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         </TableCell>
                         <TableCell>{VISIT_TYPE_LABELS[r.visit_type] || r.visit_type}</TableCell>
                         <TableCell>{r.visit_date}</TableCell>
+                        <TableCell>
+                          {lastSnap ? (
+                            <Box>
+                              <Typography fontSize={12} fontWeight={600}>{lastSnap.snapshot_date}</Typography>
+                              {lastSnap.annual_turnover && (
+                                <Typography fontSize={11} color="text.secondary">
+                                  Rev: UGX {Number(lastSnap.annual_turnover).toLocaleString()}
+                                </Typography>
+                              )}
+                            </Box>
+                          ) : (
+                            <Typography fontSize={11} color="text.disabled">No data</Typography>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Chip label={r.status} size="small" color={STATUS_COLORS[r.status] || 'default'} />
                         </TableCell>
@@ -1502,7 +1548,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           </Box>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 <TablePagination
@@ -1706,6 +1753,177 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             )}
           </Box>
         )}
+
+        {/* ── Analytics ──────────────────────────────────────────────────── */}
+        {section === 'analytics' && (() => {
+          const fmtUGX = v => v == null ? '—' : `${(Number(v)/1000).toFixed(0)}K`;
+          const quarter = d => { const m = new Date(d).getMonth(); return `Q${Math.floor(m/3)+1}`; };
+          const year    = d => new Date(d).getFullYear();
+
+          // Latest snapshot per MSME
+          const latestByMsme = {};
+          allSnapshots.forEach(s => {
+            if (!latestByMsme[s.msme] || s.snapshot_date > latestByMsme[s.msme].snapshot_date)
+              latestByMsme[s.msme] = s;
+          });
+          const latestList = Object.values(latestByMsme).sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date));
+
+          // Revenue trend — one point per snapshot sorted by date
+          const revenueTrend = [...allSnapshots]
+            .filter(s => s.annual_turnover)
+            .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
+            .map(s => ({ date: s.snapshot_date, revenue: Number(s.annual_turnover), msme: s.msme_name || s.msme }));
+
+          // Quarterly aggregation for current + previous year
+          const currentYear = new Date().getFullYear();
+          const quarterlyData = {};
+          allSnapshots.forEach(s => {
+            const y = year(s.snapshot_date); const q = quarter(s.snapshot_date);
+            if (y !== currentYear && y !== currentYear - 1) return;
+            const key = `${y} ${q}`;
+            if (!quarterlyData[key]) quarterlyData[key] = { period: key, revenue: 0, count: 0, staff: 0 };
+            if (s.annual_turnover) { quarterlyData[key].revenue += Number(s.annual_turnover); quarterlyData[key].count++; }
+            const ft = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+            const pt = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+            if (ft+pt > 0) quarterlyData[key].staff += ft+pt;
+          });
+          const quarterlyChart = Object.values(quarterlyData)
+            .sort((a, b) => a.period.localeCompare(b.period))
+            .map(q => ({ ...q, avgRevenue: q.count ? Math.round(q.revenue/q.count) : 0 }));
+
+          // Summary stats
+          const withRevenue = latestList.filter(s => s.annual_turnover);
+          const avgRevenue = withRevenue.length
+            ? withRevenue.reduce((s, x) => s + Number(x.annual_turnover), 0) / withRevenue.length : 0;
+          const msmeWithBank = latestList.filter(s => s.has_business_bank).length;
+          const msmeWithTin  = latestList.filter(s => s.has_tin).length;
+          const msmeWithSacco = latestList.filter(s => s.has_sacco).length;
+
+          return (
+            <Box>
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>Analytics</Typography>
+              {analyticsLoading && <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 4 }} />}
+              {!analyticsLoading && (
+                <>
+                  {/* Summary cards */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {[
+                      { label: 'MSMEs with data',    value: latestList.length },
+                      { label: 'Avg Annual Revenue', value: `UGX ${fmtUGX(avgRevenue)}` },
+                      { label: 'Have Bank Account',  value: `${msmeWithBank} / ${latestList.length}` },
+                      { label: 'Have TIN',           value: `${msmeWithTin} / ${latestList.length}` },
+                      { label: 'SACCO Members',      value: `${msmeWithSacco} / ${latestList.length}` },
+                      { label: 'Total Snapshots',    value: allSnapshots.length },
+                    ].map(({ label, value }) => (
+                      <Grid item xs={6} sm={4} md={2} key={label}>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', height: '100%' }}>
+                          <Typography fontSize={20} fontWeight={700} color="primary.main">{value}</Typography>
+                          <Typography fontSize={11} color="text.secondary">{label}</Typography>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+
+                  {/* Revenue trend chart */}
+                  {revenueTrend.length > 1 && (
+                    <Paper sx={{ p: 2, mb: 3 }}>
+                      <Typography fontWeight={700} fontSize={13} sx={{ mb: 1.5 }}>Revenue Over Time (UGX)</Typography>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={revenueTrend} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF2" />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                          <YAxis tickFormatter={v => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10 }} width={52} />
+                          <ReTooltip formatter={(v) => [`UGX ${Number(v).toLocaleString()}`, 'Revenue']} />
+                          <Line type="monotone" dataKey="revenue" stroke="#1B3A5C" strokeWidth={2} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </Paper>
+                  )}
+
+                  {/* Quarterly comparison chart */}
+                  {quarterlyChart.length > 0 && (
+                    <Paper sx={{ p: 2, mb: 3 }}>
+                      <Typography fontWeight={700} fontSize={13} sx={{ mb: 1.5 }}>
+                        Quarterly Avg Revenue — {currentYear - 1} vs {currentYear} (UGX)
+                      </Typography>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={quarterlyChart} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF2" />
+                          <XAxis dataKey="period" tick={{ fontSize: 10 }} />
+                          <YAxis tickFormatter={v => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10 }} width={52} />
+                          <ReTooltip formatter={(v) => [`UGX ${Number(v).toLocaleString()}`, 'Avg Revenue']} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Bar dataKey="avgRevenue" name="Avg Revenue" fill="#1B3A5C" radius={[3,3,0,0]} />
+                          <Bar dataKey="staff" name="Avg Staff" fill="#F9A825" radius={[3,3,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Paper>
+                  )}
+
+                  {/* Per-MSME latest snapshot table */}
+                  <Paper sx={{ overflowX: 'auto' }}>
+                    <Box sx={{ p: 2, borderBottom: '1px solid #E8EDF2' }}>
+                      <Typography fontWeight={700} fontSize={13}>Latest Growth Update Per MSME</Typography>
+                    </Box>
+                    {latestList.length === 0 ? (
+                      <Box sx={{ p: 3, textAlign: 'center' }}>
+                        <Typography color="text.secondary" fontSize={13}>No growth data recorded yet.</Typography>
+                      </Box>
+                    ) : (
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>MSME</TableCell>
+                            <TableCell>Last Updated</TableCell>
+                            <TableCell>Annual Revenue</TableCell>
+                            <TableCell>Last Month Rev.</TableCell>
+                            <TableCell>Total Staff</TableCell>
+                            <TableCell>TIN</TableCell>
+                            <TableCell>URSB</TableCell>
+                            <TableCell>Bank</TableCell>
+                            <TableCell>SACCO</TableCell>
+                            <TableCell>MoMo</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {latestList.map(s => {
+                            const ft = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+                            const pt = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+                            const Dot = ({ val }) => val == null
+                              ? <Typography fontSize={11} color="text.disabled">—</Typography>
+                              : <Chip size="small" label={val ? '✓' : '✗'} color={val ? 'success' : 'default'}
+                                  variant={val ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />;
+                            return (
+                              <TableRow key={s.id} hover>
+                                <TableCell>
+                                  <Typography fontSize={12} fontWeight={600}>{s.msme_name || s.msme}</Typography>
+                                </TableCell>
+                                <TableCell sx={{ fontSize: 12 }}>{s.snapshot_date}</TableCell>
+                                <TableCell sx={{ fontSize: 12 }}>{s.annual_turnover ? `UGX ${Number(s.annual_turnover).toLocaleString()}` : '—'}</TableCell>
+                                <TableCell sx={{ fontSize: 12 }}>{s.last_month_revenue ? `UGX ${Number(s.last_month_revenue).toLocaleString()}` : '—'}</TableCell>
+                                <TableCell sx={{ fontSize: 12 }}>{ft+pt > 0 ? `${ft+pt} (${ft} FT)` : '—'}</TableCell>
+                                <TableCell><Dot val={s.has_tin} /></TableCell>
+                                <TableCell><Dot val={s.has_ursb} /></TableCell>
+                                <TableCell>
+                                  {s.has_business_bank == null ? <Typography fontSize={11} color="text.disabled">—</Typography>
+                                    : <Chip size="small" label={s.bank_name || (s.has_business_bank ? '✓' : '✗')}
+                                        color={s.has_business_bank ? 'success' : 'default'}
+                                        variant={s.has_business_bank ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />}
+                                </TableCell>
+                                <TableCell><Dot val={s.has_sacco} /></TableCell>
+                                <TableCell><Dot val={s.has_mobile_money} /></TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </Paper>
+                </>
+              )}
+            </Box>
+          );
+        })()}
 
         {/* ── Training facilitation section ──────────────────────────────── */}
         {section === 'training' && (
@@ -2640,104 +2858,211 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </DialogTitle>
 
               <DialogContent dividers sx={{ p: 0 }}>
-                {/* ── Core info ── */}
-                <Box sx={{ p: 2, bgcolor: '#F8F9FA', borderBottom: '1px solid #E8EDF2' }}>
-                  <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Business Profile</Typography>
-                  <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
-                    <Field label="Owner"         value={m.owner_name} />
-                    <Field label="Phone"          value={m.phone} />
-                    <Field label="Email"          value={m.email || m.business_email} />
-                    <Field label="Sector"         value={m.sector} />
-                    <Field label="Business Type"  value={m.business_type} />
-                    <Field label="Cohort"         value={m.cohort_name} />
-                    <Field label="District"       value={m.state || m.diag_district} />
-                    <Field label="City / Town"    value={m.city} />
-                    <Field label="Assigned BGE"   value={m.assigned_bge_name} />
-                    <Field label="Registration #" value={m.registration_number} />
-                  </Grid>
-                </Box>
+                <Tabs value={msmeDetailTab} onChange={(_, v) => setMsmeDetailTab(v)}
+                  sx={{ borderBottom: '1px solid #E8EDF2', px: 2, minHeight: 40 }}
+                  TabIndicatorProps={{ style: { height: 3 } }}>
+                  <Tab label="Profile" sx={{ fontSize: 12, minHeight: 40, py: 0 }} />
+                  <Tab label={`Reports (${msmeReports.length})`} sx={{ fontSize: 12, minHeight: 40, py: 0 }} />
+                  <Tab label={`Growth History (${msmeDetailSnapshots.length})`} sx={{ fontSize: 12, minHeight: 40, py: 0 }} />
+                </Tabs>
 
-                {/* ── Diagnostic baseline ── */}
-                {hasDiag && (
-                  <Box sx={{ p: 2, borderBottom: '1px solid #E8EDF2' }}>
-                    <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>
-                      Diagnostic Baseline
-                    </Typography>
-                    <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
-                      <Field label="Annual Turnover (band)" value={m.diag_annual_turnover} />
-                      <Field label="Total Assets (band)"    value={m.diag_total_assets} />
-                      <Field label="Years Operating"        value={m.diag_years_operating} />
-                      <Field label="Owner Sex"              value={m.diag_owner_sex} />
-                      <Field label="Owner Age"              value={m.diag_owner_age} />
-                      <Field label="Owner Education"        value={m.diag_owner_education} />
-                    </Grid>
-
-                    <Box sx={{ mt: 1.5 }}>
-                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>Workforce at baseline</Typography>
-                      <Grid container spacing={1}>
-                        {[
-                          { label: 'FT Male',   val: m.diag_employees_ft_male },
-                          { label: 'FT Female', val: m.diag_employees_ft_female },
-                          { label: 'PT Male',   val: m.diag_employees_pt_male },
-                          { label: 'PT Female', val: m.diag_employees_pt_female },
-                        ].map(({ label, val }) => val != null ? (
-                          <Grid item key={label}>
-                            <Box sx={{ textAlign: 'center', px: 1.5, py: 0.75, bgcolor: '#E8EDF2', borderRadius: 1 }}>
-                              <Typography fontWeight={700} fontSize={16}>{val}</Typography>
-                              <Typography variant="caption" color="text.secondary">{label}</Typography>
-                            </Box>
-                          </Grid>
-                        ) : null)}
+                {/* ── Tab 0: Profile ── */}
+                {msmeDetailTab === 0 && (
+                  <>
+                    <Box sx={{ p: 2, bgcolor: '#F8F9FA', borderBottom: '1px solid #E8EDF2' }}>
+                      <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Business Profile</Typography>
+                      <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+                        <Field label="Owner"         value={m.owner_name} />
+                        <Field label="Phone"          value={m.phone} />
+                        <Field label="Email"          value={m.email || m.business_email} />
+                        <Field label="Sector"         value={m.sector} />
+                        <Field label="Business Type"  value={m.business_type} />
+                        <Field label="Cohort"         value={m.cohort_name} />
+                        <Field label="District"       value={m.state || m.diag_district} />
+                        <Field label="City / Town"    value={m.city} />
+                        <Field label="Assigned BGE"   value={m.assigned_bge_name} />
+                        <Field label="Registration #" value={m.registration_number} />
                       </Grid>
                     </Box>
 
-                    <Box sx={{ mt: 1.5 }}>
-                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>Compliance & Access</Typography>
-                      <BoolBadge label="TIN"               value={m.diag_has_tin} />
-                      <BoolBadge label="UNBS"              value={m.diag_has_unbs} />
-                      <BoolBadge label="Business Bank"     value={m.diag_has_business_bank} />
-                      <BoolBadge label="Mobile Money"      value={m.diag_has_mobile_money} />
-                    </Box>
-
-                    {m.diag_is_green_business && (
-                      <Box sx={{ mt: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>Green Categories</Typography>
-                        {(m.diag_green_categories || []).map((cat, i) => (
-                          <Chip key={i} size="small" label={cat} color="success" variant="outlined" sx={{ mr: 0.5, mb: 0.5, fontSize: 10 }} />
-                        ))}
+                    {hasDiag && (
+                      <Box sx={{ p: 2 }}>
+                        <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>
+                          Diagnostic Baseline
+                        </Typography>
+                        <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+                          <Field label="Annual Turnover (band)" value={m.diag_annual_turnover} />
+                          <Field label="Total Assets (band)"    value={m.diag_total_assets} />
+                          <Field label="Years Operating"        value={m.diag_years_operating} />
+                          <Field label="Owner Sex"              value={m.diag_owner_sex} />
+                          <Field label="Owner Age"              value={m.diag_owner_age} />
+                          <Field label="Owner Education"        value={m.diag_owner_education} />
+                        </Grid>
+                        <Box sx={{ mt: 1.5 }}>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>Workforce at baseline</Typography>
+                          <Grid container spacing={1}>
+                            {[
+                              { label: 'FT Male',   val: m.diag_employees_ft_male },
+                              { label: 'FT Female', val: m.diag_employees_ft_female },
+                              { label: 'PT Male',   val: m.diag_employees_pt_male },
+                              { label: 'PT Female', val: m.diag_employees_pt_female },
+                            ].map(({ label, val }) => val != null ? (
+                              <Grid item key={label}>
+                                <Box sx={{ textAlign: 'center', px: 1.5, py: 0.75, bgcolor: '#E8EDF2', borderRadius: 1 }}>
+                                  <Typography fontWeight={700} fontSize={16}>{val}</Typography>
+                                  <Typography variant="caption" color="text.secondary">{label}</Typography>
+                                </Box>
+                              </Grid>
+                            ) : null)}
+                          </Grid>
+                        </Box>
+                        <Box sx={{ mt: 1.5 }}>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>Compliance & Access at Baseline</Typography>
+                          <BoolBadge label="TIN"           value={m.diag_has_tin} />
+                          <BoolBadge label="URSB"          value={m.diag_has_unbs} />
+                          <BoolBadge label="Business Bank" value={m.diag_has_business_bank} />
+                          <BoolBadge label="Mobile Money"  value={m.diag_has_mobile_money} />
+                        </Box>
+                        {m.diag_is_green_business && (
+                          <Box sx={{ mt: 1.5 }}>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>Green Categories</Typography>
+                            {(m.diag_green_categories || []).map((cat, i) => (
+                              <Chip key={i} size="small" label={cat} color="success" variant="outlined" sx={{ mr: 0.5, mb: 0.5, fontSize: 10 }} />
+                            ))}
+                          </Box>
+                        )}
                       </Box>
+                    )}
+                  </>
+                )}
+
+                {/* ── Tab 1: Reports ── */}
+                {msmeDetailTab === 1 && (
+                  <Box sx={{ p: 2 }}>
+                    {msmeReports.length === 0 ? (
+                      <Typography color="text.secondary" fontSize={13}>No visit reports yet.</Typography>
+                    ) : (
+                      msmeReports.map(r => (
+                        <Box key={r.id} sx={{ border: '1px solid #E8EDF2', borderRadius: 2, p: 1.5, mb: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                              <Typography fontSize={13} fontWeight={600}>{VISIT_TYPE_LABELS[r.visit_type] || r.visit_type}</Typography>
+                              <Typography fontSize={11} color="text.secondary">{r.visit_date}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              <Chip label={r.status} size="small" color={STATUS_COLORS[r.status] || 'default'} />
+                              {r.status === 'draft' && (
+                                <IconButton size="small" onClick={() => { setMsmeDetailDialog(false); openEditReport(r); }}>
+                                  <Edit fontSize="small" />
+                                </IconButton>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+                      ))
                     )}
                   </Box>
                 )}
 
-                {/* ── Reports ── */}
-                <Box sx={{ p: 2 }}>
-                  <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-                    Visit Reports ({msmeReports.length})
-                  </Typography>
-                  {msmeReports.length === 0 ? (
-                    <Typography color="text.secondary" fontSize={13}>No reports yet.</Typography>
-                  ) : (
-                    msmeReports.map(r => (
-                      <Box key={r.id} sx={{ border: '1px solid #E8EDF2', borderRadius: 2, p: 1.5, mb: 1 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Box>
-                            <Typography fontSize={13} fontWeight={600}>{VISIT_TYPE_LABELS[r.visit_type] || r.visit_type}</Typography>
-                            <Typography fontSize={11} color="text.secondary">{r.visit_date}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                            <Chip label={r.status} size="small" color={STATUS_COLORS[r.status] || 'default'} />
-                            {r.status === 'draft' && (
-                              <IconButton size="small" onClick={() => { setMsmeDetailDialog(false); openEditReport(r); }}>
-                                <Edit fontSize="small" />
-                              </IconButton>
+                {/* ── Tab 2: Growth History ── */}
+                {msmeDetailTab === 2 && (
+                  <Box sx={{ p: 2 }}>
+                    {msmeDetailSnapshots.length === 0 ? (
+                      <Box sx={{ textAlign: 'center', py: 4 }}>
+                        <Typography color="text.secondary" fontSize={13}>No growth updates recorded yet.</Typography>
+                        <Button size="small" variant="outlined" color="success" sx={{ mt: 1 }}
+                          onClick={() => { setMsmeDetailDialog(false); openGrowthForm(m); }}>
+                          Record First Update
+                        </Button>
+                      </Box>
+                    ) : (
+                      [...msmeDetailSnapshots].reverse().map((s, i) => {
+                        const prev = [...msmeDetailSnapshots].reverse()[i + 1];
+                        const revDelta = prev?.annual_turnover && s.annual_turnover
+                          ? ((Number(s.annual_turnover) - Number(prev.annual_turnover)) / Number(prev.annual_turnover) * 100).toFixed(1)
+                          : null;
+                        return (
+                          <Box key={s.id} sx={{ border: '1px solid #E8EDF2', borderRadius: 1.5, p: 2, mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography fontSize={13} fontWeight={700}>{s.snapshot_date}</Typography>
+                                {i === 0 && <Chip size="small" label="Latest" color="success" sx={{ fontSize: 10 }} />}
+                              </Box>
+                              <Chip size="small" label={s.source?.replace('_', ' ')} variant="outlined" sx={{ fontSize: 10 }} />
+                            </Box>
+
+                            {/* Financials */}
+                            {(s.annual_turnover || s.last_month_revenue || s.total_assets) && (
+                              <Box sx={{ mb: 1 }}>
+                                <Typography variant="overline" fontSize={9} color="text.secondary">Financials (UGX)</Typography>
+                                <Grid container spacing={1} sx={{ mt: 0 }}>
+                                  {s.annual_turnover && (
+                                    <Grid item xs={6}>
+                                      <Typography fontSize={11} color="text.secondary">Annual Revenue</Typography>
+                                      <Typography fontSize={13} fontWeight={600}>
+                                        {Number(s.annual_turnover).toLocaleString()}
+                                        {revDelta !== null && (
+                                          <Box component="span" sx={{ ml: 0.5, fontSize: 11, color: Number(revDelta) >= 0 ? 'success.main' : 'error.main' }}>
+                                            {Number(revDelta) >= 0 ? '▲' : '▼'}{Math.abs(revDelta)}%
+                                          </Box>
+                                        )}
+                                      </Typography>
+                                    </Grid>
+                                  )}
+                                  {s.last_month_revenue && (
+                                    <Grid item xs={6}>
+                                      <Typography fontSize={11} color="text.secondary">Last Month</Typography>
+                                      <Typography fontSize={13} fontWeight={600}>{Number(s.last_month_revenue).toLocaleString()}</Typography>
+                                    </Grid>
+                                  )}
+                                  {s.total_assets && (
+                                    <Grid item xs={6}>
+                                      <Typography fontSize={11} color="text.secondary">Total Assets</Typography>
+                                      <Typography fontSize={13} fontWeight={600}>{Number(s.total_assets).toLocaleString()}</Typography>
+                                    </Grid>
+                                  )}
+                                </Grid>
+                              </Box>
+                            )}
+
+                            {/* Workforce */}
+                            {(s.employees_ft_male != null || s.employees_ft_female != null) && (
+                              <Box sx={{ mb: 1 }}>
+                                <Typography variant="overline" fontSize={9} color="text.secondary">Workforce</Typography>
+                                <Typography fontSize={12}>
+                                  FT: {(s.employees_ft_male || 0) + (s.employees_ft_female || 0)} ({s.employees_ft_female || 0}F)
+                                  {(s.employees_pt_male != null || s.employees_pt_female != null) &&
+                                    ` · PT: ${(s.employees_pt_male || 0) + (s.employees_pt_female || 0)}`}
+                                  {(s.employees_ft_refugee != null || s.employees_pt_refugee != null) &&
+                                    ` · ${(s.employees_ft_refugee || 0) + (s.employees_pt_refugee || 0)} refugees`}
+                                </Typography>
+                              </Box>
+                            )}
+
+                            {/* Compliance */}
+                            {(s.has_tin != null || s.has_ursb != null || s.has_business_bank != null || s.has_sacco != null || s.has_mobile_money != null) && (
+                              <Box sx={{ mb: s.notes ? 1 : 0 }}>
+                                <Typography variant="overline" fontSize={9} color="text.secondary">Compliance & Access</Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.25 }}>
+                                  {s.has_tin != null && <Chip size="small" label={`TIN${s.tin_number ? `: ${s.tin_number}` : ''}`} color={s.has_tin ? 'success' : 'default'} variant={s.has_tin ? 'filled' : 'outlined'} sx={{ fontSize: 10 }} />}
+                                  {s.has_ursb != null && <Chip size="small" label={`URSB${s.ursb_reg_number ? `: ${s.ursb_reg_number}` : ''}`} color={s.has_ursb ? 'success' : 'default'} variant={s.has_ursb ? 'filled' : 'outlined'} sx={{ fontSize: 10 }} />}
+                                  {s.has_business_bank != null && <Chip size="small" label={s.bank_name || 'Bank Account'} color={s.has_business_bank ? 'success' : 'default'} variant={s.has_business_bank ? 'filled' : 'outlined'} sx={{ fontSize: 10 }} />}
+                                  {s.has_sacco != null && <Chip size="small" label="SACCO" color={s.has_sacco ? 'success' : 'default'} variant={s.has_sacco ? 'filled' : 'outlined'} sx={{ fontSize: 10 }} />}
+                                  {s.has_mobile_money != null && <Chip size="small" label="Mobile Money" color={s.has_mobile_money ? 'success' : 'default'} variant={s.has_mobile_money ? 'filled' : 'outlined'} sx={{ fontSize: 10 }} />}
+                                  {s.has_momo_pay != null && <Chip size="small" label={`MoMo Pay${s.momo_pay_code ? `: ${s.momo_pay_code}` : ''}`} color={s.has_momo_pay ? 'success' : 'default'} variant={s.has_momo_pay ? 'filled' : 'outlined'} sx={{ fontSize: 10 }} />}
+                                </Box>
+                              </Box>
+                            )}
+
+                            {s.notes && (
+                              <Typography fontSize={11} color="text.secondary" sx={{ fontStyle: 'italic', mt: 0.5 }}>{s.notes}</Typography>
                             )}
                           </Box>
-                        </Box>
-                      </Box>
-                    ))
-                  )}
-                </Box>
+                        );
+                      })
+                    )}
+                  </Box>
+                )}
               </DialogContent>
 
               <DialogActions>

@@ -206,8 +206,20 @@ class MSMEGrowthSnapshotViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = MSMEGrowthSnapshot.objects.select_related('msme', 'collected_by').order_by('snapshot_date')
         msme_id = self.request.query_params.get('msme')
+        bge_id  = self.request.query_params.get('bge')
         if msme_id:
             qs = qs.filter(msme_id=msme_id)
+        if bge_id:
+            # All snapshots for MSMEs directly assigned to this BGE or in their groups
+            from .models import BusinessGrowthExpert, BGEGroup
+            try:
+                bge = BusinessGrowthExpert.objects.get(pk=bge_id)
+                group_msme_ids = MSME.objects.filter(assigned_group__in=bge.bge_groups.all()).values_list('id', flat=True)
+                direct_msme_ids = MSME.objects.filter(assigned_bge=bge).values_list('id', flat=True)
+                all_ids = set(list(direct_msme_ids) + list(group_msme_ids))
+                qs = qs.filter(msme_id__in=all_ids)
+            except BusinessGrowthExpert.DoesNotExist:
+                qs = qs.none()
         return qs
 
     def destroy(self, request, *args, **kwargs):
