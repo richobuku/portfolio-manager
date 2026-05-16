@@ -1306,6 +1306,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <TableCell>Location</TableCell>
               <TableCell align="center">Supports</TableCell>
               <TableCell>Last Support</TableCell>
+              <TableCell>Growth Update</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -1415,6 +1416,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   ) : (
                     <Typography variant="caption" color="text.disabled">No visits yet</Typography>
                   )}
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const snaps = adminSnapshots.filter(s => s.msme === m.id);
+                    if (!snaps.length) return <Typography variant="caption" color="text.disabled">—</Typography>;
+                    const latest = snaps.sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date))[0];
+                    const days = Math.floor((new Date() - new Date(latest.snapshot_date)) / 86400000);
+                    const color = days <= 30 ? 'success.main' : days <= 90 ? 'warning.main' : 'error.main';
+                    return (
+                      <Tooltip title={`${snaps.length} update${snaps.length !== 1 ? 's' : ''}`}>
+                        <Typography variant="caption" color={color}>{latest.snapshot_date}</Typography>
+                      </Tooltip>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell><ActionCell item={m} type="msme" /></TableCell>
               </TableRow>
@@ -1741,6 +1756,27 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [richAnalytics, setRichAnalytics] = useState(null);
   const [analyticTab, setAnalyticTab] = useState(0);
 
+  // ── growth snapshots (admin view) ─────────────────────────────────────────
+  const [adminSnapshots, setAdminSnapshots] = useState([]);
+  const [adminSnapshotsLoading, setAdminSnapshotsLoading] = useState(false);
+  const [msmeDetailTab, setMsmeDetailTab] = useState(0);
+
+  // Fetch all growth snapshots for the admin view (MSMEs table + analytics).
+  // Runs once on mount and whenever section switches to msmes/analytics.
+  useEffect(() => {
+    if (!token) return;
+    if (section !== 'msmes' && section !== 'analytics') return;
+    setAdminSnapshotsLoading(true);
+    axios.get(API_ENDPOINTS.GROWTH_SNAPSHOTS, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => {
+        const data = Array.isArray(r.data) ? r.data : (r.data.results || []);
+        setAdminSnapshots(data);
+      })
+      .catch(() => {})
+      .finally(() => setAdminSnapshotsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, section]);
+
   // Refetch analytics whenever the filter changes — debounced + cancellable.
   // Without this the page fired a request on every Select change and a slow
   // response could overwrite a fresher one.
@@ -1937,6 +1973,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Tab label="Diagnostic"     />
             <Tab label="Performance"    />
             <Tab label="Geography"      />
+            <Tab label="Growth Data"    />
           </Tabs>
         </Paper>
 
@@ -2306,6 +2343,156 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </Grid>
           </Box>
         )}
+
+        {/* ════════════════════════════════════════════════════════════════
+            TAB 4 — Growth Data
+            ════════════════════════════════════════════════════════════════ */}
+        {analyticTab === 4 && (() => {
+          if (adminSnapshotsLoading) return <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress /></Box>;
+
+          // Derive per-MSME latest snapshot map
+          const latestByMsme = {};
+          adminSnapshots.forEach(s => {
+            if (!latestByMsme[s.msme] || new Date(s.snapshot_date) > new Date(latestByMsme[s.msme].snapshot_date)) {
+              latestByMsme[s.msme] = s;
+            }
+          });
+          const snapshotMsmeIds = Object.keys(latestByMsme).map(Number);
+          const msmesWithUpdates = msmes.filter(m => snapshotMsmeIds.includes(m.id));
+          const msmesWithout     = msmes.filter(m => !snapshotMsmeIds.includes(m.id));
+
+          const now = new Date();
+          const fresh   = msmesWithUpdates.filter(m => (now - new Date(latestByMsme[m.id].snapshot_date)) / 86400000 <= 30);
+          const amber   = msmesWithUpdates.filter(m => { const d = (now - new Date(latestByMsme[m.id].snapshot_date)) / 86400000; return d > 30 && d <= 90; });
+          const stale   = msmesWithUpdates.filter(m => (now - new Date(latestByMsme[m.id].snapshot_date)) / 86400000 > 90);
+
+          // Compliance from snapshots
+          const total = adminSnapshots.length;
+          const complianceFields = [
+            { label: 'URSB Registered',     key: 'has_ursb',          color: '#4527A0' },
+            { label: 'Has TIN',             key: 'has_tin',           color: '#1565C0' },
+            { label: 'Business Bank Acct',  key: 'has_business_bank', color: '#00695C' },
+            { label: 'Mobile Money',        key: 'has_mobile_money',  color: '#E65100' },
+            { label: 'MOMO Pay Code',       key: 'has_momo_pay',      color: '#F57C00' },
+            { label: 'SACCO Member',        key: 'has_sacco',         color: '#2E7D32' },
+          ];
+
+          // Monthly snapshot activity (last 12 months)
+          const monthCounts = {};
+          adminSnapshots.forEach(s => {
+            const m = s.snapshot_date ? s.snapshot_date.slice(0, 7) : null;
+            if (m) monthCounts[m] = (monthCounts[m] || 0) + 1;
+          });
+          const activityData = Object.entries(monthCounts)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-12)
+            .map(([month, count]) => ({
+              month: new Date(month + '-01').toLocaleString('en', { month: 'short', year: '2-digit' }),
+              Updates: count,
+            }));
+
+          return (
+            <Box>
+              <SectionLabel>Growth Update Coverage</SectionLabel>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[
+                  { val: adminSnapshots.length,    label: 'Total Updates',       sub: 'all records',          color: BRAND.primaryMain },
+                  { val: msmesWithUpdates.length,  label: 'MSMEs Updated',       sub: `of ${msmes.length}`,   color: '#2E7D32',         pct: msmes.length ? (msmesWithUpdates.length / msmes.length * 100) : 0 },
+                  { val: fresh.length,             label: 'Fresh (≤30 days)',    sub: 'recently updated',     color: '#2E7D32' },
+                  { val: amber.length,             label: 'Amber (31–90 days)',  sub: 'need attention',       color: '#F9A825' },
+                  { val: stale.length,             label: 'Stale (>90 days)',    sub: 'overdue',              color: '#C8102E' },
+                  { val: msmesWithout.length,      label: 'No Updates Yet',      sub: 'never updated',        color: '#9E9E9E' },
+                ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
+              </Grid>
+
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={8}>
+                  <ChartCard title="Growth Updates Over Time" subtitle="Monthly update activity" height={240}>
+                    <ResponsiveContainer>
+                      <BarChart data={activityData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                        <XAxis dataKey="month" tick={{fontSize:11}}/>
+                        <YAxis tick={{fontSize:11}}/>
+                        <ReTooltip/>
+                        <Bar dataKey="Updates" fill="#1A2F4B" radius={[4,4,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card variant="outlined" sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Compliance Rates (from Growth Updates)</Typography>
+                      {total === 0 ? (
+                        <Typography variant="body2" color="text.secondary">No growth data yet.</Typography>
+                      ) : complianceFields.map(({ label, key, color }) => {
+                        const count = adminSnapshots.filter(s => s[key]).length;
+                        return (
+                          <Box key={key} sx={{ mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+                              <Typography variant="body2">{label}</Typography>
+                              <Typography variant="body2" fontWeight={700} color={color}>
+                                {count} <Typography component="span" variant="caption" color="text.secondary">/ {total}</Typography>
+                              </Typography>
+                            </Box>
+                            <LinearProgress variant="determinate" value={total ? (count / total * 100) : 0}
+                              sx={{ height: 7, borderRadius: 4, bgcolor: '#E8EDF2', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 4 } }} />
+                          </Box>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              <SectionLabel>Per-MSME Growth Freshness</SectionLabel>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                    <TableRow>
+                      <TableCell>MSME</TableCell>
+                      <TableCell>Code</TableCell>
+                      <TableCell>BGE</TableCell>
+                      <TableCell>Latest Update</TableCell>
+                      <TableCell>Updates</TableCell>
+                      <TableCell>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {msmes.map(m => {
+                      const snap = latestByMsme[m.id];
+                      const count = adminSnapshots.filter(s => s.msme === m.id).length;
+                      const days = snap ? Math.floor((now - new Date(snap.snapshot_date)) / 86400000) : null;
+                      const color = !snap ? '#9E9E9E' : days <= 30 ? '#2E7D32' : days <= 90 ? '#F9A825' : '#C8102E';
+                      const label = !snap ? 'Never' : days <= 30 ? 'Fresh' : days <= 90 ? 'Amber' : 'Stale';
+                      return (
+                        <TableRow key={m.id} hover>
+                          <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
+                          <TableCell><Typography variant="caption" sx={{ fontFamily: 'monospace' }}>{m.msme_code}</Typography></TableCell>
+                          <TableCell><Typography variant="caption">{m.assigned_bge_name || '—'}</Typography></TableCell>
+                          <TableCell>
+                            {snap
+                              ? <Typography variant="caption" color={color}>{snap.snapshot_date}</Typography>
+                              : <Typography variant="caption" color="text.disabled">—</Typography>}
+                          </TableCell>
+                          <TableCell align="center">
+                            {count > 0
+                              ? <Chip label={count} size="small" variant="outlined" />
+                              : <Typography variant="caption" color="text.disabled">—</Typography>}
+                          </TableCell>
+                          <TableCell>
+                            <Chip label={label} size="small"
+                              sx={{ bgcolor: color + '22', color, fontWeight: 700, fontSize: 11 }} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          );
+        })()}
       </Box>
     );
   };
@@ -3670,9 +3857,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Box>
 
       {/* ── View dialog ──────────────────────────────────────────────────── */}
-      <Dialog open={!!viewItem} onClose={() => setViewItem(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          {viewItem?.business_name || viewItem?.name} — Details
+      <Dialog open={!!viewItem} onClose={() => { setViewItem(null); setMsmeDetailTab(0); }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 0 }}>
+          <Typography variant="subtitle1" fontWeight={700}>{viewItem?.business_name || viewItem?.name} — Details</Typography>
+          {viewItem && viewType === 'msme' && (
+            <Tabs value={msmeDetailTab} onChange={(_, v) => setMsmeDetailTab(v)}
+              textColor="primary" indicatorColor="primary" sx={{ mt: 0.5 }}>
+              <Tab label="Profile" sx={{ fontSize: 12 }} />
+              <Tab label={`Growth History (${adminSnapshots.filter(s => s.msme === viewItem.id).length})`} sx={{ fontSize: 12 }} />
+            </Tabs>
+          )}
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           {viewItem && viewType === 'expert' ? (
@@ -3725,11 +3919,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </Box>
               )}
             </Box>
-          ) : viewItem ? (
-            /* ── MSME / generic view ── */
+          ) : viewItem && viewType === 'msme' && msmeDetailTab === 0 ? (
+            /* ── MSME Profile tab ── */
             <Grid container spacing={1.5}>
               {Object.entries(viewItem)
-                .filter(([k]) => !['id','is_active','source_file','created_at','updated_at','latitude','longitude','assigned_msmes_list','group_names'].includes(k))
+                .filter(([k]) => !['id','is_active','source_file','created_at','updated_at','latitude','longitude','assigned_msmes_list','group_names','programme_groups_detail','programme_groups'].includes(k))
                 .map(([k, v]) => (
                   <Grid item xs={6} key={k}>
                     <Typography variant="caption" color="text.secondary" display="block">
@@ -3739,9 +3933,62 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Grid>
                 ))}
             </Grid>
+          ) : viewItem && viewType === 'msme' && msmeDetailTab === 1 ? (
+            /* ── MSME Growth History tab ── */
+            (() => {
+              const snaps = adminSnapshots
+                .filter(s => s.msme === viewItem.id)
+                .sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date));
+              if (!snaps.length) return (
+                <Box sx={{ py: 4, textAlign: 'center' }}>
+                  <TrendingUp sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+                  <Typography color="text.secondary">No growth updates recorded yet.</Typography>
+                </Box>
+              );
+              return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {snaps.map((s, idx) => (
+                    <Card key={s.id} variant="outlined" sx={{ borderLeft: `3px solid ${idx === 0 ? '#2E7D32' : '#90A4AE'}` }}>
+                      <CardContent sx={{ pb: '12px !important', pt: '12px !important' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="subtitle2" fontWeight={700}>{s.snapshot_date}</Typography>
+                          {idx === 0 && <Chip label="Latest" size="small" color="success" />}
+                        </Box>
+                        <Grid container spacing={1}>
+                          {[
+                            ['FT Employees', s.employees_ft_male != null ? `${(s.employees_ft_male||0)+(s.employees_ft_female||0)} (M:${s.employees_ft_male||0}/F:${s.employees_ft_female||0})` : '—'],
+                            ['PT Employees', s.employees_pt_male != null ? `${(s.employees_pt_male||0)+(s.employees_pt_female||0)} (M:${s.employees_pt_male||0}/F:${s.employees_pt_female||0})` : '—'],
+                            ['Annual Turnover', s.annual_turnover ? `UGX ${Number(s.annual_turnover).toLocaleString()}` : '—'],
+                            ['Last Month Revenue', s.last_month_revenue ? `UGX ${Number(s.last_month_revenue).toLocaleString()}` : '—'],
+                            ['Has URSB', s.has_ursb ? `Yes${s.ursb_reg_number ? ` (${s.ursb_reg_number})` : ''}` : 'No'],
+                            ['Has TIN', s.has_tin ? `Yes${s.tin_number ? ` (${s.tin_number})` : ''}` : 'No'],
+                            ['Business Bank', s.has_business_bank ? `Yes${s.bank_name ? ` — ${s.bank_name}` : ''}` : 'No'],
+                            ['Mobile Money', s.has_mobile_money ? 'Yes' : 'No'],
+                            ['MOMO Pay', s.has_momo_pay ? `Yes${s.momo_pay_code ? ` (${s.momo_pay_code})` : ''}` : 'No'],
+                            ['SACCO', s.has_sacco ? 'Yes' : 'No'],
+                            ['Collected By', s.collected_by_name || '—'],
+                          ].map(([label, val]) => (
+                            <Grid item xs={6} key={label}>
+                              <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
+                              <Typography variant="body2">{val}</Typography>
+                            </Grid>
+                          ))}
+                        </Grid>
+                        {s.notes && (
+                          <Box sx={{ mt: 1, p: 1, bgcolor: '#F8FAFC', borderRadius: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Notes</Typography>
+                            <Typography variant="body2" sx={{ fontSize: 12 }}>{s.notes}</Typography>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              );
+            })()
           ) : null}
         </DialogContent>
-        <DialogActions><Button onClick={() => setViewItem(null)}>Close</Button></DialogActions>
+        <DialogActions><Button onClick={() => { setViewItem(null); setMsmeDetailTab(0); }}>Close</Button></DialogActions>
       </Dialog>
 
       {/* ── Edit dialog ──────────────────────────────────────────────────── */}
