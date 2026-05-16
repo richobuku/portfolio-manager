@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Chip,
@@ -984,7 +984,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <ListItemButton
             key={key}
             selected={section === key}
-            onClick={() => { setSection(key); setMobileOpen(false); }}
+            onClick={() => { startTransition(() => setSection(key)); setMobileOpen(false); }}
             sx={{
               borderRadius: 2, mb: 0.5, color: 'rgba(255,255,255,0.75)',
               '&.Mui-selected': { bgcolor: BRAND.sidebarSelected, color: '#fff' },
@@ -1095,7 +1095,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     {' '}directly assigned to you · group MSMEs are in{' '}
                     <Box component="span"
                       sx={{ color: '#F9A825', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                      onClick={() => setSection('groups')}>
+                      onClick={() => startTransition(() => setSection('groups'))}>
                       My Groups
                     </Box>
                   </Typography>
@@ -1661,7 +1661,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                 Training sessions ({linked.length})
                               </Typography>
                               <Tooltip title="Go to Training page to record attendance and submit reports">
-                                <Button size="small" startIcon={<School />} onClick={() => setSection('training')}
+                                <Button size="small" startIcon={<School />} onClick={() => startTransition(() => setSection('training'))}
                                   sx={{ fontSize: 11 }}>
                                   Open Training
                                 </Button>
@@ -1670,7 +1670,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                               {linked.map(s => (
                                 <Box key={s.id}
-                                  onClick={() => setSection('training')}
+                                  onClick={() => startTransition(() => setSection('training'))}
                                   sx={{
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                     p: 1, borderRadius: 1, bgcolor: 'background.default',

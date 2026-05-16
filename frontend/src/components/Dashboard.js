@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, startTransition } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress,
@@ -1162,7 +1162,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <ListItemButton
             key={key}
             selected={section === key}
-            onClick={() => { setSection(key); setMobileOpen(false); }}
+            onClick={() => { startTransition(() => setSection(key)); setMobileOpen(false); }}
             draggable={!navLocked}
             onDragStart={!navLocked ? () => setDragKey(key) : undefined}
             onDragOver={!navLocked ? e => e.preventDefault() : undefined}
@@ -1603,7 +1603,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Card
               variant="outlined"
               sx={{ cursor: 'pointer', '&:hover': { boxShadow: 2 } }}
-              onClick={() => { setFilterCohort(c.id); setSection('msmes'); }}
+              onClick={() => { setFilterCohort(c.id); startTransition(() => setSection('msmes')); }}
             >
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
