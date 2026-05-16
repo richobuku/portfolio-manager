@@ -2413,6 +2413,33 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             a + (s.employees_ft_male||0)+(s.employees_ft_female||0)
               + (s.employees_pt_male||0)+(s.employees_pt_female||0), 0);
 
+          // ── Compliance counts from latest snapshots ───────────────────────
+          const bankCount  = latestList.filter(s => s.has_business_bank).length;
+          const momoCount  = latestList.filter(s => s.has_momo_pay).length;
+          const tinCount   = latestList.filter(s => s.has_tin).length;
+          const ursbCount  = latestList.filter(s => s.has_ursb).length;
+          const saccoCount = latestList.filter(s => s.has_sacco).length;
+
+          // ── Employee breakdown by category (before vs after, paired only) ─
+          const empCats = [
+            { key: 'employees_ft_male',    label: 'FT Male'    },
+            { key: 'employees_ft_female',  label: 'FT Female'  },
+            { key: 'employees_pt_male',    label: 'PT Male'    },
+            { key: 'employees_pt_female',  label: 'PT Female'  },
+            { key: 'employees_ft_refugee', label: 'FT Refugee' },
+            { key: 'employees_pt_refugee', label: 'PT Refugee' },
+          ];
+          const empChart = empCats.map(({ key, label }) => ({
+            category: label,
+            Before: paired.reduce((a, s) => a + (s._first[key]||0), 0),
+            After:  paired.reduce((a, s) => a + (s[key]||0), 0),
+          })).filter(r => r.Before > 0 || r.After > 0);
+
+          const totalEmpBefore = empCats.reduce((a, { key }) =>
+            a + paired.reduce((b, s) => b + (s._first[key]||0), 0), 0);
+          const totalEmpAfter  = empCats.reduce((a, { key }) =>
+            a + paired.reduce((b, s) => b + (s[key]||0), 0), 0);
+
           const now = new Date();
           const fresh = latestList.filter(s => (now - new Date(s.snapshot_date)) / 86400000 <= 30).length;
 
@@ -2610,6 +2637,72 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               {/* ════════════════════════════════════════════════════════════
                   PROGRAMME SUMMARY CHARTS (screen view)
                   ════════════════════════════════════════════════════════════ */}
+              {/* ════════════════════════════════════════════════════════════
+                  BUSINESS METRICS SUMMARY
+                  ════════════════════════════════════════════════════════════ */}
+              <SectionLabel>Business Metrics Summary (Latest Updates)</SectionLabel>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[
+                  { val: `UGX ${(avgRevLatest/1000).toFixed(0)}K`, label: 'Avg Annual Revenue',  sub: 'across all updated MSMEs',    color: '#2E7D32' },
+                  { val: `${bankCount} / ${latestList.length}`,    label: 'Business Bank Acct',  sub: 'have formal bank account',    color: '#00695C',
+                    pct: latestList.length ? bankCount/latestList.length*100 : 0 },
+                  { val: `${momoCount} / ${latestList.length}`,    label: 'MOMO Pay Code',       sub: 'registered mobile payment',   color: '#F57C00',
+                    pct: latestList.length ? momoCount/latestList.length*100 : 0 },
+                  { val: `${tinCount} / ${latestList.length}`,     label: 'TIN Registered',      sub: 'tax identification number',   color: '#1565C0',
+                    pct: latestList.length ? tinCount/latestList.length*100 : 0 },
+                  { val: `${ursbCount} / ${latestList.length}`,    label: 'URSB Registered',     sub: 'business registration',       color: '#4527A0',
+                    pct: latestList.length ? ursbCount/latestList.length*100 : 0 },
+                  { val: `${saccoCount} / ${latestList.length}`,   label: 'SACCO Members',       sub: 'savings cooperative',         color: '#2E7D32',
+                    pct: latestList.length ? saccoCount/latestList.length*100 : 0 },
+                ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
+              </Grid>
+
+              {/* Employee totals before vs after */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={4}>
+                  <Card variant="outlined" sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>Total Employees</Typography>
+                      {[
+                        { label: 'Before (first update)', val: totalEmpBefore, color: '#90A4AE' },
+                        { label: 'After (latest update)',  val: totalEmpAfter,  color: '#1A2F4B' },
+                        { label: 'Net change',
+                          val: `${totalEmpAfter - totalEmpBefore >= 0 ? '+' : ''}${totalEmpAfter - totalEmpBefore}`,
+                          color: totalEmpAfter >= totalEmpBefore ? '#2E7D32' : '#C8102E' },
+                      ].map(({ label, val, color }) => (
+                        <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                          <Typography variant="body2" color="text.secondary">{label}</Typography>
+                          <Typography variant="body2" fontWeight={700} color={color}>{val}</Typography>
+                        </Box>
+                      ))}
+                      <Divider sx={{ my: 1 }} />
+                      <Typography variant="caption" color="text.secondary">
+                        Based on {paired.length} MSMEs with ≥2 updates
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {empChart.length > 0 && (
+                  <Grid item xs={12} sm={8}>
+                    <ChartCard title="Employees Before vs After — By Category"
+                      subtitle={`${paired.length} paired MSMEs · first update vs latest update`} height={200}>
+                      <ResponsiveContainer>
+                        <BarChart data={empChart} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                          <XAxis dataKey="category" tick={{ fontSize: 11 }}/>
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11 }}/>
+                          <ReTooltip/>
+                          <Legend wrapperStyle={{ fontSize: 11 }}/>
+                          <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
+                          <Bar dataKey="After"  fill="#1A2F4B" radius={[3,3,0,0]}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </Grid>
+                )}
+              </Grid>
+
               <SectionLabel>Programme Before / After Charts</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {financialChart.length > 0 && (
