@@ -1036,6 +1036,25 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             'diag_districts':       diag_districts,
         })
 
+    @action(detail=False, methods=['get'], url_path='inactive')
+    def inactive_msmes(self, request):
+        """Admin-only: list all inactive MSMEs so they can be reviewed before reactivation."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can view inactive MSMEs.")
+        qs = MSME.objects.filter(is_active=False).order_by('business_name')
+        data = list(qs.values('id', 'business_name', 'msme_code', 'owner_name',
+                              'sector', 'city', 'cohort_id'))
+        return Response({'count': len(data), 'msmes': data})
+
+    @action(detail=False, methods=['post'], url_path='reactivate-all')
+    def reactivate_all(self, request):
+        """Admin-only: set is_active=True for every inactive MSME."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can reactivate MSMEs.")
+        updated = MSME.objects.filter(is_active=False).update(is_active=True)
+        return Response({'reactivated': updated,
+                         'message': f'{updated} MSME(s) reactivated successfully.'})
+
     @action(detail=False, methods=['post'], url_path='import-diagnostics')
     def import_diagnostics(self, request):
         """Admin-only: upload the diagnostics Excel and run the import in-process.

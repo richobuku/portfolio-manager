@@ -364,6 +364,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── assignment dialog ──────────────────────────────────────────────────────
   const [assignDialog, setAssignDialog] = useState(false);
+  const [inactiveMsmes, setInactiveMsmes]   = useState(null);  // null=unchecked, [] or array when loaded
+  const [reactivating, setReactivating]     = useState(false);
+
   const [assignTarget, setAssignTarget] = useState(null);  // MSME being assigned
   const [assignForm, setAssignForm] = useState({ bge_id: '', objectives: '', assignment_date: '' });
   const [assignSaving, setAssignSaving] = useState(false);
@@ -678,6 +681,24 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [msmeUploadSkipDups, setMsmeUploadSkipDups] = useState(false);
   const [msmeUploadResult, setMsmeUploadResult] = useState(null);
   const msmeFileRef = React.useRef();
+
+  const checkInactiveMsmes = async () => {
+    try {
+      const r = await axios.get(`${API_ENDPOINTS.MSMES}inactive/`, { headers: { Authorization: `Bearer ${token}` } });
+      setInactiveMsmes(r.data.msmes || []);
+    } catch { notify('Failed to fetch inactive MSMEs', 'error'); }
+  };
+
+  const reactivateAll = async () => {
+    setReactivating(true);
+    try {
+      const r = await axios.post(`${API_ENDPOINTS.MSMES}reactivate-all/`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      notify(r.data.message || 'MSMEs reactivated', 'success');
+      setInactiveMsmes(null);
+      fetchAll();
+    } catch { notify('Reactivation failed', 'error'); }
+    finally { setReactivating(false); }
+  };
 
   const openMsmeUpload = () => {
     setMsmeUploadDialog(true);
@@ -1251,6 +1272,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderMSMEs = () => (
     <Box>
       <SectionHeader title="MSMEs" subtitle={`${msmes.length} records`}>
+        <Button variant="outlined" color="warning" size="small" onClick={checkInactiveMsmes}>
+          Check Inactive
+        </Button>
         <Button variant="outlined" startIcon={<Upload />} size="small" onClick={openMsmeUpload}>
           Import MSME List
         </Button>
@@ -4651,6 +4675,55 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Dialog>
 
       {/* ── Import MSME List ─────────────────────────────────────────────── */}
+      {/* ── Inactive MSMEs dialog ── */}
+      <Dialog open={inactiveMsmes !== null} onClose={() => setInactiveMsmes(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Inactive MSMEs
+          <Typography variant="caption" display="block" color="text.secondary">
+            {inactiveMsmes?.length
+              ? `${inactiveMsmes.length} MSME(s) currently marked inactive (hidden from all views)`
+              : 'No inactive MSMEs found — all records are active.'}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {inactiveMsmes?.length > 0 ? (
+            <Box sx={{ maxHeight: 360, overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#F3F6FA' }}>
+                    {['#', 'Business Name', 'MSME Code', 'Owner', 'City'].map(h => (
+                      <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #DDE4EE' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {inactiveMsmes.map((m, i) => (
+                    <tr key={m.id} style={{ borderBottom: '1px solid #EEF1F5' }}>
+                      <td style={{ padding: '5px 8px', color: '#888' }}>{i + 1}</td>
+                      <td style={{ padding: '5px 8px', fontWeight: 500 }}>{m.business_name}</td>
+                      <td style={{ padding: '5px 8px', fontFamily: 'monospace' }}>{m.msme_code || '—'}</td>
+                      <td style={{ padding: '5px 8px' }}>{m.owner_name || '—'}</td>
+                      <td style={{ padding: '5px 8px' }}>{m.city || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">Nothing to do.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInactiveMsmes(null)}>Close</Button>
+          {inactiveMsmes?.length > 0 && (
+            <Button variant="contained" color="success" disabled={reactivating}
+              onClick={reactivateAll}>
+              {reactivating ? 'Reactivating…' : `Reactivate All (${inactiveMsmes.length})`}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={msmeUploadDialog} onClose={() => setMsmeUploadDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           Import MSME List
