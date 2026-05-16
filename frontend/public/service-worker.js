@@ -1,6 +1,6 @@
 /* PRUDEV II Portfolio Management System — PWA service worker */
 
-const VERSION = 'prudev2-pwa-v3';
+const VERSION = 'prudev2-pwa-v4';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -89,7 +89,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (['script', 'style', 'image', 'font', 'manifest'].includes(request.destination)) {
+  // JS and CSS bundles: always network-first so deploys show immediately.
+  // CRA gives them unique hashes per build so old cached versions are
+  // unreachable anyway — no benefit to serving them stale.
+  if (request.destination === 'script' || request.destination === 'style') {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  // Images, fonts, manifests: stale-while-revalidate is fine (they rarely change).
+  if (['image', 'font', 'manifest'].includes(request.destination)) {
     event.respondWith(staleWhileRevalidate(request));
   }
 });
