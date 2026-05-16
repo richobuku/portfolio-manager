@@ -914,7 +914,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         # Compliance & financial access flags
         diag_compliance = {
             'has_tin':           diag_qs.filter(diag_has_tin=True).count(),
-            'has_unbs':          diag_qs.filter(diag_has_unbs=True).count(),
+            'has_ursb':          diag_qs.filter(diag_has_unbs=True).count(),
             'has_business_bank': diag_qs.filter(diag_has_business_bank=True).count(),
             'has_mobile_money':  diag_qs.filter(diag_has_mobile_money=True).count(),
             'total':             diag_total,
@@ -1905,7 +1905,7 @@ class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             report.revenue_ugx, report.total_assets_ugx,
             report.employees_ft_male is not None, report.employees_ft_female is not None,
             report.employees_pt_male is not None, report.employees_pt_female is not None,
-            report.has_tin is not None, report.has_unbs is not None,
+            report.has_tin is not None, report.has_ursb is not None,
             report.has_business_bank is not None, report.has_mobile_money is not None,
         ])
         if not has_quant:
@@ -1931,7 +1931,7 @@ class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             employees_pt_male   = report.employees_pt_male,
             employees_pt_female = report.employees_pt_female,
             has_tin             = report.has_tin,
-            has_unbs            = report.has_unbs,
+            has_ursb            = report.has_ursb,
             has_business_bank   = report.has_business_bank,
             has_mobile_money    = report.has_mobile_money,
             notes               = '\n'.join(notes_parts),

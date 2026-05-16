@@ -305,9 +305,11 @@ class MSMEGrowthSnapshot(models.Model):
     )
 
     # Financials
-    annual_turnover  = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+    annual_turnover      = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
         help_text='Total sales/turnover in last 12 months (UGX)')
-    total_assets     = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+    last_month_revenue   = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
+        help_text='Total sales/revenue in the last calendar month (UGX)')
+    total_assets         = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
         help_text='Investment in total assets (UGX)')
 
     # Workforce
@@ -322,8 +324,17 @@ class MSMEGrowthSnapshot(models.Model):
 
     # Compliance & access
     has_tin           = models.BooleanField(null=True, blank=True)
-    has_unbs          = models.BooleanField(null=True, blank=True)
+    tin_number        = models.CharField(max_length=50, blank=True, default='',
+        help_text='Uganda Revenue Authority TIN')
+    has_ursb          = models.BooleanField(null=True, blank=True,
+        help_text='Registered with Uganda Registration Services Bureau')
+    ursb_reg_number   = models.CharField(max_length=50, blank=True, default='',
+        help_text='URSB registration number')
     has_business_bank = models.BooleanField(null=True, blank=True)
+    bank_name         = models.CharField(max_length=100, blank=True, default='',
+        help_text='Name of the business bank')
+    has_sacco         = models.BooleanField(null=True, blank=True,
+        help_text='Member of a SACCO')
     has_mobile_money  = models.BooleanField(null=True, blank=True)
     has_momo_pay      = models.BooleanField(null=True, blank=True,
         help_text='Business has a MOMO Pay merchant code')
@@ -680,7 +691,7 @@ class MSMEReport(models.Model):
 
     # ── Compliance & access (template section: include_compliance) ────────────
     has_tin           = models.BooleanField(null=True, blank=True)
-    has_unbs          = models.BooleanField(null=True, blank=True)
+    has_ursb          = models.BooleanField(null=True, blank=True)
     has_business_bank = models.BooleanField(null=True, blank=True)
     has_mobile_money  = models.BooleanField(null=True, blank=True)
     has_nssf          = models.BooleanField(null=True, blank=True, help_text='Making NSSF contributions')

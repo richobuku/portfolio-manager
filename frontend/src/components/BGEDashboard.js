@@ -244,9 +244,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     annual_turnover: '', total_assets: '',
     employees_ft_male: '', employees_ft_female: '',
     employees_pt_male: '', employees_pt_female: '',
-    has_tin: '', has_unbs: '', has_business_bank: '', has_mobile_money: '',
+    has_tin: '', tin_number: '',
+    has_ursb: '', ursb_reg_number: '',
+    has_business_bank: '', bank_name: '',
+    has_sacco: '',
+    has_mobile_money: '',
     has_momo_pay: '', momo_pay_code: '',
     employees_ft_refugee: '', employees_pt_refugee: '',
+    last_month_revenue: '',
     notes: '',
   };
   const [growthForm, setGrowthForm] = useState(EMPTY_GROWTH);
@@ -273,18 +278,23 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       snapshot_date: growthForm.snapshot_date,
       source: growthForm.source,
       collected_by: bgeId || null,
-      annual_turnover:   growthForm.annual_turnover   || null,
-      total_assets:      growthForm.total_assets      || null,
+      annual_turnover:     growthForm.annual_turnover   || null,
+      last_month_revenue:  growthForm.last_month_revenue || null,
+      total_assets:        growthForm.total_assets      || null,
       employees_ft_male:   growthForm.employees_ft_male   !== '' ? Number(growthForm.employees_ft_male)   : null,
       employees_ft_female: growthForm.employees_ft_female !== '' ? Number(growthForm.employees_ft_female) : null,
       employees_pt_male:   growthForm.employees_pt_male   !== '' ? Number(growthForm.employees_pt_male)   : null,
       employees_pt_female: growthForm.employees_pt_female !== '' ? Number(growthForm.employees_pt_female) : null,
       has_tin:           growthForm.has_tin           === '' ? null : growthForm.has_tin === 'true',
-      has_unbs:          growthForm.has_unbs          === '' ? null : growthForm.has_unbs === 'true',
+      tin_number:        growthForm.has_tin === 'true' ? (growthForm.tin_number || '') : '',
+      has_ursb:          growthForm.has_ursb          === '' ? null : growthForm.has_ursb === 'true',
+      ursb_reg_number:   growthForm.has_ursb === 'true' ? (growthForm.ursb_reg_number || '') : '',
       has_business_bank: growthForm.has_business_bank === '' ? null : growthForm.has_business_bank === 'true',
+      bank_name:         growthForm.has_business_bank === 'true' ? (growthForm.bank_name || '') : '',
+      has_sacco:         growthForm.has_sacco         === '' ? null : growthForm.has_sacco === 'true',
       has_mobile_money:  growthForm.has_mobile_money  === '' ? null : growthForm.has_mobile_money === 'true',
       has_momo_pay:      growthForm.has_momo_pay      === '' ? null : growthForm.has_momo_pay === 'true',
-      momo_pay_code: growthForm.has_momo_pay === 'true' ? (growthForm.momo_pay_code || '') : '',
+      momo_pay_code:     growthForm.has_momo_pay === 'true' ? (growthForm.momo_pay_code || '') : '',
       employees_ft_refugee: growthForm.employees_ft_refugee !== '' ? Number(growthForm.employees_ft_refugee) : null,
       employees_pt_refugee: growthForm.employees_pt_refugee !== '' ? Number(growthForm.employees_pt_refugee) : null,
       notes: growthForm.notes,
@@ -2783,6 +2793,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 helperText="Total sales last 12 months" />
             </Grid>
             <Grid item xs={6}>
+              <TextField fullWidth size="small" label="Last Month's Revenue"
+                type="number" inputProps={{ min: 0 }}
+                value={growthForm.last_month_revenue}
+                onChange={e => setGrowthForm(f => ({ ...f, last_month_revenue: e.target.value }))}
+                helperText="Total sales last calendar month" />
+            </Grid>
+            <Grid item xs={6}>
               <TextField fullWidth size="small" label="Total Assets"
                 type="number" inputProps={{ min: 0 }}
                 value={growthForm.total_assets}
@@ -2831,27 +2848,137 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             <Grid item xs={12}>
               <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Compliance & Financial Access</Typography>
             </Grid>
-            {[
-              { key: 'has_tin',           label: 'Has TIN (Tax ID)' },
-              { key: 'has_unbs',          label: 'Registered with UNBS' },
-              { key: 'has_business_bank', label: 'Business Bank Account' },
-              { key: 'has_mobile_money',  label: 'Mobile Money Account' },
-              { key: 'has_momo_pay',      label: 'MOMO Pay Code' },
-            ].map(({ key, label }) => (
-              <Grid item xs={6} key={key}>
+
+            {/* TIN */}
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Has TIN (Tax ID)</InputLabel>
+                <Select value={growthForm.has_tin} label="Has TIN (Tax ID)"
+                  onChange={e => setGrowthForm(f => ({ ...f, has_tin: e.target.value }))}>
+                  <MenuItem value="">— Unknown —</MenuItem>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {growthForm.has_tin === 'true' ? (
+              <Grid item xs={6}>
+                <TextField fullWidth size="small" label="TIN Number"
+                  placeholder="e.g. 1234567890"
+                  value={growthForm.tin_number}
+                  onChange={e => setGrowthForm(f => ({ ...f, tin_number: e.target.value }))} />
+              </Grid>
+            ) : <Grid item xs={6} />}
+
+            {/* URSB */}
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Registered with URSB</InputLabel>
+                <Select value={growthForm.has_ursb} label="Registered with URSB"
+                  onChange={e => setGrowthForm(f => ({ ...f, has_ursb: e.target.value }))}>
+                  <MenuItem value="">— Unknown —</MenuItem>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {growthForm.has_ursb === 'true' ? (
+              <Grid item xs={6}>
+                <TextField fullWidth size="small" label="URSB Registration Number"
+                  placeholder="e.g. 80000012345"
+                  value={growthForm.ursb_reg_number}
+                  onChange={e => setGrowthForm(f => ({ ...f, ursb_reg_number: e.target.value }))} />
+              </Grid>
+            ) : <Grid item xs={6} />}
+
+            {/* Business Bank Account */}
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Business Bank Account</InputLabel>
+                <Select value={growthForm.has_business_bank} label="Business Bank Account"
+                  onChange={e => setGrowthForm(f => ({ ...f, has_business_bank: e.target.value, bank_name: '' }))}>
+                  <MenuItem value="">— Unknown —</MenuItem>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {growthForm.has_business_bank === 'true' ? (
+              <Grid item xs={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>{label}</InputLabel>
-                  <Select value={growthForm[key]} label={label}
-                    onChange={e => setGrowthForm(f => ({ ...f, [key]: e.target.value }))}>
-                    <MenuItem value="">— Unknown —</MenuItem>
-                    <MenuItem value="true">Yes</MenuItem>
-                    <MenuItem value="false">No</MenuItem>
+                  <InputLabel>Which Bank?</InputLabel>
+                  <Select value={growthForm.bank_name} label="Which Bank?"
+                    onChange={e => setGrowthForm(f => ({ ...f, bank_name: e.target.value }))}>
+                    <MenuItem value="">— Select bank —</MenuItem>
+                    {[
+                      'Absa Bank Uganda',
+                      'Bank of Africa Uganda',
+                      'Bank of Baroda Uganda',
+                      'Cairo International Bank',
+                      'Centenary Bank',
+                      'Citibank Uganda',
+                      'DFCU Bank',
+                      'Diamond Trust Bank Uganda',
+                      'Ecobank Uganda',
+                      'Equity Bank Uganda',
+                      'Exim Bank Uganda',
+                      'Finance Trust Bank',
+                      'Guaranty Trust Bank Uganda',
+                      'Housing Finance Bank',
+                      'I&M Bank Uganda',
+                      'KCB Bank Uganda',
+                      'NC Bank Uganda',
+                      'Opportunity Bank Uganda',
+                      'PostBank Uganda',
+                      'Pride Microfinance',
+                      'Stanbic Bank Uganda',
+                      'Standard Chartered Bank Uganda',
+                      'Tropical Bank Uganda',
+                      'United Bank for Africa Uganda',
+                      'Other',
+                    ].map(b => <MenuItem key={b} value={b}>{b}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Grid>
-            ))}
+            ) : <Grid item xs={6} />}
 
-            {/* MOMO Pay merchant code — only shown when has_momo_pay is Yes */}
+            {/* SACCO */}
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>SACCO Member</InputLabel>
+                <Select value={growthForm.has_sacco} label="SACCO Member"
+                  onChange={e => setGrowthForm(f => ({ ...f, has_sacco: e.target.value }))}>
+                  <MenuItem value="">— Unknown —</MenuItem>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6} />
+
+            {/* Mobile Money */}
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Mobile Money Account</InputLabel>
+                <Select value={growthForm.has_mobile_money} label="Mobile Money Account"
+                  onChange={e => setGrowthForm(f => ({ ...f, has_mobile_money: e.target.value }))}>
+                  <MenuItem value="">— Unknown —</MenuItem>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>MOMO Pay Code</InputLabel>
+                <Select value={growthForm.has_momo_pay} label="MOMO Pay Code"
+                  onChange={e => setGrowthForm(f => ({ ...f, has_momo_pay: e.target.value }))}>
+                  <MenuItem value="">— Unknown —</MenuItem>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
             {growthForm.has_momo_pay === 'true' && (
               <Grid item xs={12}>
                 <TextField fullWidth size="small" label="MOMO Pay Merchant Code"
@@ -2884,8 +3011,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     <Chip size="small" label={s.source.replace('_', ' ')} variant="outlined" sx={{ fontSize: 10 }} />
                   </Box>
                   <Grid container spacing={1}>
-                    {s.annual_turnover && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Revenue</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.annual_turnover).toLocaleString()}</Typography></Grid>}
-                    {s.total_assets    && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Assets</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.total_assets).toLocaleString()}</Typography></Grid>}
+                    {s.annual_turnover    && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Annual Revenue</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.annual_turnover).toLocaleString()}</Typography></Grid>}
+                    {s.last_month_revenue && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Last Month</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.last_month_revenue).toLocaleString()}</Typography></Grid>}
+                    {s.total_assets       && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Assets</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.total_assets).toLocaleString()}</Typography></Grid>}
                     {(s.employees_ft_male != null || s.employees_ft_female != null) && (
                       <Grid item xs={12}>
                         <Typography fontSize={11} color="text.secondary">
@@ -2898,11 +3026,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         </Typography>
                       </Grid>
                     )}
-                    {s.has_momo_pay != null && (
+                    {(s.has_tin != null || s.has_ursb != null || s.has_business_bank != null || s.has_sacco != null || s.has_mobile_money != null || s.has_momo_pay != null) && (
                       <Grid item xs={12}>
                         <Typography fontSize={11} color="text.secondary">
-                          MOMO Pay Code: <strong>{s.has_momo_pay ? 'Yes' : 'No'}</strong>
-                          {s.has_momo_pay && s.momo_pay_code ? ` · ${s.momo_pay_code}` : ''}
+                          {[
+                            s.has_tin != null && `TIN: ${s.has_tin ? (s.tin_number || 'Yes') : 'No'}`,
+                            s.has_ursb != null && `URSB: ${s.has_ursb ? (s.ursb_reg_number || 'Yes') : 'No'}`,
+                            s.has_business_bank != null && `Bank: ${s.has_business_bank ? (s.bank_name || 'Yes') : 'No'}`,
+                            s.has_sacco != null && `SACCO: ${s.has_sacco ? 'Yes' : 'No'}`,
+                            s.has_mobile_money != null && `MoMo: ${s.has_mobile_money ? 'Yes' : 'No'}`,
+                            s.has_momo_pay != null && `MoMo Pay: ${s.has_momo_pay ? (s.momo_pay_code || 'Yes') : 'No'}`,
+                          ].filter(Boolean).join(' · ')}
                         </Typography>
                       </Grid>
                     )}
