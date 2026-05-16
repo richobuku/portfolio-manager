@@ -22,6 +22,7 @@ import {
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
+  LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL } from '../config';
@@ -2345,145 +2346,379 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            TAB 4 — Growth Data
+            TAB 4 — Growth Analytics (before / after comparison + export)
             ════════════════════════════════════════════════════════════════ */}
         {analyticTab === 4 && (() => {
           if (adminSnapshotsLoading) return <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress /></Box>;
+          if (!adminSnapshots.length) return (
+            <Box sx={{ py: 8, textAlign: 'center' }}>
+              <TrendingUp sx={{ fontSize: 56, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary">No growth update data yet.</Typography>
+              <Typography variant="body2" color="text.secondary">BGEs need to fill in "Record Growth Update" for their MSMEs before analytics appear here.</Typography>
+            </Box>
+          );
 
-          // Derive per-MSME latest snapshot map
+          // ── Core data derivations ─────────────────────────────────────────
+          // First and latest snapshot per MSME (for before/after)
+          const firstByMsme = {};
           const latestByMsme = {};
           adminSnapshots.forEach(s => {
-            if (!latestByMsme[s.msme] || new Date(s.snapshot_date) > new Date(latestByMsme[s.msme].snapshot_date)) {
-              latestByMsme[s.msme] = s;
-            }
+            if (!firstByMsme[s.msme]  || s.snapshot_date < firstByMsme[s.msme].snapshot_date)  firstByMsme[s.msme]  = s;
+            if (!latestByMsme[s.msme] || s.snapshot_date > latestByMsme[s.msme].snapshot_date) latestByMsme[s.msme] = s;
           });
-          const snapshotMsmeIds = Object.keys(latestByMsme).map(Number);
-          const msmesWithUpdates = msmes.filter(m => snapshotMsmeIds.includes(m.id));
-          const msmesWithout     = msmes.filter(m => !snapshotMsmeIds.includes(m.id));
+          const msmeIds = Object.keys(latestByMsme).map(Number);
+          const latestList = msmeIds.map(id => ({ ...latestByMsme[id], _first: firstByMsme[id] }))
+            .sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date));
+          const paired = latestList.filter(s => s._first && s._first.id !== s.id); // MSMEs with ≥2 snapshots
+
+          // ── Before/after deltas (revenue & staff) ────────────────────────
+          const revDelta   = paired.map(s => ({
+            name: (s.msme_name || `MSME ${s.msme}`).slice(0, 20),
+            Before: s._first.annual_turnover  ? Number(s._first.annual_turnover)  : null,
+            After:  s.annual_turnover         ? Number(s.annual_turnover)          : null,
+          })).filter(d => d.Before != null && d.After != null);
+
+          const staffDelta = paired.map(s => {
+            const bFT = (s._first.employees_ft_male||0)+(s._first.employees_ft_female||0);
+            const bPT = (s._first.employees_pt_male||0)+(s._first.employees_pt_female||0);
+            const aFT = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+            const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+            return { name: (s.msme_name || `MSME ${s.msme}`).slice(0, 20), BeforeStaff: bFT+bPT, AfterStaff: aFT+aPT };
+          }).filter(d => d.BeforeStaff > 0 || d.AfterStaff > 0);
+
+          // ── Quarterly aggregation ─────────────────────────────────────────
+          const currentYear = new Date().getFullYear();
+          const qData = {};
+          adminSnapshots.forEach(s => {
+            const y = new Date(s.snapshot_date).getFullYear();
+            const q = `Q${Math.floor(new Date(s.snapshot_date).getMonth()/3)+1}`;
+            if (y !== currentYear && y !== currentYear - 1) return;
+            const key = `${y} ${q}`;
+            if (!qData[key]) qData[key] = { period: key, revenue: 0, count: 0, staff: 0 };
+            if (s.annual_turnover) { qData[key].revenue += Number(s.annual_turnover); qData[key].count++; }
+            const ft = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+            const pt = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+            qData[key].staff += ft+pt;
+          });
+          const quarterlyChart = Object.values(qData)
+            .sort((a, b) => a.period.localeCompare(b.period))
+            .map(q => ({ ...q, avgRevenue: q.count ? Math.round(q.revenue/q.count/1000) : 0, avgStaff: q.count ? Math.round(q.staff/q.count) : 0 }));
+
+          // ── Revenue trend (chronological) ─────────────────────────────────
+          const revenueTrend = [...adminSnapshots]
+            .filter(s => s.annual_turnover)
+            .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
+            .map(s => ({ date: s.snapshot_date, Revenue: Math.round(Number(s.annual_turnover)/1000) }));
+
+          // ── Compliance (paired MSMEs — first vs latest) ───────────────────
+          const compFields = [
+            { label: 'URSB Registered',    key: 'has_ursb',          color: '#4527A0' },
+            { label: 'Has TIN',            key: 'has_tin',           color: '#1565C0' },
+            { label: 'Business Bank Acct', key: 'has_business_bank', color: '#00695C' },
+            { label: 'Mobile Money',       key: 'has_mobile_money',  color: '#E65100' },
+            { label: 'MOMO Pay Code',      key: 'has_momo_pay',      color: '#F57C00' },
+            { label: 'SACCO Member',       key: 'has_sacco',         color: '#2E7D32' },
+          ];
+          // Compliance before vs after (paired MSMEs only)
+          const compBefore = (key) => paired.filter(s => s._first[key]).length;
+          const compAfter  = (key) => paired.filter(s => s[key]).length;
+
+          // ── Summary stats ─────────────────────────────────────────────────
+          const withRev = latestList.filter(s => s.annual_turnover);
+          const avgRevLatest = withRev.length ? withRev.reduce((s,x) => s+Number(x.annual_turnover),0)/withRev.length : 0;
+          const withRevFirst = paired.filter(s => s._first.annual_turnover && s.annual_turnover);
+          const totalRevGrowth = withRevFirst.reduce((acc, s) => acc + (Number(s.annual_turnover) - Number(s._first.annual_turnover)), 0);
+          const pctRevGrowth   = withRevFirst.length
+            ? ((withRevFirst.reduce((a,s) => a + (Number(s.annual_turnover)/Number(s._first.annual_turnover)-1), 0) / withRevFirst.length) * 100).toFixed(0)
+            : null;
 
           const now = new Date();
-          const fresh   = msmesWithUpdates.filter(m => (now - new Date(latestByMsme[m.id].snapshot_date)) / 86400000 <= 30);
-          const amber   = msmesWithUpdates.filter(m => { const d = (now - new Date(latestByMsme[m.id].snapshot_date)) / 86400000; return d > 30 && d <= 90; });
-          const stale   = msmesWithUpdates.filter(m => (now - new Date(latestByMsme[m.id].snapshot_date)) / 86400000 > 90);
+          const fresh = latestList.filter(s => (now - new Date(s.snapshot_date)) / 86400000 <= 30).length;
 
-          // Compliance from snapshots
-          const total = adminSnapshots.length;
-          const complianceFields = [
-            { label: 'URSB Registered',     key: 'has_ursb',          color: '#4527A0' },
-            { label: 'Has TIN',             key: 'has_tin',           color: '#1565C0' },
-            { label: 'Business Bank Acct',  key: 'has_business_bank', color: '#00695C' },
-            { label: 'Mobile Money',        key: 'has_mobile_money',  color: '#E65100' },
-            { label: 'MOMO Pay Code',       key: 'has_momo_pay',      color: '#F57C00' },
-            { label: 'SACCO Member',        key: 'has_sacco',         color: '#2E7D32' },
-          ];
+          // ── CSV Export ────────────────────────────────────────────────────
+          const exportCSV = () => {
+            const rows = [
+              ['MSME', 'Code', 'BGE', 'First Update', 'Latest Update', '# Updates',
+               'Annual Revenue (Before)', 'Annual Revenue (After)', 'Rev Change %',
+               'Last Month Revenue', 'FT Staff (Before)', 'FT Staff (After)',
+               'PT Staff (Before)', 'PT Staff (After)',
+               'TIN (Before)', 'TIN (After)', 'URSB (Before)', 'URSB (After)',
+               'Bank (Before)', 'Bank (After)', 'SACCO (Before)', 'SACCO (After)',
+               'MoMo (Before)', 'MoMo (After)', 'Bank Name'].join(','),
+              ...latestList.map(s => {
+                const f = s._first || {};
+                const bFT = (f.employees_ft_male||0)+(f.employees_ft_female||0);
+                const bPT = (f.employees_pt_male||0)+(f.employees_pt_female||0);
+                const aFT = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+                const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+                const revPct = (f.annual_turnover && s.annual_turnover)
+                  ? ((Number(s.annual_turnover)/Number(f.annual_turnover)-1)*100).toFixed(1)+'%' : '';
+                const m = msmes.find(m => m.id === s.msme);
+                return [
+                  `"${s.msme_name||''}"`, m?.msme_code||'', `"${m?.assigned_bge_name||''}"`,
+                  f.snapshot_date||'', s.snapshot_date,
+                  adminSnapshots.filter(x => x.msme === s.msme).length,
+                  f.annual_turnover||'', s.annual_turnover||'', revPct,
+                  s.last_month_revenue||'',
+                  bFT, aFT, bPT, aPT,
+                  f.has_tin?'Yes':'No', s.has_tin?'Yes':'No',
+                  f.has_ursb?'Yes':'No', s.has_ursb?'Yes':'No',
+                  f.has_business_bank?'Yes':'No', s.has_business_bank?'Yes':'No',
+                  f.has_sacco?'Yes':'No', s.has_sacco?'Yes':'No',
+                  f.has_mobile_money?'Yes':'No', s.has_mobile_money?'Yes':'No',
+                  `"${s.bank_name||''}"`,
+                ].join(',');
+              }),
+            ].join('\n');
+            const blob = new Blob([rows], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `prudev2-growth-report-${new Date().toISOString().slice(0,10)}.csv`;
+            a.click(); URL.revokeObjectURL(url);
+          };
 
-          // Monthly snapshot activity (last 12 months)
-          const monthCounts = {};
-          adminSnapshots.forEach(s => {
-            const m = s.snapshot_date ? s.snapshot_date.slice(0, 7) : null;
-            if (m) monthCounts[m] = (monthCounts[m] || 0) + 1;
-          });
-          const activityData = Object.entries(monthCounts)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .slice(-12)
-            .map(([month, count]) => ({
-              month: new Date(month + '-01').toLocaleString('en', { month: 'short', year: '2-digit' }),
-              Updates: count,
-            }));
+          const fmtUGX = v => v == null ? '—' : `UGX ${Number(v).toLocaleString()}`;
+          const Dot = ({ val }) => val == null
+            ? <Typography fontSize={11} color="text.disabled">—</Typography>
+            : <Chip size="small" label={val ? '✓' : '✗'} color={val ? 'success' : 'default'}
+                variant={val ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />;
 
           return (
             <Box>
-              <SectionLabel>Growth Update Coverage</SectionLabel>
+              {/* ── Header with export button ── */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>Growth Analytics</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Before/after comparison across {msmeIds.length} MSMEs · {adminSnapshots.length} total updates
+                  </Typography>
+                </Box>
+                <Button variant="outlined" size="small" startIcon={<Download />} onClick={exportCSV}>
+                  Export Report (CSV)
+                </Button>
+              </Box>
+
+              {/* ── KPIs ── */}
+              <SectionLabel>Programme Growth Summary</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
-                  { val: adminSnapshots.length,    label: 'Total Updates',       sub: 'all records',          color: BRAND.primaryMain },
-                  { val: msmesWithUpdates.length,  label: 'MSMEs Updated',       sub: `of ${msmes.length}`,   color: '#2E7D32',         pct: msmes.length ? (msmesWithUpdates.length / msmes.length * 100) : 0 },
-                  { val: fresh.length,             label: 'Fresh (≤30 days)',    sub: 'recently updated',     color: '#2E7D32' },
-                  { val: amber.length,             label: 'Amber (31–90 days)',  sub: 'need attention',       color: '#F9A825' },
-                  { val: stale.length,             label: 'Stale (>90 days)',    sub: 'overdue',              color: '#C8102E' },
-                  { val: msmesWithout.length,      label: 'No Updates Yet',      sub: 'never updated',        color: '#9E9E9E' },
+                  { val: msmeIds.length,                                               label: 'MSMEs with Data',    sub: `of ${msmes.length} total`,       color: BRAND.primaryMain },
+                  { val: paired.length,                                                label: 'Before/After Pairs', sub: '≥2 snapshots',                   color: '#0288D1' },
+                  { val: `UGX ${(avgRevLatest/1000).toFixed(0)}K`,                    label: 'Avg Annual Revenue', sub: 'latest snapshot',                 color: '#2E7D32' },
+                  { val: pctRevGrowth != null ? `+${pctRevGrowth}%` : '—',            label: 'Avg Revenue Growth', sub: 'first vs latest',                 color: pctRevGrowth > 0 ? '#2E7D32' : '#C8102E' },
+                  { val: `UGX ${(totalRevGrowth/1000).toFixed(0)}K`,                  label: 'Total Rev Uplift',   sub: 'across paired MSMEs',             color: '#7B1FA2' },
+                  { val: fresh,                                                        label: 'Updated ≤30 days',   sub: 'recently active',                 color: '#2E7D32' },
                 ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
               </Grid>
 
+              {/* ── Revenue trend + quarterly comparison ── */}
+              <SectionLabel>Revenue Trends</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={8}>
-                  <ChartCard title="Growth Updates Over Time" subtitle="Monthly update activity" height={240}>
-                    <ResponsiveContainer>
-                      <BarChart data={activityData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
-                        <XAxis dataKey="month" tick={{fontSize:11}}/>
-                        <YAxis tick={{fontSize:11}}/>
-                        <ReTooltip/>
-                        <Bar dataKey="Updates" fill="#1A2F4B" radius={[4,4,0,0]}/>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined" sx={{ height: '100%' }}>
-                    <CardContent>
-                      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Compliance Rates (from Growth Updates)</Typography>
-                      {total === 0 ? (
-                        <Typography variant="body2" color="text.secondary">No growth data yet.</Typography>
-                      ) : complianceFields.map(({ label, key, color }) => {
-                        const count = adminSnapshots.filter(s => s[key]).length;
-                        return (
-                          <Box key={key} sx={{ mb: 1.5 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
-                              <Typography variant="body2">{label}</Typography>
-                              <Typography variant="body2" fontWeight={700} color={color}>
-                                {count} <Typography component="span" variant="caption" color="text.secondary">/ {total}</Typography>
-                              </Typography>
-                            </Box>
-                            <LinearProgress variant="determinate" value={total ? (count / total * 100) : 0}
-                              sx={{ height: 7, borderRadius: 4, bgcolor: '#E8EDF2', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 4 } }} />
-                          </Box>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                </Grid>
+                {revenueTrend.length > 1 && (
+                  <Grid item xs={12} md={7}>
+                    <ChartCard title="Annual Revenue Over Time" subtitle="All updates chronologically (UGX thousands)" height={260}>
+                      <ResponsiveContainer>
+                        <LineChart data={revenueTrend}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                          <XAxis dataKey="date" tick={{fontSize:10}}/>
+                          <YAxis tickFormatter={v => `${v}K`} tick={{fontSize:10}} width={48}/>
+                          <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, 'Revenue']}/>
+                          <Line type="monotone" dataKey="Revenue" stroke="#1A2F4B" strokeWidth={2} dot={{ r: 3 }}/>
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </Grid>
+                )}
+                {quarterlyChart.length > 0 && (
+                  <Grid item xs={12} md={revenueTrend.length > 1 ? 5 : 12}>
+                    <ChartCard title={`Quarterly Avg Revenue — ${currentYear-1} vs ${currentYear}`} subtitle="Average across updates per quarter (UGX thousands)" height={260}>
+                      <ResponsiveContainer>
+                        <BarChart data={quarterlyChart}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                          <XAxis dataKey="period" tick={{fontSize:10}}/>
+                          <YAxis tickFormatter={v => `${v}K`} tick={{fontSize:10}} width={48}/>
+                          <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, 'Avg Revenue']}/>
+                          <Legend wrapperStyle={{fontSize:11}}/>
+                          <Bar dataKey="avgRevenue" name="Avg Revenue (K)" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                          <Bar dataKey="avgStaff"   name="Avg Total Staff" fill="#F9A825"  radius={[3,3,0,0]}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </Grid>
+                )}
               </Grid>
 
-              <SectionLabel>Per-MSME Growth Freshness</SectionLabel>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
+              {/* ── Before/After revenue per MSME ── */}
+              {revDelta.length > 0 && (
+                <>
+                  <SectionLabel>Before / After — Revenue by MSME</SectionLabel>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12}>
+                      <ChartCard title="Annual Revenue: First vs Latest Update" subtitle="UGX thousands — MSMEs with ≥2 snapshots" height={Math.max(280, revDelta.length * 32)}>
+                        <ResponsiveContainer>
+                          <BarChart layout="vertical" data={revDelta.map(d => ({ ...d, Before: Math.round(d.Before/1000), After: Math.round(d.After/1000) }))}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                            <XAxis type="number" tickFormatter={v => `${v}K`} tick={{fontSize:10}}/>
+                            <YAxis dataKey="name" type="category" width={130} tick={{fontSize:10}}/>
+                            <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, '']}/>
+                            <Legend wrapperStyle={{fontSize:11}}/>
+                            <Bar dataKey="Before" fill="#90A4AE" radius={[0,3,3,0]}/>
+                            <Bar dataKey="After"  fill="#1A2F4B" radius={[0,3,3,0]}/>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartCard>
+                    </Grid>
+                  </Grid>
+                </>
+              )}
+
+              {/* ── Before/After staff per MSME ── */}
+              {staffDelta.length > 0 && (
+                <>
+                  <SectionLabel>Before / After — Workforce by MSME</SectionLabel>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12}>
+                      <ChartCard title="Total Staff: First vs Latest Update" subtitle="MSMEs with ≥2 snapshots" height={Math.max(260, staffDelta.length * 30)}>
+                        <ResponsiveContainer>
+                          <BarChart layout="vertical" data={staffDelta}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                            <XAxis type="number" tick={{fontSize:10}}/>
+                            <YAxis dataKey="name" type="category" width={130} tick={{fontSize:10}}/>
+                            <ReTooltip/>
+                            <Legend wrapperStyle={{fontSize:11}}/>
+                            <Bar dataKey="BeforeStaff" name="Before" fill="#FFCC80" radius={[0,3,3,0]}/>
+                            <Bar dataKey="AfterStaff"  name="After"  fill="#E65100" radius={[0,3,3,0]}/>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartCard>
+                    </Grid>
+                  </Grid>
+                </>
+              )}
+
+              {/* ── Compliance before vs after ── */}
+              {paired.length > 0 && (
+                <>
+                  <SectionLabel>Before / After — Compliance Rates</SectionLabel>
+                  <Card variant="outlined" sx={{ mb: 3 }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
+                        Comparing first vs latest snapshot — {paired.length} MSMEs
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {compFields.map(({ label, key, color }) => {
+                          const before = compBefore(key);
+                          const after  = compAfter(key);
+                          const pairTotal = paired.length;
+                          const diff = after - before;
+                          return (
+                            <Grid item xs={12} sm={6} md={4} key={key}>
+                              <Box sx={{ mb: 0.5 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography variant="body2" fontWeight={600}>{label}</Typography>
+                                  <Typography variant="caption" color={diff > 0 ? 'success.main' : diff < 0 ? 'error.main' : 'text.secondary'} fontWeight={700}>
+                                    {diff > 0 ? `+${diff}` : diff < 0 ? diff : '—'}
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography variant="caption" color="text.secondary">Before</Typography>
+                                    <LinearProgress variant="determinate" value={pairTotal ? (before/pairTotal*100) : 0}
+                                      sx={{ height: 6, borderRadius: 3, bgcolor: '#E8EDF2', '& .MuiLinearProgress-bar': { bgcolor: '#90A4AE' } }} />
+                                    <Typography variant="caption">{before}/{pairTotal}</Typography>
+                                  </Box>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography variant="caption" color="text.secondary">After</Typography>
+                                    <LinearProgress variant="determinate" value={pairTotal ? (after/pairTotal*100) : 0}
+                                      sx={{ height: 6, borderRadius: 3, bgcolor: '#E8EDF2', '& .MuiLinearProgress-bar': { bgcolor: color } }} />
+                                    <Typography variant="caption" color={color} fontWeight={700}>{after}/{pairTotal}</Typography>
+                                  </Box>
+                                </Box>
+                              </Box>
+                            </Grid>
+                          );
+                        })}
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {/* ── Per-MSME detail table ── */}
+              <SectionLabel>Per-MSME Growth Detail</SectionLabel>
+              <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+                <Table size="small" sx={{ minWidth: 900 }}>
                   <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                     <TableRow>
                       <TableCell>MSME</TableCell>
-                      <TableCell>Code</TableCell>
                       <TableCell>BGE</TableCell>
+                      <TableCell>First Update</TableCell>
                       <TableCell>Latest Update</TableCell>
-                      <TableCell>Updates</TableCell>
-                      <TableCell>Status</TableCell>
+                      <TableCell># Updates</TableCell>
+                      <TableCell>Annual Revenue (Before → After)</TableCell>
+                      <TableCell>Last Month Rev.</TableCell>
+                      <TableCell>Total Staff (Before → After)</TableCell>
+                      <TableCell>TIN</TableCell>
+                      <TableCell>URSB</TableCell>
+                      <TableCell>Bank</TableCell>
+                      <TableCell>SACCO</TableCell>
+                      <TableCell>MoMo</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {msmes.map(m => {
-                      const snap = latestByMsme[m.id];
-                      const count = adminSnapshots.filter(s => s.msme === m.id).length;
-                      const days = snap ? Math.floor((now - new Date(snap.snapshot_date)) / 86400000) : null;
-                      const color = !snap ? '#9E9E9E' : days <= 30 ? '#2E7D32' : days <= 90 ? '#F9A825' : '#C8102E';
-                      const label = !snap ? 'Never' : days <= 30 ? 'Fresh' : days <= 90 ? 'Amber' : 'Stale';
+                    {latestList.map(s => {
+                      const f = s._first || {};
+                      const bFT = (f.employees_ft_male||0)+(f.employees_ft_female||0);
+                      const bPT = (f.employees_pt_male||0)+(f.employees_pt_female||0);
+                      const aFT = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+                      const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+                      const m = msmes.find(x => x.id === s.msme);
+                      const updateCount = adminSnapshots.filter(x => x.msme === s.msme).length;
+                      const hasPair = f.id && f.id !== s.id;
+                      const revPct = hasPair && f.annual_turnover && s.annual_turnover
+                        ? ((Number(s.annual_turnover)/Number(f.annual_turnover)-1)*100).toFixed(0)
+                        : null;
                       return (
-                        <TableRow key={m.id} hover>
-                          <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
-                          <TableCell><Typography variant="caption" sx={{ fontFamily: 'monospace' }}>{m.msme_code}</Typography></TableCell>
-                          <TableCell><Typography variant="caption">{m.assigned_bge_name || '—'}</Typography></TableCell>
-                          <TableCell>
-                            {snap
-                              ? <Typography variant="caption" color={color}>{snap.snapshot_date}</Typography>
-                              : <Typography variant="caption" color="text.disabled">—</Typography>}
-                          </TableCell>
+                        <TableRow key={s.id} hover>
+                          <TableCell sx={{ fontWeight: 600, fontSize: 12 }}>{s.msme_name || `MSME ${s.msme}`}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{m?.assigned_bge_name || '—'}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{f.snapshot_date || '—'}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{s.snapshot_date}</TableCell>
                           <TableCell align="center">
-                            {count > 0
-                              ? <Chip label={count} size="small" variant="outlined" />
-                              : <Typography variant="caption" color="text.disabled">—</Typography>}
+                            <Chip label={updateCount} size="small" variant="outlined" sx={{ fontSize: 10 }} />
                           </TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>
+                            {hasPair ? (
+                              <Box>
+                                <Typography fontSize={10} color="text.secondary">{fmtUGX(f.annual_turnover)}</Typography>
+                                <Typography fontSize={11} fontWeight={600}>→ {fmtUGX(s.annual_turnover)}</Typography>
+                                {revPct != null && (
+                                  <Chip size="small" label={`${revPct > 0 ? '+' : ''}${revPct}%`}
+                                    sx={{ fontSize: 9, height: 16, bgcolor: revPct > 0 ? '#E8F5E9' : '#FFEBEE', color: revPct > 0 ? '#2E7D32' : '#C8102E', fontWeight: 700 }} />
+                                )}
+                              </Box>
+                            ) : fmtUGX(s.annual_turnover)}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{s.last_month_revenue ? fmtUGX(s.last_month_revenue) : '—'}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>
+                            {hasPair ? (
+                              <Box>
+                                <Typography fontSize={10} color="text.secondary">{bFT+bPT} staff</Typography>
+                                <Typography fontSize={11} fontWeight={600}>→ {aFT+aPT} staff</Typography>
+                              </Box>
+                            ) : (aFT+aPT > 0 ? `${aFT+aPT} (${aFT} FT)` : '—')}
+                          </TableCell>
+                          <TableCell><Dot val={s.has_tin} /></TableCell>
+                          <TableCell><Dot val={s.has_ursb} /></TableCell>
                           <TableCell>
-                            <Chip label={label} size="small"
-                              sx={{ bgcolor: color + '22', color, fontWeight: 700, fontSize: 11 }} />
+                            {s.has_business_bank == null
+                              ? <Typography fontSize={11} color="text.disabled">—</Typography>
+                              : <Chip size="small" label={s.bank_name || (s.has_business_bank ? '✓' : '✗')}
+                                  color={s.has_business_bank ? 'success' : 'default'}
+                                  variant={s.has_business_bank ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />}
                           </TableCell>
+                          <TableCell><Dot val={s.has_sacco} /></TableCell>
+                          <TableCell><Dot val={s.has_mobile_money} /></TableCell>
                         </TableRow>
                       );
                     })}

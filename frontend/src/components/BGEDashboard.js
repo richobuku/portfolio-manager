@@ -17,10 +17,6 @@ import {
   HelpOutline, Close,
 } from '@mui/icons-material';
 import axios from 'axios';
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip as ReTooltip, Legend, ResponsiveContainer,
-} from 'recharts';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -204,8 +200,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // Work orders
   const [workOrders, setWorkOrders] = useState([]);
   const [workOrderPreview, setWorkOrderPreview] = useState(null);
-  const [allSnapshots, setAllSnapshots] = useState([]);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [woReview, setWoReview] = useState(null);       // WO being reviewed in dialog
   const [woSigning, setWoSigning] = useState(null);     // id of WO being signed
   const [woPdfBlob, setWoPdfBlob] = useState(null);     // blob URL for PDF preview
@@ -418,15 +412,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   useEffect(() => {
     if (typeof window.gtag === 'function') {
       window.gtag('event', 'page_view', { page_title: `BGE - ${section}`, page_path: `/bge/${section}` });
-    }
-    if (section === 'analytics' && allSnapshots.length === 0) {
-      const bgeId = currentUser?.bge_profile?.id;
-      if (!bgeId) return;
-      setAnalyticsLoading(true);
-      axios.get(`${API_ENDPOINTS.GROWTH_SNAPSHOTS}?bge=${bgeId}`, { headers })
-        .then(res => setAllSnapshots(Array.isArray(res.data) ? res.data : res.data.results || []))
-        .catch(() => setAllSnapshots([]))
-        .finally(() => setAnalyticsLoading(false));
     }
   }, [section]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -979,7 +964,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'groups',      label: 'My Groups',      icon: <GroupIcon /> },
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
-    { key: 'analytics',   label: 'Analytics',      icon: <People /> },
     ...(facilitationAssignments.length > 0
       ? [{ key: 'training', label: 'Training', icon: <School />, badge: facilitationAssignments.length }]
       : []),
@@ -1753,177 +1737,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             )}
           </Box>
         )}
-
-        {/* ── Analytics ──────────────────────────────────────────────────── */}
-        {section === 'analytics' && (() => {
-          const fmtUGX = v => v == null ? '—' : `${(Number(v)/1000).toFixed(0)}K`;
-          const quarter = d => { const m = new Date(d).getMonth(); return `Q${Math.floor(m/3)+1}`; };
-          const year    = d => new Date(d).getFullYear();
-
-          // Latest snapshot per MSME
-          const latestByMsme = {};
-          allSnapshots.forEach(s => {
-            if (!latestByMsme[s.msme] || s.snapshot_date > latestByMsme[s.msme].snapshot_date)
-              latestByMsme[s.msme] = s;
-          });
-          const latestList = Object.values(latestByMsme).sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date));
-
-          // Revenue trend — one point per snapshot sorted by date
-          const revenueTrend = [...allSnapshots]
-            .filter(s => s.annual_turnover)
-            .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
-            .map(s => ({ date: s.snapshot_date, revenue: Number(s.annual_turnover), msme: s.msme_name || s.msme }));
-
-          // Quarterly aggregation for current + previous year
-          const currentYear = new Date().getFullYear();
-          const quarterlyData = {};
-          allSnapshots.forEach(s => {
-            const y = year(s.snapshot_date); const q = quarter(s.snapshot_date);
-            if (y !== currentYear && y !== currentYear - 1) return;
-            const key = `${y} ${q}`;
-            if (!quarterlyData[key]) quarterlyData[key] = { period: key, revenue: 0, count: 0, staff: 0 };
-            if (s.annual_turnover) { quarterlyData[key].revenue += Number(s.annual_turnover); quarterlyData[key].count++; }
-            const ft = (s.employees_ft_male||0)+(s.employees_ft_female||0);
-            const pt = (s.employees_pt_male||0)+(s.employees_pt_female||0);
-            if (ft+pt > 0) quarterlyData[key].staff += ft+pt;
-          });
-          const quarterlyChart = Object.values(quarterlyData)
-            .sort((a, b) => a.period.localeCompare(b.period))
-            .map(q => ({ ...q, avgRevenue: q.count ? Math.round(q.revenue/q.count) : 0 }));
-
-          // Summary stats
-          const withRevenue = latestList.filter(s => s.annual_turnover);
-          const avgRevenue = withRevenue.length
-            ? withRevenue.reduce((s, x) => s + Number(x.annual_turnover), 0) / withRevenue.length : 0;
-          const msmeWithBank = latestList.filter(s => s.has_business_bank).length;
-          const msmeWithTin  = latestList.filter(s => s.has_tin).length;
-          const msmeWithSacco = latestList.filter(s => s.has_sacco).length;
-
-          return (
-            <Box>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>Analytics</Typography>
-              {analyticsLoading && <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 4 }} />}
-              {!analyticsLoading && (
-                <>
-                  {/* Summary cards */}
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    {[
-                      { label: 'MSMEs with data',    value: latestList.length },
-                      { label: 'Avg Annual Revenue', value: `UGX ${fmtUGX(avgRevenue)}` },
-                      { label: 'Have Bank Account',  value: `${msmeWithBank} / ${latestList.length}` },
-                      { label: 'Have TIN',           value: `${msmeWithTin} / ${latestList.length}` },
-                      { label: 'SACCO Members',      value: `${msmeWithSacco} / ${latestList.length}` },
-                      { label: 'Total Snapshots',    value: allSnapshots.length },
-                    ].map(({ label, value }) => (
-                      <Grid item xs={6} sm={4} md={2} key={label}>
-                        <Paper sx={{ p: 1.5, textAlign: 'center', height: '100%' }}>
-                          <Typography fontSize={20} fontWeight={700} color="primary.main">{value}</Typography>
-                          <Typography fontSize={11} color="text.secondary">{label}</Typography>
-                        </Paper>
-                      </Grid>
-                    ))}
-                  </Grid>
-
-                  {/* Revenue trend chart */}
-                  {revenueTrend.length > 1 && (
-                    <Paper sx={{ p: 2, mb: 3 }}>
-                      <Typography fontWeight={700} fontSize={13} sx={{ mb: 1.5 }}>Revenue Over Time (UGX)</Typography>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <LineChart data={revenueTrend} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF2" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                          <YAxis tickFormatter={v => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10 }} width={52} />
-                          <ReTooltip formatter={(v) => [`UGX ${Number(v).toLocaleString()}`, 'Revenue']} />
-                          <Line type="monotone" dataKey="revenue" stroke="#1B3A5C" strokeWidth={2} dot={{ r: 3 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </Paper>
-                  )}
-
-                  {/* Quarterly comparison chart */}
-                  {quarterlyChart.length > 0 && (
-                    <Paper sx={{ p: 2, mb: 3 }}>
-                      <Typography fontWeight={700} fontSize={13} sx={{ mb: 1.5 }}>
-                        Quarterly Avg Revenue — {currentYear - 1} vs {currentYear} (UGX)
-                      </Typography>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={quarterlyChart} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF2" />
-                          <XAxis dataKey="period" tick={{ fontSize: 10 }} />
-                          <YAxis tickFormatter={v => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10 }} width={52} />
-                          <ReTooltip formatter={(v) => [`UGX ${Number(v).toLocaleString()}`, 'Avg Revenue']} />
-                          <Legend wrapperStyle={{ fontSize: 11 }} />
-                          <Bar dataKey="avgRevenue" name="Avg Revenue" fill="#1B3A5C" radius={[3,3,0,0]} />
-                          <Bar dataKey="staff" name="Avg Staff" fill="#F9A825" radius={[3,3,0,0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </Paper>
-                  )}
-
-                  {/* Per-MSME latest snapshot table */}
-                  <Paper sx={{ overflowX: 'auto' }}>
-                    <Box sx={{ p: 2, borderBottom: '1px solid #E8EDF2' }}>
-                      <Typography fontWeight={700} fontSize={13}>Latest Growth Update Per MSME</Typography>
-                    </Box>
-                    {latestList.length === 0 ? (
-                      <Box sx={{ p: 3, textAlign: 'center' }}>
-                        <Typography color="text.secondary" fontSize={13}>No growth data recorded yet.</Typography>
-                      </Box>
-                    ) : (
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>MSME</TableCell>
-                            <TableCell>Last Updated</TableCell>
-                            <TableCell>Annual Revenue</TableCell>
-                            <TableCell>Last Month Rev.</TableCell>
-                            <TableCell>Total Staff</TableCell>
-                            <TableCell>TIN</TableCell>
-                            <TableCell>URSB</TableCell>
-                            <TableCell>Bank</TableCell>
-                            <TableCell>SACCO</TableCell>
-                            <TableCell>MoMo</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {latestList.map(s => {
-                            const ft = (s.employees_ft_male||0)+(s.employees_ft_female||0);
-                            const pt = (s.employees_pt_male||0)+(s.employees_pt_female||0);
-                            const Dot = ({ val }) => val == null
-                              ? <Typography fontSize={11} color="text.disabled">—</Typography>
-                              : <Chip size="small" label={val ? '✓' : '✗'} color={val ? 'success' : 'default'}
-                                  variant={val ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />;
-                            return (
-                              <TableRow key={s.id} hover>
-                                <TableCell>
-                                  <Typography fontSize={12} fontWeight={600}>{s.msme_name || s.msme}</Typography>
-                                </TableCell>
-                                <TableCell sx={{ fontSize: 12 }}>{s.snapshot_date}</TableCell>
-                                <TableCell sx={{ fontSize: 12 }}>{s.annual_turnover ? `UGX ${Number(s.annual_turnover).toLocaleString()}` : '—'}</TableCell>
-                                <TableCell sx={{ fontSize: 12 }}>{s.last_month_revenue ? `UGX ${Number(s.last_month_revenue).toLocaleString()}` : '—'}</TableCell>
-                                <TableCell sx={{ fontSize: 12 }}>{ft+pt > 0 ? `${ft+pt} (${ft} FT)` : '—'}</TableCell>
-                                <TableCell><Dot val={s.has_tin} /></TableCell>
-                                <TableCell><Dot val={s.has_ursb} /></TableCell>
-                                <TableCell>
-                                  {s.has_business_bank == null ? <Typography fontSize={11} color="text.disabled">—</Typography>
-                                    : <Chip size="small" label={s.bank_name || (s.has_business_bank ? '✓' : '✗')}
-                                        color={s.has_business_bank ? 'success' : 'default'}
-                                        variant={s.has_business_bank ? 'filled' : 'outlined'} sx={{ fontSize: 10, height: 18 }} />}
-                                </TableCell>
-                                <TableCell><Dot val={s.has_sacco} /></TableCell>
-                                <TableCell><Dot val={s.has_mobile_money} /></TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </Paper>
-                </>
-              )}
-            </Box>
-          );
-        })()}
 
         {/* ── Training facilitation section ──────────────────────────────── */}
         {section === 'training' && (
