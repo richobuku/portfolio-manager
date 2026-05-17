@@ -4423,7 +4423,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       {/* mobile top bar */}
       <AppBar position="fixed" sx={{ display: { md: 'none' }, bgcolor: BRAND.sidebarBg, zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar variant="dense">
-          <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 1 }}>
+          <IconButton
+            color="inherit" edge="start"
+            onClick={() => setMobileOpen(true)}
+            sx={{ mr: 1, p: 1.25, touchAction: 'manipulation' }}
+            aria-label="Open navigation menu">
             <MenuIcon />
           </IconButton>
           <Box sx={{ minWidth: 0 }}>
@@ -4438,6 +4442,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       {/* sidebar — permanent on desktop, drawer on mobile */}
       <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
         <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)}
+          keepMounted disableScrollLock
           sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: DRAWER_WIDTH, maxWidth: '86vw', height: '100dvh', boxSizing: 'border-box', border: 'none' } }}>
           {drawerContent}
         </Drawer>

@@ -1065,7 +1065,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       {/* mobile appbar */}
       <AppBar position="fixed" sx={{ display: { md: 'none' }, bgcolor: BRAND.sidebarBg, zIndex: (t) => t.zIndex.drawer + 1, boxShadow: 'none' }}>
         <Toolbar>
-          <IconButton color="inherit" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 1 }}><MenuIcon /></IconButton>
+          <IconButton color="inherit" onClick={() => setMobileOpen(o => !o)}
+            sx={{ mr: 1, p: 1.25, touchAction: 'manipulation' }} aria-label="Open navigation menu">
+            <MenuIcon />
+          </IconButton>
           <Typography fontWeight={700} fontSize={15} noWrap sx={{ flex: 1 }}>PRUDEV II · BGE Portal</Typography>
           <Tooltip title="Help">
             <IconButton color="inherit" onClick={() => { setHelpSection(0); setHelpDialog(true); }} edge="end">
@@ -1077,6 +1080,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
       {/* mobile drawer */}
       <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)}
+        keepMounted disableScrollLock
         sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: DRAWER_WIDTH, maxWidth: '86vw', height: '100dvh', boxSizing: 'border-box', border: 'none' } }}>
         <SidebarContent />
       </Drawer>
