@@ -284,7 +284,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if city:
             qs = qs.filter(city__iexact=city)
 
-        return qs.select_related('cohort', 'assigned_bge').prefetch_related('programme_groups').order_by('-created_at')
+        return qs.select_related('cohort', 'assigned_bge', 'assigned_group').prefetch_related('programme_groups').order_by('-created_at')
 
     def _is_admin_or_cohort_admin(self, request):
         u = request.user

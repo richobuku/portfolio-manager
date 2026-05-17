@@ -65,9 +65,9 @@ class CohortSerializer(serializers.ModelSerializer):
 
 class MSMESerializer(serializers.ModelSerializer):
     cohort_name = serializers.CharField(source='cohort.name', read_only=True)
-    assigned_bge_name = serializers.CharField(source='assigned_bge.name', read_only=True)
-    assigned_group_name = serializers.CharField(source='assigned_group.name', read_only=True)
-    assigned_group_objectives = serializers.CharField(source='assigned_group.objectives', read_only=True)
+    assigned_bge_name = serializers.CharField(source='assigned_bge.name', read_only=True, allow_null=True)
+    assigned_group_name = serializers.CharField(source='assigned_group.name', read_only=True, allow_null=True)
+    assigned_group_objectives = serializers.CharField(source='assigned_group.objectives', read_only=True, allow_null=True)
     total_reports = serializers.SerializerMethodField()
     last_support_date = serializers.SerializerMethodField()
     programme_groups_detail = ProgrammeGroupSerializer(source='programme_groups', many=True, read_only=True)

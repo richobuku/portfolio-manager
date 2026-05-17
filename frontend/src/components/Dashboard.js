@@ -2392,8 +2392,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           const firstByMsme = {};
           const latestByMsme = {};
           adminSnapshots.forEach(s => {
-            if (!firstByMsme[s.msme]  || s.snapshot_date < firstByMsme[s.msme].snapshot_date)  firstByMsme[s.msme]  = s;
-            if (!latestByMsme[s.msme] || s.snapshot_date > latestByMsme[s.msme].snapshot_date) latestByMsme[s.msme] = s;
+            const cur = firstByMsme[s.msme];
+            if (!cur || s.snapshot_date < cur.snapshot_date || (s.snapshot_date === cur.snapshot_date && s.id < cur.id))
+              firstByMsme[s.msme] = s;
+            const lat = latestByMsme[s.msme];
+            if (!lat || s.snapshot_date > lat.snapshot_date || (s.snapshot_date === lat.snapshot_date && s.id > lat.id))
+              latestByMsme[s.msme] = s;
           });
           const msmeIds = Object.keys(latestByMsme).map(Number);
           const latestList = msmeIds.map(id => ({ ...latestByMsme[id], _first: firstByMsme[id] }))
@@ -2415,7 +2419,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
           // ── Summary stats ─────────────────────────────────────────────────
           const withRev = latestList.filter(s => s.annual_turnover);
-          const withRevFirst = paired.filter(s => s._first.annual_turnover && s.annual_turnover);
+          const withRevFirst = paired.filter(s => Number(s._first.annual_turnover) > 0 && Number(s.annual_turnover) > 0);
           const avgRevBefore = withRevFirst.length
             ? withRevFirst.reduce((a,s) => a+Number(s._first.annual_turnover), 0) / withRevFirst.length : 0;
           const avgRevAfter  = withRevFirst.length
