@@ -14,7 +14,7 @@ import {
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
   Delete, HowToReg, School, ChevronRight, People,
-  HelpOutline, Close,
+  HelpOutline, Close, TrendingUp,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
@@ -1232,9 +1232,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                   <Visibility fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="New report">
+                              <Tooltip title="New visit report">
                                 <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
                                   <Add fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Update MSME data">
+                                <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
+                                  <TrendingUp fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                             </Box>
@@ -1409,12 +1414,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     {m.msme_code}{m.session_number ? ` · Session ${m.session_number}` : ''}{m.city ? ` · ${m.city}` : ''}
                                   </Typography>
                                 </Box>
-                                <Tooltip title="Open MSME">
+                                <Tooltip title="View details">
                                   <IconButton size="small" onClick={() => openMsmeDetail(m)}><Visibility fontSize="small" /></IconButton>
                                 </Tooltip>
-                                <Tooltip title="Record Growth Update">
+                                <Tooltip title="New visit report">
+                                  <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
+                                    <Add fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Update MSME data">
                                   <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
-                                    <Star fontSize="small" />
+                                    <TrendingUp fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
                               </Box>

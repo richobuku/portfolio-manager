@@ -105,7 +105,6 @@ export default function VisitReportForm({
 }) {
   const [templates, setTemplates]   = useState([]);
   const [form, setForm]             = useState(EMPTY_FORM);
-  const [activeSection, setActive]  = useState('narrative');
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState('');
   const [selectedMsme, setSelectedMsme] = useState(null);
@@ -132,7 +131,6 @@ export default function VisitReportForm({
     } else {
       setForm({ ...EMPTY_FORM, msme: preselectedMsme?.id || '' });
     }
-    setActive('narrative');
     setError('');
   }, [open, editingReport, preselectedMsme]);
 
