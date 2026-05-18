@@ -971,6 +971,11 @@ class WorkOrder(models.Model):
     # Signatures
     team_leader_name     = models.CharField(max_length=200, default='Stephen Maxi Opwonya')
     team_leader_position = models.CharField(max_length=200, default='Team Leader')
+    created_by           = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_work_orders',
+        help_text='Admin/PM account that issued this work order',
+    )
     status               = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     bge_signed_date      = models.DateField(null=True, blank=True)
 

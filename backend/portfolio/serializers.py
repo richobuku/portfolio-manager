@@ -317,11 +317,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     group_name       = serializers.CharField(source='group.name', read_only=True, allow_null=True)
     work_order_type_display = serializers.CharField(source='get_work_order_type_display', read_only=True)
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_name  = serializers.SerializerMethodField()
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return None
+        name = obj.created_by.get_full_name().strip()
+        return name or obj.created_by.username
 
     class Meta:
         model = WorkOrder
         fields = '__all__'
-        read_only_fields = ['work_order_number', 'created_at', 'updated_at']
+        read_only_fields = ['work_order_number', 'created_at', 'updated_at', 'created_by']
 
 
 class TrainingFacilitationAssignmentSerializer(serializers.ModelSerializer):

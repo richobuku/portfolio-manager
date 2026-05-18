@@ -316,9 +316,32 @@ def render_msme_report(report):
 
     story.append(Spacer(1, 12))
 
-    # Endorser from settings (GOPA AFC expert)
-    endorser_name     = getattr(django_settings, 'REPORT_ENDORSER_NAME',     None)
-    endorser_position = getattr(django_settings, 'REPORT_ENDORSER_POSITION', None)
+    # Endorser: the admin who created the work order covering this visit period.
+    # Falls back to the settings-level default if no matching work order is found.
+    endorser_name = endorser_position = None
+    try:
+        from .models import WorkOrder
+        wo = WorkOrder.objects.filter(
+            bge=bge,
+            start_date__isnull=False,
+            end_date__isnull=False,
+            start_date__lte=report.visit_date,
+            end_date__gte=report.visit_date,
+        ).select_related('created_by').first()
+        if wo and wo.created_by:
+            endorser_name = (wo.created_by.get_full_name().strip()
+                             or wo.created_by.username)
+            endorser_position = wo.team_leader_position or 'Team Leader, PRUDEV II — GOPA AFC'
+        elif wo:
+            # Work order found but no created_by — use the configured team leader name
+            endorser_name     = wo.team_leader_name or None
+            endorser_position = wo.team_leader_position or None
+    except Exception:
+        pass
+
+    if not endorser_name:
+        endorser_name     = getattr(django_settings, 'REPORT_ENDORSER_NAME',     None)
+        endorser_position = getattr(django_settings, 'REPORT_ENDORSER_POSITION', None)
 
     story.append(_sig_block(
         s, bge,

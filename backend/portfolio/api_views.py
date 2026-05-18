@@ -2644,7 +2644,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             start_date=data.get('start_date'),
             end_date=data.get('end_date'),
         )
-        serializer.save()
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
         self._require_admin()
