@@ -278,6 +278,393 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
   );
 });
 
+// ── Work Order Dialog (memoised to prevent full-Dashboard re-renders on keystrokes) ──
+const WO_DEFAULTS = {
+  msme_support: {
+    objective: `To mobilise assigned MSMEs (up to 65 per peer-to-peer group) for peer-to-peer learning sessions, onboard them onto a suitable CRM platform based on their individual interest and business needs (such as Message Carrier, Brevo, or an equivalent tool), ensure their customer information is accurate and up to date, unlock sales opportunities, and provide structured 1-on-1 business development support.`,
+    key_tasks: `1. Mobilise assigned MSMEs by reaching out, explaining session objectives, and confirming participation dates and location.
+2. Document any MSME that is unavailable or declines in the non-engagement register and notify the Senior BGE promptly.
+3. Assess each MSME's interest, digital capacity, and business needs to recommend the most appropriate CRM platform.
+4. Ensure all CRM account login credentials are handed directly to the MSME owner and not stored by the BGE.
+5. Assist each MSME in configuring their chosen CRM system by helping them input, structure, and verify their customer contact list.
+6. Work with each MSME to identify and unlock sales opportunities using their updated customer data.
+7. Conduct a structured 1-on-1 session with each assigned MSME using the standardised PRUDEV II session template.
+8. Attend and actively participate in the peer-to-peer learning sessions, supporting facilitation and ensuring MSMEs are engaged.
+9. Maintain personal accountability for the accuracy and timely submission of all attendance sheets and field reports.
+10. Document all field activities, session notes, and MSME progress in the required PRUDEV II formats.
+11. Maintain confidentiality of all MSME data and business information at all times.`,
+    deliverables_json: [
+      { task_num: 1, description: 'MSME mobilisation list – names and contacts of all MSMEs confirmed for the peer-to-peer session', due_date: 'End of Week 1' },
+      { task_num: 2, description: 'MSME non-engagement register – documented record of any MSME that was unavailable or declined', due_date: 'Rolling – within 2 days of each contact attempt' },
+      { task_num: 3, description: 'Signed MSME registration forms for the selected CRM platform', due_date: 'Rolling – per MSME onboarded' },
+      { task_num: 4, description: 'CRM set-up confirmation report – evidence that each MSME has an active account and customer list uploaded', due_date: 'End of Week 2' },
+      { task_num: 5, description: 'Updated customer list per MSME – cleaned, verified, and entered into the CRM system', due_date: 'End of Week 2' },
+      { task_num: 6, description: '1-on-1 session notes for each MSME (using standardised PRUDEV II template)', due_date: 'Within 2 days of each session' },
+      { task_num: 7, description: 'Signed peer-to-peer session attendance sheets submitted to the Senior BGE', due_date: 'Per session, day of event' },
+      { task_num: 8, description: 'Monthly field activity report covering CRM adoption, sessions conducted, and key MSME challenges', due_date: 'Last working day of each month' },
+      { task_num: 9, description: 'Approved invoice and signed timesheet', due_date: 'With monthly report submission' },
+    ],
+  },
+  msme_data_update: {
+    objective: `To support the updating and validation of MSME records within the BDS system through field visits, ensuring that business profiles, operational data, and compliance information are accurate, complete, and up to date.`,
+    key_tasks: `1. Participate in orientation and training to fully understand the BDS system, data collection process, and reporting expectations.
+2. Receive field materials including branded T-shirts and assignment guidelines.
+3. Visit assigned MSMEs (approximately 10 per BGE) to conduct detailed data verification and updates.
+4. Review and update MSME business profiles including ownership, location, products/services, staffing, and operational status.
+5. Verify and update business registration and compliance information where applicable.
+6. Capture updated contact details, customer channels, and digital presence information.
+7. Update financial, production, and market-related information in the BDS system.
+8. Identify missing or inconsistent records and validate information directly with MSME owners/managers.
+9. Upload and synchronize all verified updates into the BDS system accurately and in a timely manner.
+10. Submit feedback on challenges, observations, and recommendations arising from the field verification process.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Orientation on the BDS System and Assignment Expectations Completed',                 due_date: 'Day 1' },
+      { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                               due_date: 'Day 1' },
+      { task_num: 3, description: 'Assigned MSME Visit Plan',                                                            due_date: 'Day 1' },
+      { task_num: 4, description: 'MSME Field Visits and Data Collection Conducted',                                    due_date: 'Day 2 – Day 5' },
+      { task_num: 5, description: 'Verified and Updated MSME Records in the BDS System',                                due_date: 'Day 2 – Day 5' },
+      { task_num: 6, description: 'Summary Report on Key Findings, Gaps, and Recommendations',                          due_date: 'Final Day' },
+      { task_num: 7, description: 'Submission of Supporting Documentation and Completed Updates',                       due_date: 'Final Day' },
+    ],
+  },
+  msme_finance_survey: {
+    objective: `To support the collection and updating of MSME financial and business data through structured field visits using the Google Forms data collection tool, ensuring accurate and complete records within the BDS system.`,
+    key_tasks: `1. Participate in orientation and training on the finance questionnaire, Google Forms tool, and field data collection procedures.
+2. Receive assignment guidelines, field materials, and branded T-shirts.
+3. Conduct field visits to at least 25 assigned MSMEs over a 15-day period.
+4. Administer the finance questionnaire using the Google Forms platform.
+5. Verify and update key MSME data: business ownership and contact details, sales and revenue, employment and staffing, production and operational capacity, market access and customer information, and business registration / compliance status.
+6. Validate existing BDS records and correct any missing or inaccurate information.
+7. Upload and synchronize collected data accurately and on time.
+8. Provide daily progress updates and field feedback to the coordination team.
+9. Identify MSMEs requiring additional business development or financial support services.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Orientation on Finance Questionnaire and Google Forms Tool Completed',  due_date: 'Monday, 18 May 2026' },
+      { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                  due_date: 'Monday, 18 May 2026' },
+      { task_num: 3, description: 'MSME Field Visit Schedule and Assignment Plan',                         due_date: 'Monday, 18 May 2026' },
+      { task_num: 4, description: 'Completion of Field Visits to at Least 25 MSMEs',                       due_date: '19 May – 31 May 2026' },
+      { task_num: 5, description: 'Completed Finance Questionnaires Submitted through Google Forms',       due_date: '19 May – 31 May 2026' },
+      { task_num: 6, description: 'Updated MSME Records in the BDS System',                                due_date: 'Throughout Assignment Period' },
+      { task_num: 7, description: 'Daily Progress Updates Submitted',                                      due_date: 'Daily' },
+      { task_num: 8, description: 'Final Summary Report with Key Findings and Recommendations',            due_date: 'Monday, 1 June 2026' },
+      { task_num: 9, description: 'Submission of All Verified and Updated MSME Data',                      due_date: 'Monday, 1 June 2026' },
+    ],
+  },
+  mobilisation: {
+    objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
+    key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
+2. Clarify programme expectations – this is NOT a job offer; it is training to build their own business.
+3. Gather applicant information: full name, contact number, district, qualifications, smartphone access, and logistics concerns.
+4. Identify and flag barriers to participation (transport, accommodation, timing) and document in the barrier report.
+5. Provide follow-up SMS reminders to confirmed participants with dates, venue details, and what to bring.
+6. Track confirmed vs. declined applicants and provide updates to the BDS Component Coordinator.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Daily Call Log – record of each call made, time, outcome, and notes', due_date: 'Daily' },
+      { task_num: 2, description: 'Applicant Information Sheet – confirmed participants, qualifications verified, logistics information', due_date: 'End of mobilisation period' },
+      { task_num: 3, description: 'Barrier Report – summary of identified barriers and recommendations for support', due_date: 'End of mobilisation period' },
+      { task_num: 4, description: 'Final Mobilisation Summary Report – confirmation rates, analysis of no-shows/declines, final participant count', due_date: 'Day after mobilisation closes' },
+    ],
+  },
+  group_session: {
+    objective: `To facilitate and document peer-to-peer learning sessions with assigned MSME groups. The BGE will ensure effective knowledge sharing, monitor MSME engagement and progress, and submit timely session reports.`,
+    key_tasks: `1. Prepare session materials and agenda in line with PRUDEV II session templates.
+2. Facilitate the peer-to-peer group session, ensuring all assigned MSMEs are engaged and participate actively.
+3. Document attendance and participation using the official PRUDEV II attendance sheet.
+4. Capture key discussions, challenges raised, and outcomes agreed during the session.
+5. Support individual MSMEs with queries or follow-up actions arising from the session.
+6. Submit session notes and attendance records within the required timelines.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Signed attendance sheet – original submitted to Senior BGE on the day of the session', due_date: 'Day of session' },
+      { task_num: 2, description: 'Session notes – key topics discussed, challenges raised, and agreed follow-up actions', due_date: 'Within 2 days of session' },
+      { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session' },
+    ],
+  },
+  training_facilitation: {
+    objective: `To lead the design and facilitation of structured training for MSMEs and Business Growth Experts (BGEs) under the Prudev II programme. The Senior BGE will work alongside the BDS Expert to develop training content, deliver sessions, co-facilitate with the broader BGE team, monitor active participation, collect participant feedback, and share lessons learnt with the programme team.`,
+    key_tasks: `1. Collaborate with the BDS Expert to design and develop training content, materials, and session plans in line with PRUDEV II programme standards.
+2. Lead the delivery of assigned training modules for MSME cohorts and/or BGE capacity-building sessions.
+3. Co-facilitate training sessions alongside the Lead Facilitator and guest trainers, ensuring structured and effective delivery.
+4. Brief and prepare assigned BGEs before each session to ensure active, confident participation in facilitation.
+5. Monitor BGE engagement during sessions and provide real-time coaching and support where needed.
+6. Design and administer participant feedback forms at the end of each training session.
+7. Consolidate and analyse participant feedback, identifying trends, strengths, and areas for improvement.
+8. Conduct a structured post-training review with the delivery team within 3 days of each session.
+9. Compile and share a detailed Training Report and Lessons Learnt document with the programme team after each training.
+10. Maintain training records, attendance sheets, and all programme documentation in the required PRUDEV II formats.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Training Content Package – session plans, facilitator guides, and participant materials approved by the BDS Expert', due_date: 'Before first training session' },
+      { task_num: 2, description: 'Signed attendance sheets – collected and submitted for every session', due_date: 'Day of each session' },
+      { task_num: 3, description: 'Participant Feedback Summary – consolidated analysis of feedback forms from each training', due_date: 'Within 3 days of each session' },
+      { task_num: 4, description: 'Post-Training Review Notes – documented debrief with the facilitation team', due_date: 'Within 3 days of each session' },
+      { task_num: 5, description: 'Detailed Training Report – covering objectives, activities, key findings, observations, and recommendations', due_date: 'Within 5 days of each session' },
+      { task_num: 6, description: 'Lessons Learnt Report – structured document capturing insights for future training design and delivery', due_date: 'End of assignment' },
+      { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Monthly, with report submission' },
+    ],
+  },
+  other: { objective: '', key_tasks: '', deliverables_json: [] },
+};
+
+const WO_EMPTY = {
+  bge: '',
+  group: '',
+  work_order_type: 'msme_support',
+  project_name: 'Promoting Rural Development II (PRUDEV II)',
+  issue_date: new Date().toISOString().slice(0, 10),
+  start_date: '',
+  end_date: '',
+  location: 'Northern Uganda (Gulu & Lira)',
+  duration: '2 months',
+  ...WO_DEFAULTS.msme_support,
+  rate_per_day: 60000,
+  max_days: 4,
+  transport_reimbursed: true,
+  payment_notes: '',
+  team_leader_name: 'Stephen Maxi Opwonya',
+  team_leader_position: 'Team Leader',
+};
+
+const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woEditing, experts, headers, onSaved, fetchWorkOrders }) {
+  const [woForm, setWoForm] = React.useState({});
+  const [woErrors, setWoErrors] = React.useState('');
+  const [woSaving, setWoSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (woEditing) {
+      setWoForm({
+        bge: woEditing.bge,
+        group: woEditing.group || '',
+        work_order_type: woEditing.work_order_type,
+        project_name: woEditing.project_name,
+        issue_date: woEditing.issue_date,
+        start_date: woEditing.start_date || '',
+        end_date: woEditing.end_date || '',
+        location: woEditing.location,
+        duration: woEditing.duration,
+        objective: woEditing.objective,
+        key_tasks: woEditing.key_tasks,
+        deliverables_json: woEditing.deliverables_json || [],
+        rate_per_day: woEditing.rate_per_day,
+        max_days: woEditing.max_days,
+        transport_reimbursed: woEditing.transport_reimbursed,
+        payment_notes: woEditing.payment_notes || '',
+        team_leader_name: woEditing.team_leader_name,
+        team_leader_position: woEditing.team_leader_position,
+      });
+    } else {
+      setWoForm({ ...WO_EMPTY });
+    }
+    setWoErrors('');
+  }, [open, woEditing]);
+
+  const applyWoDefaults = React.useCallback((type) => {
+    const d = WO_DEFAULTS[type] || WO_DEFAULTS.other;
+    setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json }));
+  }, []);
+
+  const saveWo = React.useCallback(async () => {
+    if (!woForm.bge) { setWoErrors('BGE is required.'); return; }
+    if (!woForm.issue_date) { setWoErrors('Issue date is required.'); return; }
+    setWoSaving(true); setWoErrors('');
+    try {
+      const payload = { ...woForm, group: woForm.group || null };
+      if (woEditing) {
+        await axios.put(`${API_ENDPOINTS.WORK_ORDERS}${woEditing.id}/`, payload, { headers });
+      } else {
+        await axios.post(API_ENDPOINTS.WORK_ORDERS, payload, { headers });
+      }
+      const msg = woEditing ? 'Work order updated.' : 'Work order created.';
+      fetchWorkOrders();
+      onSaved(msg);
+    } catch (err) {
+      setWoErrors(err.response?.data?.detail || JSON.stringify(err.response?.data || {}) || 'Save failed.');
+    } finally {
+      setWoSaving(false);
+    }
+  }, [woForm, woEditing, headers, fetchWorkOrders, onSaved]);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          width: { xs: 'calc(100vw - 16px)', md: '100%' },
+          height: { xs: '96dvh', md: '90vh' },
+          maxHeight: '96dvh',
+          m: { xs: 1, md: 4 },
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        },
+      }}
+    >
+      <DialogTitle fontWeight={700} sx={{ flexShrink: 0 }}>
+        {woEditing ? 'Edit Work Order' : 'New Work Order'}
+      </DialogTitle>
+      <DialogContent
+        dividers
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          px: { xs: 2, sm: 3 },
+        }}
+      >
+        {woErrors && <Alert severity="error" sx={{ mb: 2 }}>{woErrors}</Alert>}
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth size="small" required>
+              <InputLabel>BGE</InputLabel>
+              <Select value={woForm.bge} label="BGE" onChange={e => setWoForm(f => ({ ...f, bge: e.target.value }))}>
+                {woForm.work_order_type === 'training_facilitation' ? (
+                  experts.filter(e => e.is_senior).length > 0
+                    ? experts.filter(e => e.is_senior).map(e =>
+                        <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
+                    : <MenuItem disabled value="">No Senior BGEs found</MenuItem>
+                ) : (
+                  experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
+                )}
+              </Select>
+            </FormControl>
+            {woForm.work_order_type === 'training_facilitation' && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                Only Senior BGEs are listed for this work order type.
+              </Typography>
+            )}
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Work Order Type</InputLabel>
+              <Select value={woForm.work_order_type} label="Work Order Type"
+                onChange={e => applyWoDefaults(e.target.value)}>
+                <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
+                <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
+                <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
+                <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
+                <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
+                <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth size="small" label="Issue Date" type="date" InputLabelProps={{ shrink: true }}
+              value={woForm.issue_date} onChange={e => setWoForm(f => ({ ...f, issue_date: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth size="small" label="Start Date" type="date" InputLabelProps={{ shrink: true }}
+              value={woForm.start_date} onChange={e => setWoForm(f => ({ ...f, start_date: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth size="small" label="End Date" type="date" InputLabelProps={{ shrink: true }}
+              value={woForm.end_date} onChange={e => setWoForm(f => ({ ...f, end_date: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12} sm={8}>
+            <TextField fullWidth size="small" label="Location"
+              value={woForm.location} onChange={e => setWoForm(f => ({ ...f, location: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth size="small" label="Duration"
+              value={woForm.duration} onChange={e => setWoForm(f => ({ ...f, duration: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField fullWidth multiline minRows={3} size="small" label="Objective"
+              value={woForm.objective} onChange={e => setWoForm(f => ({ ...f, objective: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField fullWidth multiline minRows={5} size="small" label="Key Tasks (one per line)"
+              helperText="Each numbered task on its own line — pre-populated by type, fully editable."
+              value={woForm.key_tasks} onChange={e => setWoForm(f => ({ ...f, key_tasks: e.target.value }))} />
+          </Grid>
+
+          {/* Deliverables table */}
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle2" fontWeight={700}>Deliverables</Typography>
+              <Button size="small" startIcon={<Add />} onClick={() => setWoForm(f => ({
+                ...f,
+                deliverables_json: [...f.deliverables_json, { task_num: f.deliverables_json.length + 1, description: '', due_date: '' }],
+              }))}>Add row</Button>
+            </Box>
+            {(woForm.deliverables_json || []).map((d, i) => (
+              <Box
+                key={i}
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(170px, 220px) 40px' },
+                  gap: 1,
+                  mb: 1,
+                  alignItems: 'flex-start',
+                }}
+              >
+                <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
+                <TextField size="small" fullWidth multiline minRows={1} label="Deliverable description"
+                  value={d.description}
+                  onChange={e => {
+                    const upd = [...woForm.deliverables_json];
+                    upd[i] = { ...d, description: e.target.value };
+                    setWoForm(f => ({ ...f, deliverables_json: upd }));
+                  }} />
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Due date"
+                  sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
+                  value={d.due_date}
+                  onChange={e => {
+                    const upd = [...woForm.deliverables_json];
+                    upd[i] = { ...d, due_date: e.target.value };
+                    setWoForm(f => ({ ...f, deliverables_json: upd }));
+                  }} />
+                <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
+                  const upd = woForm.deliverables_json.filter((_, j) => j !== i)
+                    .map((x, j) => ({ ...x, task_num: j + 1 }));
+                  setWoForm(f => ({ ...f, deliverables_json: upd }));
+                }}>
+                  <Delete fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
+          </Grid>
+
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth size="small" label="Rate / day (UGX)" type="number"
+              value={woForm.rate_per_day} onChange={e => setWoForm(f => ({ ...f, rate_per_day: Number(e.target.value) }))} />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth size="small" label="Maximum days" type="number"
+              value={woForm.max_days} onChange={e => setWoForm(f => ({ ...f, max_days: Number(e.target.value) }))} />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth size="small" label="Team Leader Name"
+              value={woForm.team_leader_name} onChange={e => setWoForm(f => ({ ...f, team_leader_name: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField fullWidth size="small" label="Payment notes (optional)"
+              value={woForm.payment_notes} onChange={e => setWoForm(f => ({ ...f, payment_notes: e.target.value }))} />
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions sx={{
+        flexShrink: 0,
+        px: { xs: 2, sm: 3 },
+        py: 1.5,
+        gap: 1,
+        flexWrap: 'wrap',
+      }}>
+        <Button onClick={onClose} sx={{ order: { xs: 2, sm: 0 } }}>Cancel</Button>
+        <Button variant="contained" onClick={saveWo} disabled={woSaving}>
+          {woSaving ? <CircularProgress size={18} /> : (woEditing ? 'Save Changes' : 'Create')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+});
+
 export default function Dashboard({ token, currentUser, onLogout }) {
   const isViewer          = currentUser?.role === 'viewer';
   const isStaff           = !!(currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'admin');
@@ -331,9 +718,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [woFilterType, setWoFilterType] = useState('');
   const [woDialog, setWoDialog] = useState(false);
   const [woEditing, setWoEditing] = useState(null);
-  const [woForm, setWoForm] = useState({});
-  const [woSaving, setWoSaving] = useState(false);
-  const [woErrors, setWoErrors] = useState('');
   const [woIssuing, setWoIssuing] = useState(null);
   const [woWithdrawing, setWoWithdrawing] = useState(null);
   const [woWithdrawDialog, setWoWithdrawDialog] = useState(false);
@@ -3638,202 +4022,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     );
   };
 
-  const WO_DEFAULTS = {
-    msme_support: {
-      objective: `To mobilise assigned MSMEs (up to 65 per peer-to-peer group) for peer-to-peer learning sessions, onboard them onto a suitable CRM platform based on their individual interest and business needs (such as Message Carrier, Brevo, or an equivalent tool), ensure their customer information is accurate and up to date, unlock sales opportunities, and provide structured 1-on-1 business development support.`,
-      key_tasks: `1. Mobilise assigned MSMEs by reaching out, explaining session objectives, and confirming participation dates and location.
-2. Document any MSME that is unavailable or declines in the non-engagement register and notify the Senior BGE promptly.
-3. Assess each MSME's interest, digital capacity, and business needs to recommend the most appropriate CRM platform.
-4. Ensure all CRM account login credentials are handed directly to the MSME owner and not stored by the BGE.
-5. Assist each MSME in configuring their chosen CRM system by helping them input, structure, and verify their customer contact list.
-6. Work with each MSME to identify and unlock sales opportunities using their updated customer data.
-7. Conduct a structured 1-on-1 session with each assigned MSME using the standardised PRUDEV II session template.
-8. Attend and actively participate in the peer-to-peer learning sessions, supporting facilitation and ensuring MSMEs are engaged.
-9. Maintain personal accountability for the accuracy and timely submission of all attendance sheets and field reports.
-10. Document all field activities, session notes, and MSME progress in the required PRUDEV II formats.
-11. Maintain confidentiality of all MSME data and business information at all times.`,
-      deliverables_json: [
-        { task_num: 1, description: 'MSME mobilisation list – names and contacts of all MSMEs confirmed for the peer-to-peer session', due_date: 'End of Week 1' },
-        { task_num: 2, description: 'MSME non-engagement register – documented record of any MSME that was unavailable or declined', due_date: 'Rolling – within 2 days of each contact attempt' },
-        { task_num: 3, description: 'Signed MSME registration forms for the selected CRM platform', due_date: 'Rolling – per MSME onboarded' },
-        { task_num: 4, description: 'CRM set-up confirmation report – evidence that each MSME has an active account and customer list uploaded', due_date: 'End of Week 2' },
-        { task_num: 5, description: 'Updated customer list per MSME – cleaned, verified, and entered into the CRM system', due_date: 'End of Week 2' },
-        { task_num: 6, description: '1-on-1 session notes for each MSME (using standardised PRUDEV II template)', due_date: 'Within 2 days of each session' },
-        { task_num: 7, description: 'Signed peer-to-peer session attendance sheets submitted to the Senior BGE', due_date: 'Per session, day of event' },
-        { task_num: 8, description: 'Monthly field activity report covering CRM adoption, sessions conducted, and key MSME challenges', due_date: 'Last working day of each month' },
-        { task_num: 9, description: 'Approved invoice and signed timesheet', due_date: 'With monthly report submission' },
-      ],
-    },
-    msme_data_update: {
-      objective: `To support the updating and validation of MSME records within the BDS system through field visits, ensuring that business profiles, operational data, and compliance information are accurate, complete, and up to date.`,
-      key_tasks: `1. Participate in orientation and training to fully understand the BDS system, data collection process, and reporting expectations.
-2. Receive field materials including branded T-shirts and assignment guidelines.
-3. Visit assigned MSMEs (approximately 10 per BGE) to conduct detailed data verification and updates.
-4. Review and update MSME business profiles including ownership, location, products/services, staffing, and operational status.
-5. Verify and update business registration and compliance information where applicable.
-6. Capture updated contact details, customer channels, and digital presence information.
-7. Update financial, production, and market-related information in the BDS system.
-8. Identify missing or inconsistent records and validate information directly with MSME owners/managers.
-9. Upload and synchronize all verified updates into the BDS system accurately and in a timely manner.
-10. Submit feedback on challenges, observations, and recommendations arising from the field verification process.`,
-      deliverables_json: [
-        { task_num: 1, description: 'Orientation on the BDS System and Assignment Expectations Completed',                 due_date: 'Day 1' },
-        { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                               due_date: 'Day 1' },
-        { task_num: 3, description: 'Assigned MSME Visit Plan',                                                            due_date: 'Day 1' },
-        { task_num: 4, description: 'MSME Field Visits and Data Collection Conducted',                                    due_date: 'Day 2 – Day 5' },
-        { task_num: 5, description: 'Verified and Updated MSME Records in the BDS System',                                due_date: 'Day 2 – Day 5' },
-        { task_num: 6, description: 'Summary Report on Key Findings, Gaps, and Recommendations',                          due_date: 'Final Day' },
-        { task_num: 7, description: 'Submission of Supporting Documentation and Completed Updates',                       due_date: 'Final Day' },
-      ],
-    },
-    msme_finance_survey: {
-      objective: `To support the collection and updating of MSME financial and business data through structured field visits using the Google Forms data collection tool, ensuring accurate and complete records within the BDS system.`,
-      key_tasks: `1. Participate in orientation and training on the finance questionnaire, Google Forms tool, and field data collection procedures.
-2. Receive assignment guidelines, field materials, and branded T-shirts.
-3. Conduct field visits to at least 25 assigned MSMEs over a 15-day period.
-4. Administer the finance questionnaire using the Google Forms platform.
-5. Verify and update key MSME data: business ownership and contact details, sales and revenue, employment and staffing, production and operational capacity, market access and customer information, and business registration / compliance status.
-6. Validate existing BDS records and correct any missing or inaccurate information.
-7. Upload and synchronize collected data accurately and on time.
-8. Provide daily progress updates and field feedback to the coordination team.
-9. Identify MSMEs requiring additional business development or financial support services.`,
-      deliverables_json: [
-        { task_num: 1, description: 'Orientation on Finance Questionnaire and Google Forms Tool Completed',  due_date: 'Monday, 18 May 2026' },
-        { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                  due_date: 'Monday, 18 May 2026' },
-        { task_num: 3, description: 'MSME Field Visit Schedule and Assignment Plan',                         due_date: 'Monday, 18 May 2026' },
-        { task_num: 4, description: 'Completion of Field Visits to at Least 25 MSMEs',                       due_date: '19 May – 31 May 2026' },
-        { task_num: 5, description: 'Completed Finance Questionnaires Submitted through Google Forms',       due_date: '19 May – 31 May 2026' },
-        { task_num: 6, description: 'Updated MSME Records in the BDS System',                                due_date: 'Throughout Assignment Period' },
-        { task_num: 7, description: 'Daily Progress Updates Submitted',                                      due_date: 'Daily' },
-        { task_num: 8, description: 'Final Summary Report with Key Findings and Recommendations',            due_date: 'Monday, 1 June 2026' },
-        { task_num: 9, description: 'Submission of All Verified and Updated MSME Data',                      due_date: 'Monday, 1 June 2026' },
-      ],
-    },
-    mobilisation: {
-      objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
-      key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
-2. Clarify programme expectations – this is NOT a job offer; it is training to build their own business.
-3. Gather applicant information: full name, contact number, district, qualifications, smartphone access, and logistics concerns.
-4. Identify and flag barriers to participation (transport, accommodation, timing) and document in the barrier report.
-5. Provide follow-up SMS reminders to confirmed participants with dates, venue details, and what to bring.
-6. Track confirmed vs. declined applicants and provide updates to the BDS Component Coordinator.`,
-      deliverables_json: [
-        { task_num: 1, description: 'Daily Call Log – record of each call made, time, outcome, and notes', due_date: 'Daily' },
-        { task_num: 2, description: 'Applicant Information Sheet – confirmed participants, qualifications verified, logistics information', due_date: 'End of mobilisation period' },
-        { task_num: 3, description: 'Barrier Report – summary of identified barriers and recommendations for support', due_date: 'End of mobilisation period' },
-        { task_num: 4, description: 'Final Mobilisation Summary Report – confirmation rates, analysis of no-shows/declines, final participant count', due_date: 'Day after mobilisation closes' },
-      ],
-    },
-    group_session: {
-      objective: `To facilitate and document peer-to-peer learning sessions with assigned MSME groups. The BGE will ensure effective knowledge sharing, monitor MSME engagement and progress, and submit timely session reports.`,
-      key_tasks: `1. Prepare session materials and agenda in line with PRUDEV II session templates.
-2. Facilitate the peer-to-peer group session, ensuring all assigned MSMEs are engaged and participate actively.
-3. Document attendance and participation using the official PRUDEV II attendance sheet.
-4. Capture key discussions, challenges raised, and outcomes agreed during the session.
-5. Support individual MSMEs with queries or follow-up actions arising from the session.
-6. Submit session notes and attendance records within the required timelines.`,
-      deliverables_json: [
-        { task_num: 1, description: 'Signed attendance sheet – original submitted to Senior BGE on the day of the session', due_date: 'Day of session' },
-        { task_num: 2, description: 'Session notes – key topics discussed, challenges raised, and agreed follow-up actions', due_date: 'Within 2 days of session' },
-        { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session' },
-      ],
-    },
-    training_facilitation: {
-      objective: `To lead the design and facilitation of structured training for MSMEs and Business Growth Experts (BGEs) under the Prudev II programme. The Senior BGE will work alongside the BDS Expert to develop training content, deliver sessions, co-facilitate with the broader BGE team, monitor active participation, collect participant feedback, and share lessons learnt with the programme team.`,
-      key_tasks: `1. Collaborate with the BDS Expert to design and develop training content, materials, and session plans in line with PRUDEV II programme standards.
-2. Lead the delivery of assigned training modules for MSME cohorts and/or BGE capacity-building sessions.
-3. Co-facilitate training sessions alongside the Lead Facilitator and guest trainers, ensuring structured and effective delivery.
-4. Brief and prepare assigned BGEs before each session to ensure active, confident participation in facilitation.
-5. Monitor BGE engagement during sessions and provide real-time coaching and support where needed.
-6. Design and administer participant feedback forms at the end of each training session.
-7. Consolidate and analyse participant feedback, identifying trends, strengths, and areas for improvement.
-8. Conduct a structured post-training review with the delivery team within 3 days of each session.
-9. Compile and share a detailed Training Report and Lessons Learnt document with the programme team after each training.
-10. Maintain training records, attendance sheets, and all programme documentation in the required PRUDEV II formats.`,
-      deliverables_json: [
-        { task_num: 1, description: 'Training Content Package – session plans, facilitator guides, and participant materials approved by the BDS Expert', due_date: 'Before first training session' },
-        { task_num: 2, description: 'Signed attendance sheets – collected and submitted for every session', due_date: 'Day of each session' },
-        { task_num: 3, description: 'Participant Feedback Summary – consolidated analysis of feedback forms from each training', due_date: 'Within 3 days of each session' },
-        { task_num: 4, description: 'Post-Training Review Notes – documented debrief with the facilitation team', due_date: 'Within 3 days of each session' },
-        { task_num: 5, description: 'Detailed Training Report – covering objectives, activities, key findings, observations, and recommendations', due_date: 'Within 5 days of each session' },
-        { task_num: 6, description: 'Lessons Learnt Report – structured document capturing insights for future training design and delivery', due_date: 'End of assignment' },
-        { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Monthly, with report submission' },
-      ],
-    },
-    other: { objective: '', key_tasks: '', deliverables_json: [] },
-  };
-
-  const WO_EMPTY = {
-    bge: '',
-    group: '',
-    work_order_type: 'msme_support',
-    project_name: 'Promoting Rural Development II (PRUDEV II)',
-    issue_date: new Date().toISOString().slice(0, 10),
-    start_date: '',
-    end_date: '',
-    location: 'Northern Uganda (Gulu & Lira)',
-    duration: '2 months',
-    ...WO_DEFAULTS.msme_support,
-    rate_per_day: 60000,
-    max_days: 4,
-    transport_reimbursed: true,
-    payment_notes: '',
-    team_leader_name: 'Stephen Maxi Opwonya',
-    team_leader_position: 'Team Leader',
-  };
-
-  const applyWoDefaults = (type) => {
-    const d = WO_DEFAULTS[type] || WO_DEFAULTS.other;
-    setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json }));
-  };
-
-  const openWoCreate = () => { setWoEditing(null); setWoForm({ ...WO_EMPTY }); setWoErrors(''); setWoDialog(true); };
-  const openWoEdit = (wo) => {
-    setWoEditing(wo);
-    setWoForm({
-      bge: wo.bge,
-      group: wo.group || '',
-      work_order_type: wo.work_order_type,
-      project_name: wo.project_name,
-      issue_date: wo.issue_date,
-      start_date: wo.start_date || '',
-      end_date: wo.end_date || '',
-      location: wo.location,
-      duration: wo.duration,
-      objective: wo.objective,
-      key_tasks: wo.key_tasks,
-      deliverables_json: wo.deliverables_json || [],
-      rate_per_day: wo.rate_per_day,
-      max_days: wo.max_days,
-      transport_reimbursed: wo.transport_reimbursed,
-      payment_notes: wo.payment_notes || '',
-      team_leader_name: wo.team_leader_name,
-      team_leader_position: wo.team_leader_position,
-    });
-    setWoErrors('');
-    setWoDialog(true);
-  };
-
-  const saveWo = async () => {
-    if (!woForm.bge) { setWoErrors('BGE is required.'); return; }
-    if (!woForm.issue_date) { setWoErrors('Issue date is required.'); return; }
-    setWoSaving(true); setWoErrors('');
-    try {
-      const payload = { ...woForm, group: woForm.group || null };
-      if (woEditing) {
-        await axios.put(`${API_ENDPOINTS.WORK_ORDERS}${woEditing.id}/`, payload, { headers });
-      } else {
-        await axios.post(API_ENDPOINTS.WORK_ORDERS, payload, { headers });
-      }
-      setSuccess(woEditing ? 'Work order updated.' : 'Work order created.');
-      setWoDialog(false);
-      fetchWorkOrders();
-    } catch (err) {
-      setWoErrors(err.response?.data?.detail || JSON.stringify(err.response?.data || {}) || 'Save failed.');
-    } finally {
-      setWoSaving(false);
-    }
-  };
+  const openWoCreate = () => { setWoEditing(null); setWoDialog(true); };
+  const openWoEdit = (wo) => { setWoEditing(wo); setWoDialog(true); };
 
   const issueWo = async (wo) => {
     setWoIssuing(wo.id);
@@ -4042,185 +4232,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </Box>
       )}
 
-      {/* Create / Edit Dialog */}
-      <Dialog
+      {/* Create / Edit Dialog — extracted to WorkOrderDialog to prevent full-Dashboard re-renders on keystrokes */}
+      <WorkOrderDialog
         open={woDialog}
         onClose={() => setWoDialog(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            width: { xs: 'calc(100vw - 16px)', md: '100%' },
-            height: { xs: '96dvh', md: '90vh' },
-            maxHeight: '96dvh',
-            m: { xs: 1, md: 4 },
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          },
-        }}
-      >
-        <DialogTitle fontWeight={700} sx={{ flexShrink: 0 }}>
-          {woEditing ? 'Edit Work Order' : 'New Work Order'}
-        </DialogTitle>
-        <DialogContent
-          dividers
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            px: { xs: 2, sm: 3 },
-          }}
-        >
-          {woErrors && <Alert severity="error" sx={{ mb: 2 }}>{woErrors}</Alert>}
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small" required>
-                <InputLabel>BGE</InputLabel>
-                <Select value={woForm.bge} label="BGE" onChange={e => setWoForm(f => ({ ...f, bge: e.target.value }))}>
-                  {woForm.work_order_type === 'training_facilitation' ? (
-                    experts.filter(e => e.is_senior).length > 0
-                      ? experts.filter(e => e.is_senior).map(e =>
-                          <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
-                      : <MenuItem disabled value="">No Senior BGEs found</MenuItem>
-                  ) : (
-                    experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
-                  )}
-                </Select>
-              </FormControl>
-              {woForm.work_order_type === 'training_facilitation' && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                  Only Senior BGEs are listed for this work order type.
-                </Typography>
-              )}
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Work Order Type</InputLabel>
-                <Select value={woForm.work_order_type} label="Work Order Type"
-                  onChange={e => applyWoDefaults(e.target.value)}>
-                  <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
-                  <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
-                  <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
-                  <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
-                  <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
-                  <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Issue Date" type="date" InputLabelProps={{ shrink: true }}
-                value={woForm.issue_date} onChange={e => setWoForm(f => ({ ...f, issue_date: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Start Date" type="date" InputLabelProps={{ shrink: true }}
-                value={woForm.start_date} onChange={e => setWoForm(f => ({ ...f, start_date: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="End Date" type="date" InputLabelProps={{ shrink: true }}
-                value={woForm.end_date} onChange={e => setWoForm(f => ({ ...f, end_date: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={8}>
-              <TextField fullWidth size="small" label="Location"
-                value={woForm.location} onChange={e => setWoForm(f => ({ ...f, location: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Duration"
-                value={woForm.duration} onChange={e => setWoForm(f => ({ ...f, duration: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth multiline minRows={3} size="small" label="Objective"
-                value={woForm.objective} onChange={e => setWoForm(f => ({ ...f, objective: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth multiline minRows={5} size="small" label="Key Tasks (one per line)"
-                helperText="Each numbered task on its own line — pre-populated by type, fully editable."
-                value={woForm.key_tasks} onChange={e => setWoForm(f => ({ ...f, key_tasks: e.target.value }))} />
-            </Grid>
-
-            {/* Deliverables table */}
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle2" fontWeight={700}>Deliverables</Typography>
-                <Button size="small" startIcon={<Add />} onClick={() => setWoForm(f => ({
-                  ...f,
-                  deliverables_json: [...f.deliverables_json, { task_num: f.deliverables_json.length + 1, description: '', due_date: '' }],
-                }))}>Add row</Button>
-              </Box>
-              {(woForm.deliverables_json || []).map((d, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(170px, 220px) 40px' },
-                    gap: 1,
-                    mb: 1,
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
-                  <TextField size="small" fullWidth multiline minRows={1} label="Deliverable description"
-                    value={d.description}
-                    onChange={e => {
-                      const upd = [...woForm.deliverables_json];
-                      upd[i] = { ...d, description: e.target.value };
-                      setWoForm(f => ({ ...f, deliverables_json: upd }));
-                    }} />
-                  <TextField
-                    size="small"
-                    fullWidth
-                    label="Due date"
-                    sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
-                    value={d.due_date}
-                    onChange={e => {
-                      const upd = [...woForm.deliverables_json];
-                      upd[i] = { ...d, due_date: e.target.value };
-                      setWoForm(f => ({ ...f, deliverables_json: upd }));
-                    }} />
-                  <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
-                    const upd = woForm.deliverables_json.filter((_, j) => j !== i)
-                      .map((x, j) => ({ ...x, task_num: j + 1 }));
-                    setWoForm(f => ({ ...f, deliverables_json: upd }));
-                  }}>
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Rate / day (UGX)" type="number"
-                value={woForm.rate_per_day} onChange={e => setWoForm(f => ({ ...f, rate_per_day: Number(e.target.value) }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Maximum days" type="number"
-                value={woForm.max_days} onChange={e => setWoForm(f => ({ ...f, max_days: Number(e.target.value) }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth size="small" label="Team Leader Name"
-                value={woForm.team_leader_name} onChange={e => setWoForm(f => ({ ...f, team_leader_name: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth size="small" label="Payment notes (optional)"
-                value={woForm.payment_notes} onChange={e => setWoForm(f => ({ ...f, payment_notes: e.target.value }))} />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{
-          flexShrink: 0,
-          px: { xs: 2, sm: 3 },
-          py: 1.5,
-          gap: 1,
-          flexWrap: 'wrap',
-        }}>
-          <Button onClick={() => setWoDialog(false)} sx={{ order: { xs: 2, sm: 0 } }}>Cancel</Button>
-          <Button variant="contained" onClick={saveWo} disabled={woSaving}>
-            {woSaving ? <CircularProgress size={18} /> : (woEditing ? 'Save Changes' : 'Create')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        woEditing={woEditing}
+        experts={experts}
+        headers={headers}
+        fetchWorkOrders={fetchWorkOrders}
+        onSaved={(msg) => { setSuccess(msg); setWoDialog(false); }}
+      />
 
       {/* Withdraw confirmation dialog */}
       <Dialog open={woWithdrawDialog} onClose={() => setWoWithdrawDialog(false)} maxWidth="sm" fullWidth>
