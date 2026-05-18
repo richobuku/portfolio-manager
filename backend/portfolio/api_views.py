@@ -1186,7 +1186,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             lines.append("")
         lines += [
             "Please log in to the PRUDEV II Portfolio Management System to view full details and submit visit reports.",
-            "", "Best regards,", "PRUDEV II Programme Management", "GIZ · GOPA AFC",
+            "", "Best regards,", "PRUDEV II BDS Team", "GIZ · GOPA AFC",
         ]
         body_text = "\n".join(lines)
 
@@ -1268,7 +1268,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         <!-- Footer -->
         <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #e8edf2;">
-          <p style="margin:0;color:#777;font-size:12px;">Best regards,<br><strong>PRUDEV II Programme Management</strong><br>GIZ · GOPA AFC</p>
+          <p style="margin:0;color:#777;font-size:12px;">Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA AFC</p>
         </td></tr>
 
       </table>
@@ -2765,7 +2765,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'Work Order Type: {work_order.get_work_order_type_display()}\n'
                 f'Issue Date: {work_order.issue_date}\n'
                 f'Net Payable: UGX {work_order.rate_per_day * work_order.max_days - int(work_order.rate_per_day * work_order.max_days * 0.06):,}\n\n'
-                f'Regards,\nPRUDEV II Programme Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
             )
             email = EmailMultiAlternatives(subject, body,
                                            getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
@@ -2817,7 +2817,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'{reason_line}\n'
                 f'Work Order Type: {work_order.get_work_order_type_display()}\n'
                 f'You will be notified when a revised work order is re-issued to you.\n\n'
-                f'Regards,\nPRUDEV II Programme Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
             )
             try:
                 msg = EmailMultiAlternatives(

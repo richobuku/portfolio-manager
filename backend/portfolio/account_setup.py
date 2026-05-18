@@ -86,7 +86,7 @@ def _welcome_email_html(bge, username, password, login_url):
     </p>
   </div>
   <div style="text-align:center;color:#9ca3af;font-size:11px;padding:14px;">
-    PRUDEV II Programme · GIZ · GOPA AFC
+    PRUDEV II BDS Team · GIZ · GOPA AFC
   </div>
 </div>"""
 
@@ -105,7 +105,7 @@ Your Business Growth Expert account on the PRUDEV II portal is ready.
 For your security, please change this password on first login. Use
 "Forgot password?" on the sign-in page if you'd prefer a reset link.
 
-— PRUDEV II Programme · GIZ · GOPA AFC
+— PRUDEV II BDS Team · GIZ · GOPA AFC
 """
 
 
