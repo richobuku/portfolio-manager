@@ -240,6 +240,42 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [growthSnapshots, setGrowthSnapshots] = useState([]);
   const [growthSaving, setGrowthSaving] = useState(false);
   const [growthError, setGrowthError] = useState('');
+  const DIGITAL_TOOLS_OPTIONS = [
+    'Zoho Books',
+    'Biashara App',
+    'Brevo (Email Marketing)',
+    'Message Carrier (SMS)',
+    'WhatsApp Business',
+    'QuickBooks',
+    'Facebook / Instagram Business',
+    'Google My Business',
+    'MTN / Airtel MoMo Business',
+    'Point of Sale (POS) System',
+    'Canva (Design & Marketing)',
+    'TikTok for Business',
+    'Shopify / WooCommerce',
+    'Other',
+  ];
+
+  const TRAINING_CHANGE_OPTIONS = [
+    'Improved record keeping / bookkeeping',
+    'Adopted digital accounting tools',
+    'Registered business (URSB / TIN)',
+    'Opened a business bank account',
+    'Joined a SACCO',
+    'Improved customer service',
+    'Expanded product or service range',
+    'Developed a business plan',
+    'Improved marketing and promotion',
+    'Hired additional staff',
+    'Improved pricing strategy',
+    'Reduced costs / improved efficiency',
+    'Accessed new markets or customers',
+    'Improved supply chain management',
+    'Improved financial management',
+    'Other',
+  ];
+
   const EMPTY_GROWTH = {
     snapshot_date: new Date().toISOString().slice(0, 10),
     source: 'bge_visit',
@@ -254,6 +290,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     has_momo_pay: '', momo_pay_code: '',
     employees_ft_refugee: '', employees_pt_refugee: '',
     last_month_revenue: '',
+    digital_tools: [],
+    digital_tools_other: '',
+    training_made_changes: '',
+    training_changes: [],
+    training_changes_other: '',
     notes: '',
   };
   const [growthForm, setGrowthForm] = useState(EMPTY_GROWTH);
@@ -299,6 +340,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       momo_pay_code:     growthForm.has_momo_pay === 'true' ? (growthForm.momo_pay_code || '') : '',
       employees_ft_refugee: growthForm.employees_ft_refugee !== '' ? Number(growthForm.employees_ft_refugee) : null,
       employees_pt_refugee: growthForm.employees_pt_refugee !== '' ? Number(growthForm.employees_pt_refugee) : null,
+      digital_tools:          growthForm.digital_tools,
+      digital_tools_other:    growthForm.digital_tools.includes('Other') ? (growthForm.digital_tools_other || '') : '',
+      training_made_changes:  growthForm.training_made_changes === '' ? null : growthForm.training_made_changes === 'true',
+      training_changes:       growthForm.training_made_changes === 'true' ? growthForm.training_changes : [],
+      training_changes_other: (growthForm.training_made_changes === 'true' && growthForm.training_changes.includes('Other'))
+                                ? (growthForm.training_changes_other || '') : '',
       notes: growthForm.notes,
     };
     try {
@@ -3129,6 +3176,111 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   value={growthForm.momo_pay_code}
                   onChange={e => setGrowthForm(f => ({ ...f, momo_pay_code: e.target.value }))} />
               </Grid>
+            )}
+
+            {/* ── Digital Tools ── */}
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>
+                Digital Tools Adopted
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                Which digital tools has this business adopted? (select all that apply)
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {DIGITAL_TOOLS_OPTIONS.map(tool => {
+                  const checked = growthForm.digital_tools.includes(tool);
+                  return (
+                    <Chip
+                      key={tool}
+                      label={tool}
+                      size="small"
+                      clickable
+                      variant={checked ? 'filled' : 'outlined'}
+                      color={checked ? 'primary' : 'default'}
+                      onClick={() => setGrowthForm(f => ({
+                        ...f,
+                        digital_tools: checked
+                          ? f.digital_tools.filter(t => t !== tool)
+                          : [...f.digital_tools, tool],
+                        digital_tools_other: tool === 'Other' && checked ? '' : f.digital_tools_other,
+                      }))}
+                    />
+                  );
+                })}
+              </Box>
+            </Grid>
+            {growthForm.digital_tools.includes('Other') && (
+              <Grid item xs={12}>
+                <TextField fullWidth size="small" label="Other digital tool(s) — please specify"
+                  value={growthForm.digital_tools_other}
+                  onChange={e => setGrowthForm(f => ({ ...f, digital_tools_other: e.target.value }))}
+                  placeholder="e.g. Sage, Odoo, custom app…" />
+              </Grid>
+            )}
+
+            {/* ── Training Impact ── */}
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>
+                Training Impact
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Has training made any changes to this business?</InputLabel>
+                <Select
+                  value={growthForm.training_made_changes}
+                  label="Has training made any changes to this business?"
+                  onChange={e => setGrowthForm(f => ({
+                    ...f,
+                    training_made_changes: e.target.value,
+                    training_changes: [],
+                    training_changes_other: '',
+                  }))}>
+                  <MenuItem value="">— Not answered —</MenuItem>
+                  <MenuItem value="true">Yes — training has made changes</MenuItem>
+                  <MenuItem value="false">No — no changes observed yet</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {growthForm.training_made_changes === 'true' && (
+              <>
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    What changes has the training led to? (select all that apply)
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                    {TRAINING_CHANGE_OPTIONS.map(change => {
+                      const checked = growthForm.training_changes.includes(change);
+                      return (
+                        <Chip
+                          key={change}
+                          label={change}
+                          size="small"
+                          clickable
+                          variant={checked ? 'filled' : 'outlined'}
+                          color={checked ? 'success' : 'default'}
+                          onClick={() => setGrowthForm(f => ({
+                            ...f,
+                            training_changes: checked
+                              ? f.training_changes.filter(c => c !== change)
+                              : [...f.training_changes, change],
+                            training_changes_other: change === 'Other' && checked ? '' : f.training_changes_other,
+                          }))}
+                        />
+                      );
+                    })}
+                  </Box>
+                </Grid>
+                {growthForm.training_changes.includes('Other') && (
+                  <Grid item xs={12}>
+                    <TextField fullWidth size="small" label="Other training change(s) — please describe"
+                      multiline rows={2}
+                      value={growthForm.training_changes_other}
+                      onChange={e => setGrowthForm(f => ({ ...f, training_changes_other: e.target.value }))}
+                      placeholder="Describe the other change(s) the training has made to this business…" />
+                  </Grid>
+                )}
+              </>
             )}
 
             {/* Notes */}

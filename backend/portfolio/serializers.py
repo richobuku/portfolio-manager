@@ -102,6 +102,7 @@ class MSMEGrowthSnapshotSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MSMEGrowthSnapshot
         fields = '__all__'
+        # JSONFields (digital_tools, training_changes) are included via '__all__'
 
 
 class BusinessGrowthExpertSerializer(serializers.ModelSerializer):

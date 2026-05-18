@@ -341,6 +341,20 @@ class MSMEGrowthSnapshot(models.Model):
     momo_pay_code     = models.CharField(max_length=50, blank=True, default='',
         help_text='MTN/Airtel MOMO Pay merchant code')
 
+    # Digital tools adoption
+    digital_tools       = models.JSONField(default=list, blank=True,
+        help_text='Digital tools the business has adopted (list of strings)')
+    digital_tools_other = models.CharField(max_length=300, blank=True, default='',
+        help_text='Other digital tools not in the standard list')
+
+    # Training impact
+    training_made_changes  = models.BooleanField(null=True, blank=True,
+        help_text='Has training delivered by the programme made changes to the business?')
+    training_changes       = models.JSONField(default=list, blank=True,
+        help_text='Areas where training has led to changes (list of strings)')
+    training_changes_other = models.CharField(max_length=500, blank=True, default='',
+        help_text='Other training-driven changes not in the standard list')
+
     # Narrative / context
     notes = models.TextField(blank=True)
 
