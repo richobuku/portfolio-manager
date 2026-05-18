@@ -151,7 +151,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return qs.select_related('investment', 'investment__portfolio').order_by('-transaction_date')
 
 
-class CohortViewSet(viewsets.ModelViewSet):
+class CohortViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     queryset = Cohort.objects.all()
     serializer_class = CohortSerializer
     permission_classes = [IsAuthenticated]
@@ -189,7 +189,7 @@ class ProgrammeGroupViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-class MSMEGrowthSnapshotViewSet(viewsets.ModelViewSet):
+class MSMEGrowthSnapshotViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """
     Growth snapshots for a single MSME.
 
@@ -1093,7 +1093,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return Response({'detail': output or 'Import complete.'})
 
 
-class BusinessGrowthExpertViewSet(viewsets.ModelViewSet):
+class BusinessGrowthExpertViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     queryset = BusinessGrowthExpert.objects.all()
     serializer_class = BusinessGrowthExpertSerializer
     permission_classes = [IsAuthenticated]
@@ -1599,7 +1599,7 @@ class SupportRequestViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-class TrainingSessionViewSet(viewsets.ModelViewSet):
+class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     serializer_class = TrainingSessionSerializer
     permission_classes = [IsAuthenticated]
 
