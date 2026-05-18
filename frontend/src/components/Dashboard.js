@@ -106,19 +106,33 @@ const AssignMsmeRows = React.memo(function AssignMsmeRows({
 //  4. Stable onClick handlers via useCallback so React skips re-rendering
 //     unchanged rows.
 const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
-  assignMsmeGroup, setAssignMsmeGroup, msmes,
-  groupMsmeSession, setGroupMsmeSession,
-  assignedGroupMsmeIds, setAssignedGroupMsmeIds,
-  toggleGroupMsme, saveGroupMsmeAssignments, groupMsmeSaving,
+  assignMsmeGroup, setAssignMsmeGroup, msmes, headers, notify, fetchAll,
 }) {
+  // All mutable state for this dialog lives here — so checkbox toggles only
+  // re-render this component, not the entire 4500-line Dashboard tree.
+  const [assignedGroupMsmeIds, setAssignedGroupMsmeIds] = React.useState([]);
+  const [groupMsmeSession, setGroupMsmeSession] = React.useState('');
+  const [groupMsmeSaving, setGroupMsmeSaving] = React.useState(false);
+
   // Search state lives INSIDE the dialog. This is critical — when it lived on
   // the parent Dashboard component (a ~4500-line tree), every keystroke
   // re-rendered the whole tree which blocked the main thread for ~230ms. Now
   // keystrokes only re-render this dialog.
   const [searchText, setSearchText] = React.useState('');
 
-  // Reset search when a different group's dialog opens.
-  React.useEffect(() => { setSearchText(''); }, [assignMsmeGroup?.id]);
+  // Reset state when a different group's dialog opens, and load current assignments.
+  React.useEffect(() => {
+    if (!assignMsmeGroup) return;
+    setSearchText('');
+    setGroupMsmeSession('');
+    setAssignedGroupMsmeIds([]);
+    axios.get(`${API_ENDPOINTS.BGE_GROUPS}${assignMsmeGroup.id}/msmes/`, { headers })
+      .then(r => {
+        const ids = (Array.isArray(r.data) ? r.data : (r.data.results || [])).map(m => m.id);
+        setAssignedGroupMsmeIds(ids);
+      })
+      .catch(() => setAssignedGroupMsmeIds([]));
+  }, [assignMsmeGroup?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced copy — the filter reads this.
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
@@ -128,13 +142,10 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
   }, [searchText]);
 
   // Defer mounting the (potentially huge) MSME list until *after* the dialog's
-  // open animation finishes. Mounting 285 list items during the transition was
-  // making the open feel sluggish on the first click. Wait one paint, then
-  // render the rows.
+  // open animation finishes.
   const [listReady, setListReady] = React.useState(false);
   React.useEffect(() => {
     if (!assignMsmeGroup) { setListReady(false); return; }
-    // ~one frame after the dialog mounts → animation has started, we won't fight it
     const h = setTimeout(() => setListReady(true), 32);
     return () => clearTimeout(h);
   }, [assignMsmeGroup]);
@@ -158,9 +169,35 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
     [assignedGroupMsmeIds]
   );
 
+  const toggleGroupMsme = React.useCallback((msmeId) => {
+    setAssignedGroupMsmeIds(prev =>
+      prev.includes(msmeId) ? prev.filter(id => id !== msmeId) : [...prev, msmeId]
+    );
+  }, []);
+
+  const saveGroupMsmeAssignments = React.useCallback(async () => {
+    if (!assignMsmeGroup) return;
+    setGroupMsmeSaving(true);
+    try {
+      await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${assignMsmeGroup.id}/unassign-msmes/`, {}, { headers });
+      if (assignedGroupMsmeIds.length > 0) {
+        const payload = { msme_ids: assignedGroupMsmeIds };
+        if (groupMsmeSession) payload.session_number = parseInt(groupMsmeSession, 10);
+        await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${assignMsmeGroup.id}/assign-msmes/`, payload, { headers });
+      }
+      notify(`${assignedGroupMsmeIds.length} MSME${assignedGroupMsmeIds.length === 1 ? '' : 's'} assigned to ${assignMsmeGroup.name}`);
+      setAssignMsmeGroup(null);
+      fetchAll();
+    } catch (e) {
+      notify(e.response?.data?.error || 'Failed to assign MSMEs', 'error');
+    } finally {
+      setGroupMsmeSaving(false);
+    }
+  }, [assignMsmeGroup, assignedGroupMsmeIds, groupMsmeSession, headers, notify, fetchAll, setAssignMsmeGroup]);
+
   const onToggle = React.useCallback((id) => toggleGroupMsme(id), [toggleGroupMsme]);
   const onClose  = React.useCallback(() => setAssignMsmeGroup(null), [setAssignMsmeGroup]);
-  const onClear  = React.useCallback(() => setAssignedGroupMsmeIds([]), [setAssignedGroupMsmeIds]);
+  const onClear  = React.useCallback(() => setAssignedGroupMsmeIds([]), []);
 
   return (
     <Dialog open={!!assignMsmeGroup} onClose={onClose} maxWidth="md" fullWidth>
@@ -228,6 +265,7 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
         <Button variant="contained" onClick={saveGroupMsmeAssignments} disabled={groupMsmeSaving}>
           {groupMsmeSaving ? 'Saving…' : 'Save Assignments'}
         </Button>
+
       </DialogActions>
     </Dialog>
   );
@@ -334,11 +372,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── group MSME assignment dialog ───────────────────────────────────────────
   const [assignMsmeGroup, setAssignMsmeGroup] = useState(null);  // group object or null
-  const [assignedGroupMsmeIds, setAssignedGroupMsmeIds] = useState([]); // currently-assigned ids for the open group
-  const [groupMsmeSession, setGroupMsmeSession] = useState('');
-  // groupMsmeSearch moved into AssignMsmesDialog itself (parent re-renders
-  // are too expensive to incur per keystroke — INP was 230ms+).
-  const [groupMsmeSaving, setGroupMsmeSaving] = useState(false);
+  // assignedGroupMsmeIds, groupMsmeSession, groupMsmeSaving, toggleGroupMsme,
+  // saveGroupMsmeAssignments all live inside AssignMsmesDialog to prevent
+  // checkbox toggles from re-rendering the full Dashboard tree (was 312ms INP).
 
   // ── training dialogs ───────────────────────────────────────────────────────
   const [sessionDialog, setSessionDialog] = useState(false);
@@ -868,45 +904,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   // ── group MSME assignment ──────────────────────────────────────────────────
-  const openAssignMsmeDialog = async (group) => {
-    setAssignMsmeGroup(group);
-    setGroupMsmeSession('');
-    // Search resets itself via useEffect inside AssignMsmesDialog
-    try {
-      const r = await axios.get(`${API_ENDPOINTS.BGE_GROUPS}${group.id}/msmes/`, { headers });
-      const ids = (Array.isArray(r.data) ? r.data : (r.data.results || [])).map(m => m.id);
-      setAssignedGroupMsmeIds(ids);
-    } catch {
-      setAssignedGroupMsmeIds([]);
-    }
-  };
-
-  const toggleGroupMsme = (msmeId) => {
-    setAssignedGroupMsmeIds(prev =>
-      prev.includes(msmeId) ? prev.filter(id => id !== msmeId) : [...prev, msmeId]
-    );
-  };
-
-  const saveGroupMsmeAssignments = async () => {
-    if (!assignMsmeGroup) return;
-    setGroupMsmeSaving(true);
-    try {
-      // Wipe current assignments for this group, then re-assign the selected set.
-      await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${assignMsmeGroup.id}/unassign-msmes/`, {}, { headers });
-      if (assignedGroupMsmeIds.length > 0) {
-        const payload = { msme_ids: assignedGroupMsmeIds };
-        if (groupMsmeSession) payload.session_number = parseInt(groupMsmeSession, 10);
-        await axios.post(`${API_ENDPOINTS.BGE_GROUPS}${assignMsmeGroup.id}/assign-msmes/`, payload, { headers });
-      }
-      notify(`${assignedGroupMsmeIds.length} MSME${assignedGroupMsmeIds.length === 1 ? '' : 's'} assigned to ${assignMsmeGroup.name}`);
-      setAssignMsmeGroup(null);
-      fetchAll();
-    } catch (e) {
-      notify(e.response?.data?.error || 'Failed to assign MSMEs', 'error');
-    } finally {
-      setGroupMsmeSaving(false);
-    }
-  };
+  const openAssignMsmeDialog = (group) => setAssignMsmeGroup(group);
 
   // ── facilitation assignments ───────────────────────────────────────────────
   const saveFacilitationAssignment = async () => {
@@ -4984,13 +4982,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         assignMsmeGroup={assignMsmeGroup}
         setAssignMsmeGroup={setAssignMsmeGroup}
         msmes={msmes}
-        groupMsmeSession={groupMsmeSession}
-        setGroupMsmeSession={setGroupMsmeSession}
-        assignedGroupMsmeIds={assignedGroupMsmeIds}
-        setAssignedGroupMsmeIds={setAssignedGroupMsmeIds}
-        toggleGroupMsme={toggleGroupMsme}
-        saveGroupMsmeAssignments={saveGroupMsmeAssignments}
-        groupMsmeSaving={groupMsmeSaving}
+        headers={headers}
+        notify={notify}
+        fetchAll={fetchAll}
       />
 
       <Dialog open={!!manageGroupItem} onClose={() => setManageGroupItem(null)} maxWidth="sm" fullWidth>
