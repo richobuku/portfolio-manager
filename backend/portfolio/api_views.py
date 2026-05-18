@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Sum, Q
 from django.contrib.auth.models import User
@@ -2616,12 +2616,47 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if not self._is_admin():
             raise PermissionDenied("Work order management is restricted to administrators.")
 
+    def _check_date_overlap(self, bge_id, start_date, end_date, exclude_id=None):
+        if not bge_id or not start_date or not end_date:
+            return
+        qs = WorkOrder.objects.filter(
+            bge_id=bge_id,
+            start_date__isnull=False,
+            end_date__isnull=False,
+            start_date__lte=end_date,
+            end_date__gte=start_date,
+        )
+        if exclude_id:
+            qs = qs.exclude(pk=exclude_id)
+        conflict = qs.first()
+        if conflict:
+            raise ValidationError(
+                f"Date overlap: this BGE already has work order {conflict.work_order_number} "
+                f"running from {conflict.start_date} to {conflict.end_date}. "
+                "BGEs cannot be assigned overlapping work orders."
+            )
+
     def perform_create(self, serializer):
         self._require_admin()
+        data = serializer.validated_data
+        self._check_date_overlap(
+            bge_id=data.get('bge').pk if data.get('bge') else None,
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+        )
         serializer.save()
 
     def perform_update(self, serializer):
         self._require_admin()
+        data = serializer.validated_data
+        instance = self.get_object()
+        bge = data.get('bge', instance.bge)
+        self._check_date_overlap(
+            bge_id=bge.pk if bge else None,
+            start_date=data.get('start_date', instance.start_date),
+            end_date=data.get('end_date', instance.end_date),
+            exclude_id=instance.pk,
+        )
         serializer.save()
 
     def destroy(self, request, *args, **kwargs):

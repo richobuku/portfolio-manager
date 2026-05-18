@@ -17,6 +17,13 @@ const h = (token) => ({ Authorization: `Bearer ${token}` });
 /* ── Visit type definitions ─────────────────────────────────────────────── */
 const VISIT_TYPES = [
   {
+    value: 'data_update',
+    label: 'Data Collection Visit',
+    icon: <Assessment />,
+    desc: 'Collect and record MSME metrics',
+    color: '#E65100',
+  },
+  {
     value: 'one_on_one',
     label: 'One-on-One Visit',
     icon: <Person />,
@@ -36,13 +43,6 @@ const VISIT_TYPES = [
     icon: <Psychology />,
     desc: 'Structured coaching session',
     color: '#7B1FA2',
-  },
-  {
-    value: 'data_update',
-    label: 'Data Collection Visit',
-    icon: <Assessment />,
-    desc: 'Collect and record MSME metrics',
-    color: '#E65100',
   },
 ];
 
@@ -164,7 +164,7 @@ const serializeTools = (arr) => arr.join(', ');
 /* ── Empty form ─────────────────────────────────────────────────────────── */
 const EMPTY_FORM = {
   msme:                '',
-  visit_type:          'one_on_one',
+  visit_type:          'data_update',
   visit_date:          new Date().toISOString().slice(0, 10),
   status:              'draft',
   // structured sections

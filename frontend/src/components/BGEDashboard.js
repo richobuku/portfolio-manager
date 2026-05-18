@@ -1251,6 +1251,49 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 </Box>
               </Box>
 
+              {/* Active work order period banner */}
+              {(() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const active = workOrders.find(wo =>
+                  wo.start_date && wo.end_date &&
+                  wo.start_date <= today && wo.end_date >= today
+                );
+                const upcoming = !active && workOrders.find(wo =>
+                  wo.start_date && wo.start_date > today
+                );
+                const wo = active || upcoming;
+                if (!wo) return null;
+                return (
+                  <Alert
+                    severity={active ? 'info' : 'warning'}
+                    icon={false}
+                    sx={{ mb: 2, borderRadius: 2, '& .MuiAlert-message': { width: '100%' } }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                      <Box>
+                        <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
+                          {active ? 'Active Assignment Period' : 'Upcoming Assignment'}
+                          {' · '}{wo.work_order_number}
+                        </Typography>
+                        <Typography variant="caption">
+                          {wo.work_order_type_display} · {wo.start_date} – {wo.end_date}
+                          {' · '}{wo.location}
+                        </Typography>
+                        <Typography variant="caption" display="block" sx={{ mt: 0.25, fontStyle: 'italic' }}>
+                          Your visit reports should fall within this date range.
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={active ? 'Active' : 'Upcoming'}
+                        size="small"
+                        color={active ? 'info' : 'warning'}
+                        variant="filled"
+                      />
+                    </Box>
+                  </Alert>
+                );
+              })()}
+
               {directMsmes.length === 0 ? (
                 <Paper sx={{ p: { xs: 3, sm: 6 }, textAlign: 'center' }}>
                   <Business sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
@@ -1379,6 +1422,49 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 </Typography>
               </Box>
             </Box>
+
+            {/* Active work order period banner */}
+            {(() => {
+              const today = new Date().toISOString().slice(0, 10);
+              const active = workOrders.find(wo =>
+                wo.start_date && wo.end_date &&
+                wo.start_date <= today && wo.end_date >= today
+              );
+              const upcoming = !active && workOrders.find(wo =>
+                wo.start_date && wo.start_date > today
+              );
+              const wo = active || upcoming;
+              if (!wo) return null;
+              return (
+                <Alert
+                  severity={active ? 'info' : 'warning'}
+                  icon={false}
+                  sx={{ mb: 2, borderRadius: 2, '& .MuiAlert-message': { width: '100%' } }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                    <Box>
+                      <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
+                        {active ? 'Active Assignment Period' : 'Upcoming Assignment'}
+                        {' · '}{wo.work_order_number}
+                      </Typography>
+                      <Typography variant="caption">
+                        {wo.work_order_type_display} · {wo.start_date} – {wo.end_date}
+                        {' · '}{wo.location}
+                      </Typography>
+                      <Typography variant="caption" display="block" sx={{ mt: 0.25, fontStyle: 'italic' }}>
+                        Your group reports should fall within this date range.
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={active ? 'Active' : 'Upcoming'}
+                      size="small"
+                      color={active ? 'info' : 'warning'}
+                      variant="filled"
+                    />
+                  </Box>
+                </Alert>
+              );
+            })()}
 
             {groups.length === 0 && (
               <Paper variant="outlined" sx={{ p: 6, textAlign: 'center', color: 'text.secondary' }}>

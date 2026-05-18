@@ -427,6 +427,31 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   const [woForm, setWoForm] = React.useState({});
   const [woErrors, setWoErrors] = React.useState('');
   const [woSaving, setWoSaving] = React.useState(false);
+  const [woConflict, setWoConflict] = React.useState(null);
+
+  // Reset conflict when dialog closes
+  React.useEffect(() => { if (!open) setWoConflict(null); }, [open]);
+
+  // Live overlap check whenever BGE or dates change
+  React.useEffect(() => {
+    const { bge, start_date, end_date } = woForm;
+    if (!bge || !start_date || !end_date) { setWoConflict(null); return; }
+    let cancelled = false;
+    axios.get(API_ENDPOINTS.WORK_ORDERS, {
+      headers,
+      params: { bge },
+    }).then(res => {
+      if (cancelled) return;
+      const orders = res.data?.results ?? res.data ?? [];
+      const conflict = orders.find(wo => {
+        if (!wo.start_date || !wo.end_date) return false;
+        if (woEditing && wo.id === woEditing.id) return false;
+        return wo.start_date <= end_date && wo.end_date >= start_date;
+      });
+      setWoConflict(conflict || null);
+    }).catch(() => setWoConflict(null));
+    return () => { cancelled = true; };
+  }, [woForm.bge, woForm.start_date, woForm.end_date, woEditing, headers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!open) return;
@@ -515,6 +540,14 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         }}
       >
         {woErrors && <Alert severity="error" sx={{ mb: 2 }}>{woErrors}</Alert>}
+        {woConflict && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <strong>Date overlap detected.</strong> This BGE is already assigned work order{' '}
+            <strong>{woConflict.work_order_number}</strong> from{' '}
+            <strong>{woConflict.start_date}</strong> to <strong>{woConflict.end_date}</strong>.
+            BGEs cannot be double-assigned during overlapping periods.
+          </Alert>
+        )}
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth size="small" required>
