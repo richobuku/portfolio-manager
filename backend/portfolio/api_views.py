@@ -244,15 +244,19 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         elif _is_viewer(user):
             pass  # viewers see all MSMEs read-only (ViewerReadOnlyMixin blocks writes)
         elif not (user.is_staff or user.is_superuser):
-            # BGE users only see their own assigned MSMEs — directly OR via any group they belong to
-            try:
-                bge = user.bge_profile
-                from django.db.models import Q
-                qs = qs.filter(
-                    Q(assigned_bge=bge) | Q(assigned_group__members=bge)
-                ).distinct()
-            except Exception:
-                qs = qs.none()
+            # BGE users only see their own assigned MSMEs — directly OR via any group they belong to.
+            # Exception: ?training=1 returns all MSMEs so a facilitator can record attendance
+            # for participants who are not personally assigned to them.
+            training_context = self.request.query_params.get('training') == '1'
+            if not training_context:
+                try:
+                    bge = user.bge_profile
+                    from django.db.models import Q
+                    qs = qs.filter(
+                        Q(assigned_bge=bge) | Q(assigned_group__members=bge)
+                    ).distinct()
+                except Exception:
+                    qs = qs.none()
 
         search = self.request.query_params.get('search')
         if search:

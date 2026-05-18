@@ -234,6 +234,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [msmeDetailTab, setMsmeDetailTab] = useState(0);
   const [msmeDetailSnapshots, setMsmeDetailSnapshots] = useState([]);
 
+  // Full MSME list for training attendance (bypasses personal assignment scope)
+  const [trainingMsmes, setTrainingMsmes] = useState([]);
+  const fetchTrainingMsmes = useCallback(async () => {
+    if (trainingMsmes.length > 0) return; // already loaded
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.MSMES}?training=1`,
+        { headers: { Authorization: `Bearer ${token}` } });
+      setTrainingMsmes(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch { /* non-critical — falls back to assigned MSMEs */ }
+  }, [token, trainingMsmes.length]);
+
   // Growth update form
   const [growthDialog, setGrowthDialog] = useState(false);
   const [growthMsme, setGrowthMsme] = useState(null);
@@ -635,6 +646,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   const openReportWizard = (assignment) => {
+    fetchTrainingMsmes(); // pre-load full MSME list for attendance picker
     // If sessions already exist for this topic, open the session detail dialog instead
     const existingSessions = sessions.filter(s => s.topic === assignment.topic);
     if (existingSessions.length === 1) {
@@ -765,6 +777,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   const openSessionAtt = async (session) => {
+    fetchTrainingMsmes(); // pre-load full MSME list for attendance picker
     setSelectedSession(session);
     setSessionAttLoading(true);
     setSessionAttDialog(true);
@@ -2029,14 +2042,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         <TableCell>
                           <Select size="small" variant="standard" displayEmpty value={row.msme || ''}
                             onChange={e => {
-                              const m = msmes.find(x => x.id === e.target.value);
+                              const list = trainingMsmes.length ? trainingMsmes : msmes;
+                              const m = list.find(x => x.id === e.target.value);
                               setReportWizardAttendees(p => p.map(r => r._key === row._key
                                 ? { ...r, msme: e.target.value, attendee_name: r.attendee_name || (m?.owner_name || '') }
                                 : r));
                             }}
                             sx={{ minWidth: 140 }}>
                             <MenuItem value=""><em>— walk-in —</em></MenuItem>
-                            {msmes.map(m => <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>)}
+                            {(trainingMsmes.length ? trainingMsmes : msmes).map(m => (
+                              <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
+                            ))}
                           </Select>
                         </TableCell>
                         <TableCell>
@@ -2589,7 +2605,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         <Select size="small" variant="standard" displayEmpty
                           value={att.msme || ''}
                           onChange={e => {
-                            const m = msmes.find(x => x.id === e.target.value);
+                            const list = trainingMsmes.length ? trainingMsmes : msmes;
+                            const m = list.find(x => x.id === e.target.value);
                             setSessionAttendees(prev => prev.map(r => {
                               if (r._key !== att._key) return r;
                               return { ...r, msme: e.target.value, attendee_name: r.attendee_name || (m?.owner_name || '') };
@@ -2597,7 +2614,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           }}
                           sx={{ minWidth: 150 }}>
                           <MenuItem value=""><em>— walk-in —</em></MenuItem>
-                          {msmes.map(m => <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>)}
+                          {(trainingMsmes.length ? trainingMsmes : msmes).map(m => (
+                            <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
+                          ))}
                         </Select>
                       </TableCell>
                       <TableCell>
