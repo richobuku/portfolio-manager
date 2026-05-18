@@ -18,7 +18,7 @@ from .models import (
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
     GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
-    TrainingFacilitationAssignment, TrainingReport,
+    TrainingFacilitationAssignment, TrainingReport, AnnualReviewReport,
 )
 from .account_setup import ensure_bge_account, send_welcome_email
 
@@ -109,6 +109,7 @@ from .serializers import (
     GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
     VisitReportTemplateSerializer,
     GroupReportAttendanceSerializer, MSMEGrowthSnapshotSerializer,
+    AnnualReviewReportSerializer,
 )
 
 
@@ -2864,6 +2865,57 @@ class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelViewSet
             return qs.filter(bge=user.bge_profile)
         except Exception:
             return qs.none()
+
+    def perform_create(self, serializer):
+        bge = None
+        try:
+            bge = self.request.user.bge_profile
+        except Exception:
+            pass
+        serializer.save(bge=bge)
+
+    def perform_update(self, serializer):
+        from django.utils import timezone
+        data = {}
+        if serializer.validated_data.get('status') == 'submitted':
+            data['submitted_at'] = timezone.now()
+        serializer.save(**data)
+
+
+class AnnualReviewReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
+    """Annual / quarterly / mid-term review reports authored by a single BGE.
+
+    A BGE selects which of their MSMEs to include (attendance list) and writes
+    a narrative summary. No financial data is captured here — that lives in
+    GrowthSnapshot records. Admins see all; BGEs see only their own.
+    """
+    serializer_class  = AnnualReviewReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            qs = AnnualReviewReport.objects.all()
+        elif _is_viewer(user):
+            qs = AnnualReviewReport.objects.all()
+        elif _is_programme_manager(user):
+            group_ids = _managed_groups(user) or []
+            qs = AnnualReviewReport.objects.filter(
+                msmes_reviewed__programme_groups__in=group_ids
+            ).distinct()
+        else:
+            try:
+                qs = AnnualReviewReport.objects.filter(bge=user.bge_profile)
+            except Exception:
+                qs = AnnualReviewReport.objects.none()
+
+        period = self.request.query_params.get('period')
+        if period:
+            qs = qs.filter(review_period=period)
+        status = self.request.query_params.get('status')
+        if status:
+            qs = qs.filter(status=status)
+        return qs.select_related('bge').prefetch_related('msmes_reviewed')
 
     def perform_create(self, serializer):
         bge = None

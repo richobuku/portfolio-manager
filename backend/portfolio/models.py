@@ -804,9 +804,6 @@ class GroupReport(models.Model):
         sess = f" S{self.session_number}" if self.session_number else ''
         return f"{self.group.name}{sess} — {self.visit_date}"
 
-    class Meta:
-        ordering = ['-visit_date', '-created_at']
-
 
 class GroupReportContribution(models.Model):
     """A note from one group member contributing to a group report.
@@ -1009,3 +1006,67 @@ class CohortAdmin(models.Model):
     def __str__(self):
         names = ', '.join(g.name for g in self.managed_groups.all()) or '(no groups)'
         return f"{self.user.get_full_name() or self.user.username} → {names}"
+
+
+class AnnualReviewReport(models.Model):
+    """Narrative-only annual (or quarterly) review report authored by a single BGE,
+    covering multiple MSMEs selected like an attendance list.
+
+    The quantitative data lives in GrowthSnapshot records; this model holds
+    only the written summary and observations so the BGE doesn't duplicate
+    numbers they already entered during the data update."""
+
+    PERIOD_CHOICES = [
+        ('annual',    'Annual Review'),
+        ('quarterly', 'Quarterly Review'),
+        ('midterm',   'Mid-term Review'),
+    ]
+    STATUS_CHOICES = [
+        ('draft',     'Draft'),
+        ('submitted', 'Submitted'),
+        ('approved',  'Approved'),
+    ]
+
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.CASCADE,
+        related_name='annual_review_reports',
+    )
+    review_period = models.CharField(
+        max_length=20, choices=PERIOD_CHOICES, default='annual',
+    )
+    review_date = models.DateField(help_text='Date the review session was conducted.')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+
+    # MSMEs covered in this review (attendance list).
+    msmes_reviewed = models.ManyToManyField(
+        'MSME', blank=True, related_name='annual_review_reports',
+        help_text='MSMEs included in this review session.',
+    )
+
+    # ── Narrative fields ──────────────────────────────────────────────────────
+    session_overview      = models.TextField(blank=True,
+        help_text='How the review session ran — format, attendance, general atmosphere.')
+    key_achievements      = models.TextField(blank=True,
+        help_text='Notable progress or milestones observed across the reviewed MSMEs.')
+    challenges_identified = models.TextField(blank=True,
+        help_text='Common or individual challenges observed.')
+    support_provided      = models.TextField(blank=True,
+        help_text='Coaching, advice, or resources provided during the review.')
+    recommendations       = models.TextField(blank=True,
+        help_text='Recommendations to the programme or individual MSMEs.')
+    next_steps            = models.TextField(blank=True,
+        help_text='Agreed follow-up actions.')
+    additional_notes      = models.TextField(blank=True)
+
+    submitted_pdf_data = models.BinaryField(null=True, blank=True)
+
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-review_date', '-created_at']
+        verbose_name = "Annual Review Report"
+
+    def __str__(self):
+        return f"{self.get_review_period_display()} — {self.bge.name} ({self.review_date})"

@@ -251,6 +251,68 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [growthSnapshots, setGrowthSnapshots] = useState([]);
   const [growthSaving, setGrowthSaving] = useState(false);
   const [growthError, setGrowthError] = useState('');
+
+  // Annual review report dialog
+  const EMPTY_ANNUAL_REVIEW = {
+    review_period: 'annual',
+    review_date: new Date().toISOString().slice(0, 10),
+    selected_msmes: [],
+    session_overview: '',
+    key_achievements: '',
+    challenges_identified: '',
+    support_provided: '',
+    recommendations: '',
+    next_steps: '',
+    additional_notes: '',
+  };
+  const [annualReviewDialog, setAnnualReviewDialog] = useState(false);
+  const [annualReviewForm, setAnnualReviewForm] = useState(EMPTY_ANNUAL_REVIEW);
+  const [annualReviewSaving, setAnnualReviewSaving] = useState(false);
+  const [annualReviewError, setAnnualReviewError] = useState('');
+  const [, setAnnualReviews] = useState([]);
+
+  const fetchAnnualReviews = useCallback(async () => {
+    try {
+      const res = await axios.get(API_ENDPOINTS.ANNUAL_REVIEWS, { headers: { Authorization: `Bearer ${token}` } });
+      setAnnualReviews(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch { /* non-critical */ }
+  }, [token]);
+
+  const openAnnualReviewDialog = () => {
+    setAnnualReviewForm(EMPTY_ANNUAL_REVIEW);
+    setAnnualReviewError('');
+    setAnnualReviewDialog(true);
+  };
+
+  const saveAnnualReview = async (submitNow = false) => {
+    if (annualReviewForm.selected_msmes.length === 0) {
+      setAnnualReviewError('Select at least one MSME for this review.'); return;
+    }
+    setAnnualReviewSaving(true); setAnnualReviewError('');
+    const bgeId = currentUser?.bge_profile?.id;
+    const payload = {
+      bge: bgeId,
+      review_period: annualReviewForm.review_period,
+      review_date: annualReviewForm.review_date,
+      status: submitNow ? 'submitted' : 'draft',
+      msmes_reviewed: annualReviewForm.selected_msmes,
+      session_overview: annualReviewForm.session_overview,
+      key_achievements: annualReviewForm.key_achievements,
+      challenges_identified: annualReviewForm.challenges_identified,
+      support_provided: annualReviewForm.support_provided,
+      recommendations: annualReviewForm.recommendations,
+      next_steps: annualReviewForm.next_steps,
+      additional_notes: annualReviewForm.additional_notes,
+    };
+    try {
+      await axios.post(API_ENDPOINTS.ANNUAL_REVIEWS, payload, { headers: { Authorization: `Bearer ${token}` } });
+      notify(submitNow ? 'Review report submitted.' : 'Review report saved as draft.');
+      setAnnualReviewDialog(false);
+      fetchAnnualReviews();
+    } catch (e) {
+      setAnnualReviewError(e.response?.data ? JSON.stringify(e.response.data) : 'Save failed.');
+    } finally { setAnnualReviewSaving(false); }
+  };
   const DIGITAL_TOOLS_OPTIONS = [
     'Zoho Books',
     'Biashara App',
@@ -1221,18 +1283,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     </Box>
                   </Typography>
                 </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  onClick={() => openNewReport()}
-                  sx={{
-                    whiteSpace: 'nowrap',
-                    alignSelf: { xs: 'stretch', sm: 'auto' },
-                    flexShrink: 0,
-                  }}
-                >
-                  New Report
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Button variant="outlined" startIcon={<Assignment />}
+                    onClick={openAnnualReviewDialog}
+                    sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Annual Review
+                  </Button>
+                  <Button variant="contained" startIcon={<Add />}
+                    onClick={() => openNewReport()}
+                    sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    New Report
+                  </Button>
+                </Box>
               </Box>
 
               {directMsmes.length === 0 ? (
@@ -3464,6 +3526,136 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <Button onClick={() => setGrowthDialog(false)}>Cancel</Button>
           <Button variant="contained" color="success" disabled={growthSaving} onClick={saveGrowthSnapshot}>
             {growthSaving ? 'Saving…' : 'Save Update'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Annual Review Report dialog ── */}
+      <Dialog open={annualReviewDialog} onClose={() => setAnnualReviewDialog(false)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { height: { xs: '96dvh', sm: '90vh' }, display: 'flex', flexDirection: 'column' } }}>
+        <DialogTitle sx={{ bgcolor: '#1A2F4B', color: '#fff', pb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography fontWeight={700} fontSize={16}>New Review Report</Typography>
+              <Typography variant="caption" sx={{ opacity: 0.75 }}>Narrative summary — data updates are recorded separately per MSME</Typography>
+            </Box>
+            <IconButton onClick={() => setAnnualReviewDialog(false)} sx={{ color: '#fff' }}><Close /></IconButton>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ overflowY: 'auto', p: { xs: 2, sm: 3 } }}>
+          {annualReviewError && <Alert severity="error" sx={{ mb: 2 }}>{annualReviewError}</Alert>}
+
+          <Grid container spacing={2}>
+            {/* Period + Date */}
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Review Period</InputLabel>
+                <Select value={annualReviewForm.review_period} label="Review Period"
+                  onChange={e => setAnnualReviewForm(f => ({ ...f, review_period: e.target.value }))}>
+                  <MenuItem value="annual">Annual Review</MenuItem>
+                  <MenuItem value="quarterly">Quarterly Review</MenuItem>
+                  <MenuItem value="midterm">Mid-term Review</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth size="small" label="Review Date" type="date"
+                InputLabelProps={{ shrink: true }}
+                value={annualReviewForm.review_date}
+                onChange={e => setAnnualReviewForm(f => ({ ...f, review_date: e.target.value }))} />
+            </Grid>
+
+            {/* MSME attendance list */}
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10} display="block" sx={{ mb: 1 }}>
+                MSMEs Reviewed ({annualReviewForm.selected_msmes.length} selected)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                Select the MSMEs you reviewed in this session. Their individual data updates should be recorded separately using the data update form.
+              </Typography>
+              <Box sx={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #E8EDF2', borderRadius: 1.5, p: 1 }}>
+                {msmes.filter(m => m.assigned_bge === myBgeId || msmes.some(x => x.id === m.id)).map(m => {
+                  const checked = annualReviewForm.selected_msmes.includes(m.id);
+                  return (
+                    <Box key={m.id}
+                      onClick={() => setAnnualReviewForm(f => ({
+                        ...f,
+                        selected_msmes: checked
+                          ? f.selected_msmes.filter(id => id !== m.id)
+                          : [...f.selected_msmes, m.id],
+                      }))}
+                      sx={{
+                        display: 'flex', alignItems: 'center', gap: 1.5,
+                        p: 1, borderRadius: 1, cursor: 'pointer',
+                        bgcolor: checked ? '#EEF4FF' : 'transparent',
+                        '&:hover': { bgcolor: checked ? '#E0ECFF' : '#F8F9FA' },
+                        mb: 0.25,
+                      }}>
+                      <Box sx={{
+                        width: 18, height: 18, borderRadius: 0.5, flexShrink: 0,
+                        border: `2px solid ${checked ? '#1A2F4B' : '#CBD5E1'}`,
+                        bgcolor: checked ? '#1A2F4B' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {checked && <CheckCircle sx={{ fontSize: 12, color: '#fff' }} />}
+                      </Box>
+                      <Box>
+                        <Typography fontSize={13} fontWeight={checked ? 600 : 400}>{m.business_name}</Typography>
+                        <Typography fontSize={11} color="text.secondary">{m.msme_code}{m.city ? ` · ${m.city}` : ''}</Typography>
+                      </Box>
+                    </Box>
+                  );
+                })}
+                {msmes.length === 0 && (
+                  <Typography fontSize={12} color="text.secondary" sx={{ p: 1 }}>No MSMEs loaded.</Typography>
+                )}
+              </Box>
+            </Grid>
+
+            {/* Narrative fields — no data duplication */}
+            <Grid item xs={12}><Divider sx={{ mt: 1 }} /></Grid>
+            <Grid item xs={12}>
+              <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>
+                Narrative Summary
+              </Typography>
+            </Grid>
+
+            {[
+              { key: 'session_overview',      label: 'Session Overview', rows: 3,
+                placeholder: 'How the review session ran — format, engagement, general atmosphere.' },
+              { key: 'key_achievements',      label: 'Key Achievements', rows: 3,
+                placeholder: 'Notable progress or milestones observed across the MSMEs in this review.' },
+              { key: 'challenges_identified', label: 'Challenges Identified', rows: 3,
+                placeholder: 'Common or significant challenges encountered.' },
+              { key: 'support_provided',      label: 'Support Provided', rows: 2,
+                placeholder: 'Coaching, advice, referrals, or resources provided during the review.' },
+              { key: 'recommendations',       label: 'Recommendations', rows: 2,
+                placeholder: 'Recommendations to the programme team or for individual follow-up.' },
+              { key: 'next_steps',            label: 'Agreed Next Steps', rows: 2,
+                placeholder: 'Follow-up actions agreed with the MSMEs.' },
+              { key: 'additional_notes',      label: 'Additional Notes', rows: 2,
+                placeholder: 'Any other observations.' },
+            ].map(({ key, label, rows, placeholder }) => (
+              <Grid item xs={12} key={key}>
+                <TextField fullWidth size="small" multiline rows={rows} label={label}
+                  placeholder={placeholder}
+                  value={annualReviewForm[key]}
+                  onChange={e => setAnnualReviewForm(f => ({ ...f, [key]: e.target.value }))} />
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 1.5, gap: 1, borderTop: '1px solid #E8EDF2' }}>
+          <Button onClick={() => setAnnualReviewDialog(false)} disabled={annualReviewSaving}>Cancel</Button>
+          <Box sx={{ flex: 1 }} />
+          <Button variant="outlined" disabled={annualReviewSaving} onClick={() => saveAnnualReview(false)}>
+            {annualReviewSaving ? 'Saving…' : 'Save Draft'}
+          </Button>
+          <Button variant="contained" disabled={annualReviewSaving}
+            sx={{ bgcolor: '#1A2F4B' }} onClick={() => saveAnnualReview(true)}>
+            {annualReviewSaving ? 'Submitting…' : 'Submit Report'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -5,7 +5,7 @@ from .models import (
     TrainingSession, Attendance, TrainingTopic,
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
     GroupReportAttendance, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
-    TrainingFacilitationAssignment, TrainingReport,
+    TrainingFacilitationAssignment, TrainingReport, AnnualReviewReport,
 )
 
 
@@ -350,3 +350,23 @@ class TrainingReportSerializer(serializers.ModelSerializer):
         model  = TrainingReport
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at', 'submitted_at']
+
+
+class AnnualReviewReportSerializer(serializers.ModelSerializer):
+    bge_name    = serializers.CharField(source='bge.name', read_only=True)
+    msme_count  = serializers.SerializerMethodField()
+    msmes_detail = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = AnnualReviewReport
+        fields = '__all__'
+        read_only_fields = ['bge', 'created_at', 'updated_at', 'submitted_at']
+
+    def get_msme_count(self, obj):
+        return obj.msmes_reviewed.count()
+
+    def get_msmes_detail(self, obj):
+        return [
+            {'id': m.id, 'business_name': m.business_name, 'msme_code': m.msme_code}
+            for m in obj.msmes_reviewed.all()
+        ]
