@@ -1271,7 +1271,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </IconButton>
       </Tooltip>
       {isStaff && <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(item, type)}><Edit fontSize="small" /></IconButton></Tooltip>}
-      {isAdmin && <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => { setDeleteItem(item); setDeleteType(type); }}><Delete fontSize="small" /></IconButton></Tooltip>}
+      {isStaff && <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => { setDeleteItem(item); setDeleteType(type); }}><Delete fontSize="small" /></IconButton></Tooltip>}
     </Box>
   );
 
@@ -1596,7 +1596,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         </IconButton>
                       </Tooltip>
                     )}
-                    {isAdmin && (
+                    {isStaff && (
                       <Tooltip title="Delete group">
                         <IconButton size="small" color="error" onClick={() => { setDeleteItem(group); setDeleteType('group'); }}>
                           <Delete fontSize="small" />
