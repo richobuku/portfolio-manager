@@ -1215,40 +1215,19 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               {/* Responsive header: stacks vertically on phones so the
                   "New Report" button gets full width and the subtitle has
                   room to breathe instead of being squeezed against the button. */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: { xs: 'column', sm: 'row' },
-                justifyContent: 'space-between',
-                alignItems: { xs: 'stretch', sm: 'center' },
-                gap: { xs: 1.5, sm: 2 },
-                mb: 2,
-              }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="h6" fontWeight={700}>My MSMEs</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <Box component="span" sx={{ color: BRAND.primaryMain, fontWeight: 600 }}>
-                      {directMsmes.length}
-                    </Box>
-                    {' '}directly assigned to you · group MSMEs are in{' '}
-                    <Box component="span"
-                      sx={{ color: '#F9A825', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                      onClick={() => startTransition(() => setSection('groups'))}>
-                      My Groups
-                    </Box>
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Button variant="outlined" startIcon={<Assignment />}
-                    onClick={openAnnualReviewDialog}
-                    sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    Annual Review
-                  </Button>
-                  <Button variant="contained" startIcon={<Add />}
-                    onClick={() => openNewReport()}
-                    sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    New Report
-                  </Button>
-                </Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h6" fontWeight={700}>My MSMEs</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  <Box component="span" sx={{ color: BRAND.primaryMain, fontWeight: 600 }}>
+                    {directMsmes.length}
+                  </Box>
+                  {' '}directly assigned to you · group MSMEs are in{' '}
+                  <Box component="span"
+                    sx={{ color: '#F9A825', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                    onClick={() => startTransition(() => setSection('groups'))}>
+                    My Groups
+                  </Box>
+                </Typography>
               </Box>
 
               {/* Active work order period banner */}
@@ -1663,14 +1642,24 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 <Typography variant="h6" fontWeight={700}>My Reports</Typography>
                 <Typography variant="body2" color="text.secondary">{reports.length} report{reports.length !== 1 ? 's' : ''} submitted</Typography>
               </Box>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => openNewReport()}
-                sx={{ alignSelf: { xs: 'stretch', sm: 'auto' }, flexShrink: 0 }}
-              >
-                New Report
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignSelf: { xs: 'stretch', sm: 'auto' } }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<Assignment />}
+                  onClick={openAnnualReviewDialog}
+                  sx={{ whiteSpace: 'nowrap', flexShrink: 0, flex: { xs: 1, sm: 'none' } }}
+                >
+                  Annual Review
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => openNewReport()}
+                  sx={{ whiteSpace: 'nowrap', flexShrink: 0, flex: { xs: 1, sm: 'none' } }}
+                >
+                  New Report
+                </Button>
+              </Box>
             </Box>
 
             {reports.length === 0 ? (
