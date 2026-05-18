@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
   Close, Save, Send, Person, School, Psychology, Assessment,
-  Flag, EventNote, Build, EmojiEvents, ArrowForward,
+  Flag, EventNote, Build, EmojiEvents, ArrowForward, QueryStats,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
@@ -43,6 +43,13 @@ const VISIT_TYPES = [
     icon: <Psychology />,
     desc: 'Structured coaching session',
     color: '#7B1FA2',
+  },
+  {
+    value: 'annual_review',
+    label: 'Annual Review',
+    icon: <QueryStats />,
+    desc: 'In-depth qualitative review of MSME data',
+    color: '#00695C',
   },
 ];
 
@@ -111,6 +118,24 @@ const TYPE_CONFIG = {
     show_participants: false,
     show_delivery:     false,
     show_focus:        false,
+    show_data_quality: false,
+  },
+  annual_review: {
+    context_label:    'Business Status at Review',
+    context_hint:     'Describe the overall state of the business at the time of this annual review. What did you observe — operations, premises, staff, activity levels?',
+    delivered_label:  'Review Process & Questions Asked',
+    delivered_hint:   'Describe how you conducted the review. What data did you seek to verify? How cooperative was the owner? Were there other people present?',
+    outcomes_label:   'Key Findings & Year-on-Year Changes',
+    outcomes_hint:    'What are the significant findings from this review? How does the business compare to last year\'s data? What has improved, declined, or stalled?',
+    msme_label:       'Records & Documentation Needed',
+    msme_hint:        'What records, documents or information does the owner still need to provide, locate or organise before data entry is complete?',
+    bge_label:        'Data Entry & Verification Follow-up',
+    bge_hint:         'What data still needs to be entered or cross-checked in the system? Is a follow-up visit required to complete verification?',
+    tools_label:      'Data Collection Forms & Tools Used',
+    show_participants: false,
+    show_delivery:     false,
+    show_focus:        false,
+    show_data_quality: true,
   },
 };
 
@@ -181,6 +206,11 @@ const EMPTY_FORM = {
   recommendations:     '',
   next_steps:          '',
   additional_notes:    '',
+  // data quality (annual_review visits)
+  data_confidence_level:       '',
+  records_sighted:             null,
+  owner_certainty_observation: '',
+  data_collection_challenges:  '',
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -222,6 +252,7 @@ export default function VisitReportForm({
       });
       f.msme       = editingReport.msme       || '';
       f.visit_type = editingReport.visit_type || 'one_on_one';
+      f.records_sighted = editingReport.records_sighted ?? null;
       const parsed = parseTools(editingReport.tools_provided || '');
       const knownSelected = parsed.filter(t => TOOLS_OPTIONS.includes(t));
       const otherText = parsed.filter(t => !TOOLS_OPTIONS.includes(t)).join(', ');
@@ -278,6 +309,11 @@ export default function VisitReportForm({
       recommendations:     form.recommendations,
       next_steps:          form.next_steps,
       additional_notes:    form.additional_notes,
+      // data quality
+      data_confidence_level:       form.data_confidence_level,
+      records_sighted:             form.records_sighted,
+      owner_certainty_observation: form.owner_certainty_observation,
+      data_collection_challenges:  form.data_collection_challenges,
     };
 
     try {
@@ -470,7 +506,61 @@ export default function VisitReportForm({
 
             <Divider sx={{ my: 3 }} />
 
-            {/* ── 3. DELIVERED & TOOLS ── */}
+            {/* ── 3. DATA QUALITY (annual_review only) ── */}
+            {cfg.show_data_quality && (
+              <>
+                <SectionBlock icon={<QueryStats />} title="Data Quality Assessment" color={typeInfo.color}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Data Confidence Level</InputLabel>
+                        <Select
+                          value={form.data_confidence_level}
+                          label="Data Confidence Level"
+                          onChange={e => set('data_confidence_level', e.target.value)}
+                        >
+                          <MenuItem value="confirmed">Confirmed — figures from actual records</MenuItem>
+                          <MenuItem value="mostly_confident">Mostly confident — minor estimates only</MenuItem>
+                          <MenuItem value="mixed">Mixed — owner unsure on several items</MenuItem>
+                          <MenuItem value="largely_estimated">Largely estimated — few actual records</MenuItem>
+                          <MenuItem value="unreliable">Unreliable — mostly guessing</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Physical Records Sighted?</InputLabel>
+                        <Select
+                          value={form.records_sighted === null ? '' : form.records_sighted ? 'yes' : 'no'}
+                          label="Physical Records Sighted?"
+                          onChange={e => set('records_sighted', e.target.value === 'yes' ? true : e.target.value === 'no' ? false : null)}
+                        >
+                          <MenuItem value="yes">Yes — BGE saw actual books / records</MenuItem>
+                          <MenuItem value="no">No — relying on owner's verbal responses</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField fullWidth multiline rows={4} size="small"
+                        label="Owner Certainty & Confidence Observations"
+                        placeholder="Was the owner confident in their answers or did they appear to be guessing? Which figures were they uncertain about — e.g. 'owner estimated sales from memory, unsure of exact figures for Q3', 'owner very clear on employee count but hesitant on profit figures'. Note anything that suggests the data may not reflect reality."
+                        value={form.owner_certainty_observation}
+                        onChange={e => set('owner_certainty_observation', e.target.value)} />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField fullWidth multiline rows={3} size="small"
+                        label="Data Collection Challenges"
+                        placeholder="Any difficulties encountered — reluctance to share figures, conflicting numbers given at different points, missing records, distractions, communication barriers, etc."
+                        value={form.data_collection_challenges}
+                        onChange={e => set('data_collection_challenges', e.target.value)} />
+                    </Grid>
+                  </Grid>
+                </SectionBlock>
+                <Divider sx={{ my: 3 }} />
+              </>
+            )}
+
+            {/* ── 4/5. DELIVERED & TOOLS ── */}
             <SectionBlock icon={<Build />} title="What Was Delivered & Tools Used" color={typeInfo.color}>
               <Grid container spacing={2}>
                 <Grid item xs={12}>

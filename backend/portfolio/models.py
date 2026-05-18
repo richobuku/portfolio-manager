@@ -657,16 +657,25 @@ class VisitReportTemplate(models.Model):
 
 class MSMEReport(models.Model):
     VISIT_TYPES = [
+        ('data_update',      'Data Collection Visit'),
         ('one_on_one',       'One-on-One Visit'),
         ('training',         'Training Visit'),
         ('coaching',         'Business Coaching Visit'),
+        ('annual_review',    'Annual Review'),
         # legacy types kept for backward compat
         ('initial',          'Initial Assessment'),
         ('followup',         'Follow-up Visit'),
         ('final',            'Final Assessment'),
         ('mentoring',        'Mentoring Session'),
-        ('annual_review',    'Annual Review'),
         ('quarterly_review', 'Quarterly Review'),
+    ]
+
+    DATA_CONFIDENCE_CHOICES = [
+        ('confirmed',        'Confirmed — figures from actual records'),
+        ('mostly_confident', 'Mostly confident — minor estimates only'),
+        ('mixed',            'Mixed — owner unsure on several items'),
+        ('largely_estimated','Largely estimated — few actual records'),
+        ('unreliable',       'Unreliable — mostly guessing'),
     ]
     STATUS_CHOICES = [
         ('draft', 'Draft'),
@@ -698,6 +707,33 @@ class MSMEReport(models.Model):
     recommendations       = models.TextField(blank=True, help_text='BGE follow-up actions / next session plan')
     next_steps            = models.TextField(blank=True)
     additional_notes      = models.TextField(blank=True)
+
+    # ── Data quality (annual_review visits) ──────────────────────────────────
+    data_confidence_level    = models.CharField(
+        max_length=30, blank=True,
+        choices=[
+            ('confirmed',        'Confirmed — figures from actual records'),
+            ('mostly_confident', 'Mostly confident — minor estimates only'),
+            ('mixed',            'Mixed — owner unsure on several items'),
+            ('largely_estimated','Largely estimated — few actual records'),
+            ('unreliable',       'Unreliable — mostly guessing'),
+        ],
+        help_text='BGE assessment of overall data reliability for this visit',
+    )
+    records_sighted          = models.BooleanField(
+        null=True, blank=True,
+        help_text='BGE physically saw business records / books',
+    )
+    owner_certainty_observation = models.TextField(
+        blank=True,
+        help_text='Qualitative notes on how confident the owner was when answering — '
+                  'what they were unsure about, where they appeared to guess',
+    )
+    data_collection_challenges = models.TextField(
+        blank=True,
+        help_text='Difficulties encountered during data collection '
+                  '(reluctance, missing records, conflicting figures, etc.)',
+    )
 
     # ── Financials (template section: include_financials) ─────────────────────
     revenue_ugx       = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
