@@ -1906,7 +1906,7 @@ class VisitReportTemplateViewSet(viewsets.ModelViewSet):
         self._require_admin(); return super().destroy(request, *args, **kwargs)
 
 
-class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
+class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     serializer_class = MSMEReportSerializer
     permission_classes = [IsAuthenticated]
 
@@ -2030,7 +2030,7 @@ class MSMEReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return resp
 
 
-class GroupReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
+class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """Group-level reports.
 
     Visibility:
@@ -2079,8 +2079,10 @@ class GroupReportViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     def _user_can_write_for_group(self, user, group):
         if user.is_staff or user.is_superuser:
             return True
+        if _is_programme_manager(user):
+            return False  # programme managers are read-only on group reports
         if _managed_groups(user) is not None:
-            return True  # cohort admin can edit reports in their groups
+            return True
         try:
             bge = user.bge_profile
         except Exception:
@@ -2839,7 +2841,7 @@ def push_vapid_key(request):
     return Response({'publicKey': settings.VAPID_PUBLIC_KEY})
 
 
-class TrainingReportViewSet(viewsets.ModelViewSet):
+class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelViewSet):
     """
     CRUD for training session reports.
     - BGEs can create/edit reports for sessions linked to their assignments.
@@ -2851,12 +2853,17 @@ class TrainingReportViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = TrainingReport.objects.select_related('session', 'bge')
-        if not (user.is_staff or user.is_superuser or hasattr(user, 'cohort_admin_profile')):
-            try:
-                return qs.filter(bge=user.bge_profile)
-            except Exception:
-                return qs.none()
-        return qs
+        if user.is_staff or user.is_superuser:
+            return qs
+        if _is_programme_manager(user):
+            group_ids = _managed_groups(user) or []
+            return qs.filter(
+                session__businesses__programme_groups__in=group_ids
+            ).distinct()
+        try:
+            return qs.filter(bge=user.bge_profile)
+        except Exception:
+            return qs.none()
 
     def perform_create(self, serializer):
         bge = None
