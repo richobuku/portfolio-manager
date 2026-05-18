@@ -2353,7 +2353,8 @@ class BGEUserViewSet(viewsets.ViewSet):
             raise PermissionDenied("Only admins can manage users.")
 
     def list(self, request):
-        self._require_admin(request)
+        if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
+            raise PermissionDenied("Only admins can manage users.")
         users = User.objects.filter(is_staff=False, is_superuser=False).select_related('bge_profile')
         data = []
         for u in users:

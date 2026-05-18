@@ -254,9 +254,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } catch {}
     return NAV_ITEMS.map(n => n.key);
   });
-  // Staff-only tabs hidden from programme managers and viewers
-  const STAFF_ONLY_TABS = isStaff ? [] : ['users'];
-  const orderedNav = navOrder.map(k => NAV_ITEMS.find(n => n.key === k)).filter(n => n && !STAFF_ONLY_TABS.includes(n.key));
+  // Tabs hidden based on role
+  const HIDDEN_TABS = isStaff
+    ? []
+    : isProgrammeManager
+      ? ['users', 'cohorts']
+      : ['users'];
+  const orderedNav = navOrder.map(k => NAV_ITEMS.find(n => n.key === k)).filter(n => n && !HIDDEN_TABS.includes(n.key));
   const [dragKey, setDragKey] = useState(null);
   const [navLocked, setNavLocked] = useState(true);
 
@@ -417,7 +421,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
         axios.get(API_ENDPOINTS.TRAINING_TOPICS, { headers: h }),
         axios.get(`${API_ENDPOINTS.MSMES}analytics/`, { headers: h }),
-        axios.get(API_ENDPOINTS.BGE_USERS, { headers: h }),
+        axios.get(API_ENDPOINTS.BGE_USERS, { headers: h }).catch(() => ({ data: [] })),
         axios.get(`${API_ENDPOINTS.REPORTS}?${reportParams}`, { headers: h }),
         axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h }).catch(() => ({ data: [] })),
         axios.get(API_ENDPOINTS.PROGRAMME_GROUPS, { headers: h }).catch(() => ({ data: [] })),
