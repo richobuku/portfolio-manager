@@ -1502,28 +1502,32 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 240, overflow: 'auto' }}>
                             {groupMsmes.map(m => (
                               <Box key={m.id} sx={{
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                p: 1, borderRadius: 1, bgcolor: 'background.default',
+                                display: 'flex', alignItems: 'center', gap: 1,
+                                px: 1, py: 0.75, borderRadius: 1, bgcolor: 'background.default',
                               }}>
-                                <Box>
-                                  <Typography variant="body2" fontWeight={500}>{m.business_name}</Typography>
-                                  <Typography variant="caption" color="text.secondary">
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography variant="body2" fontWeight={500} noWrap>{m.business_name}</Typography>
+                                  <Typography variant="caption" color="text.secondary" noWrap>
                                     {m.msme_code}{m.session_number ? ` · Session ${m.session_number}` : ''}{m.city ? ` · ${m.city}` : ''}
                                   </Typography>
                                 </Box>
-                                <Tooltip title="View details">
-                                  <IconButton size="small" onClick={() => openMsmeDetail(m)}><Visibility fontSize="small" /></IconButton>
-                                </Tooltip>
-                                <Tooltip title="New visit report">
-                                  <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
-                                    <Add fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Update MSME data">
-                                  <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
-                                    <TrendingUp fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
+                                <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+                                  <Tooltip title="View details">
+                                    <IconButton size="small" onClick={() => openMsmeDetail(m)}>
+                                      <Visibility fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="New visit report">
+                                    <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
+                                      <Add fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Update MSME data">
+                                    <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
+                                      <TrendingUp fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
                               </Box>
                             ))}
                           </Box>
