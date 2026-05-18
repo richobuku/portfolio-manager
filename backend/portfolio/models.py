@@ -657,12 +657,15 @@ class VisitReportTemplate(models.Model):
 
 class MSMEReport(models.Model):
     VISIT_TYPES = [
-        ('initial',        'Initial Assessment'),
-        ('followup',       'Follow-up Visit'),
-        ('final',          'Final Assessment'),
-        ('training',       'Training Support'),
-        ('mentoring',      'Mentoring Session'),
-        ('annual_review',  'Annual Review'),
+        ('one_on_one',       'One-on-One Visit'),
+        ('training',         'Training Visit'),
+        ('coaching',         'Business Coaching Visit'),
+        # legacy types kept for backward compat
+        ('initial',          'Initial Assessment'),
+        ('followup',         'Follow-up Visit'),
+        ('final',            'Final Assessment'),
+        ('mentoring',        'Mentoring Session'),
+        ('annual_review',    'Annual Review'),
         ('quarterly_review', 'Quarterly Review'),
     ]
     STATUS_CHOICES = [
@@ -682,14 +685,19 @@ class MSMEReport(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
 
     # ── Qualitative narrative ─────────────────────────────────────────────────
-    business_overview     = models.TextField(blank=True)
-    challenges_identified = models.TextField(blank=True)
-    support_provided      = models.TextField(blank=True)
-    recommendations       = models.TextField(blank=True)
-    action_plan           = models.TextField(blank=True)
+    visit_objectives      = models.TextField(blank=True, help_text='What this visit aimed to achieve')
+    business_overview     = models.TextField(blank=True, help_text='Context observed / topics covered / what was discussed')
+    support_provided      = models.TextField(blank=True, help_text='Support, coaching, or training content delivered')
+    tools_provided        = models.TextField(blank=True, help_text='Comma-separated tools, templates or materials given')
+    delivery_method       = models.CharField(max_length=60, blank=True, help_text='Training delivery method (training visits)')
+    participant_count     = models.PositiveSmallIntegerField(null=True, blank=True, help_text='Number of participants (training visits)')
+    coaching_focus_area   = models.CharField(max_length=100, blank=True, help_text='Focus area for coaching visits')
+    key_achievement       = models.TextField(blank=True, help_text='Key outcomes, takeaways or owner insights')
+    challenges_identified = models.TextField(blank=True, help_text='Challenges encountered or observed')
+    action_plan           = models.TextField(blank=True, help_text='MSME agreed actions / assignments given')
+    recommendations       = models.TextField(blank=True, help_text='BGE follow-up actions / next session plan')
     next_steps            = models.TextField(blank=True)
     additional_notes      = models.TextField(blank=True)
-    key_achievement       = models.TextField(blank=True, help_text='Main growth achievement since last visit')
 
     # ── Financials (template section: include_financials) ─────────────────────
     revenue_ugx       = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True,
