@@ -414,23 +414,35 @@ def render_work_order(work_order):
     if deliverables:
         story.append(Spacer(1, 6))
         story.append(Paragraph('Deliverables', s['sectiontitle']))
-        rows = [['#', 'Description', 'Due Date']]
+        # Cell styles for body rows — Paragraph ensures long text wraps instead
+        # of overflowing into adjacent columns.
+        cell_style = ParagraphStyle('del_cell', parent=s['body'],
+                                    fontSize=9, leading=12, spaceAfter=0)
+        hdr_style  = ParagraphStyle('del_hdr',  parent=cell_style,
+                                    fontName='Helvetica-Bold',
+                                    textColor=HexColor('#FFFFFF'))
+        rows = [[
+            Paragraph('#',           hdr_style),
+            Paragraph('Description', hdr_style),
+            Paragraph('Due Date',    hdr_style),
+        ]]
         for d in deliverables:
             rows.append([
-                str(d.get('task_num', '')),
-                d.get('description', ''),
-                str(d.get('due_date', '—')),
+                Paragraph(str(d.get('task_num', '')),      cell_style),
+                Paragraph(_safe_html(d.get('description', '')), cell_style),
+                Paragraph(_safe_html(str(d.get('due_date', '—'))), cell_style),
             ])
+        # Col widths: # (10mm) | Description (108mm) | Due Date (52mm) = 170mm
         t = Table(rows, hAlign='LEFT',
-                  colWidths=[12 * mm, 120 * mm, 38 * mm], repeatRows=1)
+                  colWidths=[10 * mm, 108 * mm, 52 * mm], repeatRows=1)
         t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY),
-            ('TEXTCOLOR',  (0, 0), (-1, 0), HexColor('#FFFFFF')),
-            ('FONT',       (0, 0), (-1, 0), 'Helvetica-Bold', 9),
-            ('FONT',       (0, 1), (-1, -1), 'Helvetica', 9),
-            ('LINEBELOW',  (0, 0), (-1, -1), 0.25, LIGHT_GREY),
+            ('BACKGROUND',    (0, 0), (-1, 0),  NAVY),
+            ('LINEBELOW',     (0, 0), (-1, -1), 0.25, LIGHT_GREY),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+            ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
         ]))
         story.append(t)
