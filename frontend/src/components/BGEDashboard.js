@@ -39,20 +39,6 @@ const STATUS_COLORS = {
   reviewed: 'success',
 };
 
-const EMPTY_REPORT = {
-  msme: '',
-  visit_type: 'followup',
-  visit_date: new Date().toISOString().slice(0, 10),
-  business_overview: '',
-  challenges_identified: '',
-  support_provided: '',
-  recommendations: '',
-  action_plan: '',
-  next_steps: '',
-  additional_notes: '',
-  status: 'draft',
-};
-
 const EMPTY_GROUP_REPORT = {
   group: '',
   session_number: '',
@@ -221,12 +207,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [visitReportMsme, setVisitReportMsme]   = useState(null);
   const [visitReportEdit, setVisitReportEdit]   = useState(null);
 
-  // Legacy report dialog state (kept for fallback)
-  const [reportDialog, setReportDialog] = useState(false);
-  const [reportForm, setReportForm] = useState(EMPTY_REPORT);
-  const [reportSaving, setReportSaving] = useState(false);
-  const [reportErrors, setReportErrors] = useState('');
-
   // MSME detail dialog
   const [msmeDetailDialog, setMsmeDetailDialog] = useState(false);
   const [selectedMsme, setSelectedMsme] = useState(null);
@@ -269,15 +249,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [annualReviewForm, setAnnualReviewForm] = useState(EMPTY_ANNUAL_REVIEW);
   const [annualReviewSaving, setAnnualReviewSaving] = useState(false);
   const [annualReviewError, setAnnualReviewError] = useState('');
-  const [, setAnnualReviews] = useState([]);
-
-  const fetchAnnualReviews = useCallback(async () => {
-    try {
-      const res = await axios.get(API_ENDPOINTS.ANNUAL_REVIEWS, { headers: { Authorization: `Bearer ${token}` } });
-      setAnnualReviews(Array.isArray(res.data) ? res.data : res.data.results || []);
-    } catch { /* non-critical */ }
-  }, [token]);
-
   const openAnnualReviewDialog = () => {
     setAnnualReviewForm(EMPTY_ANNUAL_REVIEW);
     setAnnualReviewError('');
@@ -308,7 +279,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       await axios.post(API_ENDPOINTS.ANNUAL_REVIEWS, payload, { headers: { Authorization: `Bearer ${token}` } });
       notify(submitNow ? 'Review report submitted.' : 'Review report saved as draft.');
       setAnnualReviewDialog(false);
-      fetchAnnualReviews();
     } catch (e) {
       setAnnualReviewError(e.response?.data ? JSON.stringify(e.response.data) : 'Save failed.');
     } finally { setAnnualReviewSaving(false); }
@@ -582,29 +552,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setVisitReportMsme(msme);
     setVisitReportEdit(report);
     setVisitReportOpen(true);
-  };
-
-  const saveReport = async (statusOverride) => {
-    if (!reportForm.msme) { setReportErrors('Please select an MSME.'); return; }
-    if (!reportForm.visit_date) { setReportErrors('Please set a visit date.'); return; }
-    setReportSaving(true);
-    setReportErrors('');
-    const payload = statusOverride ? { ...reportForm, status: statusOverride } : reportForm;
-    try {
-      if (visitReportEdit) {
-        await axios.patch(`${API_ENDPOINTS.REPORTS}${visitReportEdit.id}/`, payload, { headers });
-        notify(statusOverride === 'submitted' ? 'Report submitted' : 'Draft saved');
-      } else {
-        await axios.post(API_ENDPOINTS.REPORTS, payload, { headers });
-        notify(statusOverride === 'submitted' ? 'Report submitted' : 'Draft saved');
-      }
-      setReportDialog(false);
-      fetchReports();
-    } catch (err) {
-      setReportErrors(err.response?.data?.detail || 'Failed to save report.');
-    } finally {
-      setReportSaving(false);
-    }
   };
 
   // ── group reports ─────────────────────────────────────────────────────────
@@ -1128,7 +1075,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const SidebarContent = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, bgcolor: BRAND.sidebarBg }}>
-      <Box sx={{ px: 2.5, py: 3 }}>
+      {/* Close button — mobile only */}
+      <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'flex-end', px: 1, pt: 1 }}>
+        <IconButton size="small" onClick={() => setMobileOpen(false)}
+          sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+          <Close />
+        </IconButton>
+      </Box>
+      <Box sx={{ px: 2.5, py: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
           <Box sx={{
             width: 32, height: 32, borderRadius: 1, bgcolor: BRAND.programmeGreen,
@@ -3675,112 +3629,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         bgeProfile={currentUser?.bge_profile}
         editingReport={visitReportEdit}
       />
-
-      {/* ── Legacy report form dialog (kept for fallback) ── */}
-      <Dialog open={reportDialog} onClose={() => setReportDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {visitReportEdit ? 'Edit Report' : 'New Visit Report'}
-        </DialogTitle>
-        <DialogContent dividers>
-          {reportErrors && <Alert severity="error" sx={{ mb: 2 }}>{reportErrors}</Alert>}
-
-          {/* Show the assignment / group objectives for the selected MSME so the BGE
-              has the team's mission in front of them while filling out the report. */}
-          {(() => {
-            const m = msmes.find(x => x.id === reportForm.msme);
-            if (!m) return null;
-            const ao = (m.assignment_objectives || '').trim();
-            const go = (m.assigned_group_objectives || '').trim();
-            if (!ao && !go) return null;
-            return (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                {m.assigned_group_name && (
-                  <Typography variant="caption" fontWeight={600} display="block">
-                    {m.assigned_group_name} · objectives
-                  </Typography>
-                )}
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {ao || go}
-                </Typography>
-              </Alert>
-            );
-          })()}
-
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small" required>
-                <InputLabel>MSME</InputLabel>
-                <Select value={reportForm.msme} label="MSME" onChange={e => setReportForm({ ...reportForm, msme: e.target.value })}>
-                  {msmes.map(m => (
-                    <MenuItem key={m.id} value={m.id}>
-                      <Box>
-                        <Typography variant="body2" fontWeight={500}>{m.business_name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {m.msme_code}{m.assigned_group_name ? ` · ${m.assigned_group_name}` : ''}
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Visit Type</InputLabel>
-                <Select value={reportForm.visit_type} label="Visit Type" onChange={e => setReportForm({ ...reportForm, visit_type: e.target.value })}>
-                  {Object.entries(VISIT_TYPE_LABELS).map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth size="small" label="Visit Date" type="date" required
-                value={reportForm.visit_date}
-                onChange={e => setReportForm({ ...reportForm, visit_date: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ my: 2 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>VISIT REPORT TEMPLATE</Typography>
-          </Divider>
-
-          {[
-            { field: 'business_overview', label: 'Business Overview', hint: 'Describe the current state of the business, operations, and general performance.' },
-            { field: 'challenges_identified', label: 'Challenges Identified', hint: 'List key challenges the MSME is facing (financial, operational, market, HR, etc.).' },
-            { field: 'support_provided', label: 'Support Provided', hint: 'Describe the support, advice, or services provided during this visit.' },
-            { field: 'recommendations', label: 'Recommendations', hint: 'What changes or actions do you recommend for the MSME?' },
-            { field: 'action_plan', label: 'Action Plan', hint: 'Detail the agreed action plan with the business owner.' },
-            { field: 'next_steps', label: 'Next Steps', hint: 'What are the next steps and follow-up actions planned?' },
-            { field: 'additional_notes', label: 'Additional Notes', hint: 'Any other observations, concerns, or information.' },
-          ].map(({ field, label, hint }) => (
-            <TextField
-              key={field}
-              fullWidth multiline rows={3} size="small" label={label}
-              placeholder={hint}
-              value={reportForm[field]}
-              onChange={e => setReportForm({ ...reportForm, [field]: e.target.value })}
-              sx={{ mb: 2 }}
-              InputLabelProps={{ shrink: true }}
-            />
-          ))}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
-          <Button onClick={() => setReportDialog(false)}>Cancel</Button>
-          <Button variant="outlined" onClick={() => saveReport('draft')} disabled={reportSaving}>
-            Save Draft
-          </Button>
-          <Button
-            variant="contained" color="success"
-            onClick={() => saveReport('submitted')}
-            disabled={reportSaving}
-            startIcon={reportSaving ? <CircularProgress size={16} color="inherit" /> : <CheckCircle />}
-          >
-            Submit Report
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* ── Group Report (team lead only) ────────────────────────────────── */}
       <Dialog open={groupReportDialog} onClose={() => setGroupReportDialog(false)} maxWidth="md" fullWidth>

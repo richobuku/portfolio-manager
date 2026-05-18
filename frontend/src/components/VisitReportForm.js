@@ -6,7 +6,7 @@ import {
   Divider, IconButton,
 } from '@mui/material';
 import {
-  Close, Save, Send, Person, School, Psychology,
+  Close, Save, Send, Person, School, Psychology, Assessment,
   Flag, EventNote, Build, EmojiEvents, ArrowForward,
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -36,6 +36,13 @@ const VISIT_TYPES = [
     icon: <Psychology />,
     desc: 'Structured coaching session',
     color: '#7B1FA2',
+  },
+  {
+    value: 'data_update',
+    label: 'Data Collection Visit',
+    icon: <Assessment />,
+    desc: 'Collect and record MSME metrics',
+    color: '#E65100',
   },
 ];
 
@@ -88,6 +95,22 @@ const TYPE_CONFIG = {
     show_participants: false,
     show_delivery:     false,
     show_focus:        true,
+  },
+  data_update: {
+    context_label:    'Business Status Observed',
+    context_hint:     'What is the current state of the business? What did you see, measure or verify during this data collection visit?',
+    delivered_label:  'Data Collection Process',
+    delivered_hint:   'How did you collect the data — what did you ask, observe, verify or record? Who did you engage with?',
+    outcomes_label:   'Key Findings & Changes Noted',
+    outcomes_hint:    'What are the notable findings? What has changed compared to previous records?',
+    msme_label:       'Business Owner Actions Required',
+    msme_hint:        'Any documents, records or information the owner needs to provide or prepare.',
+    bge_label:        'Data Entry & Follow-up',
+    bge_hint:         'What still needs to be entered into the system? Any follow-up data collection needed?',
+    tools_label:      'Data Collection Tools & Forms Used',
+    show_participants: false,
+    show_delivery:     false,
+    show_focus:        false,
   },
 };
 
