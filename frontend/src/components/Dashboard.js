@@ -135,9 +135,12 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
   }, [assignMsmeGroup?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced copy — the filter reads this.
+  // Wrapped in startTransition so React treats the 280-row reconciliation as
+  // a low-priority update; the browser paints the typed character first and
+  // the list refilter happens without blocking the input (fixes INP ~392ms).
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   React.useEffect(() => {
-    const h = setTimeout(() => setDebouncedSearch(searchText), 200);
+    const h = setTimeout(() => React.startTransition(() => setDebouncedSearch(searchText)), 150);
     return () => clearTimeout(h);
   }, [searchText]);
 
@@ -152,16 +155,20 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
 
   const groupId = assignMsmeGroup?.id;
 
+  // useDeferredValue lets React render with the stale list first so the input
+  // stays responsive, then re-renders with the updated filter in the background.
+  const deferredSearch = React.useDeferredValue(debouncedSearch);
+
   const filtered = React.useMemo(() => {
-    if (!debouncedSearch) return msmes;
-    const q = debouncedSearch.toLowerCase();
+    if (!deferredSearch) return msmes;
+    const q = deferredSearch.toLowerCase();
     return msmes.filter(m =>
       (m.business_name || '').toLowerCase().includes(q) ||
       (m.owner_name    || '').toLowerCase().includes(q) ||
       (m.city          || '').toLowerCase().includes(q) ||
       (m.state         || '').toLowerCase().includes(q)
     );
-  }, [msmes, debouncedSearch]);
+  }, [msmes, deferredSearch]);
 
   // O(1) membership check inside the row map.
   const selectedSet = React.useMemo(
@@ -228,7 +235,7 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
           />
           <Chip label={`${assignedGroupMsmeIds.length} selected`} color="primary" />
           <Chip
-            label={debouncedSearch ? `${filtered.length} match${filtered.length === 1 ? '' : 'es'}` : `${msmes.length} MSMEs`}
+            label={deferredSearch ? `${filtered.length} match${filtered.length === 1 ? '' : 'es'}` : `${msmes.length} MSMEs`}
             size="small" variant="outlined"
           />
           <Button size="small" onClick={onClear} disabled={assignedGroupMsmeIds.length === 0}>
@@ -253,7 +260,7 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
               )}
               {msmes.length > 0 && filtered.length === 0 && (
                 <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
-                  No MSMEs match “{debouncedSearch}”
+                  No MSMEs match “{deferredSearch}”
                 </Box>
               )}
             </List>
