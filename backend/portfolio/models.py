@@ -657,11 +657,13 @@ class VisitReportTemplate(models.Model):
 
 class MSMEReport(models.Model):
     VISIT_TYPES = [
-        ('initial', 'Initial Assessment'),
-        ('followup', 'Follow-up Visit'),
-        ('final', 'Final Assessment'),
-        ('training', 'Training Support'),
-        ('mentoring', 'Mentoring Session'),
+        ('initial',        'Initial Assessment'),
+        ('followup',       'Follow-up Visit'),
+        ('final',          'Final Assessment'),
+        ('training',       'Training Support'),
+        ('mentoring',      'Mentoring Session'),
+        ('annual_review',  'Annual Review'),
+        ('quarterly_review', 'Quarterly Review'),
     ]
     STATUS_CHOICES = [
         ('draft', 'Draft'),
@@ -711,9 +713,11 @@ class MSMEReport(models.Model):
     has_nssf          = models.BooleanField(null=True, blank=True, help_text='Making NSSF contributions')
 
     # ── Market access (template section: include_market) ─────────────────────
-    is_exporting           = models.BooleanField(null=True, blank=True)
-    introduced_new_product = models.BooleanField(null=True, blank=True)
-    active_customers_count = models.PositiveIntegerField(null=True, blank=True)
+    is_exporting              = models.BooleanField(null=True, blank=True)
+    introduced_new_product    = models.BooleanField(null=True, blank=True)
+    active_customers_count    = models.PositiveIntegerField(null=True, blank=True)
+    markets_outside_district  = models.BooleanField(null=True, blank=True,
+        help_text='Does the MSME access markets outside their district of operation?')
 
     # ── Business management (template section: include_business_mgmt) ─────────
     has_business_plan       = models.BooleanField(null=True, blank=True)

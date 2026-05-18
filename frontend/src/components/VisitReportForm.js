@@ -40,11 +40,13 @@ const SECTIONS = [
 ];
 
 const VISIT_TYPES = [
-  { value: 'initial',   label: 'Initial Assessment' },
-  { value: 'followup',  label: 'Follow-up Visit' },
-  { value: 'final',     label: 'Final Assessment' },
-  { value: 'training',  label: 'Training Support' },
-  { value: 'mentoring', label: 'Mentoring Session' },
+  { value: 'initial',          label: 'Initial Assessment' },
+  { value: 'followup',         label: 'Follow-up Visit' },
+  { value: 'final',            label: 'Final Assessment' },
+  { value: 'training',         label: 'Training Support' },
+  { value: 'mentoring',        label: 'Mentoring Session' },
+  { value: 'annual_review',    label: 'Annual Review' },
+  { value: 'quarterly_review', label: 'Quarterly Review' },
 ];
 
 const EMPTY_FORM = {

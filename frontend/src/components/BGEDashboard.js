@@ -307,6 +307,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     training_changes: [],
     training_changes_other: '',
     notes: '',
+    // narrative (only used when source === 'annual' or 'quarterly')
+    narrative_business_overview: '',
+    narrative_key_achievement: '',
+    narrative_challenges: '',
+    narrative_support_provided: '',
+    narrative_recommendations: '',
+    narrative_next_steps: '',
   };
   const [growthForm, setGrowthForm] = useState(EMPTY_GROWTH);
 
@@ -359,10 +366,38 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                 ? (growthForm.training_changes_other || '') : '',
       notes: growthForm.notes,
     };
+    const isReviewType = growthForm.source === 'annual' || growthForm.source === 'quarterly';
+    const hasNarrative = isReviewType && [
+      growthForm.narrative_business_overview, growthForm.narrative_key_achievement,
+      growthForm.narrative_challenges, growthForm.narrative_support_provided,
+      growthForm.narrative_recommendations, growthForm.narrative_next_steps,
+    ].some(v => v.trim());
+
     try {
       await axios.post(API_ENDPOINTS.GROWTH_SNAPSHOTS, payload,
         { headers: { Authorization: `Bearer ${token}` } });
-      notify('Growth update saved.');
+
+      if (hasNarrative) {
+        const visitType = growthForm.source === 'annual' ? 'annual_review' : 'quarterly_review';
+        const reportPayload = {
+          msme:                   growthMsme.id,
+          bge:                    bgeId || null,
+          visit_type:             visitType,
+          visit_date:             growthForm.snapshot_date,
+          status:                 'draft',
+          business_overview:      growthForm.narrative_business_overview,
+          key_achievement:        growthForm.narrative_key_achievement,
+          challenges_identified:  growthForm.narrative_challenges,
+          support_provided:       growthForm.narrative_support_provided,
+          recommendations:        growthForm.narrative_recommendations,
+          next_steps:             growthForm.narrative_next_steps,
+        };
+        await axios.post(API_ENDPOINTS.REPORTS, reportPayload,
+          { headers: { Authorization: `Bearer ${token}` } });
+        notify('Growth update and narrative report saved as draft.');
+      } else {
+        notify('Growth update saved.');
+      }
       setGrowthDialog(false);
     } catch (e) {
       setGrowthError(e.response?.data ? JSON.stringify(e.response.data) : 'Save failed.');
@@ -3320,6 +3355,61 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 placeholder="Key observations, what changed since last visit, challenges, etc." />
             </Grid>
           </Grid>
+
+          {/* ── Narrative section (Annual / Quarterly reviews only) ── */}
+          {(growthForm.source === 'annual' || growthForm.source === 'quarterly') && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: '#F0F4FA', borderRadius: 2, border: '1px solid #C5D3E8' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Description sx={{ fontSize: 16, color: '#1A2F4B' }} />
+                <Typography fontWeight={700} fontSize={13} color="#1A2F4B">
+                  Review Narrative
+                </Typography>
+                <Chip label="Creates linked draft report" size="small" variant="outlined"
+                  sx={{ ml: 'auto', fontSize: 10, color: 'text.secondary' }} />
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                Add a written narrative to accompany the data update. A draft visit report will be automatically created and can be completed, edited, and submitted separately.
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField fullWidth size="small" multiline rows={3}
+                    label="Business Overview — current state of the business"
+                    value={growthForm.narrative_business_overview}
+                    onChange={e => setGrowthForm(f => ({ ...f, narrative_business_overview: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth size="small" multiline rows={2}
+                    label="Key Achievement / Progress since last review"
+                    value={growthForm.narrative_key_achievement}
+                    onChange={e => setGrowthForm(f => ({ ...f, narrative_key_achievement: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth size="small" multiline rows={2}
+                    label="Challenges Identified"
+                    value={growthForm.narrative_challenges}
+                    onChange={e => setGrowthForm(f => ({ ...f, narrative_challenges: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth size="small" multiline rows={2}
+                    label="Support Provided"
+                    value={growthForm.narrative_support_provided}
+                    onChange={e => setGrowthForm(f => ({ ...f, narrative_support_provided: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth size="small" multiline rows={2}
+                    label="Recommendations"
+                    value={growthForm.narrative_recommendations}
+                    onChange={e => setGrowthForm(f => ({ ...f, narrative_recommendations: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth size="small" multiline rows={2}
+                    label="Next Steps / Agreed Actions"
+                    value={growthForm.narrative_next_steps}
+                    onChange={e => setGrowthForm(f => ({ ...f, narrative_next_steps: e.target.value }))} />
+                </Grid>
+              </Grid>
+            </Box>
+          )}
 
           {/* ── History ── */}
           {growthSnapshots.length > 0 && (
