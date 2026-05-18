@@ -45,6 +45,13 @@ def _is_viewer(user):
     return True
 
 
+def _is_programme_manager(user):
+    """True for cohort_admin accounts that are NOT full staff/superuser."""
+    if user.is_staff or user.is_superuser:
+        return False
+    return hasattr(user, 'cohort_admin_profile')
+
+
 class ViewerReadOnlyMixin:
     """Block create/update/delete for viewer accounts."""
     def _check_not_viewer(self):
@@ -66,6 +73,31 @@ class ViewerReadOnlyMixin:
     def destroy(self, request, *args, **kwargs):
         self._check_not_viewer()
         return super().destroy(request, *args, **kwargs)
+
+
+class ProgrammeManagerReadOnlyMixin:
+    """Block create/update/delete for programme-manager (cohort_admin) accounts."""
+    def _check_not_pm(self):
+        if _is_programme_manager(self.request.user):
+            raise PermissionDenied("Programme Managers have read-only access to this resource.")
+
+    def create(self, request, *args, **kwargs):
+        self._check_not_pm()
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self._check_not_pm()
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        self._check_not_pm()
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._check_not_pm()
+        return super().destroy(request, *args, **kwargs)
+
+
 from pywebpush import webpush, WebPushException
 import json as _json
 from .serializers import (
@@ -306,6 +338,11 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if not self._is_admin_or_cohort_admin(request):
             raise PermissionDenied("Only admins can assign BGEs.")
         msme = self.get_object()
+        # Programme managers may only assign BGEs to MSMEs within their managed groups
+        if _is_programme_manager(request.user):
+            managed = _managed_groups(request.user) or []
+            if not msme.programme_groups.filter(id__in=managed).exists():
+                raise PermissionDenied("You can only assign BGEs to MSMEs in your managed programme groups.")
         bge_id = request.data.get('bge_id')
         objectives = (request.data.get('objectives') or '').strip()
         assignment_date = request.data.get('assignment_date') or None
@@ -1097,7 +1134,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return Response({'detail': output or 'Import complete.'})
 
 
-class BusinessGrowthExpertViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
+class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     queryset = BusinessGrowthExpert.objects.all()
     serializer_class = BusinessGrowthExpertSerializer
     permission_classes = [IsAuthenticated]
@@ -1250,7 +1287,7 @@ class BusinessGrowthExpertViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], url_path='set-objectives')
     def set_objectives(self, request, pk=None):
         """Save shared deployment objectives for this BGE."""
-        if not (request.user.is_staff or request.user.is_superuser or _managed_groups(request.user) is not None):
+        if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can set deployment objectives.")
         bge = self.get_object()
         bge.deployment_objectives = request.data.get('deployment_objectives', '').strip()

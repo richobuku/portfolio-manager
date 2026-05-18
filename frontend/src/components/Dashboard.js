@@ -234,9 +234,10 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
 });
 
 export default function Dashboard({ token, currentUser, onLogout }) {
-  const isViewer  = currentUser?.role === 'viewer';
-  const isStaff   = !!(currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'admin');
-  const isAdmin   = !isViewer && (isStaff || currentUser?.role === 'cohort_admin');
+  const isViewer          = currentUser?.role === 'viewer';
+  const isStaff           = !!(currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'admin');
+  const isProgrammeManager = !isStaff && currentUser?.role === 'cohort_admin';
+  const isAdmin           = !isViewer && (isStaff || currentUser?.role === 'cohort_admin');
   const headers   = { Authorization: `Bearer ${token}` };
 
   const [section, setSection] = useState(() => {
@@ -1265,7 +1266,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <Visibility fontSize="small" />
         </IconButton>
       </Tooltip>
-      <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(item, type)}><Edit fontSize="small" /></IconButton></Tooltip>
+      {isStaff && <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(item, type)}><Edit fontSize="small" /></IconButton></Tooltip>}
       {isAdmin && <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => { setDeleteItem(item); setDeleteType(type); }}><Delete fontSize="small" /></IconButton></Tooltip>}
     </Box>
   );
@@ -1473,9 +1474,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderExperts = () => (
     <Box>
       <SectionHeader title="BGE Experts" subtitle={`${experts.length} experts`}>
-        <Button variant="outlined" startIcon={<Upload />} size="small" onClick={openBgeUpload}>
-          Import BGE Excel
-        </Button>
+        {isStaff && (
+          <Button variant="outlined" startIcon={<Upload />} size="small" onClick={openBgeUpload}>
+            Import BGE Excel
+          </Button>
+        )}
       </SectionHeader>
 
       <Alert severity="info" sx={{ mb: 2 }} icon={false}>
@@ -3539,38 +3542,41 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           rows={2}
                           placeholder="Shared objectives for this BGE's deployment…"
                           value={objValue}
-                          onChange={ev => setBgeObjectives(prev => ({ ...prev, [e.id]: ev.target.value }))}
+                          onChange={ev => !isProgrammeManager && setBgeObjectives(prev => ({ ...prev, [e.id]: ev.target.value }))}
                           onFocus={() => {
                             if (!(e.id in bgeObjectives)) {
                               setBgeObjectives(prev => ({ ...prev, [e.id]: e.deployment_objectives || '' }));
                             }
                           }}
+                          InputProps={{ readOnly: isProgrammeManager }}
                           InputLabelProps={{ shrink: true }}
                         />
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          disabled={!!savingObjectives[e.id]}
-                          sx={{ flexShrink: 0, mt: 0.5 }}
-                          onClick={async () => {
-                            setSavingObjectives(prev => ({ ...prev, [e.id]: true }));
-                            try {
-                              await axios.patch(
-                                `${API_ENDPOINTS.EXPERTS}${e.id}/set-objectives/`,
-                                { deployment_objectives: objValue },
-                                { headers }
-                              );
-                              notify('Objectives saved');
-                              fetchAll();
-                            } catch {
-                              notify('Failed to save objectives', 'error');
-                            } finally {
-                              setSavingObjectives(prev => ({ ...prev, [e.id]: false }));
-                            }
-                          }}
-                        >
-                          {savingObjectives[e.id] ? <CircularProgress size={14} /> : 'Save'}
-                        </Button>
+                        {isStaff && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={!!savingObjectives[e.id]}
+                            sx={{ flexShrink: 0, mt: 0.5 }}
+                            onClick={async () => {
+                              setSavingObjectives(prev => ({ ...prev, [e.id]: true }));
+                              try {
+                                await axios.patch(
+                                  `${API_ENDPOINTS.EXPERTS}${e.id}/set-objectives/`,
+                                  { deployment_objectives: objValue },
+                                  { headers }
+                                );
+                                notify('Objectives saved');
+                                fetchAll();
+                              } catch {
+                                notify('Failed to save objectives', 'error');
+                              } finally {
+                                setSavingObjectives(prev => ({ ...prev, [e.id]: false }));
+                              }
+                            }}
+                          >
+                            {savingObjectives[e.id] ? <CircularProgress size={14} /> : 'Save'}
+                          </Button>
+                        )}
                       </Box>
                     </CardContent>
                   </Card>
