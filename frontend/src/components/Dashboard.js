@@ -1101,8 +1101,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const openRoleDialog = (u) => {
     setRoleUser(u);
     setRoleForm({
-      role: u.role === 'cohort_admin' ? 'cohort_admin' : 'viewer',
+      role: ['cohort_admin', 'viewer', 'bge'].includes(u.role) ? u.role : 'viewer',
       group_ids: u.managed_groups?.map(g => g.id) || [],
+      bge_id: u.bge_profile?.id || '',
     });
     setRoleDialog(true);
   };
@@ -3104,7 +3105,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   const renderUsers = () => (
     <Box>
-      <SectionHeader title="User Accounts" subtitle={`${bgeUsers.length} BGE login account${bgeUsers.length !== 1 ? 's' : ''}`}>
+      <SectionHeader title="User Accounts" subtitle={`${bgeUsers.length} account${bgeUsers.length !== 1 ? 's' : ''} — BGEs, Programme Managers, Viewers`}>
         {experts.some(e => !bgeUsers.some(u => u.bge_profile?.id === e.id)) && (
           <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={bulkCreateMissingAccounts} disabled={userLoading}>
             {userLoading ? 'Creating…' : 'Create Missing Accounts'}
@@ -3116,7 +3117,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </SectionHeader>
 
       <Alert severity="info" sx={{ mb: 2 }}>
-        Create login accounts here for BGE Experts so they can sign in. Link each account to a BGE Expert profile so they only see their assigned MSMEs.
+        Create and manage login accounts for all users. <strong>BGE</strong> accounts are linked to an expert profile and see only their assigned MSMEs. <strong>Programme Managers</strong> see all MSMEs in their assigned groups. <strong>Viewers</strong> have read-only access to everything. Use the <ManageAccounts sx={{ fontSize: 14, verticalAlign: 'middle' }} /> icon on any row to change a user's role.
       </Alert>
 
       {bgeUsers.length === 0 ? (
@@ -3156,30 +3157,33 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {u.role === 'cohort_admin' ? (
-                      <Box>
-                        <Chip label="Programme Manager" size="small" color="primary" variant="outlined" />
-                        {u.managed_groups?.map(g => (
-                          <Chip key={g.id} label={g.name} size="small" sx={{ ml: 0.5, fontSize: 10 }} />
-                        ))}
-                      </Box>
-                    ) : u.role === 'bge' ? (
-                      <Chip label="BGE" size="small" color="success" variant="outlined" />
-                    ) : (
-                      <Chip label="Viewer" size="small" color="default" variant="outlined" />
-                    )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                      {u.role === 'cohort_admin' ? (
+                        <>
+                          <Chip label="Programme Manager" size="small" color="primary" variant="outlined"
+                            onClick={() => openRoleDialog(u)} sx={{ cursor: 'pointer' }} />
+                          {u.managed_groups?.map(g => (
+                            <Chip key={g.id} label={g.name} size="small" sx={{ fontSize: 10 }} />
+                          ))}
+                        </>
+                      ) : u.role === 'bge' ? (
+                        <Chip label="BGE" size="small" color="success" variant="outlined"
+                          onClick={() => openRoleDialog(u)} sx={{ cursor: 'pointer' }} />
+                      ) : (
+                        <Chip label="Viewer" size="small" color="default" variant="outlined"
+                          onClick={() => openRoleDialog(u)} sx={{ cursor: 'pointer' }} />
+                      )}
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Chip label={u.is_active ? 'Active' : 'Disabled'} size="small" color={u.is_active ? 'success' : 'default'} />
                   </TableCell>
                   <TableCell align="right">
-                    {!u.bge_profile && (
-                      <Tooltip title="Set role / managed groups">
-                        <IconButton size="small" color="secondary" onClick={() => openRoleDialog(u)}>
-                          <ManageAccounts fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    <Tooltip title="Change role">
+                      <IconButton size="small" color="secondary" onClick={() => openRoleDialog(u)}>
+                        <ManageAccounts fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Reset password">
                       <IconButton size="small" onClick={() => { setPwdUser(u); setPwdDialog(true); }}>
                         <LockReset fontSize="small" />
@@ -5387,37 +5391,61 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </Dialog>
 
       {/* ── Set Role ──────────────────────────────────────────────────────── */}
-      <Dialog open={roleDialog} onClose={() => setRoleDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Set Role — {roleUser?.username}</DialogTitle>
+      <Dialog open={roleDialog} onClose={() => setRoleDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          Change Role
+          <Typography variant="caption" display="block" color="text.secondary">{roleUser?.username}</Typography>
+        </DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Choose whether this account can only view data, or can manage a specific set of programme groups.
-          </Typography>
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
             <InputLabel>Role</InputLabel>
             <Select value={roleForm.role} label="Role"
               onChange={e => setRoleForm(f => ({ ...f, role: e.target.value, group_ids: [] }))}>
+              <MenuItem value="bge">BGE Expert — sees only their assigned MSMEs</MenuItem>
+              <MenuItem value="cohort_admin">Programme Manager — sees all MSMEs in assigned groups</MenuItem>
               <MenuItem value="viewer">Viewer — read-only access to all data</MenuItem>
-              <MenuItem value="cohort_admin">Programme Manager — manage specific groups</MenuItem>
             </Select>
           </FormControl>
+
+          {roleForm.role === 'bge' && (
+            <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+              <InputLabel>Link to BGE Expert Profile</InputLabel>
+              <Select value={roleForm.bge_id || ''} label="Link to BGE Expert Profile"
+                onChange={e => setRoleForm(f => ({ ...f, bge_id: e.target.value }))}>
+                <MenuItem value="">— Not linked —</MenuItem>
+                {experts
+                  .filter(e => !bgeUsers.some(u => u.bge_profile?.id === e.id && u.id !== roleUser?.id))
+                  .map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          )}
+
           {roleForm.role === 'cohort_admin' && (
             <FormControl fullWidth size="small">
-              <InputLabel>Managed Programme Groups</InputLabel>
-              <Select multiple value={roleForm.group_ids} label="Managed Programme Groups"
+              <InputLabel>Programme Groups</InputLabel>
+              <Select multiple value={roleForm.group_ids} label="Programme Groups"
                 onChange={e => setRoleForm(f => ({ ...f, group_ids: e.target.value }))}>
                 {programmeGroups.map(g => (
                   <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>
                 ))}
               </Select>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                Select all groups this person should see MSMEs from.
+              </Typography>
             </FormControl>
+          )}
+
+          {roleForm.role === 'viewer' && (
+            <Typography variant="body2" color="text.secondary">
+              Viewers can see all MSMEs, reports and analytics but cannot create or edit anything.
+            </Typography>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRoleDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={saveRole} disabled={userLoading ||
             (roleForm.role === 'cohort_admin' && roleForm.group_ids.length === 0)}>
-            {userLoading ? <CircularProgress size={18} /> : 'Save Role'}
+            {userLoading ? <CircularProgress size={18} /> : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
