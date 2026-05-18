@@ -64,6 +64,7 @@ const EMPTY_FORM = {
   has_tin: '', has_unbs: '', has_business_bank: '', has_mobile_money: '', has_nssf: '',
   // market
   is_exporting: '', introduced_new_product: '', active_customers_count: '',
+  markets_outside_district: '',
   // business mgmt
   has_business_plan: '', uses_digital_accounting: '', has_hr_policy: '', accepts_digital_payments: '',
   // rating
@@ -186,9 +187,10 @@ export default function VisitReportForm({
     has_mobile_money:  toBool(form.has_mobile_money),
     has_nssf:          toBool(form.has_nssf),
     // market
-    is_exporting:           toBool(form.is_exporting),
-    introduced_new_product: toBool(form.introduced_new_product),
-    active_customers_count: toNum(form.active_customers_count),
+    is_exporting:             toBool(form.is_exporting),
+    introduced_new_product:   toBool(form.introduced_new_product),
+    active_customers_count:   toNum(form.active_customers_count),
+    markets_outside_district: toBool(form.markets_outside_district),
     // business mgmt
     has_business_plan:        toBool(form.has_business_plan),
     uses_digital_accounting:  toBool(form.uses_digital_accounting),
@@ -354,22 +356,14 @@ export default function VisitReportForm({
               </>
             )}
 
-            {/* Section nav */}
+            {/* Section list — informational, no click-to-switch */}
             <Divider sx={{ my: 1.5 }} />
-            <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Sections</Typography>
+            <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Sections in this report</Typography>
             <Box sx={{ mt: 0.5 }}>
               {visibleSections.map(s => (
-                <Box key={s.key}
-                  onClick={() => setActive(s.key)}
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.75,
-                    borderRadius: 1, cursor: 'pointer', mb: 0.5,
-                    bgcolor: activeSection === s.key ? '#1A2F4B' : 'transparent',
-                    color:   activeSection === s.key ? '#fff' : 'inherit',
-                    '&:hover': { bgcolor: activeSection === s.key ? '#1A2F4B' : '#E8EDF2' },
-                  }}>
-                  {React.cloneElement(s.icon, { sx: { fontSize: 16 } })}
-                  <Typography fontSize={12}>{s.label}</Typography>
+                <Box key={s.key} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5, mb: 0.25 }}>
+                  {React.cloneElement(s.icon, { sx: { fontSize: 14, color: 'text.secondary' } })}
+                  <Typography fontSize={11} color="text.secondary">{s.label}</Typography>
                 </Box>
               ))}
             </Box>
@@ -387,244 +381,264 @@ export default function VisitReportForm({
             }}>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            {/* NARRATIVE */}
-            {activeSection === 'narrative' && (
-              <Box>
-                <SectionHeading icon={<Store />} title="Visit Narrative" />
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={3} size="small"
-                      label="Business Overview — current state of the business"
-                      value={form.business_overview}
-                      onChange={e => set('business_overview', e.target.value)} />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={3} size="small"
-                      label="Key Achievement since last visit"
-                      value={form.key_achievement}
-                      onChange={e => set('key_achievement', e.target.value)}
-                      placeholder="What has the business accomplished since the last visit?" />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={3} size="small"
-                      label="Challenges Identified"
-                      value={form.challenges_identified}
-                      onChange={e => set('challenges_identified', e.target.value)} />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={3} size="small"
-                      label="Support Provided during this visit"
-                      value={form.support_provided}
-                      onChange={e => set('support_provided', e.target.value)} />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={2} size="small"
-                      label="Recommendations"
-                      value={form.recommendations}
-                      onChange={e => set('recommendations', e.target.value)} />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={2} size="small"
-                      label="Agreed Action Plan"
-                      value={form.action_plan}
-                      onChange={e => set('action_plan', e.target.value)} />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={2} size="small"
-                      label="Next Steps"
-                      value={form.next_steps}
-                      onChange={e => set('next_steps', e.target.value)} />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField fullWidth multiline rows={2} size="small"
-                      label="Additional Notes"
-                      value={form.additional_notes}
-                      onChange={e => set('additional_notes', e.target.value)} />
-                  </Grid>
+            {/* NARRATIVE — always visible */}
+            <Box sx={{ mb: 3 }}>
+              <SectionHeading icon={<Store />} title="Visit Narrative" />
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={3} size="small"
+                    label="Business Overview — current state of the business"
+                    value={form.business_overview}
+                    onChange={e => set('business_overview', e.target.value)} />
                 </Grid>
-              </Box>
-            )}
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={3} size="small"
+                    label="Key Achievement since last visit"
+                    value={form.key_achievement}
+                    onChange={e => set('key_achievement', e.target.value)}
+                    placeholder="What has the business accomplished since the last visit?" />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={3} size="small"
+                    label="Challenges Identified"
+                    value={form.challenges_identified}
+                    onChange={e => set('challenges_identified', e.target.value)} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={3} size="small"
+                    label="Support Provided during this visit"
+                    value={form.support_provided}
+                    onChange={e => set('support_provided', e.target.value)} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={2} size="small"
+                    label="Recommendations"
+                    value={form.recommendations}
+                    onChange={e => set('recommendations', e.target.value)} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={2} size="small"
+                    label="Agreed Action Plan"
+                    value={form.action_plan}
+                    onChange={e => set('action_plan', e.target.value)} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={2} size="small"
+                    label="Next Steps"
+                    value={form.next_steps}
+                    onChange={e => set('next_steps', e.target.value)} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={2} size="small"
+                    label="Additional Notes"
+                    value={form.additional_notes}
+                    onChange={e => set('additional_notes', e.target.value)} />
+                </Grid>
+              </Grid>
+            </Box>
 
             {/* FINANCIALS */}
-            {activeSection === 'financials' && (
-              <Box>
-                <SectionHeading icon={<TrendingUp />} title="Financial Metrics" />
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField fullWidth size="small" label="Annual Revenue / Turnover (UGX)"
-                      type="number" inputProps={{ min: 0 }}
-                      value={form.revenue_ugx}
-                      onChange={e => set('revenue_ugx', e.target.value)}
-                      helperText="Total sales last 12 months" />
-                    {hasDiag && m.diag_annual_turnover &&
-                      <BaselineCompare label="Baseline turnover" baseline={m.diag_annual_turnover} color="#1565C0" />}
+            {visibleSections.some(s => s.key === 'financials') && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ mb: 3 }}>
+                  <SectionHeading icon={<TrendingUp />} title="Financial Metrics" />
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField fullWidth size="small" label="Annual Revenue / Turnover (UGX)"
+                        type="number" inputProps={{ min: 0 }}
+                        value={form.revenue_ugx}
+                        onChange={e => set('revenue_ugx', e.target.value)}
+                        helperText="Total sales last 12 months" />
+                      {hasDiag && m.diag_annual_turnover &&
+                        <BaselineCompare label="Baseline turnover" baseline={m.diag_annual_turnover} color="#1565C0" />}
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField fullWidth size="small" label="Average Monthly Profit (UGX)"
+                        type="number" inputProps={{ min: 0 }}
+                        value={form.monthly_profit_ugx}
+                        onChange={e => set('monthly_profit_ugx', e.target.value)} />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField fullWidth size="small" label="Total Assets (UGX)"
+                        type="number" inputProps={{ min: 0 }}
+                        value={form.total_assets_ugx}
+                        onChange={e => set('total_assets_ugx', e.target.value)} />
+                      {hasDiag && m.diag_total_assets &&
+                        <BaselineCompare label="Baseline assets" baseline={m.diag_total_assets} color="#00695C" />}
+                    </Grid>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField fullWidth size="small" label="Average Monthly Profit (UGX)"
-                      type="number" inputProps={{ min: 0 }}
-                      value={form.monthly_profit_ugx}
-                      onChange={e => set('monthly_profit_ugx', e.target.value)} />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField fullWidth size="small" label="Total Assets (UGX)"
-                      type="number" inputProps={{ min: 0 }}
-                      value={form.total_assets_ugx}
-                      onChange={e => set('total_assets_ugx', e.target.value)} />
-                    {hasDiag && m.diag_total_assets &&
-                      <BaselineCompare label="Baseline assets" baseline={m.diag_total_assets} color="#00695C" />}
-                  </Grid>
-                </Grid>
-              </Box>
+                </Box>
+              </>
             )}
 
             {/* WORKFORCE */}
-            {activeSection === 'workforce' && (
-              <Box>
-                <SectionHeading icon={<People />} title="Workforce" />
-                {hasDiag && (m.diag_employees_ft_male != null || m.diag_employees_ft_female != null) && (
-                  <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
-                    Baseline — FT: {m.diag_employees_ft_male ?? '—'}M / {m.diag_employees_ft_female ?? '—'}F &nbsp;|&nbsp;
-                    PT: {m.diag_employees_pt_male ?? '—'}M / {m.diag_employees_pt_female ?? '—'}F
-                  </Alert>
-                )}
-                <Typography variant="overline" color="text.secondary" fontSize={10}>Full-time Employees</Typography>
-                <Grid container spacing={2} sx={{ mb: 2, mt: 0 }}>
-                  {[
-                    { key: 'employees_ft_male',   label: 'Male' },
-                    { key: 'employees_ft_female', label: 'Female' },
-                  ].map(({ key, label }) => (
-                    <Grid item xs={6} key={key}>
-                      <TextField fullWidth size="small" label={label} type="number"
-                        inputProps={{ min: 0 }}
-                        value={form[key]} onChange={e => set(key, e.target.value)} />
-                    </Grid>
-                  ))}
-                </Grid>
-                <Typography variant="overline" color="text.secondary" fontSize={10}>Part-time Employees</Typography>
-                <Grid container spacing={2} sx={{ mt: 0 }}>
-                  {[
-                    { key: 'employees_pt_male',   label: 'Male' },
-                    { key: 'employees_pt_female', label: 'Female' },
-                  ].map(({ key, label }) => (
-                    <Grid item xs={6} key={key}>
-                      <TextField fullWidth size="small" label={label} type="number"
-                        inputProps={{ min: 0 }}
-                        value={form[key]} onChange={e => set(key, e.target.value)} />
-                    </Grid>
-                  ))}
-                </Grid>
-              </Box>
+            {visibleSections.some(s => s.key === 'workforce') && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ mb: 3 }}>
+                  <SectionHeading icon={<People />} title="Workforce" />
+                  {hasDiag && (m.diag_employees_ft_male != null || m.diag_employees_ft_female != null) && (
+                    <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
+                      Baseline — FT: {m.diag_employees_ft_male ?? '—'}M / {m.diag_employees_ft_female ?? '—'}F &nbsp;|&nbsp;
+                      PT: {m.diag_employees_pt_male ?? '—'}M / {m.diag_employees_pt_female ?? '—'}F
+                    </Alert>
+                  )}
+                  <Typography variant="overline" color="text.secondary" fontSize={10}>Full-time Employees</Typography>
+                  <Grid container spacing={2} sx={{ mb: 2, mt: 0 }}>
+                    {[
+                      { key: 'employees_ft_male',   label: 'Male' },
+                      { key: 'employees_ft_female', label: 'Female' },
+                    ].map(({ key, label }) => (
+                      <Grid item xs={6} key={key}>
+                        <TextField fullWidth size="small" label={label} type="number"
+                          inputProps={{ min: 0 }}
+                          value={form[key]} onChange={e => set(key, e.target.value)} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                  <Typography variant="overline" color="text.secondary" fontSize={10}>Part-time Employees</Typography>
+                  <Grid container spacing={2} sx={{ mt: 0 }}>
+                    {[
+                      { key: 'employees_pt_male',   label: 'Male' },
+                      { key: 'employees_pt_female', label: 'Female' },
+                    ].map(({ key, label }) => (
+                      <Grid item xs={6} key={key}>
+                        <TextField fullWidth size="small" label={label} type="number"
+                          inputProps={{ min: 0 }}
+                          value={form[key]} onChange={e => set(key, e.target.value)} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              </>
             )}
 
             {/* COMPLIANCE */}
-            {activeSection === 'compliance' && (
-              <Box>
-                <SectionHeading icon={<AccountBalance />} title="Compliance & Financial Access" />
-                {hasDiag && (
-                  <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
-                    Baseline compliance: &nbsp;
-                    {[['TIN', m.diag_has_tin], ['UNBS', m.diag_has_unbs],
-                      ['Bank', m.diag_has_business_bank], ['MoMo', m.diag_has_mobile_money]]
-                      .map(([l, v]) => (
-                        <Chip key={l} size="small" label={l}
-                          color={v ? 'success' : 'default'} variant={v ? 'filled' : 'outlined'}
-                          sx={{ mr: 0.5, fontSize: 10 }} />
-                      ))}
-                  </Alert>
-                )}
-                <Grid container spacing={3}>
-                  {[
-                    { key: 'has_tin',           label: 'Has TIN (Tax ID registered)' },
-                    { key: 'has_unbs',          label: 'Registered with UNBS' },
-                    { key: 'has_business_bank', label: 'Has Business Bank Account' },
-                    { key: 'has_mobile_money',  label: 'Uses Mobile Money (business)' },
-                    { key: 'has_nssf',          label: 'Making NSSF Contributions' },
-                  ].map(({ key, label }) => (
-                    <Grid item xs={12} sm={6} key={key}>
-                      <YesNoToggle label={label} value={form[key]}
-                        onChange={v => set(key, v)} />
-                    </Grid>
-                  ))}
-                </Grid>
-              </Box>
+            {visibleSections.some(s => s.key === 'compliance') && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ mb: 3 }}>
+                  <SectionHeading icon={<AccountBalance />} title="Compliance & Financial Access" />
+                  {hasDiag && (
+                    <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
+                      Baseline compliance: &nbsp;
+                      {[['TIN', m.diag_has_tin], ['UNBS', m.diag_has_unbs],
+                        ['Bank', m.diag_has_business_bank], ['MoMo', m.diag_has_mobile_money]]
+                        .map(([l, v]) => (
+                          <Chip key={l} size="small" label={l}
+                            color={v ? 'success' : 'default'} variant={v ? 'filled' : 'outlined'}
+                            sx={{ mr: 0.5, fontSize: 10 }} />
+                        ))}
+                    </Alert>
+                  )}
+                  <Grid container spacing={3}>
+                    {[
+                      { key: 'has_tin',           label: 'Has TIN (Tax ID registered)' },
+                      { key: 'has_unbs',          label: 'Registered with UNBS' },
+                      { key: 'has_business_bank', label: 'Has Business Bank Account' },
+                      { key: 'has_mobile_money',  label: 'Uses Mobile Money (business)' },
+                      { key: 'has_nssf',          label: 'Making NSSF Contributions' },
+                    ].map(({ key, label }) => (
+                      <Grid item xs={12} sm={6} key={key}>
+                        <YesNoToggle label={label} value={form[key]}
+                          onChange={v => set(key, v)} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              </>
             )}
 
-            {/* MARKET */}
-            {activeSection === 'market' && (
-              <Box>
-                <SectionHeading icon={<Store />} title="Market Access" />
-                <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6}>
-                    <YesNoToggle label="Currently Exporting" value={form.is_exporting}
-                      onChange={v => set('is_exporting', v)} />
+            {/* MARKET ACCESS */}
+            {visibleSections.some(s => s.key === 'market') && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ mb: 3 }}>
+                  <SectionHeading icon={<Store />} title="Market Access" />
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <YesNoToggle label="Currently Exporting" value={form.is_exporting}
+                        onChange={v => set('is_exporting', v)} />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <YesNoToggle label="Introduced New Product / Service" value={form.introduced_new_product}
+                        onChange={v => set('introduced_new_product', v)} />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <YesNoToggle label="Accesses markets outside district of operation" value={form.markets_outside_district}
+                        onChange={v => set('markets_outside_district', v)} />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField fullWidth size="small" label="Number of Active Customers"
+                        type="number" inputProps={{ min: 0 }}
+                        value={form.active_customers_count}
+                        onChange={e => set('active_customers_count', e.target.value)} />
+                    </Grid>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <YesNoToggle label="Introduced New Product / Service" value={form.introduced_new_product}
-                      onChange={v => set('introduced_new_product', v)} />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField fullWidth size="small" label="Number of Active Customers"
-                      type="number" inputProps={{ min: 0 }}
-                      value={form.active_customers_count}
-                      onChange={e => set('active_customers_count', e.target.value)} />
-                  </Grid>
-                </Grid>
-              </Box>
+                </Box>
+              </>
             )}
 
             {/* BUSINESS MANAGEMENT */}
-            {activeSection === 'business_mgmt' && (
-              <Box>
-                <SectionHeading icon={<Settings />} title="Business Management" />
-                <Grid container spacing={3}>
-                  {[
-                    { key: 'has_business_plan',        label: 'Has Written Business Plan' },
-                    { key: 'uses_digital_accounting',  label: 'Uses Digital Accounting System' },
-                    { key: 'has_hr_policy',            label: 'Has HR Policy / Manual' },
-                    { key: 'accepts_digital_payments', label: 'Accepts Digital Payments' },
-                  ].map(({ key, label }) => (
-                    <Grid item xs={12} sm={6} key={key}>
-                      <YesNoToggle label={label} value={form[key]}
-                        onChange={v => set(key, v)} />
-                    </Grid>
-                  ))}
-                </Grid>
-              </Box>
+            {visibleSections.some(s => s.key === 'business_mgmt') && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ mb: 3 }}>
+                  <SectionHeading icon={<Settings />} title="Business Management" />
+                  <Grid container spacing={3}>
+                    {[
+                      { key: 'has_business_plan',        label: 'Has Written Business Plan' },
+                      { key: 'uses_digital_accounting',  label: 'Uses Digital Accounting System' },
+                      { key: 'has_hr_policy',            label: 'Has HR Policy / Manual' },
+                      { key: 'accepts_digital_payments', label: 'Accepts Digital Payments' },
+                    ].map(({ key, label }) => (
+                      <Grid item xs={12} sm={6} key={key}>
+                        <YesNoToggle label={label} value={form[key]}
+                          onChange={v => set(key, v)} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              </>
             )}
 
             {/* GROWTH RATING */}
-            {activeSection === 'rating' && (
-              <Box>
-                <SectionHeading icon={<Star />} title="Growth Rating" />
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Rate the business's overall growth trajectory since the last assessment.
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <Box key={n} onClick={() => set('growth_rating', String(n))}
-                      sx={{
-                        width: 64, height: 64, display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center', borderRadius: 2,
-                        border: '2px solid',
-                        borderColor: form.growth_rating === String(n) ? '#1A2F4B' : '#E8EDF2',
-                        bgcolor: form.growth_rating === String(n) ? '#1A2F4B' : '#fff',
-                        color:   form.growth_rating === String(n) ? '#fff' : 'inherit',
-                        cursor: 'pointer', transition: 'all .15s',
-                        '&:hover': { borderColor: '#1A2F4B' },
-                      }}>
-                      <Typography fontWeight={700} fontSize={22}>{n}</Typography>
-                      <Typography fontSize={9} sx={{ opacity: 0.7 }}>
-                        {['', 'No change', 'Slight', 'Moderate', 'Good', 'Excellent'][n]}
-                      </Typography>
-                    </Box>
-                  ))}
+            {visibleSections.some(s => s.key === 'rating') && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ mb: 3 }}>
+                  <SectionHeading icon={<Star />} title="Growth Rating" />
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Rate the business's overall growth trajectory since the last assessment.
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <Box key={n} onClick={() => set('growth_rating', String(n))}
+                        sx={{
+                          width: 64, height: 64, display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center', borderRadius: 2,
+                          border: '2px solid',
+                          borderColor: form.growth_rating === String(n) ? '#1A2F4B' : '#E8EDF2',
+                          bgcolor: form.growth_rating === String(n) ? '#1A2F4B' : '#fff',
+                          color:   form.growth_rating === String(n) ? '#fff' : 'inherit',
+                          cursor: 'pointer', transition: 'all .15s',
+                          '&:hover': { borderColor: '#1A2F4B' },
+                        }}>
+                        <Typography fontWeight={700} fontSize={22}>{n}</Typography>
+                        <Typography fontSize={9} sx={{ opacity: 0.7 }}>
+                          {['', 'No change', 'Slight', 'Moderate', 'Good', 'Excellent'][n]}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                  <TextField fullWidth multiline rows={3} size="small"
+                    label="Justification for rating"
+                    value={form.key_achievement}
+                    onChange={e => set('key_achievement', e.target.value)}
+                    placeholder="Describe the key achievement or reason for this growth rating" />
                 </Box>
-                <TextField fullWidth multiline rows={3} size="small"
-                  label="Justification for rating"
-                  value={form.key_achievement}
-                  onChange={e => set('key_achievement', e.target.value)}
-                  placeholder="Describe the key achievement or reason for this growth rating" />
-              </Box>
+              </>
             )}
           </Grid>
         </Grid>
