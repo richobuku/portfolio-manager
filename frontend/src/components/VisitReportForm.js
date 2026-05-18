@@ -136,6 +136,7 @@ const TYPE_CONFIG = {
     show_delivery:     false,
     show_focus:        false,
     show_data_quality: true,
+    show_delivered:    false,
   },
 };
 
@@ -377,18 +378,16 @@ export default function VisitReportForm({
             bgcolor: '#F8F9FA',
           }}>
 
-            {/* MSME selector */}
-            {!preselectedMsme && (
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                <InputLabel>MSME *</InputLabel>
-                <Select value={form.msme} label="MSME *"
-                  onChange={e => set('msme', e.target.value)}>
-                  {msmes.map(x => (
-                    <MenuItem key={x.id} value={x.id}>{x.business_name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
+            {/* MSME selector — always shown so report can be tied to the right MSME */}
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel>MSME *</InputLabel>
+              <Select value={form.msme} label="MSME *"
+                onChange={e => set('msme', e.target.value)}>
+                {msmes.map(x => (
+                  <MenuItem key={x.id} value={x.id}>{x.business_name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             {/* Date */}
             <TextField fullWidth size="small" label="Visit Date *" type="date"
@@ -560,8 +559,8 @@ export default function VisitReportForm({
               </>
             )}
 
-            {/* ── 4/5. DELIVERED & TOOLS ── */}
-            <SectionBlock icon={<Build />} title="What Was Delivered & Tools Used" color={typeInfo.color}>
+            {/* ── 4/5. DELIVERED & TOOLS (hidden for annual_review) ── */}
+            {cfg.show_delivered !== false && <SectionBlock icon={<Build />} title="What Was Delivered & Tools Used" color={typeInfo.color}>
               <Grid container spacing={2}>
                 <Grid item xs={12}>
                   <TextField fullWidth multiline rows={4} size="small"
@@ -596,11 +595,11 @@ export default function VisitReportForm({
                     onChange={e => setToolsOther(e.target.value)} />
                 </Grid>
               </Grid>
-            </SectionBlock>
+            </SectionBlock>}
 
-            <Divider sx={{ my: 3 }} />
+            {cfg.show_delivered !== false && <Divider sx={{ my: 3 }} />}
 
-            {/* ── 4. OUTCOMES ── */}
+            {/* ── 5/6. OUTCOMES ── */}
             <SectionBlock icon={<EmojiEvents />} title={cfg.outcomes_label} color={typeInfo.color}>
               <Grid container spacing={2}>
                 <Grid item xs={12}>

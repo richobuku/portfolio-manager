@@ -184,6 +184,10 @@ GMAIL_HOST_USER   = os.environ.get('GMAIL_HOST_USER',   'richobuku@gmail.com')
 GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 EMAIL_REPLY_TO    = os.environ.get('EMAIL_REPLY_TO',    'richard.obuku@gopa.eu')
 
+# GOPA AFC expert who endorses printed visit reports
+REPORT_ENDORSER_NAME     = os.environ.get('REPORT_ENDORSER_NAME',     'Stephen Maxi Opwonya')
+REPORT_ENDORSER_POSITION = os.environ.get('REPORT_ENDORSER_POSITION', 'Team Leader, PRUDEV II — GOPA AFC')
+
 if GMAIL_APP_PASSWORD:
     # Properly configured — use SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

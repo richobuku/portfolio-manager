@@ -174,20 +174,21 @@ def _build_doc():
     return buf, doc
 
 
-def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE / Admin)', sig_label='BGE Signature'):
+def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE / Admin)',
+               sig_label='BGE Signature', reviewer_name=None, reviewer_position=None):
     """Signature row appended to the bottom of any BGE-authored document.
-    Left column: reviewer/team-lead placeholder (always equal-height blank).
+    Left column: endorser/reviewer block (name+position pre-printed if supplied).
     Right column: BGE signature image if available, otherwise blank of same height.
     """
     from reportlab.platypus import Image as RLImage, KeepTogether
 
     reviewer_col = [
         Paragraph(reviewer_label, s['label']),
-        Spacer(1, 4),               # same gap as sig column
-        Spacer(1, SIG_H),           # blank placeholder, equal to BGE sig height
+        Spacer(1, 4),
+        Spacer(1, SIG_H),           # signature placeholder
         Paragraph('_' * 35, s['body']),
-        Paragraph('Name: ___________________________', s['meta']),
-        Paragraph('Position: ________________________', s['meta']),
+        Paragraph(f'Name: {reviewer_name}' if reviewer_name else 'Name: ___________________________', s['meta']),
+        Paragraph(f'Position: {reviewer_position}' if reviewer_position else 'Position: ________________________', s['meta']),
         Paragraph('Date: ____________________________', s['meta']),
     ]
 
@@ -238,18 +239,19 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
 
 def render_msme_report(report):
     """Build a styled PDF for one MSMEReport."""
+    from django.conf import settings as django_settings
+
     s = _styles()
     buf, doc = _build_doc()
     story = []
 
     msme = report.msme
     bge  = report.bge
+    is_annual = getattr(report, 'visit_type', '') == 'annual_review'
 
-    story.append(Paragraph(_safe_html(f'Visit Report — {msme.business_name}'), s['h1']))
     visit_label = report.get_visit_type_display() if hasattr(report, 'get_visit_type_display') else report.visit_type
-    story.append(Paragraph(
-        f'{visit_label} · {report.visit_date}', s['sub']
-    ))
+    story.append(Paragraph(_safe_html(f'Visit Report — {msme.business_name}'), s['h1']))
+    story.append(Paragraph(f'{visit_label} · {report.visit_date}', s['sub']))
 
     story.append(_kv_table([
         ['MSME',          msme.business_name],
@@ -265,21 +267,66 @@ def render_msme_report(report):
 
     story.append(Spacer(1, 8))
 
-    # Narrative sections
-    sections = [
-        ('Business overview',          report.business_overview),
-        ('Challenges identified',      report.challenges_identified),
-        ('Support provided',           report.support_provided),
-        ('Recommendations',            report.recommendations),
-        ('Action plan',                report.action_plan),
-        ('Next steps',                 report.next_steps),
-        ('Additional notes',           report.additional_notes),
-    ]
-    for title, body in sections:
-        story.extend(_section(s, title, body))
+    # 1. Objectives
+    if getattr(report, 'visit_objectives', None):
+        story.extend(_section(s, 'Objectives of this visit', report.visit_objectives))
+
+    # 2. Context / business status
+    story.extend(_section(s, 'Business status observed', report.business_overview))
+
+    # 3. Data quality (annual_review only)
+    if is_annual:
+        dq_lines = []
+        confidence = getattr(report, 'data_confidence_level', '')
+        conf_labels = {
+            'confirmed':        'Confirmed — figures from actual records',
+            'mostly_confident': 'Mostly confident — minor estimates only',
+            'mixed':            'Mixed — owner unsure on several items',
+            'largely_estimated':'Largely estimated — few actual records',
+            'unreliable':       'Unreliable — mostly guessing',
+        }
+        if confidence:
+            dq_lines.append(f'Data confidence: {conf_labels.get(confidence, confidence)}')
+        records_sighted = getattr(report, 'records_sighted', None)
+        if records_sighted is not None:
+            dq_lines.append(f'Physical records sighted: {"Yes" if records_sighted else "No"}')
+        if dq_lines:
+            story.extend(_section(s, 'Data quality summary', ' | '.join(dq_lines)))
+        if getattr(report, 'owner_certainty_observation', None):
+            story.extend(_section(s, 'Owner certainty & confidence observations',
+                                  report.owner_certainty_observation))
+        if getattr(report, 'data_collection_challenges', None):
+            story.extend(_section(s, 'Data collection challenges',
+                                  report.data_collection_challenges))
+
+    # 4. Support delivered & tools (not for annual_review)
+    if not is_annual:
+        story.extend(_section(s, 'Support provided', report.support_provided))
+        if getattr(report, 'tools_provided', None):
+            story.extend(_section(s, 'Tools & materials provided', report.tools_provided))
+
+    # 5. Outcomes / key findings
+    story.extend(_section(s, 'Key findings & outcomes', report.key_achievement))
+    story.extend(_section(s, 'Challenges identified',   report.challenges_identified))
+
+    # 6. Next steps
+    story.extend(_section(s, 'Business owner actions',  report.action_plan))
+    story.extend(_section(s, 'BGE follow-up actions',   report.recommendations))
+    story.extend(_section(s, 'Additional notes',         report.additional_notes))
 
     story.append(Spacer(1, 12))
-    story.append(_sig_block(s, bge, getattr(report, 'updated_at', None)))
+
+    # Endorser from settings (GOPA AFC expert)
+    endorser_name     = getattr(django_settings, 'REPORT_ENDORSER_NAME',     None)
+    endorser_position = getattr(django_settings, 'REPORT_ENDORSER_POSITION', None)
+
+    story.append(_sig_block(
+        s, bge,
+        signed_date=getattr(report, 'updated_at', None),
+        reviewer_label='Endorsed by — For GOPA AFC / PRUDEV II Programme',
+        reviewer_name=endorser_name,
+        reviewer_position=endorser_position,
+    ))
 
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
