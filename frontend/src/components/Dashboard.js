@@ -18,13 +18,14 @@ import {
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
   Lock, LockOpen, Star, StarBorder, Download, Undo,
+  Campaign, Send as SendIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { key: 'reports',        label: 'Reports',        icon: <PictureAsPdf /> },
   { key: 'workorders',     label: 'Work Orders',    icon: <Assignment /> },
   { key: 'analytics',      label: 'Analytics',      icon: <Assessment /> },
+  { key: 'communications', label: 'Communications', icon: <Campaign /> },
 ];
 
 // Each row is its own memoised component. With React.memo, a row only
@@ -723,8 +725,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const HIDDEN_TABS = isStaff
     ? []
     : isProgrammeManager
-      ? ['users', 'cohorts']
-      : ['users'];
+      ? ['users', 'cohorts', 'communications']
+      : ['users', 'communications'];
   const orderedNav = navOrder.map(k => NAV_ITEMS.find(n => n.key === k)).filter(n => n && !HIDDEN_TABS.includes(n.key));
   const [dragKey, setDragKey] = useState(null);
   const [navLocked, setNavLocked] = useState(true);
@@ -4476,6 +4478,247 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     );
   };
 
+  // ── Communications ────────────────────────────────────────────────────────
+  const COMM_TEMPLATES = [
+    {
+      key: 'bge_guidance',
+      label: 'BGE Data Update & Annual Review Guide',
+      subject: 'How to Use the Data Update Tool and Annual Review Template',
+      body: `Dear {{name}},
+
+We hope this message finds you well. This email provides a quick guide on two key tools you will use during your support visits.
+
+---
+
+DATA COLLECTION VISIT — Data Update Tool
+
+The Data Update Tool helps you capture the latest business metrics for each MSME you support. Please follow these steps:
+
+1. Log in to the portal and navigate to "My MSMEs".
+2. Select the MSME you just visited.
+3. Click "Record Growth Snapshot" and fill in the current figures (revenue, employees, etc.).
+4. Submit the form. The data is saved immediately.
+
+Tips:
+- Record figures as reported by the business owner. Do not estimate.
+- If the owner is unsure of a number, note this in the "Remarks" field.
+- Always confirm the reporting period with the owner before submitting.
+
+---
+
+ANNUAL REVIEW TEMPLATE
+
+After completing a Data Update visit, you should also file an Annual Review Report. This report captures qualitative observations that the numbers alone cannot show.
+
+1. Go to "My Reports" and click "New Report".
+2. Select "Annual Review" as the report type and choose the MSME.
+3. Complete all sections, paying special attention to:
+   - Data Confidence Level — Was the business owner confident or guessing?
+   - Records Sighted — Did you see physical or digital records to verify the figures?
+   - Owner Certainty Observation — Note any hesitations or inconsistencies.
+   - Data Collection Challenges — Record any difficulties encountered.
+4. Submit the report. It will be reviewed and signed off by the programme team.
+
+If you have any questions, please reply to this email.
+
+Best regards,
+PRUDEV II BDS Team`,
+    },
+  ];
+
+  const [commTab, setCommTab] = React.useState(0); // 0=BGEs 1=MSMEs
+  const [commSearch, setCommSearch] = React.useState('');
+  const [commSelected, setCommSelected] = React.useState(new Set());
+  const [commSubject, setCommSubject] = React.useState('');
+  const [commBody, setCommBody] = React.useState('');
+  const [commTemplate, setCommTemplate] = React.useState('');
+  const [commSending, setCommSending] = React.useState(false);
+  const [commConfirm, setCommConfirm] = React.useState(false);
+
+  const commRecipients = commTab === 0
+    ? experts.filter(e => e.email)
+    : msmes.filter(m => m.owner_email);
+
+  const commFiltered = commRecipients.filter(r => {
+    const name = commTab === 0
+      ? (r.name || r.full_name || r.expert_name || '')
+      : (r.business_name || r.owner_name || '');
+    return name.toLowerCase().includes(commSearch.toLowerCase()) ||
+      (commTab === 0 ? r.email : r.owner_email || '').toLowerCase().includes(commSearch.toLowerCase());
+  });
+
+  const commAllSelected = commFiltered.length > 0 && commFiltered.every(r => commSelected.has(r.id));
+
+  const toggleCommAll = () => {
+    if (commAllSelected) {
+      setCommSelected(prev => {
+        const next = new Set(prev);
+        commFiltered.forEach(r => next.delete(r.id));
+        return next;
+      });
+    } else {
+      setCommSelected(prev => {
+        const next = new Set(prev);
+        commFiltered.forEach(r => next.add(r.id));
+        return next;
+      });
+    }
+  };
+
+  const handleCommTemplate = (key) => {
+    setCommTemplate(key);
+    const tmpl = COMM_TEMPLATES.find(t => t.key === key);
+    if (tmpl) {
+      setCommSubject(tmpl.subject);
+      setCommBody(tmpl.body);
+    }
+  };
+
+  const handleCommSend = async () => {
+    setCommConfirm(false);
+    setCommSending(true);
+    try {
+      const selectedList = commFiltered.filter(r => commSelected.has(r.id));
+      const payload = {
+        recipient_type: commTab === 0 ? 'bge' : 'msme',
+        recipient_ids: selectedList.map(r => r.id),
+        subject: commSubject,
+        body: commBody,
+      };
+      const res = await axios.post(BULK_EMAIL, payload, { withCredentials: true });
+      notify(`Sent: ${res.data.sent}${res.data.failed > 0 ? ` | Failed: ${res.data.failed}` : ''}`, 'success');
+      setCommSelected(new Set());
+    } catch (err) {
+      notify(err.response?.data?.error || 'Failed to send emails', 'error');
+    } finally {
+      setCommSending(false);
+    }
+  };
+
+  const renderCommunications = () => (
+    <Box>
+      <SectionHeader title="Communications" subtitle="Send bulk emails to BGEs or MSMEs" />
+
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>Email Template</Typography>
+        <FormControl size="small" fullWidth>
+          <InputLabel>Load a template (optional)</InputLabel>
+          <Select
+            value={commTemplate}
+            label="Load a template (optional)"
+            onChange={e => handleCommTemplate(e.target.value)}
+          >
+            <MenuItem value=""><em>— none —</em></MenuItem>
+            {COMM_TEMPLATES.map(t => (
+              <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>Message</Typography>
+        <TextField
+          label="Subject"
+          value={commSubject}
+          onChange={e => setCommSubject(e.target.value)}
+          fullWidth size="small" sx={{ mb: 1.5 }}
+        />
+        <TextField
+          label="Body"
+          value={commBody}
+          onChange={e => setCommBody(e.target.value)}
+          fullWidth multiline minRows={8}
+          helperText="Use {{name}} to personalise with the recipient's first name."
+        />
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+          <Tabs value={commTab} onChange={(_, v) => { setCommTab(v); setCommSelected(new Set()); setCommSearch(''); }}>
+            <Tab label={`BGE Experts (${experts.filter(e => e.email).length})`} />
+            <Tab label={`MSMEs (${msmes.filter(m => m.owner_email).length})`} />
+          </Tabs>
+          {commSelected.size > 0 && (
+            <Chip
+              label={`${commSelected.size} selected`}
+              color="primary" size="small"
+              onDelete={() => setCommSelected(new Set())}
+            />
+          )}
+        </Box>
+
+        <TextField
+          size="small" placeholder="Search by name or email…"
+          value={commSearch} onChange={e => setCommSearch(e.target.value)}
+          InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: 'text.secondary', fontSize: 18 }} /> }}
+          sx={{ mb: 1, width: { xs: '100%', sm: 280 } }}
+        />
+
+        <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, maxHeight: 320, overflowY: 'auto' }}>
+          <ListItemButton onClick={toggleCommAll} dense sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
+            <ListItemIcon><Checkbox checked={commAllSelected} indeterminate={commSelected.size > 0 && !commAllSelected} size="small" disableRipple tabIndex={-1} /></ListItemIcon>
+            <ListItemText primary={<Typography variant="body2" fontWeight={600}>{commAllSelected ? 'Deselect all' : `Select all (${commFiltered.length})`}</Typography>} />
+          </ListItemButton>
+          {commFiltered.length === 0 && (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">No recipients found.</Typography>
+            </Box>
+          )}
+          {commFiltered.map(r => {
+            const name = commTab === 0
+              ? (r.name || r.full_name || r.expert_name || '—')
+              : (r.business_name || '—');
+            const email = commTab === 0 ? r.email : r.owner_email;
+            const sub = commTab === 0 ? (r.location || r.bge_code || '') : (r.owner_name || '');
+            return (
+              <ListItemButton key={r.id} onClick={() => setCommSelected(prev => {
+                const next = new Set(prev);
+                next.has(r.id) ? next.delete(r.id) : next.add(r.id);
+                return next;
+              })} dense>
+                <ListItemIcon><Checkbox checked={commSelected.has(r.id)} size="small" disableRipple tabIndex={-1} /></ListItemIcon>
+                <ListItemText
+                  primary={name}
+                  secondary={`${email}${sub ? ' · ' + sub : ''}`}
+                />
+              </ListItemButton>
+            );
+          })}
+        </Box>
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={commSending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+            disabled={commSelected.size === 0 || !commSubject.trim() || !commBody.trim() || commSending}
+            onClick={() => setCommConfirm(true)}
+          >
+            Send to {commSelected.size} recipient{commSelected.size !== 1 ? 's' : ''}
+          </Button>
+        </Box>
+      </Paper>
+
+      {/* Confirmation dialog */}
+      <Dialog open={commConfirm} onClose={() => setCommConfirm(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Confirm Bulk Email</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            You are about to send <strong>"{commSubject}"</strong> to{' '}
+            <strong>{commSelected.size} recipient{commSelected.size !== 1 ? 's' : ''}</strong>.
+            This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCommConfirm(false)}>Cancel</Button>
+          <Button variant="contained" startIcon={<SendIcon />} onClick={handleCommSend}>
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+
   const sectionMap = {
     msmes: renderMSMEs,
     experts: renderExperts,
@@ -4488,6 +4731,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     reports: renderReports,
     workorders: renderWorkOrders,
     analytics: renderAnalytics,
+    communications: renderCommunications,
   };
 
   // ── main render ────────────────────────────────────────────────────────────
