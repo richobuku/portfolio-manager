@@ -1170,3 +1170,27 @@ class AnnualReviewReport(models.Model):
 
     def __str__(self):
         return f"{self.get_review_period_display()} — {self.bge.name} ({self.review_date})"
+
+
+class EmailSendLog(models.Model):
+    """Tracks every individual bulk email so we can skip duplicates on re-send."""
+    RECIPIENT_TYPE_CHOICES = [('bge', 'BGE Expert'), ('msme', 'MSME')]
+
+    recipient_type = models.CharField(max_length=10, choices=RECIPIENT_TYPE_CHOICES)
+    recipient_id   = models.PositiveIntegerField()
+    recipient_email= models.EmailField()
+    subject        = models.CharField(max_length=500)
+    sent_at        = models.DateTimeField(auto_now_add=True)
+    sent_by        = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='emails_sent',
+    )
+
+    class Meta:
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['recipient_type', 'recipient_id', 'subject']),
+        ]
+
+    def __str__(self):
+        return f"{self.recipient_type}:{self.recipient_id} — {self.subject[:60]} ({self.sent_at:%Y-%m-%d})"

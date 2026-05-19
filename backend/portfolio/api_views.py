@@ -3025,16 +3025,18 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelV
 @permission_classes([_IsAuth])
 def bulk_email_view(request):
     """Admin-only: send a communication email to a selection of BGEs or MSMEs."""
+    from .models import EmailSendLog
+
     user = request.user
     if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
         raise PermissionDenied("Only administrators can send bulk emails.")
 
-    recipient_type = request.data.get('recipient_type', 'bge')   # 'bge' | 'msme'
-    recipient_ids  = request.data.get('recipient_ids', [])        # [] = all
-    subject        = (request.data.get('subject') or '').strip()
-    # accept both 'body' (frontend) and 'body_text' (legacy)
-    body_text      = (request.data.get('body') or request.data.get('body_text') or '').strip()
-    body_html      = (request.data.get('body_html') or '').strip()
+    recipient_type  = request.data.get('recipient_type', 'bge')
+    recipient_ids   = request.data.get('recipient_ids', [])
+    subject         = (request.data.get('subject') or '').strip()
+    body_text       = (request.data.get('body') or request.data.get('body_text') or '').strip()
+    body_html       = (request.data.get('body_html') or '').strip()
+    skip_sent       = bool(request.data.get('skip_already_sent', False))
 
     if not subject:
         return Response({'detail': 'Subject is required.'}, status=400)
@@ -3045,32 +3047,80 @@ def bulk_email_view(request):
         qs = BusinessGrowthExpert.objects.filter(email__isnull=False).exclude(email='')
         if recipient_ids:
             qs = qs.filter(id__in=recipient_ids)
-        pairs = [(b.name or 'BGE', b.email) for b in qs]
+        records = [{'id': b.id, 'name': b.name or 'BGE', 'email': b.email} for b in qs]
     else:
         qs = MSME.objects.filter(email__isnull=False).exclude(email='')
         if recipient_ids:
             qs = qs.filter(id__in=recipient_ids)
-        pairs = [(m.owner_name or m.business_name or 'Business Owner', m.email) for m in qs]
+        records = [{'id': m.id, 'name': m.owner_name or m.business_name or 'Business Owner', 'email': m.email} for m in qs]
+
+    # Identify already-sent recipients for this exact subject
+    already_sent_ids = set(
+        EmailSendLog.objects.filter(
+            recipient_type=recipient_type, subject=subject,
+            recipient_id__in=[r['id'] for r in records],
+        ).values_list('recipient_id', flat=True)
+    )
 
     from_email = settings.DEFAULT_FROM_EMAIL
     reply_to   = getattr(settings, 'EMAIL_REPLY_TO', from_email)
-    sent = 0
+    sent = skipped = 0
     errors = []
+    logs_to_create = []
 
-    for name, email_addr in pairs:
-        first = (name or '').split()[0] if name else 'Team'
+    for rec in records:
+        if skip_sent and rec['id'] in already_sent_ids:
+            skipped += 1
+            continue
+        first = (rec['name'] or '').split()[0] or 'Team'
         try:
             txt  = body_text.replace('{{name}}', first)
             html = body_html.replace('{{name}}', first) if body_html else ''
             msg  = EmailMultiAlternatives(
                 subject=subject, body=txt,
-                from_email=from_email, to=[email_addr], reply_to=[reply_to],
+                from_email=from_email, to=[rec['email']], reply_to=[reply_to],
             )
             if html:
                 msg.attach_alternative(html, 'text/html')
             msg.send()
             sent += 1
+            logs_to_create.append(EmailSendLog(
+                recipient_type=recipient_type, recipient_id=rec['id'],
+                recipient_email=rec['email'], subject=subject, sent_by=user,
+            ))
         except Exception as e:
-            errors.append({'email': email_addr, 'error': str(e)})
+            errors.append({'email': rec['email'], 'error': str(e)})
 
-    return Response({'sent': sent, 'failed': len(errors), 'errors': errors[:20]})
+    if logs_to_create:
+        EmailSendLog.objects.bulk_create(logs_to_create, ignore_conflicts=True)
+
+    return Response({
+        'sent': sent,
+        'skipped': skipped,
+        'already_sent_count': len(already_sent_ids),
+        'failed': len(errors),
+        'errors': errors[:20],
+    })
+
+
+@api_view(['GET'])
+@permission_classes([_IsAuth])
+def bulk_email_log_view(request):
+    """Return how many of the given recipients have already been sent a subject."""
+    from .models import EmailSendLog
+
+    subject        = request.query_params.get('subject', '')
+    recipient_type = request.query_params.get('recipient_type', 'bge')
+    ids_raw        = request.query_params.getlist('ids')
+    recipient_ids  = [int(i) for i in ids_raw if i.isdigit()]
+
+    if not subject or not recipient_ids:
+        return Response({'already_sent': [], 'count': 0})
+
+    already = list(
+        EmailSendLog.objects.filter(
+            recipient_type=recipient_type, subject=subject,
+            recipient_id__in=recipient_ids,
+        ).values_list('recipient_id', flat=True).distinct()
+    )
+    return Response({'already_sent': already, 'count': len(already)})

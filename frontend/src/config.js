@@ -47,6 +47,7 @@ export const WORK_ORDER_PDF_URL   = (id) => `${API_BASE_URL}/api/work-orders/${i
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;
 export const BULK_EMAIL = API_ENDPOINTS.BULK_EMAIL;
+export const BULK_EMAIL_LOG = `${API_BASE_URL}/api/bulk-email/log/`;
 export const MENTOR_REPORTS = API_ENDPOINTS.MENTOR_REPORTS;
 
 export default API_BASE_URL;

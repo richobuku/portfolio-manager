@@ -10,7 +10,7 @@ from .api_views import (
     VisitReportTemplateViewSet, TrainingFacilitationAssignmentViewSet,
     TrainingReportViewSet, AnnualReviewReportViewSet, MentorTrainingReportViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
-    bulk_email_view,
+    bulk_email_view, bulk_email_log_view,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset
 from .blockchain.api_views import (
@@ -61,4 +61,5 @@ urlpatterns = [
     path('api/push/unsubscribe/', push_unsubscribe, name='push_unsubscribe'),
     path('api/push/vapid-key/', push_vapid_key, name='push_vapid_key'),
     path('api/bulk-email/', bulk_email_view, name='bulk_email'),
+    path('api/bulk-email/log/', bulk_email_log_view, name='bulk_email_log'),
 ]

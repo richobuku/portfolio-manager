@@ -25,7 +25,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -4619,6 +4619,8 @@ PRUDEV II BDS Team`,
   const [commTemplate, setCommTemplate] = React.useState('');
   const [commSending, setCommSending] = React.useState(false);
   const [commConfirm, setCommConfirm] = React.useState(false);
+  const [commSkipSent, setCommSkipSent] = React.useState(false);
+  const [commAlreadySent, setCommAlreadySent] = React.useState([]);  // ids already sent this subject
 
   // ── Session MSME notification dialog ────────────────────────────────────
   const [sessionNotifyDialog, setSessionNotifyDialog] = React.useState(false);
@@ -4626,9 +4628,13 @@ PRUDEV II BDS Team`,
   const [sessionNotifySubject, setSessionNotifySubject] = React.useState('');
   const [sessionNotifyBody, setSessionNotifyBody] = React.useState('');
   const [sessionNotifySending, setSessionNotifySending] = React.useState(false);
+  const [sessionNotifySkip, setSessionNotifySkip] = React.useState(false);
+  const [sessionNotifyAlreadySent, setSessionNotifyAlreadySent] = React.useState([]);
 
-  const openSessionNotify = (s) => {
+  const openSessionNotify = async (s) => {
     setSessionNotifySession(s);
+    setSessionNotifySkip(false);
+    setSessionNotifyAlreadySent([]);
     const msmeNames = (s.businesses_detail || []).map(m => `- ${m.business_name}${m.owner_name ? ` (${m.owner_name})` : ''}`).join('\n');
     setSessionNotifySubject(`Training Session: ${s.title}`);
     setSessionNotifyBody(
@@ -4650,19 +4656,34 @@ Warm regards,
 PRUDEV II BDS Team`
     );
     setSessionNotifyDialog(true);
+    // check who was already sent this subject
+    const ids = (s.businesses_detail || []).map(m => m.id);
+    if (ids.length) {
+      const subject = `Training Session: ${s.title}`;
+      const params = new URLSearchParams({ subject, recipient_type: 'msme' });
+      ids.forEach(id => params.append('ids', id));
+      try {
+        const r = await axios.get(`${BULK_EMAIL_LOG}?${params}`, { headers });
+        setSessionNotifyAlreadySent(r.data.already_sent || []);
+      } catch { /* silent */ }
+    }
   };
 
   const sendSessionNotify = async () => {
     setSessionNotifySending(true);
     try {
       const ids = (sessionNotifySession.businesses_detail || []).map(m => m.id);
-      await axios.post(BULK_EMAIL, {
+      const res = await axios.post(BULK_EMAIL, {
         recipient_type: 'msme',
         recipient_ids: ids,
         subject: sessionNotifySubject,
         body: sessionNotifyBody,
+        skip_already_sent: sessionNotifySkip,
       }, { headers });
-      notify(`Notification sent to ${ids.length} MSME${ids.length !== 1 ? 's' : ''}`, 'success');
+      const parts = [`Sent: ${res.data.sent}`];
+      if (res.data.skipped > 0) parts.push(`Skipped: ${res.data.skipped}`);
+      if (res.data.failed > 0) parts.push(`Failed: ${res.data.failed}`);
+      notify(parts.join(' · '), 'success');
       setSessionNotifyDialog(false);
     } catch (err) {
       const d = err.response?.data;
@@ -4711,6 +4732,19 @@ PRUDEV II BDS Team`
     }
   };
 
+  // Check send log whenever subject or recipient list changes
+  React.useEffect(() => {
+    if (!commSubject.trim() || commFiltered.length === 0) { setCommAlreadySent([]); return; }
+    const ids = commFiltered.map(r => r.id);
+    const rtype = commTab === 0 ? 'bge' : 'msme';
+    const params = new URLSearchParams({ subject: commSubject, recipient_type: rtype });
+    ids.forEach(id => params.append('ids', id));
+    axios.get(`${BULK_EMAIL_LOG}?${params}`, { headers })
+      .then(r => setCommAlreadySent(r.data.already_sent || []))
+      .catch(() => setCommAlreadySent([]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commSubject, commTab, commFiltered.length]);
+
   const handleCommSend = async () => {
     setCommConfirm(false);
     setCommSending(true);
@@ -4721,10 +4755,15 @@ PRUDEV II BDS Team`
         recipient_ids: selectedList.map(r => r.id),
         subject: commSubject,
         body: commBody,
+        skip_already_sent: commSkipSent,
       };
       const res = await axios.post(BULK_EMAIL, payload, { headers });
-      notify(`Sent: ${res.data.sent}${res.data.failed > 0 ? ` | Failed: ${res.data.failed}` : ''}`, 'success');
+      const parts = [`Sent: ${res.data.sent}`];
+      if (res.data.skipped > 0) parts.push(`Skipped (already sent): ${res.data.skipped}`);
+      if (res.data.failed > 0) parts.push(`Failed: ${res.data.failed}`);
+      notify(parts.join(' · '), 'success');
       setCommSelected(new Set());
+      setCommAlreadySent([]);
     } catch (err) {
       const d = err.response?.data;
       notify(d?.detail || d?.error || d?.body?.[0] || 'Failed to send emails', 'error');
@@ -4824,6 +4863,18 @@ PRUDEV II BDS Team`
             );
           })}
         </Box>
+
+        {commAlreadySent.length > 0 && (
+          <Alert severity="warning" sx={{ mt: 1.5 }}
+            action={
+              <Button size="small" color="inherit" onClick={() => setCommSkipSent(s => !s)}>
+                {commSkipSent ? 'Include all' : 'Skip already sent'}
+              </Button>
+            }>
+            {commAlreadySent.length} of your selected recipients already received this subject.
+            {commSkipSent && ` They will be skipped.`}
+          </Alert>
+        )}
 
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
           <Button
@@ -5497,6 +5548,17 @@ PRUDEV II BDS Team`
               ))}
             </Box>
           </Box>
+          {sessionNotifyAlreadySent.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 1.5 }}
+              action={
+                <Button size="small" color="inherit" onClick={() => setSessionNotifySkip(s => !s)}>
+                  {sessionNotifySkip ? 'Include all' : 'Skip already sent'}
+                </Button>
+              }>
+              {sessionNotifyAlreadySent.length} MSME{sessionNotifyAlreadySent.length !== 1 ? 's' : ''} already received this notification.
+              {sessionNotifySkip && ' They will be skipped.'}
+            </Alert>
+          )}
           <TextField label="Subject" value={sessionNotifySubject}
             onChange={e => setSessionNotifySubject(e.target.value)}
             fullWidth size="small" sx={{ mb: 1.5 }} />
