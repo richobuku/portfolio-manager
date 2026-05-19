@@ -683,14 +683,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   const openReportWizard = (assignment) => {
-    fetchTrainingMsmes(); // pre-load full MSME list for attendance picker
-    // If sessions already exist for this topic, open the session detail dialog instead
-    const existingSessions = sessions.filter(s => s.topic === assignment.topic);
-    if (existingSessions.length === 1) {
-      openSessionDetail(existingSessions[0], 0);
+    fetchTrainingMsmes();
+    const existingSessions = sessions.filter(s => s.topic === assignment.topic || s.facilitation_assignments?.some?.(a => a.bge_id === myBgeId && a.topic === assignment.topic));
+    if (existingSessions.length >= 1) {
+      // Open the most recent session directly on the Report tab
+      const latest = [...existingSessions].sort((a, b) => b.date?.localeCompare(a.date) || 0)[0];
+      openSessionDetail(latest, 2);
       return;
     }
-    // No sessions yet (or multiple) — open combined wizard
+    // No sessions yet — open combined wizard
     setReportWizardTab(0);
     setReportWizardSessionForm({
       date: new Date().toISOString().slice(0, 10),
@@ -771,8 +772,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   const saveTrainingReport = async (submitNow = false) => {
-    // Works from both the detail dialog and the standalone dialog
-    const targetSession = trainingReportSession || sessionDetailSession;
+    const targetSession = sessionDetailSession || trainingReportSession;
     if (!targetSession) return;
     setTrainingReportSaving(true);
     const h = { Authorization: `Bearer ${token}` };
@@ -787,8 +787,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       } else {
         await axios.post(API_ENDPOINTS.TRAINING_REPORTS, payload, { headers: h });
       }
-      setTrainingReportDialog(false);
-      // refresh sessions then update the session detail state so the summary reflects the new report
+      // refresh sessions then update the session detail state so the report reflects the saved data
       const [sRes, trRes] = await Promise.all([
         axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
         axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
@@ -2066,7 +2065,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                           {topicSessions.map((s) => (
                             <Box key={s.id}
-                              onClick={() => openSessionDetail(s, 0)}
+                              onClick={() => openSessionDetail(s, 2)}
                               sx={{
                                 display: 'flex', alignItems: 'center', gap: 1.5,
                                 px: 1, py: 0.75, borderRadius: 1, cursor: 'pointer',
@@ -2774,65 +2773,179 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </Box>
           )}
 
-          {/* ── Tab 2: Training Report gateway ── */}
+          {/* ── Tab 2: Training Report (inline) ── */}
           {sessionDetailTab === 2 && (
-            <Box sx={{ p: 3 }}>
-              {sessionDetailSession?.has_training_report ? (
-                /* Report already exists — show summary + edit button */
-                <Box>
-                  <Alert severity="success" sx={{ mb: 2.5 }}>
-                    Training report filed for this session.
-                    {trainingReportData?.status === 'submitted' && ' Status: Submitted.'}
-                  </Alert>
-                  <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
-                    {[
-                      { label: 'Training Title', val: trainingReportData?.training_title },
-                      { label: 'Date(s)', val: trainingReportData?.training_dates },
-                      { label: 'Venue', val: trainingReportData?.venue },
-                      { label: 'District', val: trainingReportData?.district },
-                      { label: 'Time Allocation', val: trainingReportData?.time_allocation },
-                      { label: 'Total Participants', val: (trainingReportData?.total_participants ?? (
-                        (trainingReportData?.participants_male_youth || 0) +
-                        (trainingReportData?.participants_female_youth || 0) +
-                        (trainingReportData?.participants_adult_male || 0) +
-                        (trainingReportData?.participants_adult_female || 0))) || null },
-                    ].filter(f => f.val).map(({ label, val }) => (
-                      <Grid item xs={6} sm={4} key={label}>
-                        <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
-                        <Typography variant="body2" fontWeight={500}>{val}</Typography>
-                      </Grid>
-                    ))}
-                  </Grid>
-                  <Button variant="outlined" startIcon={<Edit />}
-                    onClick={() => { setTrainingReportSession(sessionDetailSession); setTrainingReportDialog(true); }}>
-                    Edit Report
-                  </Button>
-                </Box>
-              ) : (
-                /* No report yet — invite BGE to write one */
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Description sx={{ fontSize: 52, color: 'text.disabled', mb: 1.5 }} />
-                  <Typography variant="h6" fontWeight={600} gutterBottom>No report filed yet</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 420, mx: 'auto' }}>
-                    Write a training report covering session objectives, participant demographics,
-                    key findings, lessons learnt, and recommended next steps.
-                  </Typography>
-                  <Button variant="contained" size="large" startIcon={<Add />}
-                    onClick={() => { setTrainingReportSession(sessionDetailSession); setTrainingReportDialog(true); }}>
-                    Write Training Report
-                  </Button>
-                </Box>
+            <Box sx={{ p: { xs: 2, sm: 3 } }}>
+              {trainingReportData?.status === 'submitted' && (
+                <Alert severity="success" sx={{ mb: 2 }}>Report submitted — you can still edit and re-submit.</Alert>
               )}
+              {/* Section 1 */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>1. Training Details</Typography>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12}>
+                  <TextField fullWidth size="small" label="Training Title"
+                    value={trainingReportForm.training_title || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, training_title: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="Date(s)" placeholder="e.g. 17–19 Feb 2026"
+                    value={trainingReportForm.training_dates || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, training_dates: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={5}>
+                  <TextField fullWidth size="small" label="Venue / Location"
+                    value={trainingReportForm.venue || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, venue: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <TextField fullWidth size="small" label="District"
+                    value={trainingReportForm.district || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, district: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="Total Time Allocation" placeholder="e.g. 2 hours / 3 days"
+                    value={trainingReportForm.time_allocation || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, time_allocation: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={8}>
+                  <TextField fullWidth size="small" label="Facilitation Team" placeholder="Names of co-facilitators"
+                    value={trainingReportForm.facilitation_team || ''}
+                    onChange={e => setTrainingReportForm(f => ({ ...f, facilitation_team: e.target.value }))} />
+                </Grid>
+              </Grid>
+
+              {/* Section 2: Demographics */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>2. Participant Demographics</Typography>
+              {(() => {
+                const stats = sessionDetailSession?.attendance_stats;
+                const list  = sessionDetailSession?.attendance_list || [];
+                if (!stats?.total_present) return null;
+                return (
+                  <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: '#f0fdf4', borderColor: 'success.light' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight={700} color="success.dark">
+                          Attendance Sheet Available ({stats.total_present} present)
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">Auto-computed from the attendance records.</Typography>
+                      </Box>
+                      <Button size="small" variant="contained" color="success"
+                        onClick={() => setTrainingReportForm(f => ({
+                          ...f,
+                          participants_male_youth:   stats.youth_male   || 0,
+                          participants_female_youth: stats.youth_female || 0,
+                          participants_adult_male:   stats.adult_male   || 0,
+                          participants_adult_female: stats.adult_female || 0,
+                        }))}>Auto-fill</Button>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: list.length ? 1.5 : 0 }}>
+                      <Chip label={`Total: ${stats.total_present}`} size="small" color="success" />
+                      <Chip label={`${stats.male || 0}M / ${stats.female || 0}F`} size="small" sx={{ bgcolor: '#E3F2FD', color: '#1565C0' }} />
+                      <Chip label={`Youth ♂${stats.youth_male || 0} ♀${stats.youth_female || 0}`} size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32' }} />
+                      <Chip label={`Adult ♂${stats.adult_male || 0} ♀${stats.adult_female || 0}`} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100' }} />
+                      {stats.refugee > 0 && <Chip label={`Refugee: ${stats.refugee}`} size="small" sx={{ bgcolor: '#F3E5F5', color: '#6A1B9A' }} />}
+                      {stats.host_community > 0 && <Chip label={`Host: ${stats.host_community}`} size="small" variant="outlined" />}
+                    </Box>
+                    {list.length > 0 && (
+                      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', maxHeight: 180, overflowY: 'auto' }}>
+                        <Box sx={{ bgcolor: '#f5f5f5', px: 1.5, py: 0.5, display: 'flex', gap: 2 }}>
+                          <Typography variant="caption" fontWeight={700} sx={{ flex: 2 }}>Name / Business</Typography>
+                          <Typography variant="caption" fontWeight={700} sx={{ width: 36, textAlign: 'center' }}>Sex</Typography>
+                          <Typography variant="caption" fontWeight={700} sx={{ width: 60, textAlign: 'center' }}>Age</Typography>
+                          <Typography variant="caption" fontWeight={700} sx={{ width: 52, textAlign: 'center' }}>Status</Typography>
+                        </Box>
+                        {list.filter(a => a.present).map((a, i) => (
+                          <Box key={a.id} sx={{ display: 'flex', gap: 2, px: 1.5, py: 0.4, alignItems: 'center', bgcolor: i % 2 === 0 ? 'transparent' : 'action.hover' }}>
+                            <Box sx={{ flex: 2, minWidth: 0 }}>
+                              <Typography variant="body2" noWrap fontWeight={500}>{a.attendee_name || a.msme_name || '—'}</Typography>
+                              {a.msme_name && a.attendee_name && <Typography variant="caption" color="text.secondary" noWrap>{a.msme_name}</Typography>}
+                            </Box>
+                            <Typography variant="body2" sx={{ width: 36, textAlign: 'center', color: a.gender === 'M' ? '#1565C0' : '#880E4F' }}>{a.gender || '—'}</Typography>
+                            <Typography variant="caption" sx={{ width: 60, textAlign: 'center', color: 'text.secondary' }}>{a.age_group || '—'}</Typography>
+                            <Typography variant="caption" sx={{ width: 52, textAlign: 'center', color: a.refugee_status === 'R' ? '#6A1B9A' : 'text.secondary' }}>
+                              {a.refugee_status === 'R' ? 'Refugee' : 'Host'}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Paper>
+                );
+              })()}
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                {[
+                  { key: 'participants_male_youth',   label: 'Male Youth (15–35)' },
+                  { key: 'participants_female_youth', label: 'Female Youth (15–35)' },
+                  { key: 'participants_adult_male',   label: 'Adult Male (36+)' },
+                  { key: 'participants_adult_female', label: 'Adult Female (36+)' },
+                ].map(({ key, label }) => (
+                  <Grid item xs={6} sm={3} key={key}>
+                    <TextField fullWidth size="small" label={label} type="number" inputProps={{ min: 0 }}
+                      value={trainingReportForm[key] ?? 0}
+                      onChange={e => setTrainingReportForm(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))} />
+                  </Grid>
+                ))}
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    Total: <strong>{(trainingReportForm.participants_male_youth || 0) + (trainingReportForm.participants_female_youth || 0) + (trainingReportForm.participants_adult_male || 0) + (trainingReportForm.participants_adult_female || 0)} participants</strong>
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              {/* Section 3 */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>3. Session Content</Typography>
+              {[
+                { key: 'training_purpose',     label: 'Training Purpose / Background', hint: 'Why was this training conducted?' },
+                { key: 'session_objectives',   label: 'Session Objectives',            hint: 'What were the objectives?' },
+                { key: 'activities_delivered', label: 'Activities / Tasks Delivered',  hint: 'What activities or exercises were run?' },
+              ].map(({ key, label, hint }) => (
+                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} placeholder={hint} sx={{ mb: 2 }}
+                  value={trainingReportForm[key] || ''} onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+              ))}
+
+              {/* Section 4 */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>4. Findings &amp; Lessons</Typography>
+              {[
+                { key: 'key_lessons',          label: 'Key Lessons Learnt',               hint: 'Main takeaways for participants' },
+                { key: 'growth_support_areas', label: 'Growth Support Areas Observed',    hint: 'BDS / growth support needs from the session' },
+                { key: 'key_findings',         label: 'Key Findings / Critical Issues',   hint: 'Critical observations or concerns raised' },
+                { key: 'bge_contributions',    label: 'BGE Contributions & Capacity Notes', hint: 'How did BGEs contribute? Any capacity gaps noted?' },
+              ].map(({ key, label, hint }) => (
+                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} placeholder={hint} sx={{ mb: 2 }}
+                  value={trainingReportForm[key] || ''} onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+              ))}
+
+              {/* Section 5 */}
+              <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>5. Recommendations &amp; Next Steps</Typography>
+              {[
+                { key: 'bds_actions',     label: 'Proposed BDS Actions (next 3 months)', hint: 'Follow-up business development actions' },
+                { key: 'recommendations', label: 'General Recommendations',              hint: 'Recommendations for future sessions' },
+                { key: 'next_steps',      label: 'Agreed Next Steps',                    hint: 'Specific actions agreed with participants' },
+                { key: 'conclusion',      label: 'Conclusion',                           hint: 'Brief summary conclusion' },
+              ].map(({ key, label, hint }) => (
+                <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} placeholder={hint} sx={{ mb: 2 }}
+                  value={trainingReportForm[key] || ''} onChange={e => setTrainingReportForm(f => ({ ...f, [key]: e.target.value }))} />
+              ))}
             </Box>
           )}
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
           <Button onClick={() => setSessionDetailOpen(false)}>Close</Button>
+          {sessionDetailTab === 2 && (
+            <>
+              <Button variant="outlined" onClick={() => saveTrainingReport(false)} disabled={trainingReportSaving}>
+                {trainingReportSaving ? 'Saving…' : 'Save Draft'}
+              </Button>
+              <Button variant="contained" color="success" onClick={() => saveTrainingReport(true)} disabled={trainingReportSaving}>
+                {trainingReportSaving ? 'Submitting…' : trainingReportData?.status === 'submitted' ? 'Re-submit' : 'Submit Report'}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
-      {/* ── Training report dialog (detailed report) ─────────────────────── */}
+      {/* ── Training report dialog (standalone — kept for report-wizard flow only) ─────────────────────── */}
       <Dialog open={trainingReportDialog} onClose={() => setTrainingReportDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ pb: 0.5 }}>
           {trainingReportData ? 'Edit Training Report' : 'Write Training Report'}

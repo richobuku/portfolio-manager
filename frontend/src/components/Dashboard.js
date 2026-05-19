@@ -1443,6 +1443,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     present: true,
   });
 
+  const deleteSession = async (session) => {
+    if (!window.confirm(`Delete "${session.title}"? This will also remove all attendance records and reports for this session.`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.TRAINING_SESSIONS}${session.id}/`, { headers });
+      notify('Session deleted');
+      fetchAll();
+    } catch (e) { notify(e.response?.data?.detail || 'Failed to delete session', 'error'); }
+  };
+
   const openAttendance = async (session) => {
     setSelectedSession(session);
     setAttendanceLoading(true);
@@ -2277,6 +2286,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Tooltip>
                   <Tooltip title="Mark attendance">
                     <IconButton size="small" color="primary" onClick={() => openAttendance(s)}><CheckCircle fontSize="small" /></IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete session">
+                    <IconButton size="small" color="error" onClick={() => deleteSession(s)}><Delete fontSize="small" /></IconButton>
                   </Tooltip>
                 </TableCell>
               </TableRow>
