@@ -804,7 +804,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── training dialogs ───────────────────────────────────────────────────────
   const [sessionDialog, setSessionDialog] = useState(false);
-  const [sessionForm, setSessionForm] = useState({ title: '', date: '', location: '', description: '', topic: '', work_order: '' });
+  const [sessionForm, setSessionForm] = useState({ title: '', date: '', location: '', description: '', topic: '', work_order: '', lead_bge: '', mentor_bges: [], businesses: [] });
   const [sessionLoading, setSessionLoading] = useState(false);
   const [attendanceDialog, setAttendanceDialog] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -1363,7 +1363,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, payload, { headers });
       notify('Session created');
       setSessionDialog(false);
-      setSessionForm({ title: '', date: '', location: '', description: '', topic: '', work_order: '' });
+      setSessionForm({ title: '', date: '', location: '', description: '', topic: '', work_order: '', lead_bge: '', mentor_bges: [], businesses: [] });
       fetchAll();
     } catch { notify('Failed to create session', 'error'); }
     finally { setSessionLoading(false); }
@@ -2165,22 +2165,32 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <TableRow>
               <TableCell>Title</TableCell>
               <TableCell>Date</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell>Topic</TableCell>
+              <TableCell>Lead BGE</TableCell>
+              <TableCell>Mentors</TableCell>
+              <TableCell>MSMEs</TableCell>
               <TableCell>Attendance</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {paginate(trainingSessions, sessionPage).length === 0 ? (
-              <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>No sessions yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>No sessions yet</TableCell></TableRow>
             ) : paginate(trainingSessions, sessionPage).map(s => (
               <TableRow key={s.id} hover>
                 <TableCell sx={{ fontWeight: 500 }}>{s.title}</TableCell>
                 <TableCell>{s.date}</TableCell>
-                <TableCell>{s.location || '—'}</TableCell>
-                <TableCell>{s.topic_name ? `${s.topic_section_number ? s.topic_section_number + ' – ' : ''}${s.topic_name}` : '—'}</TableCell>
-                <TableCell><Chip icon={<EventNote />} label={`${s.attendance_count ?? 0} present`} size="small" color="info" /></TableCell>
+                <TableCell>{s.lead_bge_name || '—'}</TableCell>
+                <TableCell>
+                  {(s.mentor_bges_detail || []).length > 0
+                    ? <Chip label={`${s.mentor_bges_detail.length} mentor${s.mentor_bges_detail.length !== 1 ? 's' : ''}`} size="small" color="secondary" />
+                    : <Typography variant="caption" color="text.secondary">—</Typography>}
+                </TableCell>
+                <TableCell>
+                  {(s.businesses_detail || []).length > 0
+                    ? <Chip label={`${s.businesses_detail.length} MSME${s.businesses_detail.length !== 1 ? 's' : ''}`} size="small" color="info" />
+                    : <Typography variant="caption" color="text.secondary">—</Typography>}
+                </TableCell>
+                <TableCell><Chip icon={<EventNote />} label={`${s.attendance_count ?? 0} present`} size="small" /></TableCell>
                 <TableCell>
                   <Tooltip title="Mark attendance">
                     <IconButton size="small" color="primary" onClick={() => openAttendance(s)}><CheckCircle fontSize="small" /></IconButton>
@@ -5370,6 +5380,50 @@ PRUDEV II BDS Team`,
                       )),
                     ]);
                   })()}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small"><InputLabel>Lead Facilitator (Senior BGE)</InputLabel>
+                <Select value={sessionForm.lead_bge} onChange={e => setSessionForm({...sessionForm, lead_bge: e.target.value})} label="Lead Facilitator (Senior BGE)">
+                  <MenuItem value="">— None —</MenuItem>
+                  {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} {e.bge_code ? `(${e.bge_code})` : ''}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Mentor BGEs</InputLabel>
+                <Select
+                  multiple value={sessionForm.mentor_bges}
+                  onChange={e => setSessionForm({...sessionForm, mentor_bges: e.target.value})}
+                  label="Mentor BGEs"
+                  renderValue={sel => `${sel.length} BGE${sel.length !== 1 ? 's' : ''} selected`}
+                >
+                  {experts.filter(e => e.id !== sessionForm.lead_bge).map(e => (
+                    <MenuItem key={e.id} value={e.id}>
+                      <Checkbox checked={sessionForm.mentor_bges.includes(e.id)} size="small" />
+                      {e.name} {e.bge_code ? `(${e.bge_code})` : ''}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Attendee MSMEs</InputLabel>
+                <Select
+                  multiple value={sessionForm.businesses}
+                  onChange={e => setSessionForm({...sessionForm, businesses: e.target.value})}
+                  label="Attendee MSMEs"
+                  renderValue={sel => `${sel.length} MSME${sel.length !== 1 ? 's' : ''} selected`}
+                >
+                  {msmes.map(m => (
+                    <MenuItem key={m.id} value={m.id}>
+                      <Checkbox checked={sessionForm.businesses.includes(m.id)} size="small" />
+                      {m.business_name} {m.owner_name ? `· ${m.owner_name}` : ''}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>

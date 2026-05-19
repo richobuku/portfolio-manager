@@ -17,7 +17,7 @@ import {
   HelpOutline, Close, TrendingUp,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
+import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
 import VisitReportForm from './VisitReportForm';
@@ -127,6 +127,20 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [sessionDetailTab, setSessionDetailTab] = useState(0);
   const [helpDialog, setHelpDialog] = useState(false);
   const [helpSection, setHelpSection] = useState(0);
+
+  // Mentor sessions (sessions where this BGE is a mentor, not lead facilitator)
+  const [mentorSessions, setMentorSessions] = useState([]);
+  const [mentorReports, setMentorReports] = useState({});   // keyed by session id
+  const [mentorReportDialog, setMentorReportDialog] = useState(false);
+  const [mentorReportSession, setMentorReportSession] = useState(null);
+  const [mentorReportSaving, setMentorReportSaving] = useState(false);
+  const [mentorReportForm, setMentorReportForm] = useState({});
+  const EMPTY_MENTOR_REPORT = {
+    training_title: '', training_dates: '', venue: '',
+    mentoring_activities: '', msmes_mentored: '',
+    key_observations: '', challenges: '', recommendations: '', next_steps: '',
+    status: 'draft',
+  };
 
   // Training report state (used both in Training tab detail dialog and standalone)
   const [trainingReportDialog, setTrainingReportDialog] = useState(false);
@@ -450,18 +464,38 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const fetchSessions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
     try {
-      const [sRes, faRes, trRes] = await Promise.all([
+      const [sRes, faRes, trRes, mrRes] = await Promise.all([
         axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
         axios.get(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, { headers: h }).catch(() => ({ data: [] })),
         axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+        axios.get(MENTOR_REPORTS, { headers: h }).catch(() => ({ data: [] })),
       ]);
       const sessData = Array.isArray(sRes.data) ? sRes.data : sRes.data.results || [];
       const reportsData = Array.isArray(trRes.data) ? trRes.data : trRes.data.results || [];
-      // Annotate each session with whether a report exists
+      const mentorReportData = Array.isArray(mrRes.data) ? mrRes.data : mrRes.data.results || [];
+
       const reportBySession = {};
       reportsData.forEach(r => { reportBySession[r.session] = r; });
-      setSessions(sessData.map(s => ({ ...s, has_training_report: !!reportBySession[s.id], _training_report: reportBySession[s.id] || null })));
+
+      const mentorReportBySession = {};
+      mentorReportData.forEach(r => { mentorReportBySession[r.session] = r; });
+
+      const allSessions = sessData.map(s => ({
+        ...s,
+        has_training_report: !!reportBySession[s.id],
+        _training_report: reportBySession[s.id] || null,
+      }));
+
+      setSessions(allSessions);
       setFacilitationAssignments(Array.isArray(faRes.data) ? faRes.data : faRes.data.results || []);
+
+      // Mentor sessions: sessions where this BGE appears in mentor_bges_detail
+      // The backend already filters sessions visible to this BGE (including mentor_sessions)
+      // We identify them by presence of mentor_bges_detail vs facilitation assignment match
+      const faTopics = new Set((Array.isArray(faRes.data) ? faRes.data : faRes.data.results || []).map(a => a.topic));
+      const mentorOnly = allSessions.filter(s => !faTopics.has(s.topic) && (s.mentor_bges_detail || []).length > 0);
+      setMentorSessions(mentorOnly);
+      setMentorReports(mentorReportBySession);
     } catch {
       // silent
     }
@@ -626,12 +660,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       // Find the matching facilitation assignment to pre-fill context
       const assignment = facilitationAssignments.find(a => a.topic === session.topic);
       setTrainingReportData(null);
+      const mentorNames = (session.mentor_bges_detail || []).map(b => b.name).join(', ');
       setTrainingReportForm({
         ...EMPTY_TRAINING_REPORT,
         training_title: session.title || '',
         venue: session.location || '',
         training_dates: session.date || '',
-        facilitation_team: currentUser?.bge_profile?.name || '',
+        facilitation_team: [currentUser?.bge_profile?.name, mentorNames].filter(Boolean).join(', '),
         session_objectives: assignment?.notes || '',
       });
     }
@@ -766,6 +801,47 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       alert('Could not save report: ' + (err.response?.data ? JSON.stringify(err.response.data) : err.message));
     } finally {
       setTrainingReportSaving(false);
+    }
+  };
+
+  const openMentorReport = (session) => {
+    setMentorReportSession(session);
+    const existing = mentorReports[session.id];
+    if (existing) {
+      setMentorReportForm({ ...EMPTY_MENTOR_REPORT, ...existing });
+    } else {
+      setMentorReportForm({
+        ...EMPTY_MENTOR_REPORT,
+        training_title: session.title || '',
+        training_dates: session.date || '',
+        venue: session.location || '',
+      });
+    }
+    setMentorReportDialog(true);
+  };
+
+  const saveMentorReport = async (submitNow = false) => {
+    if (!mentorReportSession) return;
+    setMentorReportSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    const existing = mentorReports[mentorReportSession.id];
+    const payload = {
+      ...mentorReportForm,
+      session: mentorReportSession.id,
+      status: submitNow ? 'submitted' : (mentorReportForm.status || 'draft'),
+    };
+    try {
+      if (existing?.id) {
+        await axios.patch(`${MENTOR_REPORTS}${existing.id}/`, payload, { headers: h });
+      } else {
+        await axios.post(MENTOR_REPORTS, payload, { headers: h });
+      }
+      setMentorReportDialog(false);
+      await fetchSessions();
+    } catch (err) {
+      alert('Could not save mentor report: ' + (err.response?.data ? JSON.stringify(err.response.data) : err.message));
+    } finally {
+      setMentorReportSaving(false);
     }
   };
 
@@ -2037,7 +2113,184 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           )}
           </Box>
         )}
+
+        {/* ── Mentor Training Assignments ──────────────────────────────────── */}
+        {section === 'training' && mentorSessions.length > 0 && (
+          <Box sx={{ mt: 3 }}>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={700}>My Mentor Assignments</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sessions you are attending as a mentor — file your mentor report after each session.
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {mentorSessions.map(s => {
+                const mReport = mentorReports[s.id];
+                return (
+                  <Card key={s.id} sx={{ borderLeft: '4px solid #7B1FA2', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
+                          <People sx={{ color: '#7B1FA2', fontSize: 20, mt: 0.25, flexShrink: 0 }} />
+                          <Box>
+                            <Typography fontWeight={700} fontSize={15}>{s.title}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {s.date} {s.location ? `· ${s.location}` : ''}
+                              {s.lead_bge_name ? ` · Lead: ${s.lead_bge_name}` : ''}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
+                          <Chip
+                            label={mReport ? (mReport.status === 'submitted' ? 'Submitted' : 'Draft') : 'Pending'}
+                            size="small"
+                            color={mReport?.status === 'submitted' ? 'success' : mReport ? 'warning' : 'default'}
+                          />
+                          <Button size="small" variant="contained" startIcon={<Edit />}
+                            onClick={() => openMentorReport(s)}
+                            sx={{ bgcolor: '#7B1FA2', '&:hover': { bgcolor: '#6a1b9a' }, fontSize: 12 }}>
+                            {mReport ? 'Edit Report' : 'Write Report'}
+                          </Button>
+                        </Box>
+                      </Box>
+
+                      {/* MSMEs in this session */}
+                      {(s.businesses_detail || []).length > 0 && (
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600}>MSMEs in this session:</Typography>
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                            {s.businesses_detail.map(m => (
+                              <Chip key={m.id} label={m.business_name} size="small" variant="outlined" />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Attendance count */}
+                      <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                        <Chip icon={<HowToReg sx={{ fontSize: '12px !important' }} />}
+                          label={`${s.attendance_count ?? 0} attended`} size="small"
+                          color={s.attendance_count > 0 ? 'success' : 'default'} variant="outlined" />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Box>
+          </Box>
+        )}
       </Box>
+
+      {/* ── Mentor Training Report Dialog ───────────────────────────────────── */}
+      {mentorReportDialog && mentorReportSession && (
+        <Dialog open onClose={() => setMentorReportDialog(false)} maxWidth="md" fullWidth
+          PaperProps={{ sx: { height: { xs: '95dvh', md: '88vh' }, display: 'flex', flexDirection: 'column' } }}>
+          <DialogTitle sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>
+            <Typography fontWeight={700} variant="h6">Mentor Training Report</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {mentorReportSession.title} · {mentorReportSession.date}
+              {mentorReportSession.lead_bge_name ? ` · Lead Facilitator: ${mentorReportSession.lead_bge_name}` : ''}
+            </Typography>
+          </DialogTitle>
+          <DialogContent dividers sx={{ flex: 1, overflow: 'auto' }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth size="small" label="Training Title"
+                  value={mentorReportForm.training_title}
+                  onChange={e => setMentorReportForm(f => ({ ...f, training_title: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField fullWidth size="small" label="Training Dates"
+                  value={mentorReportForm.training_dates}
+                  onChange={e => setMentorReportForm(f => ({ ...f, training_dates: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField fullWidth size="small" label="Venue"
+                  value={mentorReportForm.venue}
+                  onChange={e => setMentorReportForm(f => ({ ...f, venue: e.target.value }))} />
+              </Grid>
+
+              {/* Read-only context from session */}
+              {mentorReportSession.lead_bge_name && (
+                <Grid item xs={12}>
+                  <Alert severity="info" icon={false} sx={{ py: 0.5 }}>
+                    <Typography variant="body2">
+                      <strong>Lead Facilitator:</strong> {mentorReportSession.lead_bge_name}
+                    </Typography>
+                  </Alert>
+                </Grid>
+              )}
+
+              {/* MSMEs in the session */}
+              {(mentorReportSession.businesses_detail || []).length > 0 && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" gutterBottom>MSMEs in this session</Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {mentorReportSession.businesses_detail.map(m => (
+                      <Chip key={m.id} label={`${m.business_name}${m.owner_name ? ` · ${m.owner_name}` : ''}`} size="small" variant="outlined" />
+                    ))}
+                  </Box>
+                </Grid>
+              )}
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" color="primary" sx={{ mt: 1, mb: 0.5 }}>Mentoring Activities</Typography>
+                <TextField fullWidth size="small" multiline minRows={3}
+                  label="What activities did you carry out as a mentor?"
+                  value={mentorReportForm.mentoring_activities}
+                  onChange={e => setMentorReportForm(f => ({ ...f, mentoring_activities: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField fullWidth size="small" multiline minRows={3}
+                  label="MSMEs you specifically supported"
+                  value={mentorReportForm.msmes_mentored}
+                  onChange={e => setMentorReportForm(f => ({ ...f, msmes_mentored: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField fullWidth size="small" multiline minRows={3}
+                  label="Key observations on MSME progress / needs"
+                  value={mentorReportForm.key_observations}
+                  onChange={e => setMentorReportForm(f => ({ ...f, key_observations: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth size="small" multiline minRows={2}
+                  label="Challenges encountered"
+                  value={mentorReportForm.challenges}
+                  onChange={e => setMentorReportForm(f => ({ ...f, challenges: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth size="small" multiline minRows={2}
+                  label="Recommendations"
+                  value={mentorReportForm.recommendations}
+                  onChange={e => setMentorReportForm(f => ({ ...f, recommendations: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField fullWidth size="small" multiline minRows={2}
+                  label="Agreed next steps"
+                  value={mentorReportForm.next_steps}
+                  onChange={e => setMentorReportForm(f => ({ ...f, next_steps: e.target.value }))} />
+              </Grid>
+
+              {/* Attendance sheet (read-only, from session) */}
+              {mentorReportSession.attendance_count > 0 && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ mt: 1 }}>Attendance Sheet (completed by lead facilitator)</Typography>
+                  <Typography variant="caption" color="text.secondary">{mentorReportSession.attendance_count} attendees recorded</Typography>
+                </Grid>
+              )}
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ px: 2, py: 1.5 }}>
+            <Button onClick={() => setMentorReportDialog(false)}>Cancel</Button>
+            <Button variant="outlined" onClick={() => saveMentorReport(false)} disabled={mentorReportSaving}>
+              {mentorReportSaving ? <CircularProgress size={16} /> : 'Save Draft'}
+            </Button>
+            <Button variant="contained" color="success" onClick={() => saveMentorReport(true)} disabled={mentorReportSaving}>
+              Submit Report
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       {/* ── Training Report Wizard (combined attendance + narrative) ────────── */}
       {reportWizard && (

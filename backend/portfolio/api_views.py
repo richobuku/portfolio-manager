@@ -19,6 +19,7 @@ from .models import (
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
     GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
     TrainingFacilitationAssignment, TrainingReport, AnnualReviewReport,
+    MentorTrainingReport,
 )
 from .account_setup import ensure_bge_account, send_welcome_email
 
@@ -109,7 +110,7 @@ from .serializers import (
     GroupReportSerializer, GroupReportContributionSerializer, WorkOrderSerializer,
     VisitReportTemplateSerializer,
     GroupReportAttendanceSerializer, MSMEGrowthSnapshotSerializer,
-    AnnualReviewReportSerializer,
+    AnnualReviewReportSerializer, MentorTrainingReportSerializer,
 )
 
 
@@ -1646,21 +1647,23 @@ class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = TrainingSession.objects.select_related('topic', 'work_order').all()
+        qs = TrainingSession.objects.select_related('topic', 'work_order', 'lead_bge').prefetch_related('mentor_bges', 'businesses').all()
         user = self.request.user
         if user.is_staff or user.is_superuser:
             pass  # see everything
         elif _managed_groups(user) is not None or _is_viewer(user):
             pass  # programme managers and viewers see all sessions
         else:
-            # BGEs see sessions linked to their work orders, or to their assigned topics
+            # BGEs see sessions they lead, are mentors on, or linked to their work orders / topics
             try:
                 bge = user.bge_profile
                 assigned_topics = TrainingFacilitationAssignment.objects.filter(bge=bge).values_list('topic_id', flat=True)
                 qs = qs.filter(
                     Q(work_order__bge=bge) |
-                    Q(topic_id__in=assigned_topics)
-                )
+                    Q(topic_id__in=assigned_topics) |
+                    Q(lead_bge=bge) |
+                    Q(mentor_bges=bge)
+                ).distinct()
             except Exception:
                 return qs.none()
         work_order_id = self.request.query_params.get('work_order')
@@ -2956,6 +2959,54 @@ class AnnualReviewReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMix
         bge = None
         try:
             bge = self.request.user.bge_profile
+        except Exception:
+            pass
+        serializer.save(bge=bge)
+
+    def perform_update(self, serializer):
+        from django.utils import timezone
+        data = {}
+        if serializer.validated_data.get('status') == 'submitted':
+            data['submitted_at'] = timezone.now()
+        serializer.save(**data)
+
+
+class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelViewSet):
+    """
+    Training reports filed by mentor BGEs.
+    - A mentor BGE can only create/edit their own report for sessions they are assigned to.
+    - Admins and programme managers see all mentor reports.
+    """
+    serializer_class   = MentorTrainingReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = MentorTrainingReport.objects.select_related(
+            'session', 'session__lead_bge', 'bge'
+        ).prefetch_related('session__businesses', 'session__attendances')
+        if user.is_staff or user.is_superuser:
+            return qs
+        if _is_programme_manager(user):
+            group_ids = _managed_groups(user) or []
+            return qs.filter(
+                session__businesses__programme_groups__in=group_ids
+            ).distinct()
+        try:
+            return qs.filter(bge=user.bge_profile)
+        except Exception:
+            return qs.none()
+
+    def perform_create(self, serializer):
+        bge = None
+        try:
+            bge = self.request.user.bge_profile
+            # verify BGE is actually a mentor on this session
+            session = serializer.validated_data.get('session')
+            if session and not session.mentor_bges.filter(pk=bge.pk).exists():
+                raise PermissionDenied("You are not assigned as a mentor for this session.")
+        except PermissionDenied:
+            raise
         except Exception:
             pass
         serializer.save(bge=bge)

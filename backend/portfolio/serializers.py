@@ -6,6 +6,7 @@ from .models import (
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, WorkOrder,
     GroupReportAttendance, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
     TrainingFacilitationAssignment, TrainingReport, AnnualReviewReport,
+    MentorTrainingReport,
 )
 
 
@@ -185,8 +186,10 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
     topic_section_number = serializers.CharField(source='topic.section_number', read_only=True, allow_null=True)
     work_order_number    = serializers.CharField(source='work_order.work_order_number', read_only=True, allow_null=True)
     work_order_bge       = serializers.CharField(source='work_order.bge.name', read_only=True, allow_null=True)
+    lead_bge_name        = serializers.CharField(source='lead_bge.name', read_only=True, allow_null=True)
     attendance_count     = serializers.SerializerMethodField()
     businesses_detail    = serializers.SerializerMethodField()
+    mentor_bges_detail   = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession
@@ -205,6 +208,12 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
                 'sector': m.sector or '',
             }
             for m in obj.businesses.all()
+        ]
+
+    def get_mentor_bges_detail(self, obj):
+        return [
+            {'id': b.id, 'name': b.name, 'bge_code': b.bge_code or ''}
+            for b in obj.mentor_bges.all()
         ]
 
 
@@ -376,4 +385,39 @@ class AnnualReviewReportSerializer(serializers.ModelSerializer):
         return [
             {'id': m.id, 'business_name': m.business_name, 'msme_code': m.msme_code}
             for m in obj.msmes_reviewed.all()
+        ]
+
+
+class MentorTrainingReportSerializer(serializers.ModelSerializer):
+    bge_name         = serializers.CharField(source='bge.name', read_only=True, allow_null=True)
+    session_title    = serializers.CharField(source='session.title', read_only=True)
+    session_date     = serializers.DateField(source='session.date', read_only=True)
+    session_location = serializers.CharField(source='session.location', read_only=True)
+    lead_bge_name    = serializers.CharField(source='session.lead_bge.name', read_only=True, allow_null=True)
+    session_msmes    = serializers.SerializerMethodField()
+    session_attendance = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = MentorTrainingReport
+        fields = '__all__'
+        read_only_fields = ['bge', 'created_at', 'updated_at', 'submitted_at']
+
+    def get_session_msmes(self, obj):
+        return [
+            {'id': m.id, 'business_name': m.business_name, 'owner_name': m.owner_name or ''}
+            for m in obj.session.businesses.all()
+        ]
+
+    def get_session_attendance(self, obj):
+        return [
+            {
+                'id': a.id,
+                'attendee_name': a.attendee_name,
+                'attendee_phone': a.attendee_phone,
+                'gender': a.gender,
+                'age_group': a.age_group,
+                'present': a.present,
+                'msme_name': a.msme.business_name if a.msme else '',
+            }
+            for a in obj.session.attendances.order_by('attendee_name')
         ]

@@ -8,7 +8,7 @@ from .api_views import (
     GroupReportContributionViewSet, BGEUserViewSet, WorkOrderViewSet,
     GroupReportAttendanceViewSet, ProgrammeGroupViewSet, MSMEGrowthSnapshotViewSet,
     VisitReportTemplateViewSet, TrainingFacilitationAssignmentViewSet,
-    TrainingReportViewSet, AnnualReviewReportViewSet,
+    TrainingReportViewSet, AnnualReviewReportViewSet, MentorTrainingReportViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
     bulk_email_view,
 )
@@ -42,6 +42,7 @@ router.register(r'visit-templates', VisitReportTemplateViewSet, basename='visit-
 router.register(r'facilitation-assignments', TrainingFacilitationAssignmentViewSet, basename='facilitation-assignment')
 router.register(r'training-reports', TrainingReportViewSet, basename='training-report')
 router.register(r'annual-reviews', AnnualReviewReportViewSet, basename='annual-review')
+router.register(r'mentor-reports', MentorTrainingReportViewSet, basename='mentor-report')
 router.register(r'blockchain/transactions', BlockchainTransactionViewSet)
 router.register(r'blockchain/contracts', SmartContractViewSet)
 router.register(r'blockchain/tokens', TokenViewSet)

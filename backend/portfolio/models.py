@@ -502,6 +502,16 @@ class TrainingSession(models.Model):
         related_name='training_sessions',
         help_text='Optional: link this session to a BGE deployment/work order for reporting.'
     )
+    lead_bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='led_sessions',
+        help_text='Senior BGE co-facilitating/leading this session',
+    )
+    mentor_bges = models.ManyToManyField(
+        'BusinessGrowthExpert', blank=True,
+        related_name='mentor_sessions',
+        help_text='Regular BGEs attending as mentors',
+    )
 
     def __str__(self):
         return f"{self.title} ({self.date})"
@@ -591,6 +601,42 @@ class TrainingReport(models.Model):
     def total_participants(self):
         return (self.participants_male_youth + self.participants_female_youth
                 + self.participants_adult_male + self.participants_adult_female)
+
+
+class MentorTrainingReport(models.Model):
+    STATUS_CHOICES = [('draft', 'Draft'), ('submitted', 'Submitted')]
+
+    session = models.ForeignKey(
+        TrainingSession, on_delete=models.CASCADE,
+        related_name='mentor_reports',
+    )
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='mentor_reports',
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    training_title  = models.CharField(max_length=300, blank=True)
+    training_dates  = models.CharField(max_length=100, blank=True)
+    venue           = models.CharField(max_length=200, blank=True)
+
+    mentoring_activities = models.TextField(blank=True, help_text='Activities carried out as a mentor')
+    msmes_mentored       = models.TextField(blank=True, help_text='MSMEs specifically supported during session')
+    key_observations     = models.TextField(blank=True, help_text='Key observations on MSME progress/needs')
+    challenges           = models.TextField(blank=True, help_text='Challenges encountered during mentoring')
+    recommendations      = models.TextField(blank=True, help_text='Recommendations for future sessions')
+    next_steps           = models.TextField(blank=True, help_text='Agreed follow-up actions')
+
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ('session', 'bge')
+
+    def __str__(self):
+        return f"Mentor Report: {self.bge} @ {self.session} ({self.status})"
 
 
 class Attendance(models.Model):
