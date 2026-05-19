@@ -60,6 +60,10 @@ def reverse_migration(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # atomic=False required: RunPython fires row-level triggers; subsequent
+    # RemoveField DDL (M2M junction tables) can't CREATE/DROP indexes while
+    # those triggers are pending in the same PostgreSQL transaction.
+    atomic = False
 
     dependencies = [
         ('portfolio', '0060_email_send_log'),
