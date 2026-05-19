@@ -739,7 +739,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [programmeGroups, setProgrammeGroups] = useState([]);
   const [trainingSessions, setTrainingSessions] = useState([]);
   const [trainingTopics, setTrainingTopics] = useState([]);
-  const [facilitationAssignments, setFacilitationAssignments] = useState([]);
   const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -875,7 +874,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (reportFilterBge) reportParams.append('bge', reportFilterBge);
       if (reportFilterStatus) reportParams.append('status', reportFilterStatus);
 
-      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes, faRes] = await Promise.all([
+      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes] = await Promise.all([
         axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
         axios.get(API_ENDPOINTS.EXPERTS, { headers: h }),
         axios.get(API_ENDPOINTS.COHORTS, { headers: h }),
@@ -887,7 +886,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         axios.get(`${API_ENDPOINTS.REPORTS}?${reportParams}`, { headers: h }),
         axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h }).catch(() => ({ data: [] })),
         axios.get(API_ENDPOINTS.PROGRAMME_GROUPS, { headers: h }).catch(() => ({ data: [] })),
-        axios.get(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, { headers: h }).catch(() => ({ data: [] })),
       ]);
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
@@ -898,7 +896,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setProgrammeGroups(toArr(pgRes.data));
       setTrainingSessions(toArr(sRes.data));
       setTrainingTopics(toArr(tRes.data));
-      setFacilitationAssignments(toArr(faRes.data));
       setAnalytics(aRes.data);
       setBgeUsers(Array.isArray(uRes.data) ? uRes.data : []);
       setGroupReports(toArr(grRes.data));
