@@ -491,44 +491,45 @@ class TrainingTopic(models.Model):
         return self.name
 
 class TrainingSession(models.Model):
-    title = models.CharField(max_length=200)
-    date = models.DateField()
-    location = models.CharField(max_length=200, blank=True)
+    title       = models.CharField(max_length=200)
+    date        = models.DateField()
+    location    = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
-    topic = models.ForeignKey(TrainingTopic, on_delete=models.SET_NULL, null=True, related_name='sessions')
-    businesses = models.ManyToManyField('MSME', blank=True, related_name='sessions_attended')
-    work_order = models.ForeignKey(
-        'WorkOrder', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='training_sessions',
-        help_text='Optional: link this session to a BGE deployment/work order for reporting.'
-    )
-    lead_bge = models.ForeignKey(
-        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='led_sessions',
-        help_text='Senior BGE co-facilitating/leading this session',
-    )
-    mentor_bges = models.ManyToManyField(
-        'BusinessGrowthExpert', blank=True,
-        related_name='mentor_sessions',
-        help_text='Regular BGEs attending as mentors',
-    )
-    mentor_work_orders = models.ManyToManyField(
-        'WorkOrder', blank=True,
-        related_name='mentor_training_sessions',
-        help_text='Work orders for each mentor BGE in this session',
-    )
+    topic       = models.ForeignKey(TrainingTopic, on_delete=models.SET_NULL, null=True, related_name='sessions')
+    businesses  = models.ManyToManyField('MSME', blank=True, related_name='sessions_attended')
 
     def __str__(self):
         return f"{self.title} ({self.date})"
 
+    @property
+    def lead_bge(self):
+        a = self.facilitation_assignments.filter(role='lead').select_related('bge').first()
+        return a.bge if a else None
+
+    @property
+    def lead_bge_name(self):
+        b = self.lead_bge
+        return b.name if b else None
+
 
 class TrainingFacilitationAssignment(models.Model):
+    ROLE_CHOICES = [('lead', 'Lead Facilitator'), ('mentor', 'Mentor')]
+
     bge           = models.ForeignKey(
         'BusinessGrowthExpert', on_delete=models.CASCADE,
         related_name='facilitation_assignments',
     )
     topic         = models.ForeignKey(
         TrainingTopic, on_delete=models.CASCADE,
+        related_name='facilitation_assignments',
+    )
+    session       = models.ForeignKey(
+        TrainingSession, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='facilitation_assignments',
+    )
+    role          = models.CharField(max_length=10, choices=ROLE_CHOICES, default='lead')
+    work_order    = models.ForeignKey(
+        'WorkOrder', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='facilitation_assignments',
     )
     assigned_by   = models.ForeignKey(
@@ -540,11 +541,12 @@ class TrainingFacilitationAssignment(models.Model):
     created_at    = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('bge', 'topic')
         ordering = ['topic__module_number', 'topic__section_number', 'bge__name']
 
     def __str__(self):
-        return f"{self.bge.name} → {self.topic}"
+        role_label = 'Lead' if self.role == 'lead' else 'Mentor'
+        session_part = f' @ {self.session}' if self.session_id else ''
+        return f"{self.bge.name} [{role_label}] → {self.topic}{session_part}"
 
 
 class TrainingReport(models.Model):

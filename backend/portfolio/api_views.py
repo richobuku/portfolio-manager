@@ -1647,28 +1647,29 @@ class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = TrainingSession.objects.select_related('topic', 'work_order', 'lead_bge').prefetch_related('mentor_bges', 'businesses').all()
+        qs = TrainingSession.objects.select_related('topic').prefetch_related(
+            'businesses',
+            'facilitation_assignments__bge',
+            'facilitation_assignments__work_order',
+        ).all()
         user = self.request.user
         if user.is_staff or user.is_superuser:
             pass  # see everything
         elif _managed_groups(user) is not None or _is_viewer(user):
             pass  # programme managers and viewers see all sessions
         else:
-            # BGEs see sessions they lead, are mentors on, or linked to their work orders / topics
+            # BGEs see sessions they are assigned to (as lead or mentor)
             try:
                 bge = user.bge_profile
-                assigned_topics = TrainingFacilitationAssignment.objects.filter(bge=bge).values_list('topic_id', flat=True)
                 qs = qs.filter(
-                    Q(work_order__bge=bge) |
-                    Q(topic_id__in=assigned_topics) |
-                    Q(lead_bge=bge) |
-                    Q(mentor_bges=bge)
+                    Q(topic_id__in=TrainingFacilitationAssignment.objects.filter(bge=bge).values('topic_id')) |
+                    Q(facilitation_assignments__bge=bge)
                 ).distinct()
             except Exception:
                 return qs.none()
         work_order_id = self.request.query_params.get('work_order')
         if work_order_id:
-            qs = qs.filter(work_order_id=work_order_id)
+            qs = qs.filter(facilitation_assignments__work_order_id=work_order_id)
         return qs
 
     @action(detail=True, methods=['post'])
@@ -1852,7 +1853,7 @@ class TrainingFacilitationAssignmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = TrainingFacilitationAssignment.objects.select_related(
-            'bge', 'topic', 'assigned_by'
+            'bge', 'topic', 'assigned_by', 'session', 'work_order'
         )
         # BGEs only see their own assignments
         if not (user.is_staff or user.is_superuser or hasattr(user, 'cohort_admin_profile')):
@@ -1861,6 +1862,16 @@ class TrainingFacilitationAssignmentViewSet(viewsets.ModelViewSet):
                 return qs.filter(bge=bge)
             except Exception:
                 return qs.none()
+        # Optional filters
+        session_id = self.request.query_params.get('session')
+        if session_id:
+            qs = qs.filter(session_id=session_id)
+        role = self.request.query_params.get('role')
+        if role:
+            qs = qs.filter(role=role)
+        bge_id = self.request.query_params.get('bge')
+        if bge_id:
+            qs = qs.filter(bge_id=bge_id)
         return qs
 
     def perform_create(self, serializer):
@@ -2983,8 +2994,11 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelV
     def get_queryset(self):
         user = self.request.user
         qs = MentorTrainingReport.objects.select_related(
-            'session', 'session__lead_bge', 'bge'
-        ).prefetch_related('session__businesses', 'session__attendances')
+            'session', 'bge'
+        ).prefetch_related(
+            'session__businesses', 'session__attendances',
+            'session__facilitation_assignments__bge',
+        )
         if user.is_staff or user.is_superuser:
             return qs
         if _is_programme_manager(user):
@@ -3003,7 +3017,7 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelV
             bge = self.request.user.bge_profile
             # verify BGE is actually a mentor on this session
             session = serializer.validated_data.get('session')
-            if session and not session.mentor_bges.filter(pk=bge.pk).exists():
+            if session and not session.facilitation_assignments.filter(bge=bge, role='mentor').exists():
                 raise PermissionDenied("You are not assigned as a mentor for this session.")
         except PermissionDenied:
             raise

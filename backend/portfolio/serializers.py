@@ -184,12 +184,10 @@ class TrainingTopicSerializer(serializers.ModelSerializer):
 class TrainingSessionSerializer(serializers.ModelSerializer):
     topic_name           = serializers.CharField(source='topic.name', read_only=True)
     topic_section_number = serializers.CharField(source='topic.section_number', read_only=True, allow_null=True)
-    work_order_number    = serializers.CharField(source='work_order.work_order_number', read_only=True, allow_null=True)
-    work_order_bge       = serializers.CharField(source='work_order.bge.name', read_only=True, allow_null=True)
-    lead_bge_name        = serializers.CharField(source='lead_bge.name', read_only=True, allow_null=True)
     attendance_count     = serializers.SerializerMethodField()
     businesses_detail    = serializers.SerializerMethodField()
-    mentor_bges_detail   = serializers.SerializerMethodField()
+    team                 = serializers.SerializerMethodField()
+    lead_bge_name        = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession
@@ -210,24 +208,23 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
             for m in obj.businesses.all()
         ]
 
-    def get_mentor_bges_detail(self, obj):
-        return [
-            {'id': b.id, 'name': b.name, 'bge_code': b.bge_code or ''}
-            for b in obj.mentor_bges.all()
-        ]
-
-    mentor_work_orders_detail = serializers.SerializerMethodField()
-
-    def get_mentor_work_orders_detail(self, obj):
+    def get_team(self, obj):
         return [
             {
-                'id': wo.id,
-                'work_order_number': wo.work_order_number,
-                'bge_id': wo.bge_id,
-                'bge_name': wo.bge.name if wo.bge else '',
+                'id': a.id,
+                'role': a.role,
+                'bge_id': a.bge_id,
+                'bge_name': a.bge.name if a.bge_id else '',
+                'bge_code': a.bge.bge_code if a.bge_id else '',
+                'work_order_id': a.work_order_id,
+                'work_order_number': a.work_order.work_order_number if a.work_order_id else '',
             }
-            for wo in obj.mentor_work_orders.select_related('bge').all()
+            for a in obj.facilitation_assignments.select_related('bge', 'work_order').all()
         ]
+
+    def get_lead_bge_name(self, obj):
+        lead = next((a for a in obj.facilitation_assignments.all() if a.role == 'lead'), None)
+        return lead.bge.name if lead and lead.bge_id else None
 
 
 class AttendanceSerializer(serializers.ModelSerializer):
@@ -354,13 +351,16 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
 
 class TrainingFacilitationAssignmentSerializer(serializers.ModelSerializer):
-    bge_name            = serializers.CharField(source='bge.name', read_only=True)
-    bge_code            = serializers.CharField(source='bge.bge_code', read_only=True)
-    topic_name          = serializers.CharField(source='topic.name', read_only=True)
+    bge_name             = serializers.CharField(source='bge.name', read_only=True)
+    bge_code             = serializers.CharField(source='bge.bge_code', read_only=True)
+    topic_name           = serializers.CharField(source='topic.name', read_only=True)
     topic_section_number = serializers.CharField(source='topic.section_number', read_only=True)
     topic_module_number  = serializers.IntegerField(source='topic.module_number', read_only=True)
     topic_module_name    = serializers.CharField(source='topic.module_name', read_only=True)
-    assigned_by_name    = serializers.CharField(source='assigned_by.get_full_name', read_only=True, allow_null=True)
+    assigned_by_name     = serializers.CharField(source='assigned_by.get_full_name', read_only=True, allow_null=True)
+    work_order_number    = serializers.CharField(source='work_order.work_order_number', read_only=True, allow_null=True)
+    session_title        = serializers.CharField(source='session.title', read_only=True, allow_null=True)
+    session_date         = serializers.DateField(source='session.date', read_only=True, allow_null=True)
 
     class Meta:
         model = TrainingFacilitationAssignment
@@ -406,7 +406,7 @@ class MentorTrainingReportSerializer(serializers.ModelSerializer):
     session_title    = serializers.CharField(source='session.title', read_only=True)
     session_date     = serializers.DateField(source='session.date', read_only=True)
     session_location = serializers.CharField(source='session.location', read_only=True)
-    lead_bge_name    = serializers.CharField(source='session.lead_bge.name', read_only=True, allow_null=True)
+    lead_bge_name    = serializers.SerializerMethodField()
     session_msmes    = serializers.SerializerMethodField()
     session_attendance = serializers.SerializerMethodField()
 
@@ -414,6 +414,10 @@ class MentorTrainingReportSerializer(serializers.ModelSerializer):
         model  = MentorTrainingReport
         fields = '__all__'
         read_only_fields = ['bge', 'created_at', 'updated_at', 'submitted_at']
+
+    def get_lead_bge_name(self, obj):
+        lead = obj.session.facilitation_assignments.filter(role='lead').select_related('bge').first()
+        return lead.bge.name if lead and lead.bge_id else None
 
     def get_session_msmes(self, obj):
         return [

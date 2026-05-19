@@ -489,11 +489,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       setSessions(allSessions);
       setFacilitationAssignments(Array.isArray(faRes.data) ? faRes.data : faRes.data.results || []);
 
-      // Mentor sessions: sessions where this BGE appears in mentor_bges_detail
-      // The backend already filters sessions visible to this BGE (including mentor_sessions)
-      // We identify them by presence of mentor_bges_detail vs facilitation assignment match
-      const faTopics = new Set((Array.isArray(faRes.data) ? faRes.data : faRes.data.results || []).map(a => a.topic));
-      const mentorOnly = allSessions.filter(s => !faTopics.has(s.topic) && (s.mentor_bges_detail || []).length > 0);
+      // Mentor sessions: sessions where this BGE has a mentor assignment
+      const allAssignments = Array.isArray(faRes.data) ? faRes.data : faRes.data.results || [];
+      const mentorAssignmentSessionIds = new Set(
+        allAssignments.filter(a => a.role === 'mentor' && a.session).map(a => a.session)
+      );
+      const mentorOnly = allSessions.filter(s => mentorAssignmentSessionIds.has(s.id));
       setMentorSessions(mentorOnly);
       setMentorReports(mentorReportBySession);
     } catch {
@@ -658,15 +659,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       setTrainingReportForm({ ...EMPTY_TRAINING_REPORT, ...rest });
     } else {
       // Find the matching facilitation assignment to pre-fill context
-      const assignment = facilitationAssignments.find(a => a.topic === session.topic);
+      const assignment = facilitationAssignments.find(a => a.session === session.id || a.topic === session.topic);
       setTrainingReportData(null);
-      const mentorNames = (session.mentor_bges_detail || []).map(b => b.name).join(', ');
+      const teamNames = (session.team || []).map(m => m.bge_name).filter(Boolean).join(', ');
       setTrainingReportForm({
         ...EMPTY_TRAINING_REPORT,
         training_title: session.title || '',
         venue: session.location || '',
         training_dates: session.date || '',
-        facilitation_team: [currentUser?.bge_profile?.name, mentorNames].filter(Boolean).join(', '),
+        facilitation_team: teamNames,
         session_objectives: assignment?.notes || '',
       });
     }
@@ -2138,7 +2139,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             <Typography fontWeight={700} fontSize={15}>{s.title}</Typography>
                             <Typography variant="caption" color="text.secondary">
                               {s.date} {s.location ? `· ${s.location}` : ''}
-                              {s.lead_bge_name ? ` · Lead: ${s.lead_bge_name}` : ''}
+                              {(s.team || []).find(m => m.role === 'lead')?.bge_name ? ` · Lead: ${(s.team || []).find(m => m.role === 'lead').bge_name}` : ''}
                             </Typography>
                           </Box>
                         </Box>
@@ -2191,7 +2192,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             <Typography fontWeight={700} variant="h6">Mentor Training Report</Typography>
             <Typography variant="caption" color="text.secondary">
               {mentorReportSession.title} · {mentorReportSession.date}
-              {mentorReportSession.lead_bge_name ? ` · Lead Facilitator: ${mentorReportSession.lead_bge_name}` : ''}
+              {(mentorReportSession.team || []).find(m => m.role === 'lead')?.bge_name ? ` · Lead Facilitator: ${(mentorReportSession.team || []).find(m => m.role === 'lead').bge_name}` : ''}
             </Typography>
           </DialogTitle>
           <DialogContent dividers sx={{ flex: 1, overflow: 'auto' }}>
@@ -2217,18 +2218,20 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 1 }}>
                   <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Session Overview</Typography>
                   <Grid container spacing={1}>
-                    {mentorReportSession.lead_bge_name && (
+                    {(mentorReportSession.team || []).find(m => m.role === 'lead') && (
                       <Grid item xs={12} sm={6}>
                         <Typography variant="caption" color="text.secondary" display="block">Lead Facilitator</Typography>
-                        <Typography variant="body2" fontWeight={600}>{mentorReportSession.lead_bge_name}</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {(mentorReportSession.team || []).find(m => m.role === 'lead')?.bge_name}
+                        </Typography>
                       </Grid>
                     )}
-                    {(mentorReportSession.mentor_bges_detail || []).filter(b => b.name !== (mentorReportSession._myName)).length > 0 && (
+                    {(mentorReportSession.team || []).filter(m => m.role === 'mentor').length > 0 && (
                       <Grid item xs={12} sm={6}>
                         <Typography variant="caption" color="text.secondary" display="block">Other Mentor BGEs</Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.25 }}>
-                          {mentorReportSession.mentor_bges_detail.map(b => (
-                            <Chip key={b.id} label={b.name} size="small" sx={{ bgcolor: '#EDE7F6', color: '#4527A0', fontWeight: 600 }} />
+                          {(mentorReportSession.team || []).filter(m => m.role === 'mentor').map(m => (
+                            <Chip key={m.bge_id} label={m.bge_name} size="small" sx={{ bgcolor: '#EDE7F6', color: '#4527A0', fontWeight: 600 }} />
                           ))}
                         </Box>
                       </Grid>
