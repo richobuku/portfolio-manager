@@ -520,7 +520,7 @@ class TrainingFacilitationAssignment(models.Model):
         related_name='facilitation_assignments',
     )
     topic         = models.ForeignKey(
-        TrainingTopic, on_delete=models.CASCADE,
+        TrainingTopic, on_delete=models.CASCADE, null=True, blank=True,
         related_name='facilitation_assignments',
     )
     session       = models.ForeignKey(
@@ -541,7 +541,7 @@ class TrainingFacilitationAssignment(models.Model):
     created_at    = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['topic__module_number', 'topic__section_number', 'bge__name']
+        ordering = ['topic__module_number', 'topic__section_number', 'bge__name', 'id']
 
     def __str__(self):
         role_label = 'Lead' if self.role == 'lead' else 'Mentor'

@@ -14,10 +14,17 @@ import django.db.models.deletion
 def migrate_sessions_to_assignments(apps, schema_editor):
     TrainingSession = apps.get_model('portfolio', 'TrainingSession')
     TrainingFacilitationAssignment = apps.get_model('portfolio', 'TrainingFacilitationAssignment')
+    from datetime import date as date_type
 
     for session in TrainingSession.objects.prefetch_related(
         'mentor_bges', 'mentor_work_orders'
     ).select_related('lead_bge', 'work_order', 'topic'):
+        # topic is required on TrainingFacilitationAssignment — skip sessions with none
+        if not session.topic_id:
+            continue
+
+        fallback_date = session.date or date_type.today()
+
         # Build a map of bge_id → work_order for mentors
         mentor_wo_map = {wo.bge_id: wo for wo in session.mentor_work_orders.all() if wo.bge_id}
 
@@ -28,9 +35,9 @@ def migrate_sessions_to_assignments(apps, schema_editor):
                 session=session,
                 role='lead',
                 defaults={
-                    'topic': session.topic,
+                    'topic_id': session.topic_id,
                     'work_order': session.work_order,
-                    'assigned_date': session.date,
+                    'assigned_date': fallback_date,
                 },
             )
 
@@ -41,9 +48,9 @@ def migrate_sessions_to_assignments(apps, schema_editor):
                 session=session,
                 role='mentor',
                 defaults={
-                    'topic': session.topic,
+                    'topic_id': session.topic_id,
                     'work_order': mentor_wo_map.get(bge.id),
-                    'assigned_date': session.date,
+                    'assigned_date': fallback_date,
                 },
             )
 
