@@ -32,6 +32,7 @@ export const API_ENDPOINTS = {
   FACILITATION_ASSIGNMENTS:  `${API_BASE_URL}/api/facilitation-assignments/`,
   TRAINING_REPORTS:          `${API_BASE_URL}/api/training-reports/`,
   ANNUAL_REVIEWS:            `${API_BASE_URL}/api/annual-reviews/`,
+  BULK_EMAIL:                `${API_BASE_URL}/api/bulk-email/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
@@ -44,5 +45,6 @@ export const WORK_ORDER_PDF_URL   = (id) => `${API_BASE_URL}/api/work-orders/${i
 // legacy alias kept for any existing references
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;
+export const BULK_EMAIL = API_ENDPOINTS.BULK_EMAIL;
 
 export default API_BASE_URL;

@@ -2966,3 +2966,59 @@ class AnnualReviewReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMix
         if serializer.validated_data.get('status') == 'submitted':
             data['submitted_at'] = timezone.now()
         serializer.save(**data)
+
+
+# ── Bulk communication email ────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([_IsAuth])
+def bulk_email_view(request):
+    """Admin-only: send a communication email to a selection of BGEs or MSMEs."""
+    user = request.user
+    if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+        raise PermissionDenied("Only administrators can send bulk emails.")
+
+    recipient_type = request.data.get('recipient_type', 'bge')   # 'bge' | 'msme'
+    recipient_ids  = request.data.get('recipient_ids', [])        # [] = all
+    subject        = (request.data.get('subject') or '').strip()
+    body_text      = (request.data.get('body_text') or '').strip()
+    body_html      = (request.data.get('body_html') or '').strip()
+
+    if not subject:
+        return Response({'detail': 'Subject is required.'}, status=400)
+    if not body_text:
+        return Response({'detail': 'Plain-text body is required.'}, status=400)
+
+    if recipient_type == 'bge':
+        qs = BusinessGrowthExpert.objects.filter(email__isnull=False).exclude(email='')
+        if recipient_ids:
+            qs = qs.filter(id__in=recipient_ids)
+        pairs = [(b.name or 'BGE', b.email) for b in qs]
+    else:
+        qs = MSME.objects.filter(email__isnull=False).exclude(email='')
+        if recipient_ids:
+            qs = qs.filter(id__in=recipient_ids)
+        pairs = [(m.owner_name or m.business_name or 'Business Owner', m.email) for m in qs]
+
+    from_email = settings.DEFAULT_FROM_EMAIL
+    reply_to   = getattr(settings, 'EMAIL_REPLY_TO', from_email)
+    sent = 0
+    errors = []
+
+    for name, email_addr in pairs:
+        first = (name or '').split()[0] if name else 'Team'
+        try:
+            txt  = body_text.replace('{{name}}', first)
+            html = body_html.replace('{{name}}', first) if body_html else ''
+            msg  = EmailMultiAlternatives(
+                subject=subject, body=txt,
+                from_email=from_email, to=[email_addr], reply_to=[reply_to],
+            )
+            if html:
+                msg.attach_alternative(html, 'text/html')
+            msg.send()
+            sent += 1
+        except Exception as e:
+            errors.append({'email': email_addr, 'error': str(e)})
+
+    return Response({'sent': sent, 'failed': len(errors), 'errors': errors[:20]})
