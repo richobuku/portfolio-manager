@@ -1093,9 +1093,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'groups',      label: 'My Groups',      icon: <GroupIcon /> },
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
-    ...(facilitationAssignments.length > 0
-      ? [{ key: 'training', label: 'Training', icon: <School />, badge: facilitationAssignments.length }]
-      : []),
+    { key: 'training', label: 'Training', icon: <School />,
+      badge: facilitationAssignments.length + mentorSessions.length || undefined },
   ];
 
   const SidebarContent = () => (
@@ -1972,10 +1971,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Box>
             </Box>
 
-          {facilitationAssignments.length === 0 ? (
+          {facilitationAssignments.length === 0 && mentorSessions.length === 0 ? (
             <Paper sx={{ p: 6, textAlign: 'center' }}>
               <School sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-              <Typography color="text.secondary">No facilitation assignments yet. Contact your programme administrator.</Typography>
+              <Typography color="text.secondary" gutterBottom>No training assignments yet.</Typography>
+              <Typography variant="caption" color="text.secondary">
+                You will appear here as a lead facilitator or mentor once the programme administrator assigns you to a session.
+              </Typography>
             </Paper>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
@@ -2210,45 +2212,70 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   onChange={e => setMentorReportForm(f => ({ ...f, venue: e.target.value }))} />
               </Grid>
 
-              {/* Read-only context from session */}
-              {mentorReportSession.lead_bge_name && (
-                <Grid item xs={12}>
-                  <Alert severity="info" icon={false} sx={{ py: 0.5 }}>
-                    <Typography variant="body2">
-                      <strong>Lead Facilitator:</strong> {mentorReportSession.lead_bge_name}
-                    </Typography>
-                  </Alert>
-                </Grid>
-              )}
-
-              {/* MSMEs in the session */}
-              {(mentorReportSession.businesses_detail || []).length > 0 && (
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" gutterBottom>MSMEs in this session</Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {mentorReportSession.businesses_detail.map(m => (
-                      <Chip key={m.id} label={`${m.business_name}${m.owner_name ? ` · ${m.owner_name}` : ''}`} size="small" variant="outlined" />
-                    ))}
-                  </Box>
-                </Grid>
-              )}
-
+              {/* ── Session context panel (read-only) ── */}
               <Grid item xs={12}>
-                <Typography variant="subtitle2" color="primary" sx={{ mt: 1, mb: 0.5 }}>Mentoring Activities</Typography>
+                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Session Overview</Typography>
+                  <Grid container spacing={1}>
+                    {mentorReportSession.lead_bge_name && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary" display="block">Lead Facilitator</Typography>
+                        <Typography variant="body2" fontWeight={600}>{mentorReportSession.lead_bge_name}</Typography>
+                      </Grid>
+                    )}
+                    {(mentorReportSession.mentor_bges_detail || []).filter(b => b.name !== (mentorReportSession._myName)).length > 0 && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary" display="block">Other Mentor BGEs</Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.25 }}>
+                          {mentorReportSession.mentor_bges_detail.map(b => (
+                            <Chip key={b.id} label={b.name} size="small" sx={{ bgcolor: '#EDE7F6', color: '#4527A0', fontWeight: 600 }} />
+                          ))}
+                        </Box>
+                      </Grid>
+                    )}
+                    {(mentorReportSession.businesses_detail || []).length > 0 && (
+                      <Grid item xs={12}>
+                        <Typography variant="caption" color="text.secondary" display="block">MSMEs in this session</Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.25 }}>
+                          {mentorReportSession.businesses_detail.map(m => (
+                            <Chip key={m.id} label={`${m.business_name}${m.owner_name ? ` · ${m.owner_name}` : ''}`}
+                              size="small" variant="outlined" />
+                          ))}
+                        </Box>
+                      </Grid>
+                    )}
+                    <Grid item xs={12}>
+                      <Alert severity={mentorReportSession.attendance_count > 0 ? 'success' : 'warning'}
+                        icon={false} sx={{ py: 0.5, mt: 0.5 }}>
+                        <Typography variant="body2">
+                          <strong>Attendance Sheet:</strong>{' '}
+                          {mentorReportSession.attendance_count > 0
+                            ? `${mentorReportSession.attendance_count} attendee${mentorReportSession.attendance_count !== 1 ? 's' : ''} recorded by the lead facilitator. This sheet is attached to your report automatically.`
+                            : 'Not yet completed by the lead facilitator.'}
+                        </Typography>
+                      </Alert>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+
+              {/* ── Report fields ── */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" color="primary" sx={{ mt: 0.5, mb: 0.5 }}>Your Mentoring Activities</Typography>
                 <TextField fullWidth size="small" multiline minRows={3}
-                  label="What activities did you carry out as a mentor?"
+                  label="What activities did you carry out as a mentor during this session?"
                   value={mentorReportForm.mentoring_activities}
                   onChange={e => setMentorReportForm(f => ({ ...f, mentoring_activities: e.target.value }))} />
               </Grid>
               <Grid item xs={12}>
                 <TextField fullWidth size="small" multiline minRows={3}
-                  label="MSMEs you specifically supported"
+                  label="Which MSMEs did you specifically support and how?"
                   value={mentorReportForm.msmes_mentored}
                   onChange={e => setMentorReportForm(f => ({ ...f, msmes_mentored: e.target.value }))} />
               </Grid>
               <Grid item xs={12}>
                 <TextField fullWidth size="small" multiline minRows={3}
-                  label="Key observations on MSME progress / needs"
+                  label="Key observations on MSME progress and needs"
                   value={mentorReportForm.key_observations}
                   onChange={e => setMentorReportForm(f => ({ ...f, key_observations: e.target.value }))} />
               </Grid>
@@ -2260,24 +2287,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField fullWidth size="small" multiline minRows={2}
-                  label="Recommendations"
+                  label="Recommendations for future sessions"
                   value={mentorReportForm.recommendations}
                   onChange={e => setMentorReportForm(f => ({ ...f, recommendations: e.target.value }))} />
               </Grid>
               <Grid item xs={12}>
                 <TextField fullWidth size="small" multiline minRows={2}
-                  label="Agreed next steps"
+                  label="Agreed next steps / follow-up actions"
                   value={mentorReportForm.next_steps}
                   onChange={e => setMentorReportForm(f => ({ ...f, next_steps: e.target.value }))} />
               </Grid>
-
-              {/* Attendance sheet (read-only, from session) */}
-              {mentorReportSession.attendance_count > 0 && (
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" sx={{ mt: 1 }}>Attendance Sheet (completed by lead facilitator)</Typography>
-                  <Typography variant="caption" color="text.secondary">{mentorReportSession.attendance_count} attendees recorded</Typography>
-                </Grid>
-              )}
             </Grid>
           </DialogContent>
           <DialogActions sx={{ px: 2, py: 1.5 }}>
