@@ -4662,7 +4662,7 @@ PRUDEV II BDS Team`,
         subject: commSubject,
         body: commBody,
       };
-      const res = await axios.post(BULK_EMAIL, payload, { withCredentials: true });
+      const res = await axios.post(BULK_EMAIL, payload, { headers });
       notify(`Sent: ${res.data.sent}${res.data.failed > 0 ? ` | Failed: ${res.data.failed}` : ''}`, 'success');
       setCommSelected(new Set());
     } catch (err) {
