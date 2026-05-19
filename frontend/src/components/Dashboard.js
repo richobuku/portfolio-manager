@@ -740,10 +740,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [trainingSessions, setTrainingSessions] = useState([]);
   const [trainingTopics, setTrainingTopics] = useState([]);
   const [facilitationAssignments, setFacilitationAssignments] = useState([]);
-  const [facilitationDialog, setFacilitationDialog] = useState(false);
-  const [facilitationEditing, setFacilitationEditing] = useState(null);
-  const [facilitationForm, setFacilitationForm] = useState({ bge: '', topic: '', role: 'lead', work_order: '', session: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
-  const [facilitationSaving, setFacilitationSaving] = useState(false);
   const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -1337,42 +1333,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const openAssignMsmeDialog = (group) => setAssignMsmeGroup(group);
 
   // ── facilitation assignments ───────────────────────────────────────────────
-  const openFacilitationEdit = (a) => {
-    setFacilitationEditing(a.id);
-    setFacilitationForm({ bge: a.bge, topic: a.topic, role: a.role || 'lead', work_order: a.work_order || '', session: a.session || '', assigned_date: a.assigned_date, notes: a.notes || '' });
-    setFacilitationDialog(true);
-  };
-
-  const saveFacilitationAssignment = async () => {
-    setFacilitationSaving(true);
-    try {
-      const payload = { ...facilitationForm };
-      if (!payload.work_order) delete payload.work_order;
-      if (!payload.session) delete payload.session;
-      if (facilitationEditing) {
-        await axios.put(`${API_ENDPOINTS.FACILITATION_ASSIGNMENTS}${facilitationEditing}/`, payload, { headers });
-        notify('Assignment updated');
-      } else {
-        await axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, payload, { headers });
-        notify('Facilitator assigned');
-      }
-      setFacilitationDialog(false);
-      setFacilitationEditing(null);
-      setFacilitationForm({ bge: '', topic: '', role: 'lead', work_order: '', session: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
-      fetchAll();
-    } catch (e) {
-      notify(e.response?.data?.non_field_errors?.[0] || e.response?.data?.detail || 'Failed to save assignment', 'error');
-    } finally { setFacilitationSaving(false); }
-  };
-
-  const removeAssignment = async (id) => {
-    try {
-      await axios.delete(`${API_ENDPOINTS.FACILITATION_ASSIGNMENTS}${id}/`, { headers });
-      notify('Assignment removed');
-      fetchAll();
-    } catch { notify('Failed to remove assignment', 'error'); }
-  };
-
   // ── training sessions ──────────────────────────────────────────────────────
   const openSessionEdit = (s) => {
     setSessionEditing(s.id);
@@ -2175,64 +2135,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   const renderTraining = () => (
     <Box>
-      {/* ── Facilitation Assignments ── */}
-      <SectionHeader title="Facilitation Assignments" subtitle={`${facilitationAssignments.length} assigned`}>
-        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => { setFacilitationEditing(null); setFacilitationForm({ bge: '', topic: '', role: 'lead', work_order: '', session: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' }); setFacilitationDialog(true); }}>
-          Assign Facilitator
-        </Button>
-      </SectionHeader>
-
-      {facilitationAssignments.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 3, mb: 3, textAlign: 'center', color: 'text.secondary' }}>
-          No facilitators assigned yet. Click "Assign Facilitator" to get started.
-        </Paper>
-      ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
-          <Table size="small">
-            <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-              <TableRow>
-                <TableCell>BGE</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell>Module</TableCell>
-                <TableCell>Topic / Section</TableCell>
-                <TableCell>Session</TableCell>
-                <TableCell>Work Order</TableCell>
-                <TableCell>Assigned Date</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {facilitationAssignments.map(a => (
-                <TableRow key={a.id} hover>
-                  <TableCell sx={{ fontWeight: 600 }}>{a.bge_name}</TableCell>
-                  <TableCell>
-                    <Chip label={a.role === 'lead' ? 'Lead' : 'Mentor'} size="small"
-                      color={a.role === 'lead' ? 'primary' : 'secondary'} />
-                  </TableCell>
-                  <TableCell>
-                    <Chip label={`Module ${a.topic_module_number}`} size="small" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 700 }} />
-                  </TableCell>
-                  <TableCell>{a.topic_section_number ? `${a.topic_section_number} – ` : ''}{a.topic_name}</TableCell>
-                  <TableCell sx={{ color: a.session_title ? 'text.primary' : 'text.disabled' }}>
-                    {a.session_title ? `${a.session_title} (${a.session_date})` : '— Pre-assignment —'}
-                  </TableCell>
-                  <TableCell sx={{ color: 'text.secondary' }}>{a.work_order_number || '—'}</TableCell>
-                  <TableCell>{a.assigned_date}</TableCell>
-                  <TableCell>
-                    <Tooltip title="Edit assignment">
-                      <IconButton size="small" onClick={() => openFacilitationEdit(a)}><Edit fontSize="small" /></IconButton>
-                    </Tooltip>
-                    <Tooltip title="Remove assignment">
-                      <IconButton size="small" color="error" onClick={() => removeAssignment(a.id)}><Delete fontSize="small" /></IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
       {/* ── Training Sessions ── */}
       <SectionHeader title="Training Sessions" subtitle={`${trainingSessions.length} sessions`}>
         <Button variant="contained" startIcon={<Add />} size="small" onClick={() => { setSessionEditing(null); setSessionForm(EMPTY_SESSION_FORM); setSessionDialog(true); }}>
@@ -5727,109 +5629,6 @@ PRUDEV II BDS Team`
           <Button onClick={() => { setSessionDialog(false); setSessionEditing(null); }}>Cancel</Button>
           <Button variant="contained" onClick={createSession} disabled={sessionLoading || !sessionForm.title || !sessionForm.date}>
             {sessionLoading ? <CircularProgress size={18} /> : sessionEditing ? 'Save Changes' : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── Assign Facilitator dialog ──────────────────────────────────────── */}
-      <Dialog open={facilitationDialog} onClose={() => { setFacilitationDialog(false); setFacilitationEditing(null); }} maxWidth="sm" fullWidth>
-        <DialogTitle>{facilitationEditing ? 'Edit Facilitation Assignment' : 'New Facilitation Assignment'}</DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={2} sx={{ pt: 1 }}>
-            <Grid item xs={8}>
-              <FormControl fullWidth size="small" required>
-                <InputLabel>BGE</InputLabel>
-                <Select value={facilitationForm.bge} onChange={e => setFacilitationForm({ ...facilitationForm, bge: e.target.value })} label="BGE">
-                  <MenuItem value="">— Select BGE —</MenuItem>
-                  {experts.filter(e => e.is_senior).map(e => (
-                    <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` (${e.bge_code})` : ''}</MenuItem>
-                  ))}
-                  {experts.filter(e => !e.is_senior).length > 0 && [
-                    <ListSubheader key="other-hdr" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>Other BGEs</ListSubheader>,
-                    ...experts.filter(e => !e.is_senior).map(e => (
-                      <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` (${e.bge_code})` : ''}</MenuItem>
-                    )),
-                  ]}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={4}>
-              <FormControl fullWidth size="small" required>
-                <InputLabel>Role</InputLabel>
-                <Select value={facilitationForm.role} onChange={e => setFacilitationForm({ ...facilitationForm, role: e.target.value })} label="Role">
-                  <MenuItem value="lead">Lead Facilitator</MenuItem>
-                  <MenuItem value="mentor">Mentor</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth size="small" required>
-                <InputLabel>Training Module / Topic</InputLabel>
-                <Select value={facilitationForm.topic} onChange={e => setFacilitationForm({ ...facilitationForm, topic: e.target.value })} label="Training Module / Topic">
-                  <MenuItem value="">— Select topic —</MenuItem>
-                  {(() => {
-                    const grouped = trainingTopics.reduce((acc, t) => {
-                      const key = t.module_number || 0;
-                      if (!acc[key]) acc[key] = { label: t.module_name || 'Other', items: [] };
-                      acc[key].items.push(t);
-                      return acc;
-                    }, {});
-                    return Object.entries(grouped).map(([modNum, { label, items }]) => [
-                      <ListSubheader key={`mod-${modNum}`} sx={{ fontWeight: 700, lineHeight: '2em', bgcolor: 'grey.100' }}>
-                        {modNum > 0 ? `Module ${modNum}: ${label}` : label}
-                      </ListSubheader>,
-                      ...items.map(t => (
-                        <MenuItem key={t.id} value={t.id} sx={{ pl: 3 }}>
-                          {t.section_number ? `${t.section_number} – ` : ''}{t.name}
-                        </MenuItem>
-                      )),
-                    ]);
-                  })()}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Link to Session (optional)</InputLabel>
-                <Select value={facilitationForm.session} onChange={e => setFacilitationForm({ ...facilitationForm, session: e.target.value })} label="Link to Session (optional)">
-                  <MenuItem value="">— Pre-assignment (no session yet) —</MenuItem>
-                  {trainingSessions.map(s => (
-                    <MenuItem key={s.id} value={s.id}>{s.title} ({s.date})</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Work Order (optional)</InputLabel>
-                <Select value={facilitationForm.work_order} onChange={e => setFacilitationForm({ ...facilitationForm, work_order: e.target.value })} label="Work Order (optional)">
-                  <MenuItem value="">— Not linked —</MenuItem>
-                  {workOrders.map(wo => (
-                    <MenuItem key={wo.id} value={wo.id}>{wo.work_order_number} · {wo.bge_name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth size="small" required label="Assignment Date" type="date"
-                InputLabelProps={{ shrink: true }}
-                value={facilitationForm.assigned_date}
-                onChange={e => setFacilitationForm({ ...facilitationForm, assigned_date: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth size="small" multiline rows={2} label="Notes (optional)"
-                value={facilitationForm.notes}
-                onChange={e => setFacilitationForm({ ...facilitationForm, notes: e.target.value })}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setFacilitationDialog(false); setFacilitationEditing(null); }}>Cancel</Button>
-          <Button variant="contained" onClick={saveFacilitationAssignment}
-            disabled={facilitationSaving || !facilitationForm.bge || !facilitationForm.topic || !facilitationForm.assigned_date}>
-            {facilitationSaving ? <CircularProgress size={18} /> : facilitationEditing ? 'Save Changes' : 'Assign'}
           </Button>
         </DialogActions>
       </Dialog>

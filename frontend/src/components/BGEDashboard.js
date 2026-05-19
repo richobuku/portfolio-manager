@@ -144,7 +144,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   // Training report state (used both in Training tab detail dialog and standalone)
   const [trainingReportDialog, setTrainingReportDialog] = useState(false);
-  const [trainingReportSession, setTrainingReportSession] = useState(null);
+  const [trainingReportSession] = useState(null);
   const [trainingReportData, setTrainingReportData] = useState(null);
   const [trainingReportSaving, setTrainingReportSaving] = useState(false);
   const [trainingReportForm, setTrainingReportForm] = useState({});
