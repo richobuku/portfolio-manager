@@ -4538,7 +4538,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const COMM_TEMPLATES = [
     {
       key: 'bge_guidance',
-      label: 'BGE Data Update & Annual Review Guide',
+      label: 'BGE — Data Update & Annual Review Guide',
       subject: 'How to Use the Data Update Tool and Annual Review Template',
       body: `Dear {{name}},
 
@@ -4580,6 +4580,27 @@ If you have any questions, please reply to this email.
 Best regards,
 PRUDEV II BDS Team`,
     },
+    {
+      key: 'msme_data_visit',
+      label: 'MSME — Upcoming Data Visit Notification',
+      subject: 'A Quick Check-In From the PRUDEV II Team',
+      body: `Dear {{name}},
+
+We hope you and your business are doing well.
+
+As you may recall, we recently held a training session on business compliance and governance — and we are truly grateful for your participation and continued engagement with the PRUDEV II programme.
+
+As part of our ongoing commitment to supporting your growth, we are now reaching out to check on how things are progressing. We want to understand the real impact our training and support have been making, and to hear directly from you about what is working and what more we can do.
+
+To that end, we are sending one of our Business Growth Experts (BGEs) to visit you at your business. They will be in touch with you shortly to arrange a convenient time to come by. The visit will be brief and informal — they simply want to sit with you, listen, and document how your business is doing at this stage.
+
+We kindly ask that you make yourself available this week or next week to receive them. Your honest feedback means a great deal to us and will directly shape how we support you going forward.
+
+Thank you for being such a valued part of the PRUDEV II community. We look forward to seeing you soon.
+
+Warm regards,
+PRUDEV II BDS Team`,
+    },
   ];
 
   const [commTab, setCommTab] = React.useState(0); // 0=BGEs 1=MSMEs
@@ -4593,14 +4614,14 @@ PRUDEV II BDS Team`,
 
   const commRecipients = commTab === 0
     ? experts.filter(e => e.email)
-    : msmes.filter(m => m.owner_email);
+    : msmes.filter(m => m.email);
 
   const commFiltered = commRecipients.filter(r => {
     const name = commTab === 0
       ? (r.name || r.full_name || r.expert_name || '')
       : (r.business_name || r.owner_name || '');
     return name.toLowerCase().includes(commSearch.toLowerCase()) ||
-      (commTab === 0 ? r.email : r.owner_email || '').toLowerCase().includes(commSearch.toLowerCase());
+      (r.email || '').toLowerCase().includes(commSearch.toLowerCase());
   });
 
   const commAllSelected = commFiltered.length > 0 && commFiltered.every(r => commSelected.has(r.id));
@@ -4645,7 +4666,8 @@ PRUDEV II BDS Team`,
       notify(`Sent: ${res.data.sent}${res.data.failed > 0 ? ` | Failed: ${res.data.failed}` : ''}`, 'success');
       setCommSelected(new Set());
     } catch (err) {
-      notify(err.response?.data?.error || 'Failed to send emails', 'error');
+      const d = err.response?.data;
+      notify(d?.detail || d?.error || d?.body?.[0] || 'Failed to send emails', 'error');
     } finally {
       setCommSending(false);
     }
@@ -4693,7 +4715,7 @@ PRUDEV II BDS Team`,
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
           <Tabs value={commTab} onChange={(_, v) => { setCommTab(v); setCommSelected(new Set()); setCommSearch(''); }}>
             <Tab label={`BGE Experts (${experts.filter(e => e.email).length})`} />
-            <Tab label={`MSMEs (${msmes.filter(m => m.owner_email).length})`} />
+            <Tab label={`MSMEs (${msmes.filter(m => m.email).length})`} />
           </Tabs>
           {commSelected.size > 0 && (
             <Chip
@@ -4725,7 +4747,7 @@ PRUDEV II BDS Team`,
             const name = commTab === 0
               ? (r.name || r.full_name || r.expert_name || '—')
               : (r.business_name || '—');
-            const email = commTab === 0 ? r.email : r.owner_email;
+            const email = r.email;
             const sub = commTab === 0 ? (r.location || r.bge_code || '') : (r.owner_name || '');
             return (
               <ListItemButton key={r.id} onClick={() => setCommSelected(prev => {
