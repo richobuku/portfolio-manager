@@ -662,6 +662,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       const assignment = facilitationAssignments.find(a => a.session === session.id || a.topic === session.topic);
       setTrainingReportData(null);
       const teamNames = (session.team || []).map(m => m.bge_name).filter(Boolean).join(', ');
+      const stats = session.attendance_stats || {};
       setTrainingReportForm({
         ...EMPTY_TRAINING_REPORT,
         training_title: session.title || '',
@@ -669,6 +670,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         training_dates: session.date || '',
         facilitation_team: teamNames,
         session_objectives: assignment?.notes || '',
+        // Auto-fill demographics from attendance sheet if available
+        ...(stats.total_present ? {
+          participants_male_youth:   stats.youth_male   || 0,
+          participants_female_youth: stats.youth_female || 0,
+          participants_adult_male:   stats.adult_male   || 0,
+          participants_adult_female: stats.adult_female || 0,
+        } : {}),
       });
     }
     setSessionDetailOpen(true);
@@ -2247,17 +2255,84 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         </Box>
                       </Grid>
                     )}
-                    <Grid item xs={12}>
-                      <Alert severity={mentorReportSession.attendance_count > 0 ? 'success' : 'warning'}
-                        icon={false} sx={{ py: 0.5, mt: 0.5 }}>
-                        <Typography variant="body2">
-                          <strong>Attendance Sheet:</strong>{' '}
-                          {mentorReportSession.attendance_count > 0
-                            ? `${mentorReportSession.attendance_count} attendee${mentorReportSession.attendance_count !== 1 ? 's' : ''} recorded by the lead facilitator. This sheet is attached to your report automatically.`
-                            : 'Not yet completed by the lead facilitator.'}
-                        </Typography>
-                      </Alert>
-                    </Grid>
+                    {/* ── Attendance stats summary ── */}
+                    {(() => {
+                      const stats = mentorReportSession.attendance_stats || {};
+                      const list  = mentorReportSession.attendance_list  || [];
+                      if (!stats.total_present) return (
+                        <Grid item xs={12}>
+                          <Alert severity="warning" icon={false} sx={{ py: 0.5 }}>
+                            <Typography variant="body2">
+                              <strong>Attendance Sheet:</strong> Not yet completed by the lead facilitator.
+                            </Typography>
+                          </Alert>
+                        </Grid>
+                      );
+                      return (
+                        <>
+                          {/* Stats chips */}
+                          <Grid item xs={12}>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                              Attendance Summary (from lead facilitator's sheet)
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                              <Chip label={`${stats.total_present} present`} size="small" color="success" />
+                              <Chip label={`${stats.male || 0}M / ${stats.female || 0}F`} size="small" sx={{ bgcolor: '#E3F2FD', color: '#1565C0' }} />
+                              <Chip label={`Youth: ${(stats.youth_male || 0) + (stats.youth_female || 0)}`} size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32' }} />
+                              <Chip label={`Adult: ${(stats.adult_male || 0) + (stats.adult_female || 0)}`} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100' }} />
+                              {stats.refugee > 0 && <Chip label={`Refugee: ${stats.refugee}`} size="small" sx={{ bgcolor: '#F3E5F5', color: '#6A1B9A' }} />}
+                              {stats.host_community > 0 && <Chip label={`Host: ${stats.host_community}`} size="small" variant="outlined" />}
+                            </Box>
+                          </Grid>
+
+                          {/* Detailed breakdown table */}
+                          <Grid item xs={12}>
+                            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+                              <Box sx={{ bgcolor: '#f5f5f5', px: 1.5, py: 0.75, display: 'flex', gap: 2 }}>
+                                <Typography variant="caption" fontWeight={700} sx={{ flex: 2 }}>Name / Business</Typography>
+                                <Typography variant="caption" fontWeight={700} sx={{ width: 40, textAlign: 'center' }}>Gender</Typography>
+                                <Typography variant="caption" fontWeight={700} sx={{ width: 60, textAlign: 'center' }}>Age</Typography>
+                                <Typography variant="caption" fontWeight={700} sx={{ width: 55, textAlign: 'center' }}>Status</Typography>
+                                <Typography variant="caption" fontWeight={700} sx={{ width: 48, textAlign: 'center' }}>Present</Typography>
+                              </Box>
+                              {list.length === 0 ? (
+                                <Box sx={{ px: 1.5, py: 1 }}>
+                                  <Typography variant="caption" color="text.secondary">No individual attendance records yet.</Typography>
+                                </Box>
+                              ) : list.map((a, i) => (
+                                <Box key={a.id} sx={{
+                                  display: 'flex', gap: 2, px: 1.5, py: 0.5, alignItems: 'center',
+                                  bgcolor: i % 2 === 0 ? 'transparent' : 'action.hover',
+                                }}>
+                                  <Box sx={{ flex: 2, minWidth: 0 }}>
+                                    <Typography variant="body2" noWrap fontWeight={a.present ? 500 : 400} color={a.present ? 'text.primary' : 'text.disabled'}>
+                                      {a.attendee_name || a.msme_name || '—'}
+                                    </Typography>
+                                    {a.msme_name && a.attendee_name && (
+                                      <Typography variant="caption" color="text.secondary" noWrap>{a.msme_name}</Typography>
+                                    )}
+                                  </Box>
+                                  <Typography variant="body2" sx={{ width: 40, textAlign: 'center', color: a.gender === 'M' ? '#1565C0' : '#880E4F' }}>
+                                    {a.gender || '—'}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ width: 60, textAlign: 'center', color: 'text.secondary' }}>
+                                    {a.age_group || '—'}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ width: 55, textAlign: 'center', color: a.refugee_status === 'R' ? '#6A1B9A' : 'text.secondary' }}>
+                                    {a.refugee_status === 'R' ? 'Refugee' : a.refugee_status === 'H' ? 'Host' : '—'}
+                                  </Typography>
+                                  <Box sx={{ width: 48, textAlign: 'center' }}>
+                                    {a.present
+                                      ? <CheckCircle sx={{ fontSize: 16, color: 'success.main' }} />
+                                      : <Typography variant="caption" color="error.main">✗</Typography>}
+                                  </Box>
+                                </Box>
+                              ))}
+                            </Box>
+                          </Grid>
+                        </>
+                      );
+                    })()}
                   </Grid>
                 </Paper>
               </Grid>
@@ -2815,6 +2890,82 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <Typography variant="overline" color="primary" sx={{ display: 'block', mb: 1.5 }}>
             2. Participant Demographics
           </Typography>
+          {/* Auto-fill panel from attendance sheet */}
+          {(() => {
+            const stats = trainingReportSession?.attendance_stats;
+            const list  = trainingReportSession?.attendance_list || [];
+            if (!stats?.total_present) return null;
+            return (
+              <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: '#f0fdf4', borderColor: 'success.light' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} color="success.dark">
+                      Attendance Sheet Available ({stats.total_present} present)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Demographics computed automatically from the attendance records below.
+                    </Typography>
+                  </Box>
+                  <Button size="small" variant="contained" color="success"
+                    onClick={() => setTrainingReportForm(f => ({
+                      ...f,
+                      participants_male_youth:   stats.youth_male   || 0,
+                      participants_female_youth: stats.youth_female || 0,
+                      participants_adult_male:   stats.adult_male   || 0,
+                      participants_adult_female: stats.adult_female || 0,
+                    }))}>
+                    Auto-fill
+                  </Button>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: list.length ? 1.5 : 0 }}>
+                  <Chip label={`Total: ${stats.total_present}`} size="small" color="success" />
+                  <Chip label={`${stats.male || 0}M / ${stats.female || 0}F`} size="small" sx={{ bgcolor: '#E3F2FD', color: '#1565C0' }} />
+                  <Chip label={`Youth ♂${stats.youth_male || 0} ♀${stats.youth_female || 0}`} size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32' }} />
+                  <Chip label={`Adult ♂${stats.adult_male || 0} ♀${stats.adult_female || 0}`} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100' }} />
+                  {stats.refugee > 0 && <Chip label={`Refugee: ${stats.refugee}`} size="small" sx={{ bgcolor: '#F3E5F5', color: '#6A1B9A' }} />}
+                  {stats.host_community > 0 && <Chip label={`Host Community: ${stats.host_community}`} size="small" variant="outlined" />}
+                </Box>
+                {list.length > 0 && (
+                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', maxHeight: 200, overflowY: 'auto' }}>
+                    <Box sx={{ bgcolor: '#f5f5f5', px: 1.5, py: 0.5, display: 'flex', gap: 2 }}>
+                      <Typography variant="caption" fontWeight={700} sx={{ flex: 2 }}>Name / Business</Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ width: 36, textAlign: 'center' }}>Sex</Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ width: 60, textAlign: 'center' }}>Age</Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ width: 52, textAlign: 'center' }}>Status</Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ width: 44, textAlign: 'center' }}>Present</Typography>
+                    </Box>
+                    {list.map((a, i) => (
+                      <Box key={a.id} sx={{
+                        display: 'flex', gap: 2, px: 1.5, py: 0.4, alignItems: 'center',
+                        bgcolor: i % 2 === 0 ? 'transparent' : 'action.hover',
+                      }}>
+                        <Box sx={{ flex: 2, minWidth: 0 }}>
+                          <Typography variant="body2" noWrap fontWeight={500}>{a.attendee_name || a.msme_name || '—'}</Typography>
+                          {a.msme_name && a.attendee_name && (
+                            <Typography variant="caption" color="text.secondary" noWrap>{a.msme_name}</Typography>
+                          )}
+                        </Box>
+                        <Typography variant="body2" sx={{ width: 36, textAlign: 'center', color: a.gender === 'M' ? '#1565C0' : '#880E4F' }}>
+                          {a.gender || '—'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ width: 60, textAlign: 'center', color: 'text.secondary' }}>
+                          {a.age_group || '—'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ width: 52, textAlign: 'center', color: a.refugee_status === 'R' ? '#6A1B9A' : 'text.secondary' }}>
+                          {a.refugee_status === 'R' ? 'Refugee' : a.refugee_status === 'H' ? 'Host' : '—'}
+                        </Typography>
+                        <Box sx={{ width: 44, textAlign: 'center' }}>
+                          {a.present
+                            ? <CheckCircle sx={{ fontSize: 15, color: 'success.main' }} />
+                            : <Typography variant="caption" color="error.main">✗</Typography>}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Paper>
+            );
+          })()}
           <Grid container spacing={2} sx={{ mb: 2 }}>
             {[
               { key: 'participants_male_youth',   label: 'Male Youth (15–35)' },

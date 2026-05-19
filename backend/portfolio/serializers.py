@@ -226,6 +226,53 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
         lead = next((a for a in obj.facilitation_assignments.all() if a.role == 'lead'), None)
         return lead.bge.name if lead and lead.bge_id else None
 
+    attendance_stats = serializers.SerializerMethodField()
+
+    def get_attendance_stats(self, obj):
+        rows = list(obj.attendances.filter(present=True).values('gender', 'age_group', 'refugee_status'))
+        total = len(rows)
+        male   = sum(1 for r in rows if r['gender'] == 'M')
+        female = sum(1 for r in rows if r['gender'] == 'F')
+        youth_m  = sum(1 for r in rows if r['gender'] == 'M' and r['age_group'] == '18-34')
+        youth_f  = sum(1 for r in rows if r['gender'] == 'F' and r['age_group'] == '18-34')
+        adult_m  = sum(1 for r in rows if r['gender'] == 'M' and r['age_group'] != '18-34' and r['age_group'])
+        adult_f  = sum(1 for r in rows if r['gender'] == 'F' and r['age_group'] != '18-34' and r['age_group'])
+        refugee  = sum(1 for r in rows if r['refugee_status'] == 'R')
+        host     = sum(1 for r in rows if r['refugee_status'] == 'H')
+        age_groups = {}
+        for r in rows:
+            ag = r['age_group'] or 'Unknown'
+            age_groups[ag] = age_groups.get(ag, 0) + 1
+        return {
+            'total_present': total,
+            'male': male,
+            'female': female,
+            'youth_male': youth_m,
+            'youth_female': youth_f,
+            'adult_male': adult_m,
+            'adult_female': adult_f,
+            'refugee': refugee,
+            'host_community': host,
+            'age_groups': age_groups,
+        }
+
+    attendance_list = serializers.SerializerMethodField()
+
+    def get_attendance_list(self, obj):
+        return [
+            {
+                'id': a.id,
+                'attendee_name': a.attendee_name,
+                'attendee_phone': a.attendee_phone,
+                'msme_name': a.msme.business_name if a.msme_id else '',
+                'gender': a.gender,
+                'age_group': a.age_group,
+                'refugee_status': a.refugee_status,
+                'present': a.present,
+            }
+            for a in obj.attendances.select_related('msme').order_by('attendee_name')
+        ]
+
 
 class AttendanceSerializer(serializers.ModelSerializer):
     msme_name    = serializers.CharField(source='msme.business_name', read_only=True, allow_null=True)

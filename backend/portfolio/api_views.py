@@ -1651,6 +1651,7 @@ class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             'businesses',
             'facilitation_assignments__bge',
             'facilitation_assignments__work_order',
+            'attendances__msme',
         ).all()
         user = self.request.user
         if user.is_staff or user.is_superuser:
