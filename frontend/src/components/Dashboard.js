@@ -2238,6 +2238,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <Tooltip title="Edit session">
                     <IconButton size="small" onClick={() => openSessionEdit(s)}><Edit fontSize="small" /></IconButton>
                   </Tooltip>
+                  <Tooltip title={`Notify ${(s.businesses_detail || []).length} MSME${(s.businesses_detail || []).length !== 1 ? 's' : ''} by email`}>
+                    <span>
+                      <IconButton size="small" color="secondary" disabled={!(s.businesses_detail || []).length}
+                        onClick={() => openSessionNotify(s)}>
+                        <Email fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                   <Tooltip title="Mark attendance">
                     <IconButton size="small" color="primary" onClick={() => openAttendance(s)}><CheckCircle fontSize="small" /></IconButton>
                   </Tooltip>
@@ -4612,6 +4620,58 @@ PRUDEV II BDS Team`,
   const [commSending, setCommSending] = React.useState(false);
   const [commConfirm, setCommConfirm] = React.useState(false);
 
+  // ── Session MSME notification dialog ────────────────────────────────────
+  const [sessionNotifyDialog, setSessionNotifyDialog] = React.useState(false);
+  const [sessionNotifySession, setSessionNotifySession] = React.useState(null);
+  const [sessionNotifySubject, setSessionNotifySubject] = React.useState('');
+  const [sessionNotifyBody, setSessionNotifyBody] = React.useState('');
+  const [sessionNotifySending, setSessionNotifySending] = React.useState(false);
+
+  const openSessionNotify = (s) => {
+    setSessionNotifySession(s);
+    const msmeNames = (s.businesses_detail || []).map(m => `- ${m.business_name}${m.owner_name ? ` (${m.owner_name})` : ''}`).join('\n');
+    setSessionNotifySubject(`Training Session: ${s.title}`);
+    setSessionNotifyBody(
+`Dear {{name}},
+
+We are pleased to inform you that your business has been registered to participate in an upcoming training session under the PRUDEV II programme.
+
+Training Details:
+- Title: ${s.title}
+- Date: ${s.date}${s.location ? `\n- Location: ${s.location}` : ''}${s.lead_bge_name ? `\n- Lead Facilitator: ${s.lead_bge_name}` : ''}
+
+${(s.businesses_detail || []).length > 1 ? `Participating MSMEs:\n${msmeNames}\n\n` : ''}Please make sure you are available on the day of the training. Your participation is very important for your business growth and for the success of the programme.
+
+If you have any questions or need to make alternative arrangements, please get in touch with us as soon as possible.
+
+We look forward to seeing you there.
+
+Warm regards,
+PRUDEV II BDS Team`
+    );
+    setSessionNotifyDialog(true);
+  };
+
+  const sendSessionNotify = async () => {
+    setSessionNotifySending(true);
+    try {
+      const ids = (sessionNotifySession.businesses_detail || []).map(m => m.id);
+      await axios.post(BULK_EMAIL, {
+        recipient_type: 'msme',
+        recipient_ids: ids,
+        subject: sessionNotifySubject,
+        body: sessionNotifyBody,
+      }, { headers });
+      notify(`Notification sent to ${ids.length} MSME${ids.length !== 1 ? 's' : ''}`, 'success');
+      setSessionNotifyDialog(false);
+    } catch (err) {
+      const d = err.response?.data;
+      notify(d?.detail || d?.error || 'Failed to send notifications', 'error');
+    } finally {
+      setSessionNotifySending(false);
+    }
+  };
+
   const commRecipients = commTab === 0
     ? experts.filter(e => e.email)
     : msmes.filter(m => m.email);
@@ -5419,6 +5479,42 @@ PRUDEV II BDS Team`,
       </Dialog>
 
       {/* ── Create Training Session ───────────────────────────────────────── */}
+      {/* ── Session MSME notification dialog ─────────────────────────────── */}
+      <Dialog open={sessionNotifyDialog} onClose={() => setSessionNotifyDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Notify MSMEs — {sessionNotifySession?.title}
+          <Typography variant="caption" display="block" color="text.secondary">
+            {(sessionNotifySession?.businesses_detail || []).length} recipient{(sessionNotifySession?.businesses_detail || []).length !== 1 ? 's' : ''}
+            {' · '}{sessionNotifySession?.date}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ mb: 1.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>Sending to:</Typography>
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+              {(sessionNotifySession?.businesses_detail || []).map(m => (
+                <Chip key={m.id} label={m.business_name} size="small" color="info" variant="outlined" />
+              ))}
+            </Box>
+          </Box>
+          <TextField label="Subject" value={sessionNotifySubject}
+            onChange={e => setSessionNotifySubject(e.target.value)}
+            fullWidth size="small" sx={{ mb: 1.5 }} />
+          <TextField label="Message" value={sessionNotifyBody}
+            onChange={e => setSessionNotifyBody(e.target.value)}
+            fullWidth multiline minRows={10}
+            helperText="{{name}} is replaced with the business owner's first name." />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSessionNotifyDialog(false)}>Cancel</Button>
+          <Button variant="contained" startIcon={sessionNotifySending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+            onClick={sendSessionNotify}
+            disabled={sessionNotifySending || !sessionNotifySubject.trim() || !sessionNotifyBody.trim()}>
+            Send to {(sessionNotifySession?.businesses_detail || []).length} MSME{(sessionNotifySession?.businesses_detail || []).length !== 1 ? 's' : ''}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={sessionDialog} onClose={() => { setSessionDialog(false); setSessionEditing(null); }} maxWidth="sm" fullWidth>
         <DialogTitle>{sessionEditing ? 'Edit Training Session' : 'New Training Session'}</DialogTitle>
         <DialogContent dividers>
