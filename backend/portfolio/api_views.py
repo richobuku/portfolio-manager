@@ -3032,13 +3032,14 @@ def bulk_email_view(request):
     recipient_type = request.data.get('recipient_type', 'bge')   # 'bge' | 'msme'
     recipient_ids  = request.data.get('recipient_ids', [])        # [] = all
     subject        = (request.data.get('subject') or '').strip()
-    body_text      = (request.data.get('body_text') or '').strip()
+    # accept both 'body' (frontend) and 'body_text' (legacy)
+    body_text      = (request.data.get('body') or request.data.get('body_text') or '').strip()
     body_html      = (request.data.get('body_html') or '').strip()
 
     if not subject:
         return Response({'detail': 'Subject is required.'}, status=400)
     if not body_text:
-        return Response({'detail': 'Plain-text body is required.'}, status=400)
+        return Response({'detail': 'Body is required.'}, status=400)
 
     if recipient_type == 'bge':
         qs = BusinessGrowthExpert.objects.filter(email__isnull=False).exclude(email='')

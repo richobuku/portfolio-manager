@@ -741,6 +741,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [trainingTopics, setTrainingTopics] = useState([]);
   const [facilitationAssignments, setFacilitationAssignments] = useState([]);
   const [facilitationDialog, setFacilitationDialog] = useState(false);
+  const [facilitationEditing, setFacilitationEditing] = useState(null);
   const [facilitationForm, setFacilitationForm] = useState({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
   const [facilitationSaving, setFacilitationSaving] = useState(false);
   const [analytics, setAnalytics] = useState({});
@@ -804,7 +805,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── training dialogs ───────────────────────────────────────────────────────
   const [sessionDialog, setSessionDialog] = useState(false);
-  const [sessionForm, setSessionForm] = useState({ title: '', date: '', location: '', description: '', topic: '', work_order: '', lead_bge: '', mentor_bges: [], businesses: [] });
+  const [sessionEditing, setSessionEditing] = useState(null);
+  const EMPTY_SESSION_FORM = { title: '', date: '', location: '', description: '', topic: '', work_order: '', lead_bge: '', mentor_bges: [], mentor_work_orders: [], businesses: [] };
+  const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [attendanceDialog, setAttendanceDialog] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -1333,16 +1336,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const openAssignMsmeDialog = (group) => setAssignMsmeGroup(group);
 
   // ── facilitation assignments ───────────────────────────────────────────────
+  const openFacilitationEdit = (a) => {
+    setFacilitationEditing(a.id);
+    setFacilitationForm({ bge: a.bge, topic: a.topic, assigned_date: a.assigned_date, notes: a.notes || '' });
+    setFacilitationDialog(true);
+  };
+
   const saveFacilitationAssignment = async () => {
     setFacilitationSaving(true);
     try {
-      await axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, facilitationForm, { headers });
-      notify('Facilitator assigned');
+      if (facilitationEditing) {
+        await axios.put(`${API_ENDPOINTS.FACILITATION_ASSIGNMENTS}${facilitationEditing}/`, facilitationForm, { headers });
+        notify('Assignment updated');
+      } else {
+        await axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, facilitationForm, { headers });
+        notify('Facilitator assigned');
+      }
       setFacilitationDialog(false);
+      setFacilitationEditing(null);
       setFacilitationForm({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
       fetchAll();
     } catch (e) {
-      notify(e.response?.data?.non_field_errors?.[0] || e.response?.data?.detail || 'Failed to assign facilitator', 'error');
+      notify(e.response?.data?.non_field_errors?.[0] || e.response?.data?.detail || 'Failed to save assignment', 'error');
     } finally { setFacilitationSaving(false); }
   };
 
@@ -1354,18 +1369,43 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } catch { notify('Failed to remove assignment', 'error'); }
   };
 
-  // ── training ───────────────────────────────────────────────────────────────
+  // ── training sessions ──────────────────────────────────────────────────────
+  const openSessionEdit = (s) => {
+    setSessionEditing(s.id);
+    setSessionForm({
+      title: s.title,
+      date: s.date,
+      location: s.location || '',
+      description: s.description || '',
+      topic: s.topic || '',
+      work_order: s.work_order || '',
+      lead_bge: s.lead_bge || '',
+      mentor_bges: (s.mentor_bges || []),
+      mentor_work_orders: (s.mentor_work_orders || []),
+      businesses: (s.businesses || []),
+    });
+    setSessionDialog(true);
+  };
+
   const createSession = async () => {
     setSessionLoading(true);
     try {
       const payload = { ...sessionForm };
       if (!payload.topic) delete payload.topic;
-      await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, payload, { headers });
-      notify('Session created');
+      if (!payload.work_order) delete payload.work_order;
+      if (!payload.lead_bge) delete payload.lead_bge;
+      if (sessionEditing) {
+        await axios.put(`${API_ENDPOINTS.TRAINING_SESSIONS}${sessionEditing}/`, payload, { headers });
+        notify('Session updated');
+      } else {
+        await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, payload, { headers });
+        notify('Session created');
+      }
       setSessionDialog(false);
-      setSessionForm({ title: '', date: '', location: '', description: '', topic: '', work_order: '', lead_bge: '', mentor_bges: [], businesses: [] });
+      setSessionEditing(null);
+      setSessionForm(EMPTY_SESSION_FORM);
       fetchAll();
-    } catch { notify('Failed to create session', 'error'); }
+    } catch (e) { notify(e.response?.data?.detail || 'Failed to save session', 'error'); }
     finally { setSessionLoading(false); }
   };
 
@@ -2108,7 +2148,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     <Box>
       {/* ── Facilitation Assignments ── */}
       <SectionHeader title="Facilitation Assignments" subtitle={`${facilitationAssignments.length} assigned`}>
-        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => setFacilitationDialog(true)}>
+        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => { setFacilitationEditing(null); setFacilitationForm({ bge: '', topic: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' }); setFacilitationDialog(true); }}>
           Assign Facilitator
         </Button>
       </SectionHeader>
@@ -2141,6 +2181,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <TableCell>{a.assigned_date}</TableCell>
                   <TableCell sx={{ color: 'text.secondary' }}>{a.notes || '—'}</TableCell>
                   <TableCell>
+                    <Tooltip title="Edit assignment">
+                      <IconButton size="small" onClick={() => openFacilitationEdit(a)}><Edit fontSize="small" /></IconButton>
+                    </Tooltip>
                     <Tooltip title="Remove assignment">
                       <IconButton size="small" color="error" onClick={() => removeAssignment(a.id)}><Delete fontSize="small" /></IconButton>
                     </Tooltip>
@@ -2154,7 +2197,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       {/* ── Training Sessions ── */}
       <SectionHeader title="Training Sessions" subtitle={`${trainingSessions.length} sessions`}>
-        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => setSessionDialog(true)}>
+        <Button variant="contained" startIcon={<Add />} size="small" onClick={() => { setSessionEditing(null); setSessionForm(EMPTY_SESSION_FORM); setSessionDialog(true); }}>
           New Session
         </Button>
       </SectionHeader>
@@ -2192,6 +2235,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </TableCell>
                 <TableCell><Chip icon={<EventNote />} label={`${s.attendance_count ?? 0} present`} size="small" /></TableCell>
                 <TableCell>
+                  <Tooltip title="Edit session">
+                    <IconButton size="small" onClick={() => openSessionEdit(s)}><Edit fontSize="small" /></IconButton>
+                  </Tooltip>
                   <Tooltip title="Mark attendance">
                     <IconButton size="small" color="primary" onClick={() => openAttendance(s)}><CheckCircle fontSize="small" /></IconButton>
                   </Tooltip>
@@ -5351,8 +5397,8 @@ PRUDEV II BDS Team`,
       </Dialog>
 
       {/* ── Create Training Session ───────────────────────────────────────── */}
-      <Dialog open={sessionDialog} onClose={() => setSessionDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>New Training Session</DialogTitle>
+      <Dialog open={sessionDialog} onClose={() => { setSessionDialog(false); setSessionEditing(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{sessionEditing ? 'Edit Training Session' : 'New Training Session'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2}>
             <Grid item xs={12}><TextField fullWidth size="small" required label="Title" value={sessionForm.title} onChange={e => setSessionForm({...sessionForm, title: e.target.value})} /></Grid>
@@ -5428,11 +5474,29 @@ PRUDEV II BDS Team`,
               </FormControl>
             </Grid>
             <Grid item xs={12}>
-              <FormControl fullWidth size="small"><InputLabel>Link to Work Order / Deployment</InputLabel>
-                <Select value={sessionForm.work_order} onChange={e => setSessionForm({...sessionForm, work_order: e.target.value})} label="Link to Work Order / Deployment">
+              <FormControl fullWidth size="small"><InputLabel>Lead BGE Work Order</InputLabel>
+                <Select value={sessionForm.work_order} onChange={e => setSessionForm({...sessionForm, work_order: e.target.value})} label="Lead BGE Work Order">
                   <MenuItem value="">— Not linked —</MenuItem>
                   {workOrders.map(wo => (
                     <MenuItem key={wo.id} value={wo.id}>
+                      {wo.work_order_number} · {wo.bge_name} ({wo.work_order_type_display})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Mentor BGE Work Orders</InputLabel>
+                <Select
+                  multiple value={sessionForm.mentor_work_orders}
+                  onChange={e => setSessionForm({...sessionForm, mentor_work_orders: e.target.value})}
+                  label="Mentor BGE Work Orders"
+                  renderValue={sel => `${sel.length} work order${sel.length !== 1 ? 's' : ''} linked`}
+                >
+                  {workOrders.filter(wo => wo.id !== sessionForm.work_order).map(wo => (
+                    <MenuItem key={wo.id} value={wo.id}>
+                      <Checkbox checked={sessionForm.mentor_work_orders.includes(wo.id)} size="small" />
                       {wo.work_order_number} · {wo.bge_name} ({wo.work_order_type_display})
                     </MenuItem>
                   ))}
@@ -5443,16 +5507,16 @@ PRUDEV II BDS Team`,
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSessionDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setSessionDialog(false); setSessionEditing(null); }}>Cancel</Button>
           <Button variant="contained" onClick={createSession} disabled={sessionLoading || !sessionForm.title || !sessionForm.date}>
-            {sessionLoading ? <CircularProgress size={18} /> : 'Create'}
+            {sessionLoading ? <CircularProgress size={18} /> : sessionEditing ? 'Save Changes' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* ── Assign Facilitator dialog ──────────────────────────────────────── */}
-      <Dialog open={facilitationDialog} onClose={() => setFacilitationDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Assign Training Facilitator</DialogTitle>
+      <Dialog open={facilitationDialog} onClose={() => { setFacilitationDialog(false); setFacilitationEditing(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{facilitationEditing ? 'Edit Facilitation Assignment' : 'Assign Training Facilitator'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ pt: 1 }}>
             <Grid item xs={12}>
@@ -5514,10 +5578,10 @@ PRUDEV II BDS Team`,
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setFacilitationDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setFacilitationDialog(false); setFacilitationEditing(null); }}>Cancel</Button>
           <Button variant="contained" onClick={saveFacilitationAssignment}
             disabled={facilitationSaving || !facilitationForm.bge || !facilitationForm.topic || !facilitationForm.assigned_date}>
-            {facilitationSaving ? <CircularProgress size={18} /> : 'Assign'}
+            {facilitationSaving ? <CircularProgress size={18} /> : facilitationEditing ? 'Save Changes' : 'Assign'}
           </Button>
         </DialogActions>
       </Dialog>

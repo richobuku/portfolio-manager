@@ -216,6 +216,19 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
             for b in obj.mentor_bges.all()
         ]
 
+    mentor_work_orders_detail = serializers.SerializerMethodField()
+
+    def get_mentor_work_orders_detail(self, obj):
+        return [
+            {
+                'id': wo.id,
+                'work_order_number': wo.work_order_number,
+                'bge_id': wo.bge_id,
+                'bge_name': wo.bge.name if wo.bge else '',
+            }
+            for wo in obj.mentor_work_orders.select_related('bge').all()
+        ]
+
 
 class AttendanceSerializer(serializers.ModelSerializer):
     msme_name    = serializers.CharField(source='msme.business_name', read_only=True, allow_null=True)

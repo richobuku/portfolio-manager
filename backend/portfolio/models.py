@@ -512,6 +512,11 @@ class TrainingSession(models.Model):
         related_name='mentor_sessions',
         help_text='Regular BGEs attending as mentors',
     )
+    mentor_work_orders = models.ManyToManyField(
+        'WorkOrder', blank=True,
+        related_name='mentor_training_sessions',
+        help_text='Work orders for each mentor BGE in this session',
+    )
 
     def __str__(self):
         return f"{self.title} ({self.date})"
