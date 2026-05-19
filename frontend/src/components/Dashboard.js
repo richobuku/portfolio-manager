@@ -4680,9 +4680,10 @@ PRUDEV II BDS Team`
         body: sessionNotifyBody,
         skip_already_sent: sessionNotifySkip,
       }, { headers });
-      const parts = [`Sent: ${res.data.sent}`];
-      if (res.data.skipped > 0) parts.push(`Skipped: ${res.data.skipped}`);
-      if (res.data.failed > 0) parts.push(`Failed: ${res.data.failed}`);
+      const d = res.data;
+      const parts = [`Queued: ${d.queued ?? d.sent ?? 0}`];
+      if (d.skipped > 0) parts.push(`Skipped: ${d.skipped}`);
+      if (d.duplicates_removed > 0) parts.push(`Duplicates removed: ${d.duplicates_removed}`);
       notify(parts.join(' · '), 'success');
       setSessionNotifyDialog(false);
     } catch (err) {
@@ -4758,9 +4759,11 @@ PRUDEV II BDS Team`
         skip_already_sent: commSkipSent,
       };
       const res = await axios.post(BULK_EMAIL, payload, { headers });
-      const parts = [`Sent: ${res.data.sent}`];
-      if (res.data.skipped > 0) parts.push(`Skipped (already sent): ${res.data.skipped}`);
-      if (res.data.failed > 0) parts.push(`Failed: ${res.data.failed}`);
+      const d = res.data;
+      const parts = [`Queued: ${d.queued ?? d.sent ?? 0}`];
+      if (d.skipped > 0) parts.push(`Skipped (already sent): ${d.skipped}`);
+      if (d.duplicates_removed > 0) parts.push(`Duplicates removed: ${d.duplicates_removed}`);
+      if (d.failed > 0) parts.push(`Failed: ${d.failed}`);
       notify(parts.join(' · '), 'success');
       setCommSelected(new Set());
       setCommAlreadySent([]);

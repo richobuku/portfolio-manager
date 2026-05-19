@@ -3021,10 +3021,70 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelV
 
 # ── Bulk communication email ────────────────────────────────────────────────────
 
+def _do_send_emails(records, subject, body_text, body_html, skip_sent,
+                    already_sent_ids, recipient_type, from_email, reply_to, user_id):
+    """Send emails in a background thread using a single SMTP connection."""
+    import django
+    from django.core.mail import get_connection
+    from .models import EmailSendLog
+
+    # Deduplicate by email address (keeps first occurrence per address)
+    seen_emails = set()
+    deduped = []
+    for rec in records:
+        addr = (rec['email'] or '').lower().strip()
+        if addr and addr not in seen_emails:
+            seen_emails.add(addr)
+            deduped.append(rec)
+
+    logs_to_create = []
+    try:
+        connection = get_connection()
+        connection.open()
+    except Exception:
+        connection = None  # fall back to per-message connections
+
+    for rec in deduped:
+        if skip_sent and rec['id'] in already_sent_ids:
+            continue
+        first = (rec['name'] or '').split()[0] or 'Team'
+        try:
+            txt  = body_text.replace('{{name}}', first)
+            html = body_html.replace('{{name}}', first) if body_html else ''
+            msg  = EmailMultiAlternatives(
+                subject=subject, body=txt,
+                from_email=from_email, to=[rec['email']], reply_to=[reply_to],
+                connection=connection,
+            )
+            if html:
+                msg.attach_alternative(html, 'text/html')
+            msg.send()
+            logs_to_create.append(EmailSendLog(
+                recipient_type=recipient_type, recipient_id=rec['id'],
+                recipient_email=rec['email'], subject=subject,
+                sent_by_id=user_id,
+            ))
+        except Exception:
+            pass
+
+    if connection:
+        try:
+            connection.close()
+        except Exception:
+            pass
+
+    try:
+        if logs_to_create:
+            EmailSendLog.objects.bulk_create(logs_to_create, ignore_conflicts=True)
+    except Exception:
+        pass
+
+
 @api_view(['POST'])
 @permission_classes([_IsAuth])
 def bulk_email_view(request):
     """Admin-only: send a communication email to a selection of BGEs or MSMEs."""
+    import threading
     from .models import EmailSendLog
 
     user = request.user
@@ -3054,52 +3114,48 @@ def bulk_email_view(request):
             qs = qs.filter(id__in=recipient_ids)
         records = [{'id': m.id, 'name': m.owner_name or m.business_name or 'Business Owner', 'email': m.email} for m in qs]
 
-    # Identify already-sent recipients for this exact subject
-    already_sent_ids = set(
-        EmailSendLog.objects.filter(
-            recipient_type=recipient_type, subject=subject,
-            recipient_id__in=[r['id'] for r in records],
-        ).values_list('recipient_id', flat=True)
-    )
+    # Deduplicate by email address before counting
+    seen = set()
+    deduped_records = []
+    for rec in records:
+        addr = (rec['email'] or '').lower().strip()
+        if addr and addr not in seen:
+            seen.add(addr)
+            deduped_records.append(rec)
+
+    # Identify already-sent recipients for this subject
+    try:
+        already_sent_ids = set(
+            EmailSendLog.objects.filter(
+                recipient_type=recipient_type, subject=subject,
+                recipient_id__in=[r['id'] for r in deduped_records],
+            ).values_list('recipient_id', flat=True)
+        )
+    except Exception:
+        already_sent_ids = set()
+
+    to_send = len(deduped_records) - (len(already_sent_ids) if skip_sent else 0)
+    skipped = len(deduped_records) - to_send
+    duplicates_removed = len(records) - len(deduped_records)
 
     from_email = settings.DEFAULT_FROM_EMAIL
     reply_to   = getattr(settings, 'EMAIL_REPLY_TO', from_email)
-    sent = skipped = 0
-    errors = []
-    logs_to_create = []
 
-    for rec in records:
-        if skip_sent and rec['id'] in already_sent_ids:
-            skipped += 1
-            continue
-        first = (rec['name'] or '').split()[0] or 'Team'
-        try:
-            txt  = body_text.replace('{{name}}', first)
-            html = body_html.replace('{{name}}', first) if body_html else ''
-            msg  = EmailMultiAlternatives(
-                subject=subject, body=txt,
-                from_email=from_email, to=[rec['email']], reply_to=[reply_to],
-            )
-            if html:
-                msg.attach_alternative(html, 'text/html')
-            msg.send()
-            sent += 1
-            logs_to_create.append(EmailSendLog(
-                recipient_type=recipient_type, recipient_id=rec['id'],
-                recipient_email=rec['email'], subject=subject, sent_by=user,
-            ))
-        except Exception as e:
-            errors.append({'email': rec['email'], 'error': str(e)})
-
-    if logs_to_create:
-        EmailSendLog.objects.bulk_create(logs_to_create, ignore_conflicts=True)
+    # Fire-and-forget background thread — avoids HTTP timeout for large lists
+    t = threading.Thread(
+        target=_do_send_emails,
+        args=(deduped_records, subject, body_text, body_html, skip_sent,
+              already_sent_ids, recipient_type, from_email, reply_to, user.id),
+        daemon=True,
+    )
+    t.start()
 
     return Response({
-        'sent': sent,
+        'queued': to_send,
         'skipped': skipped,
+        'duplicates_removed': duplicates_removed,
         'already_sent_count': len(already_sent_ids),
-        'failed': len(errors),
-        'errors': errors[:20],
+        'message': f'{to_send} email{"s" if to_send != 1 else ""} queued for delivery.',
     })
 
 
