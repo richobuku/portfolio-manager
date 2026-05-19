@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm install && npm run build",
+  "buildCommand": "cd frontend && npm install && NODE_OPTIONS=--max-old-space-size=4096 npm run build",
   "outputDirectory": "frontend/build",
   "installCommand": "echo 'install handled inside buildCommand'",
   "rewrites": [

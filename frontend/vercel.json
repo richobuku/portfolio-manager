@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install && npm run build",
+  "buildCommand": "npm install && NODE_OPTIONS=--max-old-space-size=4096 npm run build",
   "outputDirectory": "build",
   "redirects": [
     {
