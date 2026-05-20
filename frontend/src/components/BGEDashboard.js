@@ -139,6 +139,28 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     next_steps: '', status: 'draft',
   };
 
+  // Attendance dialog (lead — editable)
+  const [attDialog, setAttDialog] = useState(false);
+  const [attSession, setAttSession] = useState(null);
+  const [attRows, setAttRows] = useState([]);
+  const [attLoading, setAttLoading] = useState(false);
+  const _attKey = useRef(0);
+  const newAttRow = () => ({
+    _key: ++_attKey.current,
+    id: null, msme: '', attendee_name: '', attendee_phone: '',
+    gender: '', age_group: '', refugee_status: 'H', consent_photo: true, consent_contact: true,
+  });
+
+  // Full MSME list for attendance picker (bypasses personal assignment scope)
+  const [trainingMsmes, setTrainingMsmes] = useState([]);
+  const fetchTrainingMsmes = useCallback(async () => {
+    if (trainingMsmes.length > 0) return;
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.MSMES}?training=1`, { headers: { Authorization: `Bearer ${token}` } });
+      setTrainingMsmes(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch { /* non-critical */ }
+  }, [token, trainingMsmes.length]);
+
   // Mentor report dialog
   const [mrDialog, setMrDialog] = useState(false);
   const [mrSession, setMrSession] = useState(null);
@@ -440,9 +462,55 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     } catch { /* silent */ }
   }, [token]);
 
+  const openAttendance = async (session) => {
+    fetchTrainingMsmes();
+    setAttSession(session);
+    setAttLoading(true);
+    setAttDialog(true);
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.ATTENDANCE}?session=${session.id}`, { headers: h });
+      const records = Array.isArray(res.data) ? res.data : res.data.results || [];
+      setAttRows(records.length ? records.map(r => ({ ...r, _key: r.id })) : [newAttRow()]);
+    } catch {
+      setAttRows([newAttRow()]);
+    } finally {
+      setAttLoading(false);
+    }
+  };
+
+  const saveAttendance = async () => {
+    setAttLoading(true);
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const filled = attRows.filter(a => a.attendee_name || a.msme);
+      await Promise.all(filled.map(a => {
+        const payload = {
+          session: attSession.id,
+          msme: a.msme || null,
+          attendee_name: a.attendee_name,
+          attendee_phone: a.attendee_phone,
+          gender: a.gender,
+          age_group: a.age_group,
+          refugee_status: a.refugee_status || 'H',
+          consent_photo: a.consent_photo,
+          consent_contact: a.consent_contact,
+          present: true,
+        };
+        if (a.id) return axios.patch(`${API_ENDPOINTS.ATTENDANCE}${a.id}/`, payload, { headers: h });
+        return axios.post(API_ENDPOINTS.ATTENDANCE, payload, { headers: h });
+      }));
+      notify('Attendance saved');
+      setAttDialog(false);
+      fetchSessions();
+    } catch { notify('Failed to save attendance', 'error'); }
+    finally { setAttLoading(false); }
+  };
+
   const openTrReport = (session) => {
     setTrSession(session);
     const existing = session._tr;
+    const stats = session.attendance_stats || {};
     if (existing) {
       const { id, session: _s, bge: _b, created_at, updated_at, submitted_at,
               session_title, session_date, session_location, bge_name, total_participants, ...rest } = existing;
@@ -456,6 +524,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         training_dates: session.date || '',
         venue: session.location || '',
         facilitation_team: (session.team || []).map(m => m.bge_name).filter(Boolean).join(', '),
+        // Auto-fill demographics from attendance sheet
+        ...(stats.total_present ? {
+          participants_male_youth:   stats.youth_male   || 0,
+          participants_female_youth: stats.youth_female || 0,
+          participants_adult_male:   stats.adult_male   || 0,
+          participants_adult_female: stats.adult_female || 0,
+        } : {}),
       });
     }
     setTrDialog(true);
@@ -1715,9 +1790,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             </Typography>
                           </Box>
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
                           <Chip label={s._tr ? (s._tr.status === 'submitted' ? 'Submitted' : 'Draft') : 'Pending'}
                             size="small" color={s._tr?.status === 'submitted' ? 'success' : s._tr ? 'warning' : 'default'} />
+                          <Chip label={`${s.attendance_count ?? 0} present`} size="small" variant="outlined"
+                            color={s.attendance_count > 0 ? 'success' : 'default'} />
+                          <Button size="small" variant="outlined" startIcon={<Assignment />}
+                            onClick={() => openAttendance(s)}
+                            sx={{ fontSize: 12, borderColor: '#1565C0', color: '#1565C0' }}>
+                            Attendance
+                          </Button>
                           <Button size="small" variant="contained" startIcon={<Edit />}
                             onClick={() => openTrReport(s)}
                             sx={{ bgcolor: '#1565C0', '&:hover': { bgcolor: '#0d47a1' }, fontSize: 12 }}>
@@ -1831,6 +1913,57 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </Typography>
           </DialogTitle>
           <DialogContent dividers sx={{ pt: 2 }}>
+            {/* ── Attendance summary (from lead's sheet) ── */}
+            {(() => {
+              const stats = mrSession?.attendance_stats || {};
+              const list  = mrSession?.attendance_list  || [];
+              if (!stats.total_present) return (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Attendance has not been recorded yet. The lead facilitator will fill in the attendance sheet.
+                </Alert>
+              );
+              return (
+                <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                    ATTENDANCE SUMMARY (from lead's sheet)
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                    <Chip label={`${stats.total_present} present`} size="small" color="success" />
+                    <Chip label={`${stats.male ?? 0} M · ${stats.female ?? 0} F`} size="small" variant="outlined" />
+                    <Chip label={`${stats.youth_male + stats.youth_female} youth`} size="small" variant="outlined" />
+                    <Chip label={`${stats.refugee ?? 0} refugee · ${stats.host_community ?? 0} host`} size="small" variant="outlined" />
+                  </Box>
+                  {list.length > 0 && (
+                    <TableContainer sx={{ maxHeight: 180 }}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>#</TableCell>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>Name</TableCell>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>MSME</TableCell>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>Sex</TableCell>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>Age</TableCell>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>Status</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {list.map((a, i) => (
+                            <TableRow key={a.id ?? i} hover>
+                              <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>{i + 1}</TableCell>
+                              <TableCell sx={{ fontSize: 11 }}>{a.attendee_name}</TableCell>
+                              <TableCell sx={{ fontSize: 11 }}>{a.msme_name || '—'}</TableCell>
+                              <TableCell sx={{ fontSize: 11 }}>{a.gender || '—'}</TableCell>
+                              <TableCell sx={{ fontSize: 11 }}>{a.age_group || '—'}</TableCell>
+                              <TableCell sx={{ fontSize: 11 }}>{a.refugee_status === 'R' ? 'Refugee' : 'Host'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                </Box>
+              );
+            })()}
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Date(s)"
                 value={mrForm.training_dates || ''} onChange={e => setMrForm(f => ({ ...f, training_dates: e.target.value }))} /></Grid>
@@ -1857,6 +1990,120 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             <Button variant="contained" color="success" onClick={() => saveMrReport(true)} disabled={mrSaving}>
               {mrSaving ? 'Submitting…' : 'Submit Report'}
             </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* ── Attendance dialog (lead — editable) ─────────────────────────── */}
+      {attDialog && (
+        <Dialog open onClose={() => setAttDialog(false)} maxWidth="xl" fullWidth
+          PaperProps={{ sx: { height: { xs: '95dvh', md: '88vh' }, display: 'flex', flexDirection: 'column' } }}>
+          <DialogTitle sx={{ pb: 0.5 }}>
+            <Typography fontWeight={700}>Attendance — {attSession?.title}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {attSession?.date}{attSession?.location ? ` · ${attSession.location}` : ''}
+            </Typography>
+          </DialogTitle>
+          <DialogContent dividers sx={{ p: 0, overflow: 'auto' }}>
+            {attLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+            ) : (
+              <TableContainer>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#F1F5F9' }}>
+                      <TableCell sx={{ width: 36, fontWeight: 700, fontSize: 11 }}>#</TableCell>
+                      <TableCell sx={{ minWidth: 160, fontWeight: 700, fontSize: 11 }}>NAME</TableCell>
+                      <TableCell sx={{ minWidth: 120, fontWeight: 700, fontSize: 11 }}>PHONE</TableCell>
+                      <TableCell sx={{ minWidth: 180, fontWeight: 700, fontSize: 11 }}>MSME / BUSINESS</TableCell>
+                      <TableCell sx={{ minWidth: 70,  fontWeight: 700, fontSize: 11 }}>SEX</TableCell>
+                      <TableCell sx={{ minWidth: 100, fontWeight: 700, fontSize: 11 }}>AGE GROUP</TableCell>
+                      <TableCell sx={{ minWidth: 90,  fontWeight: 700, fontSize: 11 }}>STATUS</TableCell>
+                      <TableCell sx={{ minWidth: 80,  fontWeight: 700, fontSize: 11 }}>CONSENT</TableCell>
+                      <TableCell sx={{ width: 36 }} />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {attRows.map((row, idx) => (
+                      <TableRow key={row._key} hover>
+                        <TableCell sx={{ color: 'text.secondary', fontSize: 11 }}>{idx + 1}</TableCell>
+                        <TableCell>
+                          <TextField size="small" variant="standard" placeholder="Full name" value={row.attendee_name}
+                            onChange={e => setAttRows(p => p.map(r => r._key === row._key ? { ...r, attendee_name: e.target.value } : r))}
+                            sx={{ minWidth: 140 }} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" variant="standard" placeholder="Phone" value={row.attendee_phone}
+                            onChange={e => setAttRows(p => p.map(r => r._key === row._key ? { ...r, attendee_phone: e.target.value } : r))}
+                            sx={{ minWidth: 100 }} />
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" displayEmpty value={row.msme || ''}
+                            onChange={e => {
+                              const msmeList = trainingMsmes.length ? trainingMsmes : msmes;
+                              const m = msmeList.find(x => x.id === e.target.value);
+                              setAttRows(p => p.map(r => r._key === row._key
+                                ? { ...r, msme: e.target.value, attendee_name: r.attendee_name || (m?.owner_name || '') }
+                                : r));
+                            }}
+                            sx={{ minWidth: 150 }}>
+                            <MenuItem value=""><em>— walk-in —</em></MenuItem>
+                            {(trainingMsmes.length ? trainingMsmes : msmes).map(m => (
+                              <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
+                            ))}
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" displayEmpty value={row.gender || ''}
+                            onChange={e => setAttRows(p => p.map(r => r._key === row._key ? { ...r, gender: e.target.value } : r))}
+                            sx={{ minWidth: 55 }}>
+                            <MenuItem value=""><em>—</em></MenuItem>
+                            <MenuItem value="M">M</MenuItem>
+                            <MenuItem value="F">F</MenuItem>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" displayEmpty value={row.age_group || ''}
+                            onChange={e => setAttRows(p => p.map(r => r._key === row._key ? { ...r, age_group: e.target.value } : r))}
+                            sx={{ minWidth: 85 }}>
+                            <MenuItem value=""><em>—</em></MenuItem>
+                            {['18-34', '35-45', '46-55', '56+'].map(ag => <MenuItem key={ag} value={ag}>{ag}</MenuItem>)}
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select size="small" variant="standard" value={row.refugee_status || 'H'}
+                            onChange={e => setAttRows(p => p.map(r => r._key === row._key ? { ...r, refugee_status: e.target.value } : r))}
+                            sx={{ minWidth: 75 }}>
+                            <MenuItem value="H">Host</MenuItem>
+                            <MenuItem value="R">Refugee</MenuItem>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Checkbox size="small" checked={!!row.consent_photo}
+                            onChange={e => setAttRows(p => p.map(r => r._key === row._key ? { ...r, consent_photo: e.target.checked } : r))} />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton size="small" onClick={() => setAttRows(p => p.filter(r => r._key !== row._key))}>
+                            <Delete fontSize="small" sx={{ color: 'error.main' }} />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 1.5, justifyContent: 'space-between' }}>
+            <Button size="small" startIcon={<Add />} onClick={() => setAttRows(p => [...p, newAttRow()])}>
+              Add row
+            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button onClick={() => setAttDialog(false)} disabled={attLoading}>Cancel</Button>
+              <Button variant="contained" onClick={saveAttendance} disabled={attLoading}>
+                {attLoading ? <CircularProgress size={18} /> : 'Save Attendance'}
+              </Button>
+            </Box>
           </DialogActions>
         </Dialog>
       )}
