@@ -291,7 +291,7 @@ class MSMEGrowthSnapshot(models.Model):
         ('diagnostic', 'Application Diagnostic (Baseline)'),
         ('bge_visit',  'BGE Visit'),
         ('quarterly',  'Quarterly Review'),
-        ('annual',     'Annual Review'),
+        ('annual',     'Data Update'),
         ('other',      'Other'),
     ]
 

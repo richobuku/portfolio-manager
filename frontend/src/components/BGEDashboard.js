@@ -2385,7 +2385,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   onChange={e => setGrowthForm(f => ({ ...f, source: e.target.value }))}>
                   <MenuItem value="bge_visit">BGE Visit</MenuItem>
                   <MenuItem value="quarterly">Quarterly Review</MenuItem>
-                  <MenuItem value="annual">Annual Review</MenuItem>
+                  <MenuItem value="annual">Data Update</MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
               </FormControl>
@@ -2778,7 +2778,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 <Box key={s.id} sx={{ border: '1px solid #E8EDF2', borderRadius: 1.5, p: 1.5, mt: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                     <Typography fontSize={12} fontWeight={600}>{s.snapshot_date}</Typography>
-                    <Chip size="small" label={s.source.replace('_', ' ')} variant="outlined" sx={{ fontSize: 10 }} />
+                    <Chip size="small" variant="outlined" sx={{ fontSize: 10 }}
+                      label={{ diagnostic: 'Baseline', bge_visit: 'BGE Visit', quarterly: 'Quarterly', annual: 'Data Update', other: 'Other' }[s.source] || s.source} />
                   </Box>
                   <Grid container spacing={1}>
                     {s.annual_turnover    && <Grid item xs={6}><Typography fontSize={11} color="text.secondary">Annual Revenue</Typography><Typography fontSize={12} fontWeight={600}>UGX {Number(s.annual_turnover).toLocaleString()}</Typography></Grid>}

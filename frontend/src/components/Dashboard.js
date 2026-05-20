@@ -4025,7 +4025,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <MenuItem value="diagnostic">Baseline Diagnostic</MenuItem>
                 <MenuItem value="bge_visit">BGE Visit</MenuItem>
                 <MenuItem value="quarterly">Quarterly Review</MenuItem>
-                <MenuItem value="annual">Annual Review</MenuItem>
+                <MenuItem value="annual">Data Update</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
@@ -4044,7 +4044,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           // ── Core derivations (all snapshots, not filtered) ─────────────
           const SOURCE_LABELS = {
             diagnostic: 'Baseline', bge_visit: 'BGE Visit', quarterly: 'Quarterly',
-            annual: 'Annual', other: 'Other',
+            annual: 'Data Update', other: 'Other',
           };
           const fmtUGX = v => (v == null || v === '') ? '—' : `UGX ${Number(v).toLocaleString()}`;
 
@@ -6682,7 +6682,7 @@ PRUDEV II BDS Team`
           const fmtUGX = v => v == null || v === '' ? '—' : `UGX ${Number(v).toLocaleString()}`;
           const SOURCE_LABELS = {
             diagnostic: 'Baseline Diagnostic', bge_visit: 'BGE Visit',
-            quarterly: 'Quarterly Review', annual: 'Annual Review', other: 'Other',
+            quarterly: 'Quarterly Review', annual: 'Data Update', other: 'Other',
           };
           const ftTotal = (s.employees_ft_male||0)+(s.employees_ft_female||0);
           const ptTotal = (s.employees_pt_male||0)+(s.employees_pt_female||0);
