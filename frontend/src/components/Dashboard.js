@@ -828,6 +828,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [emailEditSubject, setEmailEditSubject] = useState(''); // editable subject
   const [emailSending, setEmailSending] = useState(false);
 
+  // ── training / mentor reports (admin) ─────────────────────────────────────
+  const [adminTrainingReports, setAdminTrainingReports] = useState([]);
+  const [adminMentorReports, setAdminMentorReports] = useState([]);
+  const [trReportsLoaded, setTrReportsLoaded] = useState(false);
+  const [trReportTab, setTrReportTab] = useState(0);
+  const [viewTrReport, setViewTrReport] = useState(null);
+  const [viewMrReport, setViewMrReport] = useState(null);
+
   // ── assignment dialog ──────────────────────────────────────────────────────
   const [assignDialog, setAssignDialog] = useState(false);
   const [inactiveMsmes, setInactiveMsmes]   = useState(null);  // null=unchecked, [] or array when loaded
@@ -916,6 +924,21 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       window.gtag('event', 'page_view', { page_title: `Admin - ${section}`, page_path: `/admin/${section}` });
     }
   }, [section]);
+
+  useEffect(() => {
+    if (section !== 'reports' || trReportsLoaded) return;
+    const h = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+      axios.get(API_ENDPOINTS.MENTOR_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+    ]).then(([trRes, mrRes]) => {
+      const toArr = d => Array.isArray(d) ? d : d.results || [];
+      setAdminTrainingReports(toArr(trRes.data));
+      setAdminMentorReports(toArr(mrRes.data));
+      setTrReportsLoaded(true);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, trReportsLoaded, token]);
 
   const fetchWorkOrders = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -3813,6 +3836,121 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </TableContainer>
         )}
       </Box>
+
+      {/* ── Training & Mentor Reports ───────────────────────────────────── */}
+      <Box sx={{ mt: 4 }}>
+        <SectionHeader
+          title="Training Reports"
+          subtitle={`${adminTrainingReports.length} lead · ${adminMentorReports.length} mentor`}
+        />
+        <Tabs value={trReportTab} onChange={(_, v) => setTrReportTab(v)}
+          sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Tab label={`Lead Reports (${adminTrainingReports.length})`} />
+          <Tab label={`Mentor Reports (${adminMentorReports.length})`} />
+        </Tabs>
+
+        {trReportTab === 0 && (
+          adminTrainingReports.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+              No training reports submitted yet.
+            </Paper>
+          ) : (
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell>Session</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Lead BGE</TableCell>
+                    <TableCell>Participants</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {adminTrainingReports.map(r => (
+                    <TableRow key={r.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={500}>{r.session_title}</Typography>
+                        {r.session_location && (
+                          <Typography variant="caption" color="text.secondary">{r.session_location}</Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{r.session_date || '—'}</TableCell>
+                      <TableCell>{r.bge_name || '—'}</TableCell>
+                      <TableCell>
+                        {r.total_participants > 0 ? (
+                          <Chip label={`${r.total_participants} participants`} size="small" variant="outlined" />
+                        ) : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={r.status} size="small"
+                          color={r.status === 'submitted' ? 'primary' : 'default'} />
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="View report">
+                          <IconButton size="small" color="primary" onClick={() => setViewTrReport(r)}>
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )
+        )}
+
+        {trReportTab === 1 && (
+          adminMentorReports.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+              No mentor reports submitted yet.
+            </Paper>
+          ) : (
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell>Session</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Mentor BGE</TableCell>
+                    <TableCell>Lead BGE</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {adminMentorReports.map(r => (
+                    <TableRow key={r.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={500}>{r.session_title}</Typography>
+                        {r.session_location && (
+                          <Typography variant="caption" color="text.secondary">{r.session_location}</Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{r.session_date || '—'}</TableCell>
+                      <TableCell>{r.bge_name || '—'}</TableCell>
+                      <TableCell>{r.lead_bge_name || '—'}</TableCell>
+                      <TableCell>
+                        <Chip label={r.status} size="small"
+                          color={r.status === 'submitted' ? 'primary' : 'default'} />
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="View report">
+                          <IconButton size="small" color="primary" onClick={() => setViewMrReport(r)}>
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )
+        )}
+      </Box>
     </Box>
   );
 
@@ -6105,6 +6243,184 @@ PRUDEV II BDS Team`
       </Dialog>
 
       {/* ── In-App Report Viewer ──────────────────────────────────────────── */}
+      {/* ── Training Report detail dialog ────────────────────────────────── */}
+      <Dialog open={!!viewTrReport} onClose={() => setViewTrReport(null)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { maxHeight: '90vh' } }}>
+        {viewTrReport && (() => {
+          const tr = viewTrReport;
+          const total = (tr.participants_male_youth || 0) + (tr.participants_female_youth || 0)
+            + (tr.participants_adult_male || 0) + (tr.participants_adult_female || 0);
+          const SECTIONS = [
+            { key: 'training_purpose',    label: 'Background & Purpose' },
+            { key: 'session_objectives',  label: 'Session Objectives' },
+            { key: 'activities_delivered', label: 'Activities Delivered' },
+            { key: 'key_lessons',         label: 'Key Lessons Learnt' },
+            { key: 'growth_support_areas', label: 'Growth Support Areas' },
+            { key: 'key_findings',        label: 'Key Findings & Critical Issues' },
+            { key: 'bge_contributions',   label: 'BGE Contributions & Development Needs' },
+            { key: 'bds_actions',         label: 'Proposed BDS Actions (Next 3 Months)' },
+            { key: 'recommendations',     label: 'Recommendations' },
+            { key: 'next_steps',          label: 'Next Steps' },
+            { key: 'conclusion',          label: 'Conclusion' },
+          ];
+          return <>
+            <Box sx={{ bgcolor: BRAND.sidebarBg, px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+                  Lead Training Report
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.3 }}>
+                  {tr.session_title}
+                </Typography>
+              </Box>
+              <Chip label={tr.status} size="small" color={tr.status === 'submitted' ? 'primary' : 'default'} />
+            </Box>
+            <DialogContent sx={{ p: 0 }}>
+              <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+                {[
+                  ['Lead BGE', tr.bge_name],
+                  ['Session Date', tr.session_date],
+                  ['Location', tr.session_location],
+                  ['Training Dates', tr.training_dates],
+                  ['Venue', tr.venue],
+                  ['District', tr.district],
+                  ['Time Allocation', tr.time_allocation],
+                ].filter(([, v]) => v).map(([label, val]) => (
+                  <Box key={label}>
+                    <Typography variant="caption" color="text.secondary" display="block"
+                      sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{val}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              {/* Demographics */}
+              <Box sx={{ px: 3, pt: 2, pb: 1 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Participant Demographics</Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Male Youth', value: tr.participants_male_youth || 0 },
+                    { label: 'Female Youth', value: tr.participants_female_youth || 0 },
+                    { label: 'Adult Male', value: tr.participants_adult_male || 0 },
+                    { label: 'Adult Female', value: tr.participants_adult_female || 0 },
+                    { label: 'Total', value: total },
+                  ].map(({ label, value }) => (
+                    <Box key={label} sx={{ textAlign: 'center', minWidth: 72,
+                      bgcolor: '#F4F6F9', borderRadius: 1.5, px: 1.5, py: 1 }}>
+                      <Typography variant="h6" fontWeight={700}>{value}</Typography>
+                      <Typography variant="caption" color="text.secondary">{label}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                {tr.facilitation_team && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: 10 }}>
+                      Facilitation Team
+                    </Typography>
+                    <Typography variant="body2">{tr.facilitation_team}</Typography>
+                  </Box>
+                )}
+              </Box>
+              <Divider />
+              <Box sx={{ px: 3, py: 2 }}>
+                {SECTIONS.map(({ key, label }, idx) => (
+                  <Box key={key} sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                      <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: BRAND.sidebarBg,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Typography sx={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>{idx + 1}</Typography>
+                      </Box>
+                      <Typography variant="subtitle2" fontWeight={700} color="primary">{label}</Typography>
+                    </Box>
+                    <Box sx={{ bgcolor: '#F4F6F9', borderRadius: 1.5, px: 2, py: 1.5,
+                      borderLeft: `3px solid ${tr[key] ? '#009B62' : '#E5E7EB'}` }}>
+                      {tr[key] ? (
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{tr[key]}</Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>No information recorded.</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ borderTop: '1px solid #E5E7EB' }}>
+              <Button onClick={() => setViewTrReport(null)}>Close</Button>
+            </DialogActions>
+          </>;
+        })()}
+      </Dialog>
+
+      {/* ── Mentor Training Report detail dialog ─────────────────────────── */}
+      <Dialog open={!!viewMrReport} onClose={() => setViewMrReport(null)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { maxHeight: '90vh' } }}>
+        {viewMrReport && (() => {
+          const mr = viewMrReport;
+          const SECTIONS = [
+            { key: 'mentoring_activities', label: 'Mentoring Activities' },
+            { key: 'msmes_mentored',       label: 'MSMEs Specifically Supported' },
+            { key: 'key_observations',     label: 'Key Observations' },
+            { key: 'challenges',           label: 'Challenges Encountered' },
+            { key: 'recommendations',      label: 'Recommendations' },
+            { key: 'next_steps',           label: 'Next Steps' },
+          ];
+          return <>
+            <Box sx={{ bgcolor: '#6a1b9a', px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+                  Mentor Training Report
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.3 }}>
+                  {mr.session_title}
+                </Typography>
+              </Box>
+              <Chip label={mr.status} size="small" color={mr.status === 'submitted' ? 'primary' : 'default'} />
+            </Box>
+            <DialogContent sx={{ p: 0 }}>
+              <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+                {[
+                  ['Mentor BGE', mr.bge_name],
+                  ['Lead BGE', mr.lead_bge_name],
+                  ['Session Date', mr.session_date],
+                  ['Location', mr.session_location],
+                  ['Training Dates', mr.training_dates],
+                  ['Venue', mr.venue],
+                ].filter(([, v]) => v).map(([label, val]) => (
+                  <Box key={label}>
+                    <Typography variant="caption" color="text.secondary" display="block"
+                      sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{val}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Box sx={{ px: 3, py: 2 }}>
+                {SECTIONS.map(({ key, label }, idx) => (
+                  <Box key={key} sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                      <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#6a1b9a',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Typography sx={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>{idx + 1}</Typography>
+                      </Box>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#6a1b9a' }}>{label}</Typography>
+                    </Box>
+                    <Box sx={{ bgcolor: '#F4F6F9', borderRadius: 1.5, px: 2, py: 1.5,
+                      borderLeft: `3px solid ${mr[key] ? '#6a1b9a' : '#E5E7EB'}` }}>
+                      {mr[key] ? (
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{mr[key]}</Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>No information recorded.</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ borderTop: '1px solid #E5E7EB' }}>
+              <Button onClick={() => setViewMrReport(null)}>Close</Button>
+            </DialogActions>
+          </>;
+        })()}
+      </Dialog>
+
       <Dialog open={!!viewReport} onClose={() => setViewReport(null)} maxWidth="md" fullWidth
         PaperProps={{ sx: { maxHeight: '90vh' } }}>
         {viewReport && (() => {
