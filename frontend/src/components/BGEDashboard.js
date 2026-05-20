@@ -13,11 +13,11 @@ import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
-  Delete,
+  Delete, School, People,
   HelpOutline, Close, TrendingUp,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL } from '../config';
+import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
 import VisitReportForm from './VisitReportForm';
@@ -121,6 +121,36 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const [helpDialog, setHelpDialog] = useState(false);
   const [helpSection, setHelpSection] = useState(0);
+
+  // Training tab — assigned sessions
+  const [leadSessions, setLeadSessions] = useState([]);
+  const [mentorSessions, setMentorSessions] = useState([]);
+
+  // Training report dialog (lead sessions)
+  const [trDialog, setTrDialog] = useState(false);
+  const [trSession, setTrSession] = useState(null);
+  const [trData, setTrData] = useState(null);
+  const [trSaving, setTrSaving] = useState(false);
+  const [trForm, setTrForm] = useState({});
+  const EMPTY_TR = {
+    training_title: '', training_dates: '', venue: '', district: '',
+    facilitation_team: '', training_purpose: '', session_objectives: '',
+    activities_delivered: '', key_lessons: '', recommendations: '',
+    next_steps: '', status: 'draft',
+  };
+
+  // Mentor report dialog
+  const [mrDialog, setMrDialog] = useState(false);
+  const [mrSession, setMrSession] = useState(null);
+  const [mrData, setMrData] = useState(null);
+  const [mrSaving, setMrSaving] = useState(false);
+  const [mrForm, setMrForm] = useState({});
+  const EMPTY_MR = {
+    training_title: '', training_dates: '', venue: '',
+    mentoring_activities: '', msmes_mentored: '',
+    key_observations: '', challenges: '', recommendations: '', next_steps: '',
+    status: 'draft',
+  };
 
   // Work orders
   const [workOrders, setWorkOrders] = useState([]);
@@ -378,6 +408,114 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   }, [token]);
 
 
+  const fetchSessions = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const [sRes, faRes, trRes, mrRes] = await Promise.all([
+        axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
+        axios.get(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, { headers: h }).catch(() => ({ data: [] })),
+        axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+        axios.get(MENTOR_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+      ]);
+      const sessData = Array.isArray(sRes.data) ? sRes.data : sRes.data.results || [];
+      const allAssignments = Array.isArray(faRes.data) ? faRes.data : faRes.data.results || [];
+      const trReports = Array.isArray(trRes.data) ? trRes.data : trRes.data.results || [];
+      const mrReports = Array.isArray(mrRes.data) ? mrRes.data : mrRes.data.results || [];
+
+      const trBySession = {};
+      trReports.forEach(r => { trBySession[r.session] = r; });
+      const mrBySession = {};
+      mrReports.forEach(r => { mrBySession[r.session] = r; });
+
+      const enriched = sessData.map(s => ({
+        ...s,
+        _tr: trBySession[s.id] || null,
+        _mr: mrBySession[s.id] || null,
+      }));
+
+      const leadTopics = new Set(allAssignments.filter(a => a.role !== 'mentor' && a.topic).map(a => a.topic));
+      const mentorIds  = new Set(allAssignments.filter(a => a.role === 'mentor' && a.session).map(a => a.session));
+      setLeadSessions(enriched.filter(s => leadTopics.has(s.topic)));
+      setMentorSessions(enriched.filter(s => mentorIds.has(s.id)));
+    } catch { /* silent */ }
+  }, [token]);
+
+  const openTrReport = (session) => {
+    setTrSession(session);
+    const existing = session._tr;
+    if (existing) {
+      const { id, session: _s, bge: _b, created_at, updated_at, submitted_at,
+              session_title, session_date, session_location, bge_name, total_participants, ...rest } = existing;
+      setTrData(existing);
+      setTrForm({ ...EMPTY_TR, ...rest });
+    } else {
+      setTrData(null);
+      setTrForm({
+        ...EMPTY_TR,
+        training_title: session.title || '',
+        training_dates: session.date || '',
+        venue: session.location || '',
+        facilitation_team: (session.team || []).map(m => m.bge_name).filter(Boolean).join(', '),
+      });
+    }
+    setTrDialog(true);
+  };
+
+  const saveTrReport = async (submitNow = false) => {
+    if (!trSession) return;
+    setTrSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    const payload = { ...trForm, session: trSession.id, status: submitNow ? 'submitted' : (trForm.status || 'draft') };
+    try {
+      if (trData?.id) {
+        await axios.patch(`${API_ENDPOINTS.TRAINING_REPORTS}${trData.id}/`, payload, { headers: h });
+      } else {
+        await axios.post(API_ENDPOINTS.TRAINING_REPORTS, payload, { headers: h });
+      }
+      notify(submitNow ? 'Report submitted!' : 'Draft saved');
+      setTrDialog(false);
+      fetchSessions();
+    } catch (err) { notify(err.response?.data?.detail || 'Failed to save', 'error'); }
+    finally { setTrSaving(false); }
+  };
+
+  const openMrReport = (session) => {
+    setMrSession(session);
+    const existing = session._mr;
+    if (existing) {
+      setMrData(existing);
+      setMrForm({ ...EMPTY_MR, ...existing });
+    } else {
+      setMrData(null);
+      setMrForm({
+        ...EMPTY_MR,
+        training_title: session.title || '',
+        training_dates: session.date || '',
+        venue: session.location || '',
+      });
+    }
+    setMrDialog(true);
+  };
+
+  const saveMrReport = async (submitNow = false) => {
+    if (!mrSession) return;
+    setMrSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    const existing = mrSession._mr;
+    const payload = { ...mrForm, session: mrSession.id, status: submitNow ? 'submitted' : (mrForm.status || 'draft') };
+    try {
+      if (existing?.id) {
+        await axios.patch(`${MENTOR_REPORTS}${existing.id}/`, payload, { headers: h });
+      } else {
+        await axios.post(MENTOR_REPORTS, payload, { headers: h });
+      }
+      notify(submitNow ? 'Mentor report submitted!' : 'Draft saved');
+      setMrDialog(false);
+      fetchSessions();
+    } catch (err) { notify(err.response?.data?.detail || 'Failed to save', 'error'); }
+    finally { setMrSaving(false); }
+  };
+
   const pushAttempted = useRef(false);
 
   useEffect(() => {
@@ -386,12 +524,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchGroups();
     fetchGroupReports();
     fetchWorkOrders();
+    fetchSessions();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, token]);
+  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSessions, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -717,6 +856,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'groups',      label: 'My Groups',      icon: <GroupIcon /> },
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
+    { key: 'training',   label: 'Training',       icon: <School />,
+      badge: leadSessions.length + mentorSessions.length || undefined },
   ];
 
   const SidebarContent = () => (
@@ -1537,7 +1678,188 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             )}
           </Box>
         )}
+
+        {/* ── Training tab ─────────────────────────────────────────────────── */}
+        {section === 'training' && (
+          <Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={700}>My Training Sessions</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sessions you are assigned to as lead facilitator or mentor.
+              </Typography>
+            </Box>
+
+            {leadSessions.length === 0 && mentorSessions.length === 0 ? (
+              <Paper sx={{ p: 6, textAlign: 'center' }}>
+                <School sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                <Typography color="text.secondary" gutterBottom>No training sessions yet.</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  You will appear here once the programme administrator assigns you to a session.
+                </Typography>
+              </Paper>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {leadSessions.map(s => (
+                  <Card key={s.id} sx={{ borderLeft: '4px solid #1565C0', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', minWidth: 0 }}>
+                          <School sx={{ color: '#1565C0', fontSize: 20, mt: 0.3, flexShrink: 0 }} />
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Chip label="Lead" size="small" sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                              <Typography fontWeight={700} fontSize={15}>{s.title}</Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {s.date}{s.location ? ` · ${s.location}` : ''}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                          <Chip label={s._tr ? (s._tr.status === 'submitted' ? 'Submitted' : 'Draft') : 'Pending'}
+                            size="small" color={s._tr?.status === 'submitted' ? 'success' : s._tr ? 'warning' : 'default'} />
+                          <Button size="small" variant="contained" startIcon={<Edit />}
+                            onClick={() => openTrReport(s)}
+                            sx={{ bgcolor: '#1565C0', '&:hover': { bgcolor: '#0d47a1' }, fontSize: 12 }}>
+                            {s._tr ? 'Edit Report' : 'Write Report'}
+                          </Button>
+                        </Box>
+                      </Box>
+                      {(s.businesses_detail || []).length > 0 && (
+                        <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          {s.businesses_detail.map(m => (
+                            <Chip key={m.id} label={m.business_name} size="small" variant="outlined" />
+                          ))}
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {mentorSessions.map(s => (
+                  <Card key={s.id} sx={{ borderLeft: '4px solid #7B1FA2', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', minWidth: 0 }}>
+                          <People sx={{ color: '#7B1FA2', fontSize: 20, mt: 0.3, flexShrink: 0 }} />
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Chip label="Mentor" size="small" sx={{ bgcolor: '#7B1FA2', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                              <Typography fontWeight={700} fontSize={15}>{s.title}</Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {s.date}{s.location ? ` · ${s.location}` : ''}
+                              {(s.team || []).find(m => m.role === 'lead')?.bge_name ? ` · Lead: ${(s.team || []).find(m => m.role === 'lead').bge_name}` : ''}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                          <Chip label={s._mr ? (s._mr.status === 'submitted' ? 'Submitted' : 'Draft') : 'Pending'}
+                            size="small" color={s._mr?.status === 'submitted' ? 'success' : s._mr ? 'warning' : 'default'} />
+                          <Button size="small" variant="contained" startIcon={<Edit />}
+                            onClick={() => openMrReport(s)}
+                            sx={{ bgcolor: '#7B1FA2', '&:hover': { bgcolor: '#6a1b9a' }, fontSize: 12 }}>
+                            {s._mr ? 'Edit Report' : 'Write Report'}
+                          </Button>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            )}
+          </Box>
+        )}
       </Box>
+
+      {/* ── Training report dialog (lead sessions) ─────────────────────────── */}
+      {trDialog && (
+        <Dialog open onClose={() => setTrDialog(false)} maxWidth="md" fullWidth>
+          <DialogTitle sx={{ pb: 0.5 }}>
+            {trData ? 'Edit Training Report' : 'Write Training Report'}
+            <Typography variant="caption" display="block" color="text.secondary">
+              {trSession?.title} · {trSession?.date}
+              {trData?.status === 'submitted' && <Chip label="Submitted" size="small" color="success" sx={{ ml: 1, fontSize: 10 }} />}
+            </Typography>
+          </DialogTitle>
+          <DialogContent dividers sx={{ pt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}><TextField fullWidth size="small" label="Training Title"
+                value={trForm.training_title || ''} onChange={e => setTrForm(f => ({ ...f, training_title: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="Date(s)" placeholder="e.g. 17–19 Feb 2026"
+                value={trForm.training_dates || ''} onChange={e => setTrForm(f => ({ ...f, training_dates: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={5}><TextField fullWidth size="small" label="Venue / Location"
+                value={trForm.venue || ''} onChange={e => setTrForm(f => ({ ...f, venue: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={3}><TextField fullWidth size="small" label="District"
+                value={trForm.district || ''} onChange={e => setTrForm(f => ({ ...f, district: e.target.value }))} /></Grid>
+              <Grid item xs={12}><TextField fullWidth size="small" label="Facilitation Team"
+                value={trForm.facilitation_team || ''} onChange={e => setTrForm(f => ({ ...f, facilitation_team: e.target.value }))} /></Grid>
+            </Grid>
+            <Divider sx={{ my: 2 }} />
+            {[
+              { key: 'training_purpose',    label: 'Purpose / Background' },
+              { key: 'session_objectives',  label: 'Session Objectives' },
+              { key: 'activities_delivered',label: 'Activities Delivered' },
+              { key: 'key_lessons',         label: 'Key Lessons Learned' },
+              { key: 'recommendations',     label: 'Recommendations' },
+              { key: 'next_steps',          label: 'Next Steps' },
+            ].map(({ key, label }) => (
+              <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
+                value={trForm[key] || ''} onChange={e => setTrForm(f => ({ ...f, [key]: e.target.value }))} />
+            ))}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+            <Button onClick={() => setTrDialog(false)} disabled={trSaving}>Cancel</Button>
+            <Button variant="outlined" onClick={() => saveTrReport(false)} disabled={trSaving}>
+              {trSaving ? 'Saving…' : 'Save Draft'}
+            </Button>
+            <Button variant="contained" color="success" onClick={() => saveTrReport(true)} disabled={trSaving}>
+              {trSaving ? 'Submitting…' : 'Submit Report'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* ── Mentor report dialog ────────────────────────────────────────────── */}
+      {mrDialog && (
+        <Dialog open onClose={() => setMrDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ pb: 0.5 }}>
+            {mrData ? 'Edit Mentor Report' : 'Write Mentor Report'}
+            <Typography variant="caption" display="block" color="text.secondary">
+              {mrSession?.title} · {mrSession?.date}
+              {mrData?.status === 'submitted' && <Chip label="Submitted" size="small" color="success" sx={{ ml: 1, fontSize: 10 }} />}
+            </Typography>
+          </DialogTitle>
+          <DialogContent dividers sx={{ pt: 2 }}>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Date(s)"
+                value={mrForm.training_dates || ''} onChange={e => setMrForm(f => ({ ...f, training_dates: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Venue"
+                value={mrForm.venue || ''} onChange={e => setMrForm(f => ({ ...f, venue: e.target.value }))} /></Grid>
+            </Grid>
+            {[
+              { key: 'mentoring_activities', label: 'Mentoring Activities' },
+              { key: 'msmes_mentored',       label: 'MSMEs / Participants Mentored' },
+              { key: 'key_observations',     label: 'Key Observations' },
+              { key: 'challenges',           label: 'Challenges' },
+              { key: 'recommendations',      label: 'Recommendations' },
+              { key: 'next_steps',           label: 'Next Steps' },
+            ].map(({ key, label }) => (
+              <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
+                value={mrForm[key] || ''} onChange={e => setMrForm(f => ({ ...f, [key]: e.target.value }))} />
+            ))}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+            <Button onClick={() => setMrDialog(false)} disabled={mrSaving}>Cancel</Button>
+            <Button variant="outlined" onClick={() => saveMrReport(false)} disabled={mrSaving}>
+              {mrSaving ? 'Saving…' : 'Save Draft'}
+            </Button>
+            <Button variant="contained" color="success" onClick={() => saveMrReport(true)} disabled={mrSaving}>
+              {mrSaving ? 'Submitting…' : 'Submit Report'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       {/* ── MSME detail dialog ── */}
       <Dialog open={msmeDetailDialog} onClose={() => setMsmeDetailDialog(false)} maxWidth="md" fullWidth>
@@ -3003,6 +3325,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               <Tab label="My MSMEs" />
               <Tab label="My Groups" />
               <Tab label="Work Orders" />
+              <Tab label="Training" />
               <Tab label="My Reports" />
             </Tabs>
           </Box>
@@ -3037,6 +3360,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 ],
               },
               {
+                title: 'Training',
+                steps: [
+                  { n: 1, text: 'Sessions you are assigned to as lead facilitator or mentor appear here as cards.' },
+                  { n: 2, text: 'Lead sessions show a blue "Lead" badge; mentor sessions show a purple "Mentor" badge.' },
+                  { n: 3, text: 'Click "Write Report" to open the report form for that session.' },
+                  { n: 4, text: 'Use "Save Draft" to continue later, or "Submit Report" when complete.' },
+                ],
+              },
+              {
                 title: 'My Reports',
                 steps: [
                   { n: 1, text: 'All your individual and group support reports are listed here with their status (Draft / Submitted / Approved).' },
@@ -3061,7 +3393,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <DialogActions sx={{ px: 3 }}>
             <Button disabled={helpSection === 0} onClick={() => setHelpSection(s => s - 1)}>← Previous</Button>
             <Box sx={{ flex: 1 }} />
-            <Button disabled={helpSection === 3} variant="contained" onClick={() => setHelpSection(s => s + 1)}>Next →</Button>
+            <Button disabled={helpSection === 4} variant="contained" onClick={() => setHelpSection(s => s + 1)}>Next →</Button>
           </DialogActions>
         </Dialog>
       )}
