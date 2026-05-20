@@ -2243,12 +2243,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [adminSnapshots, setAdminSnapshots] = useState([]);
   const [adminSnapshotsLoading, setAdminSnapshotsLoading] = useState(false);
   const [msmeDetailTab, setMsmeDetailTab] = useState(0);
+  const [snapshotFilterBge, setSnapshotFilterBge] = useState('');
+  const [snapshotFilterSource, setSnapshotFilterSource] = useState('');
+  const [snapshotPage, setSnapshotPage] = useState(0);
+  const [viewSnapshot, setViewSnapshot] = useState(null);
 
-  // Fetch all growth snapshots for the admin view (MSMEs table + analytics).
-  // Runs once on mount and whenever section switches to msmes/analytics.
+  // Fetch all growth snapshots for the admin view (MSMEs table + analytics + reports).
+  // Runs once on mount and whenever section switches to msmes/analytics/reports.
   useEffect(() => {
     if (!token) return;
-    if (section !== 'msmes' && section !== 'analytics') return;
+    if (section !== 'msmes' && section !== 'analytics' && section !== 'reports') return;
     setAdminSnapshotsLoading(true);
     axios.get(API_ENDPOINTS.GROWTH_SNAPSHOTS, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => {
@@ -3950,6 +3954,121 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </TableContainer>
           )
         )}
+      </Box>
+
+      {/* ── Growth Updates (Snapshots) ──────────────────────────────────── */}
+      <Box sx={{ mt: 4 }}>
+        <SectionHeader
+          title="Growth Updates"
+          subtitle={`${adminSnapshots.length} submission${adminSnapshots.length === 1 ? '' : 's'} across all MSMEs`}
+        >
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>
+              <InputLabel>Filter by BGE</InputLabel>
+              <Select value={snapshotFilterBge} label="Filter by BGE"
+                onChange={e => { setSnapshotFilterBge(e.target.value); setSnapshotPage(0); }}>
+                <MenuItem value="">All BGEs</MenuItem>
+                {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: 0 }}>
+              <InputLabel>Source</InputLabel>
+              <Select value={snapshotFilterSource} label="Source"
+                onChange={e => { setSnapshotFilterSource(e.target.value); setSnapshotPage(0); }}>
+                <MenuItem value="">All Sources</MenuItem>
+                <MenuItem value="diagnostic">Baseline Diagnostic</MenuItem>
+                <MenuItem value="bge_visit">BGE Visit</MenuItem>
+                <MenuItem value="quarterly">Quarterly Review</MenuItem>
+                <MenuItem value="annual">Annual Review</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </SectionHeader>
+
+        {adminSnapshotsLoading ? (
+          <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress /></Box>
+        ) : (() => {
+          const SOURCE_LABELS = {
+            diagnostic: 'Baseline', bge_visit: 'BGE Visit', quarterly: 'Quarterly',
+            annual: 'Annual', other: 'Other',
+          };
+          const fmtUGX = v => v == null || v === '' ? '—' : `UGX ${Number(v).toLocaleString()}`;
+          const filtered = adminSnapshots.filter(s =>
+            (!snapshotFilterBge || s.collected_by === Number(snapshotFilterBge)) &&
+            (!snapshotFilterSource || s.source === snapshotFilterSource)
+          );
+          const pageSlice = filtered.slice(snapshotPage * ROWS_PER_PAGE, (snapshotPage + 1) * ROWS_PER_PAGE);
+          if (filtered.length === 0) {
+            return (
+              <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+                No growth updates match the current filters.
+              </Paper>
+            );
+          }
+          return (
+            <>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                    <TableRow>
+                      <TableCell>MSME</TableCell>
+                      <TableCell>BGE</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell>Source</TableCell>
+                      <TableCell>Annual Turnover</TableCell>
+                      <TableCell>Employees</TableCell>
+                      <TableCell>Compliance</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {pageSlice.map(s => {
+                      const totalEmp = (s.employees_ft_male||0)+(s.employees_ft_female||0)
+                        +(s.employees_pt_male||0)+(s.employees_pt_female||0);
+                      return (
+                        <TableRow key={s.id} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={500}>{s.msme_name}</Typography>
+                          </TableCell>
+                          <TableCell>{s.collected_by_name || '—'}</TableCell>
+                          <TableCell>{s.snapshot_date}</TableCell>
+                          <TableCell>
+                            <Chip label={SOURCE_LABELS[s.source] || s.source} size="small" variant="outlined" />
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                            {fmtUGX(s.annual_turnover)}
+                          </TableCell>
+                          <TableCell>{totalEmp > 0 ? totalEmp : '—'}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                              {s.has_tin && <Chip label="TIN" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                              {s.has_ursb && <Chip label="URSB" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                              {s.has_business_bank && <Chip label="Bank" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                              {s.has_mobile_money && <Chip label="MoMo" size="small" color="info" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Tooltip title="View full update">
+                              <IconButton size="small" color="primary" onClick={() => setViewSnapshot(s)}>
+                                <Visibility fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                <TablePagination
+                  component="div" count={filtered.length} page={snapshotPage}
+                  rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
+                  onPageChange={(_, p) => setSnapshotPage(p)}
+                />
+              </TableContainer>
+            </>
+          );
+        })()}
       </Box>
     </Box>
   );
@@ -6243,6 +6362,122 @@ PRUDEV II BDS Team`
       </Dialog>
 
       {/* ── In-App Report Viewer ──────────────────────────────────────────── */}
+      {/* ── Growth Snapshot detail dialog ────────────────────────────────── */}
+      <Dialog open={!!viewSnapshot} onClose={() => setViewSnapshot(null)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { maxHeight: '90vh' } }}>
+        {viewSnapshot && (() => {
+          const s = viewSnapshot;
+          const fmtUGX = v => v == null || v === '' ? '—' : `UGX ${Number(v).toLocaleString()}`;
+          const SOURCE_LABELS = {
+            diagnostic: 'Baseline Diagnostic', bge_visit: 'BGE Visit',
+            quarterly: 'Quarterly Review', annual: 'Annual Review', other: 'Other',
+          };
+          const ftTotal = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+          const ptTotal = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+          return <>
+            <Box sx={{ bgcolor: '#1565C0', px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+                  Growth Update
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.3 }}>
+                  {s.msme_name}
+                </Typography>
+              </Box>
+              <Chip label={SOURCE_LABELS[s.source] || s.source} size="small"
+                sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff' }} />
+            </Box>
+            <DialogContent sx={{ p: 0 }}>
+              <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1.5, bgcolor: '#F8FAFC',
+                borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+                {[
+                  ['BGE', s.collected_by_name],
+                  ['Date', s.snapshot_date],
+                ].filter(([, v]) => v).map(([label, val]) => (
+                  <Box key={label}>
+                    <Typography variant="caption" color="text.secondary" display="block"
+                      sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{val}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Box sx={{ px: 3, py: 2 }}>
+                {/* Financials */}
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Financials</Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+                  {[
+                    { label: 'Annual Turnover', value: fmtUGX(s.annual_turnover) },
+                    { label: 'Last Month Revenue', value: fmtUGX(s.last_month_revenue) },
+                    { label: 'Total Assets', value: fmtUGX(s.total_assets) },
+                  ].map(({ label, value }) => (
+                    <Box key={label} sx={{ bgcolor: '#F4F6F9', borderRadius: 1.5, px: 2, py: 1, flex: '1 1 140px' }}>
+                      <Typography variant="caption" color="text.secondary" display="block"
+                        sx={{ fontSize: 10, textTransform: 'uppercase' }}>{label}</Typography>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontFamily: 'monospace' }}>{value}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                {/* Workforce */}
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Workforce</Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+                  {[
+                    { label: 'FT Male', value: s.employees_ft_male ?? '—' },
+                    { label: 'FT Female', value: s.employees_ft_female ?? '—' },
+                    { label: 'PT Male', value: s.employees_pt_male ?? '—' },
+                    { label: 'PT Female', value: s.employees_pt_female ?? '—' },
+                    { label: 'FT Total', value: ftTotal },
+                    { label: 'PT Total', value: ptTotal },
+                    { label: 'FT Refugee', value: s.employees_ft_refugee ?? '—' },
+                    { label: 'PT Refugee', value: s.employees_pt_refugee ?? '—' },
+                  ].map(({ label, value }) => (
+                    <Box key={label} sx={{ textAlign: 'center', bgcolor: '#F4F6F9',
+                      borderRadius: 1.5, px: 1.5, py: 1, minWidth: 68 }}>
+                      <Typography variant="h6" fontWeight={700}>{value}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>{label}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                {/* Compliance */}
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Compliance & Access</Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                  {[
+                    { key: 'has_tin', label: 'TIN', detail: s.tin_number },
+                    { key: 'has_ursb', label: 'URSB', detail: s.ursb_reg_number },
+                    { key: 'has_business_bank', label: 'Business Bank', detail: s.bank_name },
+                    { key: 'has_sacco', label: 'SACCO' },
+                    { key: 'has_mobile_money', label: 'Mobile Money' },
+                    { key: 'has_momo_pay', label: 'MOMO Pay', detail: s.momo_pay_code },
+                  ].map(({ key, label, detail }) => (
+                    <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 0.5,
+                      bgcolor: s[key] ? '#E8F5E9' : '#FAFAFA', borderRadius: 1, px: 1.5, py: 0.5,
+                      border: `1px solid ${s[key] ? '#A5D6A7' : '#E0E0E0'}` }}>
+                      <CheckCircle sx={{ fontSize: 14, color: s[key] ? '#2E7D32' : '#BDBDBD' }} />
+                      <Typography variant="caption" fontWeight={500}>{label}</Typography>
+                      {detail && <Typography variant="caption" color="text.secondary">({detail})</Typography>}
+                    </Box>
+                  ))}
+                </Box>
+                {/* Digital tools */}
+                {s.digital_tools && s.digital_tools.length > 0 && (
+                  <>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Digital Tools</Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
+                      {s.digital_tools.map(t => (
+                        <Chip key={t} label={t} size="small" variant="outlined" />
+                      ))}
+                      {s.digital_tools_other && <Chip label={s.digital_tools_other} size="small" variant="outlined" />}
+                    </Box>
+                  </>
+                )}
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ borderTop: '1px solid #E5E7EB' }}>
+              <Button onClick={() => setViewSnapshot(null)}>Close</Button>
+            </DialogActions>
+          </>;
+        })()}
+      </Dialog>
+
       {/* ── Training Report detail dialog ────────────────────────────────── */}
       <Dialog open={!!viewTrReport} onClose={() => setViewTrReport(null)} maxWidth="md" fullWidth
         PaperProps={{ sx: { maxHeight: '90vh' } }}>
