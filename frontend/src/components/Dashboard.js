@@ -4006,7 +4006,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Box sx={{ mt: 4 }}>
         <SectionHeader
           title="Growth Updates"
-          subtitle={`${adminSnapshots.length} submission${adminSnapshots.length === 1 ? '' : 's'} across all MSMEs`}
+          subtitle={`${adminSnapshots.length} submission${adminSnapshots.length === 1 ? '' : 's'} · ${[...new Set(adminSnapshots.map(s => s.msme))].length} MSMEs covered`}
         >
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>
@@ -4035,83 +4035,349 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         {adminSnapshotsLoading ? (
           <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress /></Box>
         ) : (() => {
+          if (adminSnapshots.length === 0) return (
+            <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+              No growth updates recorded yet.
+            </Paper>
+          );
+
+          // ── Core derivations (all snapshots, not filtered) ─────────────
           const SOURCE_LABELS = {
             diagnostic: 'Baseline', bge_visit: 'BGE Visit', quarterly: 'Quarterly',
             annual: 'Annual', other: 'Other',
           };
-          const fmtUGX = v => v == null || v === '' ? '—' : `UGX ${Number(v).toLocaleString()}`;
+          const fmtUGX = v => (v == null || v === '') ? '—' : `UGX ${Number(v).toLocaleString()}`;
+
+          const latestByMsme = {};
+          const firstByMsme  = {};
+          adminSnapshots.forEach(s => {
+            const lat = latestByMsme[s.msme];
+            if (!lat || s.snapshot_date > lat.snapshot_date || (s.snapshot_date === lat.snapshot_date && s.id > lat.id))
+              latestByMsme[s.msme] = s;
+            const cur = firstByMsme[s.msme];
+            if (!cur || s.snapshot_date < cur.snapshot_date || (s.snapshot_date === cur.snapshot_date && s.id < cur.id))
+              firstByMsme[s.msme] = s;
+          });
+          const latestList = Object.values(latestByMsme);
+          const paired = latestList
+            .filter(s => firstByMsme[s.msme] && firstByMsme[s.msme].id !== s.id)
+            .map(s => ({ ...s, _first: firstByMsme[s.msme] }))
+            .sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date));
+
+          const bgeCnt = new Set(adminSnapshots.filter(x => x.collected_by).map(x => x.collected_by)).size;
+
+          // ── Compliance (latest snapshot per MSME) ─────────────────────
+          const compFields = [
+            { label: 'TIN',           key: 'has_tin',           color: '#1565C0' },
+            { label: 'URSB',          key: 'has_ursb',          color: '#4527A0' },
+            { label: 'Business Bank', key: 'has_business_bank', color: '#00695C' },
+            { label: 'SACCO',         key: 'has_sacco',         color: '#2E7D32' },
+            { label: 'Mobile Money',  key: 'has_mobile_money',  color: '#E65100' },
+            { label: 'MOMO Pay',      key: 'has_momo_pay',      color: '#F57C00' },
+          ];
+
+          // ── Financials ────────────────────────────────────────────────
+          const withRev     = latestList.filter(s => s.annual_turnover);
+          const totalRev    = withRev.reduce((a, s) => a + Number(s.annual_turnover), 0);
+          const avgRev      = withRev.length ? totalRev / withRev.length : 0;
+          const withMoRev   = latestList.filter(s => s.last_month_revenue);
+          const avgMoRev    = withMoRev.length
+            ? withMoRev.reduce((a, s) => a + Number(s.last_month_revenue), 0) / withMoRev.length : 0;
+          const totalEmpAll = latestList.reduce((a, s) =>
+            a + (s.employees_ft_male||0)+(s.employees_ft_female||0)
+              + (s.employees_pt_male||0)+(s.employees_pt_female||0), 0);
+          const femaleEmp   = latestList.reduce((a, s) =>
+            a + (s.employees_ft_female||0)+(s.employees_pt_female||0), 0);
+          const refugeeEmp  = latestList.reduce((a, s) =>
+            a + (s.employees_ft_refugee||0)+(s.employees_pt_refugee||0), 0);
+          const trainingImpact = latestList.filter(s => s.training_made_changes === true).length;
+
+          // ── Filtered table ────────────────────────────────────────────
           const filtered = adminSnapshots.filter(s =>
-            (!snapshotFilterBge || s.collected_by === Number(snapshotFilterBge)) &&
+            (!snapshotFilterBge    || s.collected_by === Number(snapshotFilterBge)) &&
             (!snapshotFilterSource || s.source === snapshotFilterSource)
           );
           const pageSlice = filtered.slice(snapshotPage * ROWS_PER_PAGE, (snapshotPage + 1) * ROWS_PER_PAGE);
-          if (filtered.length === 0) {
-            return (
-              <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
-                No growth updates match the current filters.
-              </Paper>
-            );
-          }
+
+          const COMP_LABELS = { has_tin: 'TIN', has_ursb: 'URSB', has_business_bank: 'Bank', has_sacco: 'SACCO', has_mobile_money: 'MoMo', has_momo_pay: 'MOMO Pay' };
+          const COMP_KEYS   = Object.keys(COMP_LABELS);
+
           return (
             <>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                    <TableRow>
-                      <TableCell>MSME</TableCell>
-                      <TableCell>BGE</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Source</TableCell>
-                      <TableCell>Annual Turnover</TableCell>
-                      <TableCell>Employees</TableCell>
-                      <TableCell>Compliance</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {pageSlice.map(s => {
-                      const totalEmp = (s.employees_ft_male||0)+(s.employees_ft_female||0)
-                        +(s.employees_pt_male||0)+(s.employees_pt_female||0);
-                      return (
-                        <TableRow key={s.id} hover>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={500}>{s.msme_name}</Typography>
-                          </TableCell>
-                          <TableCell>{s.collected_by_name || '—'}</TableCell>
-                          <TableCell>{s.snapshot_date}</TableCell>
-                          <TableCell>
-                            <Chip label={SOURCE_LABELS[s.source] || s.source} size="small" variant="outlined" />
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                            {fmtUGX(s.annual_turnover)}
-                          </TableCell>
-                          <TableCell>{totalEmp > 0 ? totalEmp : '—'}</TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                              {s.has_tin && <Chip label="TIN" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
-                              {s.has_ursb && <Chip label="URSB" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
-                              {s.has_business_bank && <Chip label="Bank" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
-                              {s.has_mobile_money && <Chip label="MoMo" size="small" color="info" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Tooltip title="View full update">
-                              <IconButton size="small" color="primary" onClick={() => setViewSnapshot(s)}>
-                                <Visibility fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
+              {/* ── Coverage stat chips ─────────────────────────────────── */}
+              <Box sx={{ display: 'flex', gap: 1.5, mb: 2.5, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Total Submissions',  value: adminSnapshots.length },
+                  { label: 'MSMEs Covered',      value: latestList.length },
+                  { label: 'BGEs Reporting',     value: bgeCnt },
+                  { label: 'With Baseline Data', value: paired.length, sub: 'baseline + update' },
+                  { label: 'Training Impact',    value: trainingImpact, sub: 'training made a change' },
+                ].map(({ label, value, sub }) => (
+                  <Box key={label} sx={{ flex: '1 1 130px', textAlign: 'center',
+                    bgcolor: '#F4F6F9', borderRadius: 2, px: 2, py: 1.5 }}>
+                    <Typography variant="h5" fontWeight={700} color="primary.main">{value}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.3 }}>{label}</Typography>
+                    {sub && <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>{sub}</Typography>}
+                  </Box>
+                ))}
+              </Box>
+
+              {/* ── Compliance summary ──────────────────────────────────── */}
+              <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                  Compliance &amp; Access
+                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    (based on latest snapshot · {latestList.length} MSMEs)
+                  </Typography>
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  {compFields.map(({ label, key, color }) => {
+                    const cnt = latestList.filter(s => s[key]).length;
+                    const pct = latestList.length > 0 ? Math.round(cnt / latestList.length * 100) : 0;
+                    return (
+                      <Box key={key} sx={{ flex: '1 1 130px', bgcolor: '#FAFAFA',
+                        borderRadius: 1.5, p: 1.5, borderLeft: `3px solid ${color}` }}>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                          <Typography variant="h6" fontWeight={700} sx={{ color }}>{cnt}</Typography>
+                          <Typography variant="caption" color="text.disabled">/ {latestList.length}</Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>{label}</Typography>
+                        <LinearProgress variant="determinate" value={pct}
+                          sx={{ height: 6, borderRadius: 3, bgcolor: '#E0E0E0',
+                            '& .MuiLinearProgress-bar': { bgcolor: color } }} />
+                        <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>{pct}%</Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Paper>
+
+              {/* ── Financial & workforce summary ───────────────────────── */}
+              <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                  Financial &amp; Workforce
+                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    (latest snapshot per MSME)
+                  </Typography>
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Total Annual Turnover',   value: fmtUGX(Math.round(totalRev)),  sub: `${withRev.length} MSMEs reported` },
+                    { label: 'Avg Annual Turnover',     value: fmtUGX(Math.round(avgRev)),    sub: 'per MSME' },
+                    { label: 'Avg Last Month Revenue',  value: fmtUGX(Math.round(avgMoRev)),  sub: `${withMoRev.length} MSMEs reported` },
+                    { label: 'Total Employees (FT+PT)', value: totalEmpAll,                   sub: 'across all MSMEs' },
+                    { label: 'Female Employees',        value: femaleEmp,                     sub: `${totalEmpAll > 0 ? Math.round(femaleEmp/totalEmpAll*100) : 0}% of total` },
+                    { label: 'Refugee Employees',       value: refugeeEmp,                    sub: 'FT + PT refugees' },
+                  ].map(({ label, value, sub }) => (
+                    <Box key={label} sx={{ flex: '1 1 155px', bgcolor: '#F4F6F9', borderRadius: 1.5, px: 2, py: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary"
+                        sx={{ textTransform: 'uppercase', fontSize: 10, display: 'block' }}>{label}</Typography>
+                      <Typography variant="body1" fontWeight={700}
+                        sx={{ fontFamily: typeof value === 'string' ? 'monospace' : 'inherit', mt: 0.25 }}>
+                        {value}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>{sub}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Paper>
+
+              {/* ── Baseline vs Latest comparison ───────────────────────── */}
+              {paired.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                    Baseline vs Latest Comparison
+                    <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                      {paired.length} MSME{paired.length !== 1 ? 's' : ''} with both baseline &amp; update
+                    </Typography>
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                        <TableRow>
+                          <TableCell>MSME</TableCell>
+                          <TableCell>Baseline</TableCell>
+                          <TableCell>Latest</TableCell>
+                          <TableCell>Annual Turnover</TableCell>
+                          <TableCell>Last Month Revenue</TableCell>
+                          <TableCell>Employees</TableCell>
+                          <TableCell>Compliance Change</TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-                <TablePagination
-                  component="div" count={filtered.length} page={snapshotPage}
-                  rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
-                  onPageChange={(_, p) => setSnapshotPage(p)}
-                />
-              </TableContainer>
+                      </TableHead>
+                      <TableBody>
+                        {paired.map(s => {
+                          const f = s._first;
+                          const revB = Number(f.annual_turnover) || 0;
+                          const revA = Number(s.annual_turnover) || 0;
+                          const revDelta = revB > 0 && revA > 0
+                            ? ((revA - revB) / revB * 100).toFixed(0) : null;
+                          const moRevB = Number(f.last_month_revenue) || 0;
+                          const moRevA = Number(s.last_month_revenue) || 0;
+                          const moRevDelta = moRevB > 0 && moRevA > 0
+                            ? ((moRevA - moRevB) / moRevB * 100).toFixed(0) : null;
+                          const empB = (f.employees_ft_male||0)+(f.employees_ft_female||0)+(f.employees_pt_male||0)+(f.employees_pt_female||0);
+                          const empA = (s.employees_ft_male||0)+(s.employees_ft_female||0)+(s.employees_pt_male||0)+(s.employees_pt_female||0);
+                          const empDelta = empA - empB;
+                          const gained = COMP_KEYS.filter(k => !f[k] && s[k]);
+                          const lost   = COMP_KEYS.filter(k =>  f[k] && !s[k]);
+                          return (
+                            <TableRow key={s.id} hover>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight={500}>{s.msme_name}</Typography>
+                                <Typography variant="caption" color="text.secondary">{s.collected_by_name || ''}</Typography>
+                              </TableCell>
+                              <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>
+                                {f.snapshot_date}<br/>
+                                <Typography variant="caption" color="text.disabled">{SOURCE_LABELS[f.source] || f.source}</Typography>
+                              </TableCell>
+                              <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>
+                                {s.snapshot_date}<br/>
+                                <Typography variant="caption" color="text.disabled">{SOURCE_LABELS[s.source] || s.source}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                {(revB > 0 || revA > 0) ? (
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                                      {fmtUGX(revB)}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                                      {fmtUGX(revA)}
+                                    </Typography>
+                                    {revDelta && (
+                                      <Chip label={`${revDelta > 0 ? '+' : ''}${revDelta}%`} size="small"
+                                        color={Number(revDelta) > 0 ? 'success' : 'error'}
+                                        sx={{ height: 18, fontSize: 10, mt: 0.5 }} />
+                                    )}
+                                  </Box>
+                                ) : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {(moRevB > 0 || moRevA > 0) ? (
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                                      {fmtUGX(moRevB)}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                                      {fmtUGX(moRevA)}
+                                    </Typography>
+                                    {moRevDelta && (
+                                      <Chip label={`${moRevDelta > 0 ? '+' : ''}${moRevDelta}%`} size="small"
+                                        color={Number(moRevDelta) > 0 ? 'success' : 'error'}
+                                        sx={{ height: 18, fontSize: 10, mt: 0.5 }} />
+                                    )}
+                                  </Box>
+                                ) : '—'}
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="caption" color="text.secondary" display="block">{empB} → {empA}</Typography>
+                                {empDelta !== 0 && (
+                                  <Chip label={`${empDelta > 0 ? '+' : ''}${empDelta}`} size="small"
+                                    color={empDelta > 0 ? 'success' : 'error'} sx={{ height: 18, fontSize: 10 }} />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                  {gained.map(k => (
+                                    <Chip key={k} label={`+${COMP_LABELS[k]}`} size="small" color="success"
+                                      sx={{ height: 18, fontSize: 10 }} />
+                                  ))}
+                                  {lost.map(k => (
+                                    <Chip key={k} label={`−${COMP_LABELS[k]}`} size="small" color="error"
+                                      sx={{ height: 18, fontSize: 10 }} />
+                                  ))}
+                                  {gained.length === 0 && lost.length === 0 && (
+                                    <Typography variant="caption" color="text.disabled">No change</Typography>
+                                  )}
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              {/* ── All submissions table ───────────────────────────────── */}
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                All Submissions
+                {(snapshotFilterBge || snapshotFilterSource) && (
+                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    (filtered · {filtered.length} result{filtered.length !== 1 ? 's' : ''})
+                  </Typography>
+                )}
+              </Typography>
+              {filtered.length === 0 ? (
+                <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                  No submissions match the current filters.
+                </Paper>
+              ) : (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableRow>
+                        <TableCell>MSME</TableCell>
+                        <TableCell>BGE</TableCell>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Source</TableCell>
+                        <TableCell>Annual Turnover</TableCell>
+                        <TableCell>Last Mo. Revenue</TableCell>
+                        <TableCell>Employees</TableCell>
+                        <TableCell>Compliance</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pageSlice.map(s => {
+                        const totalEmp = (s.employees_ft_male||0)+(s.employees_ft_female||0)
+                          +(s.employees_pt_male||0)+(s.employees_pt_female||0);
+                        return (
+                          <TableRow key={s.id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500}>{s.msme_name}</Typography>
+                            </TableCell>
+                            <TableCell>{s.collected_by_name || '—'}</TableCell>
+                            <TableCell>{s.snapshot_date}</TableCell>
+                            <TableCell>
+                              <Chip label={SOURCE_LABELS[s.source] || s.source} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                              {fmtUGX(s.annual_turnover)}
+                            </TableCell>
+                            <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                              {fmtUGX(s.last_month_revenue)}
+                            </TableCell>
+                            <TableCell>{totalEmp > 0 ? totalEmp : '—'}</TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                {s.has_tin           && <Chip label="TIN"  size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                                {s.has_ursb          && <Chip label="URSB" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                                {s.has_business_bank && <Chip label="Bank" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                                {s.has_sacco         && <Chip label="SACCO" size="small" color="success" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                                {s.has_mobile_money  && <Chip label="MoMo" size="small" color="info"    variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                                {s.has_momo_pay      && <Chip label="MoMo Pay" size="small" color="info" variant="outlined" sx={{ fontSize: 10, height: 20 }} />}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Tooltip title="View full update">
+                                <IconButton size="small" color="primary" onClick={() => setViewSnapshot(s)}>
+                                  <Visibility fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  <TablePagination
+                    component="div" count={filtered.length} page={snapshotPage}
+                    rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
+                    onPageChange={(_, p) => setSnapshotPage(p)}
+                  />
+                </TableContainer>
+              )}
             </>
           );
         })()}
@@ -6506,7 +6772,7 @@ PRUDEV II BDS Team`
                 {/* Digital tools */}
                 {s.digital_tools && s.digital_tools.length > 0 && (
                   <>
-                    <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Digital Tools</Typography>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Digital Tools Adopted</Typography>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
                       {s.digital_tools.map(t => (
                         <Chip key={t} label={t} size="small" variant="outlined" />
@@ -6515,6 +6781,20 @@ PRUDEV II BDS Team`
                     </Box>
                   </>
                 )}
+                {/* Training impact */}
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Training Impact</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1,
+                  bgcolor: s.training_made_changes ? '#E8F5E9' : '#FFF3E0', borderRadius: 1,
+                  border: `1px solid ${s.training_made_changes ? '#A5D6A7' : '#FFE0B2'}` }}>
+                  <CheckCircle sx={{ fontSize: 16, color: s.training_made_changes ? '#2E7D32' : '#BDBDBD' }} />
+                  <Typography variant="body2">
+                    {s.training_made_changes === true
+                      ? 'Training delivered by the programme has made changes to this business'
+                      : s.training_made_changes === false
+                        ? 'Training has not yet made changes to this business'
+                        : 'Training impact not recorded'}
+                  </Typography>
+                </Box>
               </Box>
             </DialogContent>
             <DialogActions sx={{ borderTop: '1px solid #E5E7EB' }}>
