@@ -18,7 +18,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
 )
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY
 
 
 NAVY = HexColor('#1A2F4B')
@@ -60,7 +60,7 @@ def _styles():
         'sub':   ParagraphStyle('sub',   parent=base['Normal'],   fontSize=10, textColor=GREY, spaceAfter=10),
         'h2':    ParagraphStyle('h2',    parent=base['Heading2'], fontSize=12, textColor=NAVY, spaceBefore=12, spaceAfter=4),
         'label': ParagraphStyle('lbl',   parent=base['Normal'],   fontSize=8,  textColor=GREY, spaceAfter=2),
-        'body':  ParagraphStyle('body',  parent=base['Normal'],   fontSize=10, leading=14, alignment=TA_LEFT, spaceAfter=8),
+        'body':  ParagraphStyle('body',  parent=base['Normal'],   fontSize=10, leading=14, alignment=TA_JUSTIFY, spaceAfter=8),
         'meta':  ParagraphStyle('meta',  parent=base['Normal'],   fontSize=9,  textColor=GREY),
         'sectiontitle': ParagraphStyle('sectiontitle', parent=base['Normal'], fontSize=11, textColor=RED, spaceBefore=12, spaceAfter=2, fontName='Helvetica-Bold'),
     }
