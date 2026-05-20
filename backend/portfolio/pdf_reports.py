@@ -625,3 +625,132 @@ def render_work_order(work_order):
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
     return buf
+
+
+def render_training_report(report):
+    """Build a styled PDF for one TrainingReport (lead facilitator)."""
+    s = _styles()
+    buf, doc = _build_doc()
+    story = []
+
+    session = report.session
+    bge = report.bge
+
+    story.append(Paragraph(_safe_html(f'Training Report — {session.title}'), s['h1']))
+    story.append(Paragraph(f'Lead Training Report · {session.date}', s['sub']))
+
+    story.append(_kv_table([
+        ['Session',           session.title],
+        ['Date',              str(session.date)],
+        ['Location',          session.location or '—'],
+        ['Lead BGE',          bge.name if bge else '—'],
+        ['Training Dates',    report.training_dates or '—'],
+        ['Venue',             report.venue or '—'],
+        ['District',          report.district or '—'],
+        ['Time Allocation',   report.time_allocation or '—'],
+        ['Facilitation Team', report.facilitation_team or '—'],
+        ['Status',            report.get_status_display() if hasattr(report, 'get_status_display') else report.status],
+    ]))
+
+    story.append(Spacer(1, 8))
+
+    # Participant demographics
+    total = (report.participants_male_youth + report.participants_female_youth
+             + report.participants_adult_male + report.participants_adult_female)
+    demo_rows = [
+        ['Male Youth (15–35)', 'Female Youth (15–35)', 'Adult Male (36+)', 'Adult Female (36+)', 'Total'],
+        [
+            str(report.participants_male_youth),
+            str(report.participants_female_youth),
+            str(report.participants_adult_male),
+            str(report.participants_adult_female),
+            str(total),
+        ],
+    ]
+    demo_table = Table(demo_rows, hAlign='LEFT')
+    demo_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
+        ('TEXTCOLOR',     (0, 0), (-1, 0), HexColor('#FFFFFF')),
+        ('FONT',          (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+        ('FONT',          (0, 1), (-1, 1), 'Helvetica', 11),
+        ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING',    (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('GRID',          (0, 0), (-1, -1), 0.5, LIGHT_GREY),
+        ('BACKGROUND',    (4, 1), (4, 1), LIGHT_GREY),
+        ('FONT',          (4, 1), (4, 1), 'Helvetica-Bold', 11),
+    ]))
+    story.append(Paragraph('Participant Demographics', s['sectiontitle']))
+    story.append(demo_table)
+    story.append(Spacer(1, 10))
+
+    narrative_sections = [
+        ('Background & Purpose',                  report.training_purpose),
+        ('Session Objectives',                     report.session_objectives),
+        ('Activities Delivered',                   report.activities_delivered),
+        ('Key Lessons Learnt',                     report.key_lessons),
+        ('Growth Support Areas Observed',          report.growth_support_areas),
+        ('Key Findings & Critical Issues',         report.key_findings),
+        ('BGE Contributions & Development Needs',  report.bge_contributions),
+        ('Proposed BDS Actions (Next 3 Months)',   report.bds_actions),
+        ('Recommendations',                        report.recommendations),
+        ('Next Steps',                             report.next_steps),
+        ('Conclusion',                             report.conclusion),
+    ]
+    for title, body in narrative_sections:
+        story.extend(_section(s, title, body))
+
+    story.append(Spacer(1, 12))
+    story.append(_sig_block(s, bge, signed_date=report.updated_at))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf
+
+
+def render_mentor_report(report):
+    """Build a styled PDF for one MentorTrainingReport."""
+    s = _styles()
+    buf, doc = _build_doc()
+    story = []
+
+    session = report.session
+    bge = report.bge
+
+    lead_assignment = session.facilitation_assignments.filter(role='lead').select_related('bge').first()
+    lead_name = lead_assignment.bge.name if lead_assignment and lead_assignment.bge_id else '—'
+
+    story.append(Paragraph(_safe_html(f'Mentor Training Report — {session.title}'), s['h1']))
+    story.append(Paragraph(f'Mentor Report · {session.date}', s['sub']))
+
+    story.append(_kv_table([
+        ['Session',        session.title],
+        ['Date',           str(session.date)],
+        ['Location',       session.location or '—'],
+        ['Mentor BGE',     bge.name if bge else '—'],
+        ['Lead BGE',       lead_name],
+        ['Training Dates', report.training_dates or '—'],
+        ['Venue',          report.venue or '—'],
+        ['Status',         report.get_status_display() if hasattr(report, 'get_status_display') else report.status],
+    ]))
+
+    story.append(Spacer(1, 8))
+
+    narrative_sections = [
+        ('Mentoring Activities',          report.mentoring_activities),
+        ('MSMEs Specifically Supported',  report.msmes_mentored),
+        ('Key Observations',              report.key_observations),
+        ('Challenges Encountered',        report.challenges),
+        ('Recommendations',               report.recommendations),
+        ('Next Steps',                    report.next_steps),
+    ]
+    for title, body in narrative_sections:
+        story.extend(_section(s, title, body))
+
+    story.append(Spacer(1, 12))
+    story.append(_sig_block(s, bge, signed_date=report.updated_at))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf

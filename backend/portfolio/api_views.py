@@ -2931,6 +2931,20 @@ class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelViewSet
             data['submitted_at'] = timezone.now()
         serializer.save(**data)
 
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """Render this training report as a branded PDF."""
+        from .pdf_reports import render_training_report
+        report = self.get_object()
+        safe = report.session.title[:40].replace(' ', '_')
+        fname = f"TrainingReport_{safe}_{report.session.date}.pdf"
+        dl = request.query_params.get('dl')
+        buf = render_training_report(report)
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        disposition = 'attachment' if dl else 'inline'
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
+
 
 class AnnualReviewReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """Annual / quarterly / mid-term review reports authored by a single BGE.
@@ -3032,6 +3046,20 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelV
         if serializer.validated_data.get('status') == 'submitted':
             data['submitted_at'] = timezone.now()
         serializer.save(**data)
+
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """Render this mentor training report as a branded PDF."""
+        from .pdf_reports import render_mentor_report
+        report = self.get_object()
+        safe = report.session.title[:40].replace(' ', '_')
+        fname = f"MentorReport_{safe}_{report.session.date}.pdf"
+        dl = request.query_params.get('dl')
+        buf = render_mentor_report(report)
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        disposition = 'attachment' if dl else 'inline'
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
 
 
 # ── Bulk communication email ────────────────────────────────────────────────────

@@ -42,7 +42,9 @@ export const EXPERT_UPLOAD_SIGNATURE_URL = (id) => `${API_BASE_URL}/api/experts/
 export const WORK_ORDER_ISSUE_URL = (id) => `${API_BASE_URL}/api/work-orders/${id}/issue/`;
 export const WORK_ORDER_SIGN_URL  = (id) => `${API_BASE_URL}/api/work-orders/${id}/sign/`;
 export const WORK_ORDER_WITHDRAW_URL = (id) => `${API_BASE_URL}/api/work-orders/${id}/withdraw/`;
-export const WORK_ORDER_PDF_URL   = (id) => `${API_BASE_URL}/api/work-orders/${id}/pdf/`;
+export const WORK_ORDER_PDF_URL        = (id) => `${API_BASE_URL}/api/work-orders/${id}/pdf/`;
+export const TRAINING_REPORT_PDF_URL   = (id) => `${API_BASE_URL}/api/training-reports/${id}/pdf/`;
+export const MENTOR_REPORT_PDF_URL     = (id) => `${API_BASE_URL}/api/mentor-reports/${id}/pdf/`;
 // legacy alias kept for any existing references
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;

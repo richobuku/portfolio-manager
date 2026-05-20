@@ -25,7 +25,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -1329,6 +1329,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         const a = document.createElement('a');
         a.href = url;
         a.download = `${kind === 'group' ? 'GroupReport' : 'MSMEReport'}_${reportId}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else {
+        window.open(url, '_blank');
+      }
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch {
+      notify('Failed to render PDF', 'error');
+    }
+  };
+
+  const openTrainingReportPdf = async (kind, reportId, mode = 'view') => {
+    const urlFn = kind === 'mentor' ? MENTOR_REPORT_PDF_URL : TRAINING_REPORT_PDF_URL;
+    try {
+      const res = await axios.get(
+        `${urlFn(reportId)}${mode === 'download' ? '?dl=1' : ''}`,
+        { headers, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (mode === 'download') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${kind === 'mentor' ? 'MentorReport' : 'TrainingReport'}_${reportId}.pdf`;
         document.body.appendChild(a); a.click(); a.remove();
       } else {
         window.open(url, '_blank');
@@ -3892,11 +3914,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           color={r.status === 'submitted' ? 'primary' : 'default'} />
                       </TableCell>
                       <TableCell>
-                        <Tooltip title="View report">
-                          <IconButton size="small" color="primary" onClick={() => setViewTrReport(r)}>
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Tooltip title="View report">
+                            <IconButton size="small" color="primary" onClick={() => setViewTrReport(r)}>
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Open PDF">
+                            <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'view')}>
+                              <PictureAsPdf fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download PDF">
+                            <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'download')}>
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -3941,11 +3975,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           color={r.status === 'submitted' ? 'primary' : 'default'} />
                       </TableCell>
                       <TableCell>
-                        <Tooltip title="View report">
-                          <IconButton size="small" color="primary" onClick={() => setViewMrReport(r)}>
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Tooltip title="View report">
+                            <IconButton size="small" color="primary" onClick={() => setViewMrReport(r)}>
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Open PDF">
+                            <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'view')}>
+                              <PictureAsPdf fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download PDF">
+                            <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'download')}>
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -6578,7 +6624,13 @@ PRUDEV II BDS Team`
                 ))}
               </Box>
             </DialogContent>
-            <DialogActions sx={{ borderTop: '1px solid #E5E7EB' }}>
+            <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1 }}>
+              <Button onClick={() => openTrainingReportPdf('lead', tr.id, 'view')} startIcon={<PictureAsPdf />}>
+                Open PDF
+              </Button>
+              <Button onClick={() => openTrainingReportPdf('lead', tr.id, 'download')} startIcon={<Download />}>
+                Download
+              </Button>
               <Button onClick={() => setViewTrReport(null)}>Close</Button>
             </DialogActions>
           </>;
@@ -6649,7 +6701,13 @@ PRUDEV II BDS Team`
                 ))}
               </Box>
             </DialogContent>
-            <DialogActions sx={{ borderTop: '1px solid #E5E7EB' }}>
+            <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1 }}>
+              <Button onClick={() => openTrainingReportPdf('mentor', mr.id, 'view')} startIcon={<PictureAsPdf />}>
+                Open PDF
+              </Button>
+              <Button onClick={() => openTrainingReportPdf('mentor', mr.id, 'download')} startIcon={<Download />}>
+                Download
+              </Button>
               <Button onClick={() => setViewMrReport(null)}>Close</Button>
             </DialogActions>
           </>;
