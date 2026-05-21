@@ -2192,17 +2192,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </Button>
       </SectionHeader>
 
-      <TableContainer component={Paper} variant="outlined">
-        <Table size="small">
-          <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 520, overflowY: 'auto' }}>
+        <Table size="small" stickyHeader>
+          <TableHead>
             <TableRow>
-              <TableCell>Title</TableCell>
-              <TableCell>Date</TableCell>
-              <TableCell>Lead BGE</TableCell>
-              <TableCell>Mentors</TableCell>
-              <TableCell>MSMEs</TableCell>
-              <TableCell>Attendance</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Title</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Date</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Lead BGE</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Mentors</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>MSMEs</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Attendance</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
