@@ -25,7 +25,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -1319,6 +1319,19 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       fetchAll();
     } catch (e) {
       notify(e.response?.data?.error || 'Failed to approve report', 'error');
+    }
+  };
+
+  const revertReport = async (kind, id) => {
+    const label = kind === 'group' ? 'group report' : 'visit report';
+    if (!window.confirm(`Revert this ${label} to draft? The BGE will be able to edit and resubmit it.`)) return;
+    try {
+      const url = kind === 'group' ? GROUP_REPORT_REVERT_URL(id) : REPORT_REVERT_URL(id);
+      await axios.post(url, {}, { headers });
+      notify(`${label.charAt(0).toUpperCase() + label.slice(1)} reverted to draft`);
+      fetchAll();
+    } catch (e) {
+      notify(e.response?.data?.detail || `Failed to revert ${label}`, 'error');
     }
   };
 
@@ -3794,6 +3807,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <Download fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      {r.status !== 'draft' && (
+                        <Tooltip title="Revert to draft">
+                          <IconButton size="small" color="warning" onClick={() => revertReport('msme', r.id)}>
+                            <Undo fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -3861,6 +3881,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <Tooltip title="Approve report">
                             <IconButton size="small" color="success" onClick={() => approveGroupReport(g.id)}>
                               <CheckCircle fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {g.status !== 'draft' && (
+                          <Tooltip title="Revert to draft">
+                            <IconButton size="small" color="warning" onClick={() => revertReport('group', g.id)}>
+                              <Undo fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         )}

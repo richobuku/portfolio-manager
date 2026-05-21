@@ -54,6 +54,22 @@ const EMPTY_GROUP_REPORT = {
   status: 'draft',
 };
 
+/* ── Group report draft persistence helpers ─────────────────────────────── */
+function grpDraftKey(editingGroupReport, groupId) {
+  if (editingGroupReport) return `grp_report_draft_edit_${editingGroupReport.id}`;
+  return `grp_report_draft_new_${groupId || 'unknown'}`;
+}
+function readGrpDraft(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+}
+function writeGrpDraft(key, form) {
+  try { localStorage.setItem(key, JSON.stringify({ form, savedAt: Date.now() })); }
+  catch { /* storage full */ }
+}
+function clearGrpDraft(key) {
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+}
+
 const EMPTY_CONTRIBUTION = {
   group_report: '',
   msmes_observed: [],
@@ -99,6 +115,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [groupReportForm, setGroupReportForm] = useState(EMPTY_GROUP_REPORT);
   const [groupReportSaving, setGroupReportSaving] = useState(false);
   const [groupReportErrors, setGroupReportErrors] = useState('');
+  const [grpDraftBanner, setGrpDraftBanner]       = useState(null); // { savedAt }
+  const grpDraftTimerRef    = useRef(null);
+  const currentGrpDraftKey  = useRef('');
 
   // Member contribution dialog (non-leader BGEs feeding info into a group report)
   const [contributionDialog, setContributionDialog] = useState(false);
@@ -628,9 +647,48 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   // ── group reports ─────────────────────────────────────────────────────────
+
+  /* Draft-save helpers (debounced 800 ms) */
+  const scheduleGrpDraftSave = useCallback((f) => {
+    clearTimeout(grpDraftTimerRef.current);
+    grpDraftTimerRef.current = setTimeout(() => {
+      if (currentGrpDraftKey.current) writeGrpDraft(currentGrpDraftKey.current, f);
+    }, 800);
+  }, []);
+
+  /* Thin wrapper — updates form AND schedules a draft save */
+  const setGrf = useCallback((updater) => {
+    setGroupReportForm(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      scheduleGrpDraftSave(next);
+      return next;
+    });
+  }, [scheduleGrpDraftSave]);
+
+  const restoreGrpDraft = () => {
+    const saved = readGrpDraft(currentGrpDraftKey.current);
+    if (!saved) return;
+    setGroupReportForm(saved.form);
+    setGrpDraftBanner(null);
+  };
+
+  const discardGrpDraft = () => {
+    clearGrpDraft(currentGrpDraftKey.current);
+    setGrpDraftBanner(null);
+  };
+
   const openNewGroupReport = (groupId = '') => {
     setEditingGroupReport(null);
-    setGroupReportForm({ ...EMPTY_GROUP_REPORT, group: groupId });
+    const key = grpDraftKey(null, groupId);
+    currentGrpDraftKey.current = key;
+    const saved = readGrpDraft(key);
+    if (saved) {
+      setGrpDraftBanner({ savedAt: saved.savedAt });
+      setGroupReportForm(saved.form);
+    } else {
+      setGroupReportForm({ ...EMPTY_GROUP_REPORT, group: groupId });
+      setGrpDraftBanner(null);
+    }
     setGroupReportErrors('');
     setGrpAttendees([newGrpRow()]);
     setGroupReportDialog(true);
@@ -638,7 +696,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const openEditGroupReport = async (rep) => {
     setEditingGroupReport(rep);
-    setGroupReportForm({
+    const key = grpDraftKey(rep, rep.group);
+    currentGrpDraftKey.current = key;
+    const serverForm = {
       group: rep.group,
       session_number: rep.session_number || '',
       visit_date: rep.visit_date,
@@ -651,7 +711,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       next_steps: rep.next_steps || '',
       additional_notes: rep.additional_notes || '',
       status: rep.status,
-    });
+    };
+    const saved = readGrpDraft(key);
+    const serverTs = rep.updated_at ? new Date(rep.updated_at).getTime() : 0;
+    if (saved && saved.savedAt > serverTs) {
+      setGrpDraftBanner({ savedAt: saved.savedAt });
+      // Show server data first; user decides to restore or discard
+      setGroupReportForm(serverForm);
+    } else {
+      setGroupReportForm(serverForm);
+      setGrpDraftBanner(null);
+    }
     setGroupReportErrors('');
     setReportContributions([]);
     setGrpAttendees([]);
@@ -715,6 +785,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           return axios.post(API_ENDPOINTS.GROUP_REPORT_ATTENDANCE, ap, { headers: h });
         }));
       }
+      // Clear local draft after successful server save
+      clearGrpDraft(currentGrpDraftKey.current);
       setGroupReportDialog(false);
       fetchGroupReports();
     } catch (err) {
@@ -2849,6 +2921,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         <DialogContent dividers>
           {groupReportErrors && <Alert severity="error" sx={{ mb: 2 }}>{groupReportErrors}</Alert>}
 
+          {/* Draft recovery banner */}
+          {grpDraftBanner && (
+            <Alert severity="warning" sx={{ mb: 2 }}
+              action={
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button size="small" color="inherit" variant="outlined" onClick={restoreGrpDraft}>Restore</Button>
+                  <Button size="small" color="inherit" onClick={discardGrpDraft}>Discard</Button>
+                </Box>
+              }
+            >
+              Unsaved draft from{' '}
+              {new Date(grpDraftBanner.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {' '}— restore it?
+            </Alert>
+          )}
+
           {/* Group + objectives reminder banner */}
           {(() => {
             const g = groups.find(x => x.id === groupReportForm.group);
@@ -2969,11 +3057,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   // Switching group also clears the MSME multi-select — otherwise
                   // ids from the previous group's MSMEs would silently slip into
                   // the POST even though the dropdown filtered them out.
-                  onChange={e => setGroupReportForm({
-                    ...groupReportForm,
+                  onChange={e => setGrf(prev => ({
+                    ...prev,
                     group: e.target.value,
                     msmes_supported: [],
-                  })}
+                  }))}
                   disabled={!!editingGroupReport}
                 >
                   {groups.filter(g => isTeamLeadOf(g)).map(g => (
@@ -2986,7 +3074,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               <TextField
                 fullWidth size="small" type="number" label="Session # (optional)"
                 value={groupReportForm.session_number}
-                onChange={e => setGroupReportForm({ ...groupReportForm, session_number: e.target.value })}
+                onChange={e => setGrf(prev => ({ ...prev, session_number: e.target.value }))}
                 inputProps={{ min: 1, max: 10 }}
               />
             </Grid>
@@ -2995,7 +3083,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 fullWidth size="small" type="date" label="Visit Date" required
                 InputLabelProps={{ shrink: true }}
                 value={groupReportForm.visit_date}
-                onChange={e => setGroupReportForm({ ...groupReportForm, visit_date: e.target.value })}
+                onChange={e => setGrf(prev => ({ ...prev, visit_date: e.target.value }))}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -3005,7 +3093,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   multiple
                   value={groupReportForm.msmes_supported}
                   label="MSMEs supported"
-                  onChange={e => setGroupReportForm({ ...groupReportForm, msmes_supported: e.target.value })}
+                  onChange={e => setGrf(prev => ({ ...prev, msmes_supported: e.target.value }))}
                   renderValue={(ids) => `${ids.length} selected`}
                 >
                   {msmes
@@ -3026,13 +3114,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             const members = g?.members_detail || [];
             if (!members.length) return null;
             const toggleAttendee = (bgeId) => {
-              const current = groupReportForm.attendees || [];
-              setGroupReportForm({
-                ...groupReportForm,
-                attendees: current.includes(bgeId)
-                  ? current.filter(id => id !== bgeId)
-                  : [...current, bgeId],
-              });
+              setGrf(prev => ({
+                ...prev,
+                attendees: (prev.attendees || []).includes(bgeId)
+                  ? (prev.attendees || []).filter(id => id !== bgeId)
+                  : [...(prev.attendees || []), bgeId],
+              }));
             };
             const allPresent = members.every(m => (groupReportForm.attendees || []).includes(m.id));
             return (
@@ -3043,10 +3130,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   </Typography>
                   <Button
                     size="small"
-                    onClick={() => setGroupReportForm({
-                      ...groupReportForm,
+                    onClick={() => setGrf(prev => ({
+                      ...prev,
                       attendees: allPresent ? [] : members.map(m => m.id),
-                    })}
+                    }))}
                   >
                     {allPresent ? 'Mark none' : 'Mark all present'}
                   </Button>
@@ -3260,7 +3347,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               fullWidth multiline rows={3} size="small" label={label}
               placeholder={hint}
               value={groupReportForm[field]}
-              onChange={e => setGroupReportForm({ ...groupReportForm, [field]: e.target.value })}
+              onChange={e => setGrf(prev => ({ ...prev, [field]: e.target.value }))}
               sx={{ mt: 2 }}
               InputLabelProps={{ shrink: true }}
             />

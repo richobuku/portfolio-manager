@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Grid, Typography, Button, TextField, FormControl,
@@ -232,6 +232,27 @@ function SectionBlock({ icon, title, color = '#1A2F4B', children }) {
   );
 }
 
+/* ── Draft persistence helpers ───────────────────────────────────────────── */
+function draftKey(editingReport, preselectedMsme) {
+  if (editingReport) return `visit_report_draft_edit_${editingReport.id}`;
+  const msmeId = preselectedMsme?.id || 'new';
+  return `visit_report_draft_new_${msmeId}`;
+}
+
+function readDraft(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+}
+
+function writeDraft(key, form, tools, toolsOther) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ form, tools, toolsOther, savedAt: Date.now() }));
+  } catch { /* storage full or unavailable */ }
+}
+
+function clearDraft(key) {
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+}
+
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function VisitReportForm({
   open, onClose, onSaved, msme: preselectedMsme, msmes = [],
@@ -242,10 +263,16 @@ export default function VisitReportForm({
   const [error, setError]   = useState('');
   const [selectedTools, setSelectedTools] = useState([]);
   const [toolsOther, setToolsOther]       = useState('');
+  const [draftBanner, setDraftBanner]     = useState(null); // { savedAt, key }
+  const draftTimerRef = useRef(null);
+  const currentDraftKey = useRef('');
 
   /* Populate on open */
   useEffect(() => {
     if (!open) return;
+    const key = draftKey(editingReport, preselectedMsme);
+    currentDraftKey.current = key;
+
     if (editingReport) {
       const f = { ...EMPTY_FORM };
       Object.keys(EMPTY_FORM).forEach(k => {
@@ -260,20 +287,73 @@ export default function VisitReportForm({
       setSelectedTools(knownSelected);
       setToolsOther(otherText);
       setForm(f);
+      // For edits, check if there's an unsaved local draft that's newer
+      const saved = readDraft(key);
+      if (saved && saved.savedAt > (editingReport.updated_at ? new Date(editingReport.updated_at).getTime() : 0)) {
+        setDraftBanner({ savedAt: saved.savedAt, key });
+      } else {
+        setDraftBanner(null);
+      }
     } else {
+      // For new reports, offer to restore any unsaved draft
+      const saved = readDraft(key);
+      if (saved) {
+        setDraftBanner({ savedAt: saved.savedAt, key });
+        // Pre-fill from saved draft immediately
+        setForm(saved.form);
+        setSelectedTools(saved.tools || []);
+        setToolsOther(saved.toolsOther || '');
+      } else {
+        setForm({ ...EMPTY_FORM, msme: preselectedMsme?.id || '' });
+        setSelectedTools([]);
+        setToolsOther('');
+        setDraftBanner(null);
+      }
+    }
+    setError('');
+  }, [open, editingReport, preselectedMsme]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Auto-save draft to localStorage 800 ms after each change */
+  const scheduleDraftSave = useCallback((f, tools, other) => {
+    clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      if (currentDraftKey.current) writeDraft(currentDraftKey.current, f, tools, other);
+    }, 800);
+  }, []);
+
+  const set = (key, val) => {
+    setForm(f => {
+      const next = { ...f, [key]: val };
+      scheduleDraftSave(next, selectedTools, toolsOther);
+      return next;
+    });
+  };
+
+  const toggleTool = (tool) =>
+    setSelectedTools(prev => {
+      const next = prev.includes(tool) ? prev.filter(t => t !== tool) : [...prev, tool];
+      scheduleDraftSave(form, next, toolsOther);
+      return next;
+    });
+
+  const restoreDraft = () => {
+    const saved = readDraft(currentDraftKey.current);
+    if (!saved) return;
+    setForm(saved.form);
+    setSelectedTools(saved.tools || []);
+    setToolsOther(saved.toolsOther || '');
+    setDraftBanner(null);
+  };
+
+  const discardDraft = () => {
+    clearDraft(currentDraftKey.current);
+    setDraftBanner(null);
+    if (!editingReport) {
       setForm({ ...EMPTY_FORM, msme: preselectedMsme?.id || '' });
       setSelectedTools([]);
       setToolsOther('');
     }
-    setError('');
-  }, [open, editingReport, preselectedMsme]);
-
-  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
-
-  const toggleTool = (tool) =>
-    setSelectedTools(prev =>
-      prev.includes(tool) ? prev.filter(t => t !== tool) : [...prev, tool]
-    );
+  };
 
   const cfg = TYPE_CONFIG[form.visit_type] || DEFAULT_CONFIG;
   const typeInfo = VISIT_TYPES.find(t => t.value === form.visit_type) || VISIT_TYPES[0];
@@ -323,6 +403,8 @@ export default function VisitReportForm({
       } else {
         await axios.post(API_ENDPOINTS.REPORTS, payload, { headers: h(token) });
       }
+      // Clear local draft on successful server save
+      clearDraft(currentDraftKey.current);
       onSaved?.();
       onClose();
     } catch (e) {
@@ -358,6 +440,30 @@ export default function VisitReportForm({
           <IconButton onClick={onClose} sx={{ color: '#fff' }}><Close /></IconButton>
         </Box>
       </DialogTitle>
+
+      {/* ── Draft recovery banner ── */}
+      {draftBanner && (
+        <Alert
+          severity="warning"
+          sx={{ mx: 2, mt: 1.5, mb: 0, flexShrink: 0 }}
+          action={
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button size="small" color="inherit" variant="outlined"
+                onClick={restoreDraft}>
+                Restore
+              </Button>
+              <Button size="small" color="inherit"
+                onClick={discardDraft}>
+                Discard
+              </Button>
+            </Box>
+          }
+        >
+          Unsaved draft from{' '}
+          {new Date(draftBanner.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {' '}— restore it?
+        </Alert>
+      )}
 
       <DialogContent sx={{ p: 0, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <Box sx={{
@@ -592,7 +698,10 @@ export default function VisitReportForm({
                     label="Other tools or materials (free text)"
                     placeholder="e.g. Custom pricing calculator, loan application template…"
                     value={toolsOther}
-                    onChange={e => setToolsOther(e.target.value)} />
+                    onChange={e => {
+                      setToolsOther(e.target.value);
+                      scheduleDraftSave(form, selectedTools, e.target.value);
+                    }} />
                 </Grid>
               </Grid>
             </SectionBlock>}

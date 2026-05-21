@@ -2138,6 +2138,23 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
             notes               = '\n'.join(notes_parts),
         )
 
+    @action(detail=True, methods=['post'], url_path='revert')
+    def revert(self, request, pk=None):
+        """Admin-only: revert a submitted/reviewed report back to draft
+        so the BGE can re-edit and resubmit."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can revert reports.")
+        report = self.get_object()
+        if report.status == 'draft':
+            return Response({'detail': 'Report is already a draft.'}, status=status.HTTP_400_BAD_REQUEST)
+        report.status = 'draft'
+        if report.submitted_pdf:
+            report.submitted_pdf.delete(save=False)
+        report.submitted_pdf_data = None
+        report.save(update_fields=['status', 'submitted_pdf', 'submitted_pdf_data'])
+        from .serializers import MSMEReportSerializer
+        return Response(MSMEReportSerializer(report, context={'request': request}).data)
+
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
         """Render this MSME visit report as a styled PDF.
@@ -2282,6 +2299,24 @@ class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vie
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can delete group reports.")
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='revert')
+    def revert(self, request, pk=None):
+        """Admin-only: revert a submitted or approved group report back to draft."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can revert reports.")
+        report = self.get_object()
+        if report.status == 'draft':
+            return Response({'detail': 'Report is already a draft.'}, status=status.HTTP_400_BAD_REQUEST)
+        report.status = 'draft'
+        report.submitted_at = None
+        report.approved_at = None
+        if report.submitted_pdf:
+            report.submitted_pdf.delete(save=False)
+        report.submitted_pdf_data = None
+        report.save(update_fields=['status', 'submitted_at', 'approved_at', 'submitted_pdf', 'submitted_pdf_data'])
+        from .serializers import GroupReportSerializer
+        return Response(GroupReportSerializer(report, context={'request': request}).data)
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
