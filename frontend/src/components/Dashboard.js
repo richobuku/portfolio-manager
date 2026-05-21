@@ -925,6 +925,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   }, [section]);
 
+  // Auto-load participation summary whenever the user navigates to the tab.
+  useEffect(() => {
+    if (section === 'participation') fetchParticipationSummary(participationCohort);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
+
   useEffect(() => {
     if (section !== 'reports' || trReportsLoaded) return;
     const h = { Authorization: `Bearer ${token}` };
@@ -1515,6 +1521,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify('Attendance saved');
       setAttendanceDialog(false);
       fetchAll();
+      // Live-refresh participation tab if it's currently visible
+      if (section === 'participation') fetchParticipationSummary(participationCohort);
     } catch { notify('Failed to save attendance', 'error'); }
     finally { setAttendanceLoading(false); }
   };
@@ -4891,24 +4899,58 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   const renderParticipation = () => {
     const s = participationSummary;
+
     const statBox = (label, value, color = '#1565C0') => (
-      <Grid item xs={6} sm={4} md={3} key={label}>
+      <Grid item xs={6} sm={4} md={3} lg={2} key={label}>
         <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
           <Typography variant="h4" fontWeight={700} sx={{ color }}>{value ?? '—'}</Typography>
           <Typography variant="caption" color="text.secondary">{label}</Typography>
         </Paper>
       </Grid>
     );
+
+    const demCells = (row) => (
+      <>
+        <TableCell align="center">
+          <Chip label={row.total} size="small"
+            color={row.total > 0 ? 'primary' : 'default'} />
+        </TableCell>
+        <TableCell align="center">{row.female || 0}</TableCell>
+        <TableCell align="center">{row.male || 0}</TableCell>
+        <TableCell align="center" sx={{ color: '#E65100' }}>
+          {(row.female_youth || 0) + (row.male_youth || 0) || 0}
+        </TableCell>
+        <TableCell align="center">
+          {row.refugees_total > 0
+            ? <Chip label={row.refugees_total} size="small" color="warning" />
+            : 0}
+        </TableCell>
+        <TableCell align="center">{row.host_community || 0}</TableCell>
+      </>
+    );
+
+    const demHeader = (
+      <>
+        <TableCell align="center">Present</TableCell>
+        <TableCell align="center">F</TableCell>
+        <TableCell align="center">M</TableCell>
+        <TableCell align="center">Youth</TableCell>
+        <TableCell align="center">Refugees</TableCell>
+        <TableCell align="center">Host Comm.</TableCell>
+      </>
+    );
+
     return (
       <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        {/* Header row */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, flexWrap: 'wrap', gap: 1 }}>
           <Box>
-            <Typography variant="h5" fontWeight={700}>Participation Summary</Typography>
+            <Typography variant="h5" fontWeight={700}>Participation</Typography>
             <Typography variant="body2" color="text.secondary">
-              Aggregated attendance + BGE report data across all sessions and deployments
+              Live attendance tracking across all training sessions
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             <FormControl size="small" sx={{ minWidth: 160 }}>
               <InputLabel>Filter by Cohort</InputLabel>
               <Select value={participationCohort} label="Filter by Cohort"
@@ -4917,38 +4959,113 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
               </Select>
             </FormControl>
-            <Button variant="outlined" onClick={() => fetchParticipationSummary(participationCohort)}>
+            <Button variant="outlined" size="small" startIcon={participationLoading ? <CircularProgress size={14} /> : null}
+              onClick={() => fetchParticipationSummary(participationCohort)} disabled={participationLoading}>
               Refresh
             </Button>
           </Box>
         </Box>
 
-        {participationLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+        {participationLoading && !s ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
         ) : !s ? (
           <Box sx={{ textAlign: 'center', py: 6 }}>
-            <Typography color="text.secondary" gutterBottom>No data loaded yet.</Typography>
+            <Typography color="text.secondary" gutterBottom>No participation data yet.</Typography>
             <Button variant="contained" onClick={() => fetchParticipationSummary('')}>Load Summary</Button>
           </Box>
         ) : (
           <>
-            {/* Top-level totals */}
+            {/* ── 1. Per-Session table ───────────────────────────────────────── */}
+            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+              Training Sessions ({(s.by_session || []).length})
+            </Typography>
+            {(s.by_session || []).length === 0 ? (
+              <Typography color="text.secondary" sx={{ mb: 3 }}>No training sessions recorded yet.</Typography>
+            ) : (
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 4 }}>
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: '#EEF2F8' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Session / Topic</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Lead BGE</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700 }}>Reg.</TableCell>
+                      {demHeader}
+                      <TableCell align="center" sx={{ fontWeight: 700 }}>Lead Report</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700 }}>Mentor Reports</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(s.by_session || []).map(sess => {
+                      const noAtt = sess.total === 0;
+                      const bgColor = noAtt ? '#FFFDE7' : 'inherit';
+                      return (
+                        <TableRow key={sess.session_id} hover sx={{ bgcolor: bgColor }}>
+                          <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                            {sess.session_date}
+                          </TableCell>
+                          <TableCell sx={{ maxWidth: 220 }}>
+                            <Typography variant="body2" fontWeight={600} noWrap>
+                              {sess.session_title}
+                            </Typography>
+                            {sess.topic_name && (
+                              <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                                {sess.topic_number ? `§${sess.topic_number} · ` : ''}{sess.topic_name}
+                              </Typography>
+                            )}
+                            {sess.session_location && (
+                              <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                                📍 {sess.session_location}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: 12 }}>
+                            {sess.lead_bge_name || <Typography variant="caption" color="text.secondary">—</Typography>}
+                            {(sess.mentor_names || []).length > 0 && (
+                              <Typography variant="caption" display="block" color="text.secondary" noWrap>
+                                +{sess.mentor_names.length} mentor{sess.mentor_names.length > 1 ? 's' : ''}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="caption" color="text.secondary">{sess.registered_count}</Typography>
+                          </TableCell>
+                          {demCells(sess)}
+                          <TableCell align="center">
+                            {sess.has_training_report
+                              ? <Chip label="Filed" size="small" color="success" />
+                              : <Chip label="Pending" size="small" color="default" />}
+                          </TableCell>
+                          <TableCell align="center">
+                            {sess.mentor_report_count > 0
+                              ? <Chip label={sess.mentor_report_count} size="small" color="info" />
+                              : <Typography variant="caption" color="text.secondary">—</Typography>}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {/* ── 2. Overall totals ─────────────────────────────────────────── */}
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>Overall Attendance Totals</Typography>
             <Grid container spacing={2} sx={{ mb: 4 }}>
-              {statBox('Total Attendees', s.total, '#1565C0')}
+              {statBox('Total Present', s.total, '#1565C0')}
               {statBox('Female', s.female, '#AD1457')}
               {statBox('Male', s.male, '#1565C0')}
               {statBox('Female Youth (18–34)', s.female_youth, '#AD1457')}
               {statBox('Male Youth (18–34)', s.male_youth, '#1565C0')}
               {statBox('Adult Female', s.female_adult, '#AD1457')}
               {statBox('Adult Male', s.male_adult, '#1565C0')}
-              {statBox('Refugees (total)', s.refugees_total, '#E65100')}
+              {statBox('Refugees', s.refugees_total, '#E65100')}
               {statBox('Female Refugees', s.refugee_female, '#E65100')}
               {statBox('Male Refugees', s.refugee_male, '#E65100')}
               {statBox('Host Community', s.host_community, '#2E7D32')}
             </Grid>
 
-            {/* BGE report totals */}
+            {/* ── 3. BGE report totals ──────────────────────────────────────── */}
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>BGE Field Reports</Typography>
             <Grid container spacing={2} sx={{ mb: 4 }}>
               {statBox('MSME Visit Reports', s.msme_reports, '#5C6BC0')}
@@ -4956,27 +5073,54 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               {statBox('Group Sessions Filed', s.group_sessions, '#00695C')}
             </Grid>
 
-            {/* Per-work-order breakdown (activity/deployment level) */}
-            {(s.by_work_order || []).length > 0 && (
+            {/* ── 4. Per-cohort breakdown ───────────────────────────────────── */}
+            {(s.by_cohort || []).length > 0 && (
               <>
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom sx={{ mt: 2 }}>
-                  By BGE Deployment / Work Order
-                </Typography>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>Attendance by Cohort</Typography>
                 <TableContainer component={Paper} variant="outlined" sx={{ mb: 4 }}>
                   <Table size="small">
                     <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                       <TableRow>
-                        <TableCell>Work Order</TableCell>
-                        <TableCell>BGE</TableCell>
-                        <TableCell>Type</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell align="center">Attendees</TableCell>
-                        <TableCell align="center">F</TableCell>
-                        <TableCell align="center">M</TableCell>
-                        <TableCell align="center">Youth</TableCell>
-                        <TableCell align="center">Refugees</TableCell>
-                        <TableCell align="center">Reports</TableCell>
-                        <TableCell align="center">MSMEs</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Cohort</TableCell>
+                        {demHeader}
+                        <TableCell align="center" sx={{ fontWeight: 700 }}>Youth Total</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700 }}>Adults</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700 }}>MSME Reports</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700 }}>Unique MSMEs</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {s.by_cohort.map(c => (
+                        <TableRow key={c.cohort_id} hover>
+                          <TableCell sx={{ fontWeight: 500 }}>{c.cohort_name}</TableCell>
+                          {demCells(c)}
+                          <TableCell align="center">{(c.male_youth || 0) + (c.female_youth || 0)}</TableCell>
+                          <TableCell align="center">{(c.male_adult || 0) + (c.female_adult || 0)}</TableCell>
+                          <TableCell align="center">{c.msme_reports}</TableCell>
+                          <TableCell align="center">{c.unique_msmes}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
+
+            {/* ── 5. Per-work-order (BGE deployment) breakdown ─────────────── */}
+            {(s.by_work_order || []).length > 0 && (
+              <>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>By BGE Deployment / Work Order</Typography>
+                <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Work Order</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>BGE</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        {demHeader}
+                        <TableCell align="center" sx={{ fontWeight: 700 }}>Reports</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700 }}>Unique MSMEs</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -4989,58 +5133,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             <Chip label={w.status} size="small"
                               color={w.status === 'signed' ? 'success' : w.status === 'issued' ? 'primary' : 'default'} />
                           </TableCell>
-                          <TableCell align="center"><Chip label={w.total} size="small" color="primary" /></TableCell>
-                          <TableCell align="center">{w.female}</TableCell>
-                          <TableCell align="center">{w.male}</TableCell>
-                          <TableCell align="center">{(w.male_youth || 0) + (w.female_youth || 0)}</TableCell>
-                          <TableCell align="center">
-                            {w.refugees_total > 0 ? <Chip label={w.refugees_total} size="small" color="warning" /> : '0'}
-                          </TableCell>
+                          {demCells(w)}
                           <TableCell align="center">{w.msme_reports}</TableCell>
                           <TableCell align="center">{w.unique_msmes}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </>
-            )}
-
-            {/* Per-cohort breakdown */}
-            {(s.by_cohort || []).length > 0 && (
-              <>
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>Breakdown by Cohort</Typography>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
-                    <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                      <TableRow>
-                        <TableCell>Cohort</TableCell>
-                        <TableCell align="center">Attendees</TableCell>
-                        <TableCell align="center">Female</TableCell>
-                        <TableCell align="center">Male</TableCell>
-                        <TableCell align="center">Youth</TableCell>
-                        <TableCell align="center">Adults</TableCell>
-                        <TableCell align="center">Refugees</TableCell>
-                        <TableCell align="center">Host Comm.</TableCell>
-                        <TableCell align="center">MSME Reports</TableCell>
-                        <TableCell align="center">Unique MSMEs</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {s.by_cohort.map(c => (
-                        <TableRow key={c.cohort_id} hover>
-                          <TableCell sx={{ fontWeight: 500 }}>{c.cohort_name}</TableCell>
-                          <TableCell align="center"><Chip label={c.total} size="small" color="primary" /></TableCell>
-                          <TableCell align="center">{c.female}</TableCell>
-                          <TableCell align="center">{c.male}</TableCell>
-                          <TableCell align="center">{(c.male_youth || 0) + (c.female_youth || 0)}</TableCell>
-                          <TableCell align="center">{(c.male_adult || 0) + (c.female_adult || 0)}</TableCell>
-                          <TableCell align="center">
-                            {c.refugees_total > 0 ? <Chip label={c.refugees_total} size="small" color="warning" /> : '0'}
-                          </TableCell>
-                          <TableCell align="center">{c.host_community}</TableCell>
-                          <TableCell align="center">{c.msme_reports}</TableCell>
-                          <TableCell align="center">{c.unique_msmes}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

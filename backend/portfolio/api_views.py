@@ -1738,9 +1738,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         """
         Participation summary — demographic totals from attendance + BGE report counts.
         Filters: cohort, session, work_order, bge, date_from, date_to.
-        Groups: by_cohort, by_work_order (each deployment/activity).
+        Groups: by_session (per training session), by_cohort, by_work_order.
         """
-        from portfolio.models import MSMEReport, GroupReport, Cohort as CohortModel, WorkOrder
+        from portfolio.models import (
+            MSMEReport, GroupReport, Cohort as CohortModel, WorkOrder,
+            TrainingSession, TrainingReport, MentorTrainingReport,
+        )
 
         cohort_id     = request.query_params.get('cohort')
         session_id    = request.query_params.get('session')
@@ -1775,10 +1778,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             grp_qs = grp_qs.filter(visit_date__lte=date_to)
 
         # Pull the full attendance list once and aggregate in Python —
-        # avoids 11 separate COUNT queries per cohort/work-order in the loops below.
+        # avoids 11 separate COUNT queries per cohort/work-order/session in the loops below.
         att_rows = list(att_qs.values('gender', 'age_group', 'refugee_status',
                                       'msme_id', 'msme__cohort_id',
-                                      'session__work_order_id'))
+                                      'session_id', 'session__work_order_id'))
 
         def _dem_rows(rows):
             youth   = [r for r in rows if r['age_group'] == '18-34']
@@ -1806,7 +1809,61 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'group_sessions':       grp_qs.count(),
         })
 
-        # Per-cohort breakdown — group already-fetched rows by cohort_id
+        # ── Per-session breakdown ──────────────────────────────────────────────
+        # Build lookup maps for training reports and mentor reports in one query each
+        tr_by_session  = {tr.session_id: tr.id for tr in TrainingReport.objects.only('id', 'session_id')}
+        mr_by_session  = {}
+        for mr in MentorTrainingReport.objects.values('session_id', 'id'):
+            mr_by_session.setdefault(mr['session_id'], []).append(mr['id'])
+
+        sess_qs = TrainingSession.objects.select_related('topic').prefetch_related(
+            'facilitation_assignments__bge',
+        ).order_by('date')
+
+        # Apply same date/cohort filters to session list when scoping
+        if date_from:
+            sess_qs = sess_qs.filter(date__gte=date_from)
+        if date_to:
+            sess_qs = sess_qs.filter(date__lte=date_to)
+        if session_id:
+            sess_qs = sess_qs.filter(id=session_id)
+
+        session_data = []
+        for sess in sess_qs:
+            s_rows = [r for r in att_rows if r['session_id'] == sess.id]
+            dem = _dem_rows(s_rows)
+
+            # Lead BGE name from pre-fetched facilitation assignments
+            lead_name = None
+            mentor_names = []
+            for fa in sess.facilitation_assignments.all():
+                if fa.role == 'lead':
+                    lead_name = fa.bge.name if fa.bge_id else None
+                elif fa.role == 'mentor':
+                    if fa.bge_id:
+                        mentor_names.append(fa.bge.name)
+
+            dem.update({
+                'session_id':       sess.id,
+                'session_title':    sess.title,
+                'session_date':     str(sess.date),
+                'session_location': sess.location or '',
+                'topic_name':       sess.topic.name if sess.topic_id else '',
+                'topic_number':     (
+                    f"{sess.topic.module_number}.{sess.topic.section_number}"
+                    if sess.topic_id and sess.topic.section_number else
+                    str(sess.topic.module_number) if sess.topic_id else ''
+                ),
+                'lead_bge_name':    lead_name or '',
+                'mentor_names':     mentor_names,
+                'has_training_report': sess.id in tr_by_session,
+                'training_report_id':  tr_by_session.get(sess.id),
+                'mentor_report_count': len(mr_by_session.get(sess.id, [])),
+                'registered_count':    sess.businesses.count(),
+            })
+            session_data.append(dem)
+
+        # ── Per-cohort breakdown — group already-fetched rows by cohort_id ─────
         rep_by_cohort = {}
         for item in rep_qs.values('msme__cohort_id', 'msme_id'):
             cid = item['msme__cohort_id']
@@ -1827,7 +1884,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                         'unique_msmes': len(c_rep['msmes'])})
             cohorts_data.append(row)
 
-        # Per-work-order breakdown — group rows by work_order_id
+        # ── Per-work-order breakdown ───────────────────────────────────────────
         rep_by_bge = {}
         for item in rep_qs.values('bge_id', 'msme_id'):
             bid = item['bge_id']
@@ -1858,7 +1915,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             })
             wo_data.append(row)
 
-        overall['by_cohort'] = cohorts_data
+        overall['by_session']    = session_data
+        overall['by_cohort']     = cohorts_data
         overall['by_work_order'] = wo_data
         return Response(overall)
 
