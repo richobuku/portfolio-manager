@@ -2281,7 +2281,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         const data = Array.isArray(r.data) ? r.data : (r.data.results || []);
         setAdminSnapshots(data);
       })
-      .catch(() => {})
+      .catch(err => {
+        if (!axios.isCancel(err)) console.error('Failed to load growth snapshots:', err);
+      })
       .finally(() => setAdminSnapshotsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, section]);
@@ -2586,7 +2588,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             {diagTotal === 0 ? (
               <DiagnosticImporter token={token} onImported={() => {
                 axios.get(`${API_ENDPOINTS.MSMES}analytics/`, { headers: { Authorization: `Token ${token}` } })
-                  .then(r => setAnalytics(r.data)).catch(() => {});
+                  .then(r => setAnalytics(r.data))
+                  .catch(err => console.warn('Analytics refresh failed after import:', err));
               }} isAdmin={isAdmin} />
             ) : (
               <>

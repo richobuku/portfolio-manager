@@ -1,10 +1,14 @@
+import logging
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Sum, Q, Max
 from django.contrib.auth.models import User
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
@@ -190,6 +194,11 @@ class CohortViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     serializer_class = CohortSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        # Annotate msme_count at DB level so CohortSerializer.get_msme_count
+        # can avoid a per-row COUNT query (N+1 fix).
+        return Cohort.objects.annotate(_msme_count=Count('msmes', distinct=True))
+
     def destroy(self, request, *args, **kwargs):
         if not request.user.is_staff and not request.user.is_superuser:
             raise PermissionDenied("Only admins can delete cohorts.")
@@ -202,6 +211,11 @@ class ProgrammeGroupViewSet(viewsets.ModelViewSet):
     queryset = ProgrammeGroup.objects.all()
     serializer_class = None  # defined below via import
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Annotate msme_count at DB level so ProgrammeGroupSerializer.get_msme_count
+        # can avoid a per-row COUNT query (N+1 fix).
+        return ProgrammeGroup.objects.annotate(_msme_count=Count('msmes', distinct=True))
 
     def get_serializer_class(self):
         from .serializers import ProgrammeGroupSerializer
@@ -322,7 +336,20 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if city:
             qs = qs.filter(city__iexact=city)
 
-        return qs.select_related('cohort', 'assigned_bge', 'assigned_group').prefetch_related('programme_groups').order_by('-created_at')
+        return (
+            qs.select_related('cohort', 'assigned_bge', 'assigned_group')
+            .prefetch_related('programme_groups')
+            # Annotate counts and latest dates at the DB level to eliminate the
+            # N+1 queries that MSMESerializer.get_total_reports / get_last_support_date
+            # would otherwise fire (one round-trip per row).
+            .annotate(
+                _reports_count=Count('reports', distinct=True),
+                _group_reports_count=Count('group_reports', distinct=True),
+                _last_individual_date=Max('reports__visit_date'),
+                _last_group_date=Max('group_reports__visit_date'),
+            )
+            .order_by('-created_at')
+        )
 
     def _is_admin_or_cohort_admin(self, request):
         u = request.user
@@ -1980,8 +2007,8 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
                 report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=False)
                 report.submitted_pdf_data = pdf_bytes
                 report.save(update_fields=['submitted_pdf', 'submitted_pdf_data'])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error('Failed to snapshot MSME report PDF (report id=%s): %s', report.id, e)
 
             # Auto-create a growth snapshot from the quantitative fields
             self._create_snapshot_from_report(report)
@@ -2038,8 +2065,8 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
                 resp = HttpResponse(report.submitted_pdf.read(), content_type='application/pdf')
                 resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
                 return resp
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Stored MSME report PDF unreadable (report id=%s), regenerating: %s', report.id, e)
         buf = render_msme_report(report)
         resp = HttpResponse(buf.read(), content_type='application/pdf')
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
@@ -2162,8 +2189,8 @@ class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vie
                     safe_name = report.group.name.replace(' ', '_')
                     fname = f"GroupReport_{safe_name}_{report.visit_date}.pdf"
                     report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.error('Failed to snapshot group report PDF (report id=%s): %s', report.id, e)
 
     def destroy(self, request, *args, **kwargs):
         if not (request.user.is_staff or request.user.is_superuser):
@@ -2183,8 +2210,8 @@ class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vie
                 resp = HttpResponse(report.submitted_pdf.read(), content_type='application/pdf')
                 resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
                 return resp
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Stored group report PDF unreadable (report id=%s), regenerating: %s', report.id, e)
         buf = render_group_report(report)
         resp = HttpResponse(buf.read(), content_type='application/pdf')
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
@@ -2712,8 +2739,9 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             # Store bytes in DB so the signed copy survives Render filesystem wipes
             work_order.signed_pdf_data = pdf_bytes
             work_order.save(update_fields=['signed_pdf', 'signed_pdf_data'])
-        except Exception:
-            pass  # signing is complete even if PDF storage fails
+        except Exception as e:
+            logger.error('Failed to store signed work order PDF (wo id=%s): %s', work_order.id, e)
+            # Signing is complete; PDF storage failure is non-fatal
 
         return Response(self.get_serializer(work_order).data)
 
@@ -3067,7 +3095,6 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelV
 def _do_send_emails(records, subject, body_text, body_html, skip_sent,
                     already_sent_ids, recipient_type, from_email, reply_to, user_id):
     """Send emails in a background thread using a single SMTP connection."""
-    import django
     from django.core.mail import get_connection
     from .models import EmailSendLog
 
@@ -3081,10 +3108,13 @@ def _do_send_emails(records, subject, body_text, body_html, skip_sent,
             deduped.append(rec)
 
     logs_to_create = []
+    failed_count = 0
+
     try:
         connection = get_connection()
         connection.open()
-    except Exception:
+    except Exception as e:
+        logger.warning('Bulk email: could not open SMTP connection, falling back to per-message: %s', e)
         connection = None  # fall back to per-message connections
 
     for rec in deduped:
@@ -3107,8 +3137,13 @@ def _do_send_emails(records, subject, body_text, body_html, skip_sent,
                 recipient_email=rec['email'], subject=subject,
                 sent_by_id=user_id,
             ))
-        except Exception:
-            pass
+        except Exception as e:
+            failed_count += 1
+            logger.error('Bulk email: failed to send to %s (id=%s): %s', rec.get('email'), rec.get('id'), e)
+
+    if failed_count:
+        logger.warning('Bulk email job finished with %d failure(s) out of %d recipients for subject: %s',
+                       failed_count, len(deduped), subject)
 
     if connection:
         try:
@@ -3119,8 +3154,8 @@ def _do_send_emails(records, subject, body_text, body_html, skip_sent,
     try:
         if logs_to_create:
             EmailSendLog.objects.bulk_create(logs_to_create, ignore_conflicts=True)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error('Bulk email: failed to persist send logs: %s', e)
 
 
 @api_view(['POST'])

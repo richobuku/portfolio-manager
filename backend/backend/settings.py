@@ -248,11 +248,11 @@ for origin in [o.strip() for o in _extra.split(',') if o.strip()]:
     if origin not in CORS_ALLOWED_ORIGINS:
         CORS_ALLOWED_ORIGINS.append(origin)
 
-# Accept ANY Vercel preview/production URL for this project (deployment-specific
-# URLs change every push). Without this, only the canonical alias works and
-# direct deployment URLs cause CORS-blocked logins.
+# Accept Vercel preview/deployment URLs for this project only (deployment-specific
+# URLs change every push). Scoped to the 'frontend' project slug to prevent
+# other Vercel tenants from making credentialed requests to this API.
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.vercel\.app$",
+    r"^https://frontend-[a-z0-9-]+\.vercel\.app$",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -289,7 +289,15 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-# VAPID keys for Web Push notifications
-VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY',  'BNnpWxm6leoeTv_adABmTgTeIuNZOcWQqiY2hVa9M9Hjpmmo_YImgdbCBqZpUBlt2AnX6vxdquneem0B_Ld84ng')
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', 'fl8iq2jZaNjJnZEb0PQ6KIQsaMQaajrvWPCJQQRWVlE')
+# VAPID keys for Web Push notifications — must be set via environment variables.
+# Generate a new key pair with: python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print(v.public_key, v.private_key)"
+VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY')
 VAPID_CLAIMS      = {'sub': os.environ.get('VAPID_SUBJECT', 'mailto:admin@prudev.org')}
+if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+    import warnings
+    warnings.warn(
+        "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are not set. "
+        "Web Push notifications will be disabled until these environment variables are configured.",
+        stacklevel=2,
+    )

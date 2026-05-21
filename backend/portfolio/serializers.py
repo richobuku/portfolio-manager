@@ -18,6 +18,9 @@ class ProgrammeGroupSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_msme_count(self, obj):
+        # Use DB-level annotation when available (N+1 fix: avoids a COUNT per row)
+        if hasattr(obj, '_msme_count'):
+            return obj._msme_count
         return obj.msmes.count()
 
 
@@ -61,6 +64,9 @@ class CohortSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_msme_count(self, obj):
+        # Use DB-level annotation when available (N+1 fix)
+        if hasattr(obj, '_msme_count'):
+            return obj._msme_count
         return obj.msmes.filter(is_active=True).count()
 
 
@@ -78,12 +84,16 @@ class MSMESerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_total_reports(self, obj):
-        individual = obj.reports.count()
-        group = obj.group_reports.count()
-        return individual + group
+        # Use DB-level annotations when available (N+1 fix: avoids 2 COUNT queries per row)
+        if hasattr(obj, '_reports_count') and hasattr(obj, '_group_reports_count'):
+            return (obj._reports_count or 0) + (obj._group_reports_count or 0)
+        return obj.reports.count() + obj.group_reports.count()
 
     def get_last_support_date(self, obj):
-        from datetime import date
+        # Use DB-level Max annotations when available (N+1 fix: avoids 2 subqueries per row)
+        if hasattr(obj, '_last_individual_date'):
+            dates = [d for d in [obj._last_individual_date, obj._last_group_date] if d]
+            return str(max(dates)) if dates else None
         dates = []
         lr = obj.reports.order_by('-visit_date').values_list('visit_date', flat=True).first()
         if lr:
