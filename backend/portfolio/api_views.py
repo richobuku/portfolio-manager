@@ -3581,7 +3581,8 @@ def _build_tshirt_pdf(receipt):
             date_str,
         ])
 
-    tbl = Table(rows, colWidths=col_w, repeatRows=1)
+    row_heights = [0.65 * cm] + [SIG_ROW_H] * len(entries)
+    tbl = Table(rows, colWidths=col_w, rowHeights=row_heights, repeatRows=1)
     tbl.setStyle(TableStyle([
         # Header row
         ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
@@ -3605,9 +3606,6 @@ def _build_tshirt_pdf(receipt):
         # Grid
         ('GRID',           (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
     ]))
-    row_heights = [0.65 * cm] + [SIG_ROW_H] * len(entries)
-    tbl._argH = row_heights
-
     story = [
         Paragraph(receipt.title, title_style),
     ]
