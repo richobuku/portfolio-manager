@@ -125,6 +125,10 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessGrowthExpert
         fields = '__all__'
+        # signature and signature_data are managed via the dedicated
+        # upload-signature / rotate-signature endpoints only — sending them
+        # as plain JSON in a PATCH causes Django to reject the request.
+        read_only_fields = ('signature', 'signature_data')
 
     def get_assigned_msme_count(self, obj):
         # Use the prefetch cache when available (avoids a DB round-trip per BGE)

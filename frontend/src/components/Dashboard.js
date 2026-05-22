@@ -1144,11 +1144,25 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       const url = editType === 'msme'
         ? `${API_ENDPOINTS.MSMES}${editItem.id}/`
         : `${API_ENDPOINTS.EXPERTS}${editItem.id}/`;
-      await axios.patch(url, editForm, { headers });
+
+      // Strip computed / file fields that can't be PATCH'd as plain JSON.
+      // Signature files are managed via the dedicated upload/rotate endpoints.
+      const STRIP_FIELDS = [
+        'signature', 'signature_data', 'signature_url',
+        'assigned_msme_count', 'assigned_msmes_list', 'group_names',
+        'created_at', 'updated_at',
+      ];
+      const payload = Object.fromEntries(
+        Object.entries(editForm).filter(([k]) => !STRIP_FIELDS.includes(k))
+      );
+
+      await axios.patch(url, payload, { headers });
       notify('Saved successfully');
       closeEdit();
       fetchAll();
-    } catch { notify('Failed to save', 'error'); }
+    } catch (err) {
+      notify(err.response?.data ? JSON.stringify(err.response.data) : 'Failed to save', 'error');
+    }
     finally { setEditLoading(false); }
   };
 
