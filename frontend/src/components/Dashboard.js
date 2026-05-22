@@ -18,14 +18,14 @@ import {
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
   Lock, LockOpen, Star, StarBorder, Download, Undo,
-  Campaign, Send as SendIcon,
+  Campaign, Send as SendIcon, Checkroom, DrawOutlined,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -44,6 +44,7 @@ const NAV_ITEMS = [
   { key: 'workorders',     label: 'Work Orders',    icon: <Assignment /> },
   { key: 'analytics',      label: 'Analytics',      icon: <Assessment /> },
   { key: 'communications', label: 'Communications', icon: <Campaign /> },
+  { key: 'tshirts',        label: 'T-Shirt Receipts', icon: <Checkroom /> },
 ];
 
 // Each row is its own memoised component. With React.memo, a row only
@@ -851,6 +852,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [addMsmeDialog, setAddMsmeDialog] = useState(null); // bge object
   const [addMsmePick, setAddMsmePick] = useState('');
 
+  // ── t-shirt receipts ──────────────────────────────────────────────────────
+  const [tshirtReceipts, setTshirtReceipts] = useState([]);
+  const [tshirtLoading, setTshirtLoading] = useState(false);
+  const [tshirtDialog, setTshirtDialog] = useState(false);
+  const [tshirtForm, setTshirtForm] = useState({ title: 'PRUDEV II T-Shirt Collection', event: '', colour: 'Blue', notes: '' });
+  const [tshirtFormEntries, setTshirtFormEntries] = useState([]); // [{bge_id, name, size, quantity}]
+  const [tshirtSaving, setTshirtSaving] = useState(false);
+  const [tshirtDetailId, setTshirtDetailId] = useState(null); // receipt id being viewed
+  const [tshirtBulkSigning, setTshirtBulkSigning] = useState(false);
+  const [tshirtBgeSearch, setTshirtBgeSearch] = useState('');
+  const [tshirtPage, setTshirtPage] = useState(0);
+
   // ── user management ────────────────────────────────────────────────────────
   const [bgeUsers, setBgeUsers] = useState([]);
   const [userDialog, setUserDialog] = useState(false);
@@ -962,6 +975,24 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   }, [token, woFilterBge, woFilterStatus, woFilterType]);
 
   useEffect(() => { fetchWorkOrders(); }, [fetchWorkOrders]);
+
+  const fetchTshirtReceipts = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    setTshirtLoading(true);
+    try {
+      const res = await axios.get(API_ENDPOINTS.TSHIRT_RECEIPTS, { headers: h });
+      setTshirtReceipts(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      setTshirtReceipts([]);
+    } finally {
+      setTshirtLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    if (section === 'tshirts') fetchTshirtReceipts();
+  }, [section, fetchTshirtReceipts]);
 
   // Lightweight, debounced refetch JUST for the MSME list when search/filter
   // changes. AbortController cancels any in-flight request when the user keeps
@@ -5545,6 +5576,456 @@ PRUDEV II BDS Team`
     </Box>
   );
 
+  // ── T-Shirt Receipts helpers ───────────────────────────────────────────────
+  const tshirtDetail = tshirtDetailId ? tshirtReceipts.find(r => r.id === tshirtDetailId) : null;
+
+  const openCreateTshirt = () => {
+    setTshirtForm({ title: 'PRUDEV II T-Shirt Collection', event: '', colour: 'Blue', notes: '' });
+    const sorted = [...experts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    setTshirtFormEntries(sorted.map((e, idx) => ({ bge_id: e.id, name: e.name, size: 'L', quantity: 1, order: idx })));
+    setTshirtBgeSearch('');
+    setTshirtDialog(true);
+  };
+
+  const handleCreateTshirt = async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    setTshirtSaving(true);
+    try {
+      const rRes = await axios.post(API_ENDPOINTS.TSHIRT_RECEIPTS, {
+        title: tshirtForm.title,
+        event: tshirtForm.event,
+        colour: tshirtForm.colour,
+        notes: tshirtForm.notes,
+      }, { headers: h });
+      const receiptId = rRes.data.id;
+      const selected = tshirtFormEntries.filter(e => e._selected !== false);
+      await Promise.all(selected.map((e, idx) =>
+        axios.post(API_ENDPOINTS.TSHIRT_ENTRIES, {
+          receipt: receiptId,
+          bge: e.bge_id,
+          size: e.size,
+          quantity: e.quantity,
+          order: e.order ?? idx,
+        }, { headers: h })
+      ));
+      setTshirtDialog(false);
+      await fetchTshirtReceipts();
+      setSuccess('T-shirt receipt created successfully.');
+    } catch (err) {
+      setError(err.response?.data?.detail || err.response?.data?.non_field_errors?.[0] || 'Failed to create receipt.');
+    } finally {
+      setTshirtSaving(false);
+    }
+  };
+
+  const handleTshirtBulkSign = async (receiptId) => {
+    const h = { Authorization: `Bearer ${token}` };
+    setTshirtBulkSigning(true);
+    try {
+      const res = await axios.post(TSHIRT_RECEIPT_BULK_SIGN(receiptId), {}, { headers: h });
+      await fetchTshirtReceipts();
+      setSuccess(`Bulk sign complete — ${res.data.signed} BGE(s) signed.`);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Bulk sign failed.');
+    } finally {
+      setTshirtBulkSigning(false);
+    }
+  };
+
+  const handleDownloadTshirtPdf = async (receiptId) => {
+    const h = { Authorization: `Bearer ${token}`, responseType: 'blob' };
+    try {
+      const res = await axios.get(TSHIRT_RECEIPT_PDF_URL(receiptId), { headers: h, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      const receipt = tshirtReceipts.find(r => r.id === receiptId);
+      a.download = `tshirt-receipt-${receipt?.title?.replace(/\s+/g, '-') || receiptId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Failed to download PDF.');
+    }
+  };
+
+  // ── renderTshirtReceipts ───────────────────────────────────────────────────
+  const renderTshirtReceipts = () => {
+    const filteredFormEntries = tshirtFormEntries.filter(e =>
+      !tshirtBgeSearch || (e.name || '').toLowerCase().includes(tshirtBgeSearch.toLowerCase())
+    );
+    const selectedCount = tshirtFormEntries.filter(e => e._selected !== false).length;
+
+    return (
+      <Box>
+        <SectionHeader
+          title="T-Shirt Receipts"
+          subtitle="Create digital sign-off receipts for BGE t-shirt distribution"
+        >
+          <Button variant="contained" startIcon={<Add />} onClick={openCreateTshirt}>
+            Create Receipt
+          </Button>
+        </SectionHeader>
+
+        {tshirtLoading && <LinearProgress sx={{ mb: 2 }} />}
+
+        {tshirtReceipts.length === 0 && !tshirtLoading && (
+          <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+            <Checkroom sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body1" color="text.secondary">No receipts yet.</Typography>
+            <Typography variant="body2" color="text.secondary">Create a receipt to track t-shirt distribution.</Typography>
+          </Paper>
+        )}
+
+        {tshirtReceipts.length > 0 && (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>Title</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Event</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Colour</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Progress</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {tshirtReceipts.slice(tshirtPage * ROWS_PER_PAGE, (tshirtPage + 1) * ROWS_PER_PAGE).map(r => (
+                  <TableRow key={r.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>{r.title}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">{r.event || '—'}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">{r.colour}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip
+                          size="small"
+                          label={`${r.signed_count}/${r.total_entries} signed`}
+                          color={r.fully_signed ? 'success' : r.signed_count > 0 ? 'warning' : 'default'}
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                        <Tooltip title="View details">
+                          <IconButton size="small" onClick={() => setTshirtDetailId(r.id)}>
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Download PDF">
+                          <IconButton size="small" onClick={() => handleDownloadTshirtPdf(r.id)}>
+                            <Download fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {tshirtReceipts.length > ROWS_PER_PAGE && (
+              <TablePagination
+                component="div"
+                count={tshirtReceipts.length}
+                rowsPerPage={ROWS_PER_PAGE}
+                page={tshirtPage}
+                onPageChange={(_, p) => setTshirtPage(p)}
+                rowsPerPageOptions={[ROWS_PER_PAGE]}
+              />
+            )}
+          </TableContainer>
+        )}
+
+        {/* ── Create Receipt dialog ────────────────────────────────────────── */}
+        <Dialog open={tshirtDialog} onClose={() => setTshirtDialog(false)} maxWidth="md" fullWidth
+          PaperProps={{ sx: { maxHeight: '90vh' } }}>
+          <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Checkroom sx={{ color: BRAND.sidebarBg }} />
+              <Typography variant="h6" fontWeight={700}>Create T-Shirt Receipt</Typography>
+            </Box>
+          </DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Receipt Title" fullWidth size="small"
+                  value={tshirtForm.title}
+                  onChange={e => setTshirtForm(f => ({ ...f, title: e.target.value }))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Event / Programme" fullWidth size="small"
+                  value={tshirtForm.event}
+                  onChange={e => setTshirtForm(f => ({ ...f, event: e.target.value }))}
+                  placeholder="e.g. BGE TOT 2026, Adjumani"
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>T-Shirt Colour</InputLabel>
+                  <Select
+                    label="T-Shirt Colour"
+                    value={tshirtForm.colour}
+                    onChange={e => setTshirtForm(f => ({ ...f, colour: e.target.value }))}
+                  >
+                    {['Blue', 'White', 'Navy', 'Black', 'Grey', 'Green', 'Red'].map(c => (
+                      <MenuItem key={c} value={c}>{c}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={8}>
+                <TextField
+                  label="Notes (optional)" fullWidth size="small"
+                  value={tshirtForm.notes}
+                  onChange={e => setTshirtForm(f => ({ ...f, notes: e.target.value }))}
+                />
+              </Grid>
+            </Grid>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="subtitle2" fontWeight={700}>
+                BGE Recipients ({selectedCount} selected)
+              </Typography>
+              <TextField
+                size="small" placeholder="Search BGEs…"
+                value={tshirtBgeSearch}
+                onChange={e => setTshirtBgeSearch(e.target.value)}
+                InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: 'text.secondary', fontSize: 18 }} /> }}
+                sx={{ width: 220 }}
+              />
+            </Box>
+
+            <Paper variant="outlined" sx={{ maxHeight: 360, overflowY: 'auto' }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        size="small"
+                        checked={tshirtFormEntries.length > 0 && tshirtFormEntries.every(e => e._selected !== false)}
+                        indeterminate={tshirtFormEntries.some(e => e._selected !== false) && !tshirtFormEntries.every(e => e._selected !== false)}
+                        onChange={e => setTshirtFormEntries(prev => prev.map(x => ({ ...x, _selected: e.target.checked })))}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>BGE Name</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: 110 }}>Size</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: 80 }}>Qty</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredFormEntries.map(entry => (
+                    <TableRow key={entry.bge_id} hover>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          checked={entry._selected !== false}
+                          onChange={ev => setTshirtFormEntries(prev =>
+                            prev.map(x => x.bge_id === entry.bge_id ? { ...x, _selected: ev.target.checked } : x)
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{entry.name}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {experts.find(e => e.id === entry.bge_id)?.bge_code || '—'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          size="small" value={entry.size}
+                          onChange={ev => setTshirtFormEntries(prev =>
+                            prev.map(x => x.bge_id === entry.bge_id ? { ...x, size: ev.target.value } : x)
+                          )}
+                          sx={{ fontSize: 13, minWidth: 80 }}
+                        >
+                          {['L', 'XL', '2XL'].map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number" size="small" value={entry.quantity}
+                          inputProps={{ min: 1, max: 5, style: { width: 44, textAlign: 'center' } }}
+                          onChange={ev => setTshirtFormEntries(prev =>
+                            prev.map(x => x.bge_id === entry.bge_id ? { ...x, quantity: Math.max(1, parseInt(ev.target.value) || 1) } : x)
+                          )}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredFormEntries.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>No BGEs found.</Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          </DialogContent>
+          <DialogActions sx={{ borderTop: 1, borderColor: 'divider', gap: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ flex: 1, ml: 1 }}>
+              {selectedCount} BGE(s) will be added to this receipt.
+            </Typography>
+            <Button onClick={() => setTshirtDialog(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              disabled={tshirtSaving || !tshirtForm.title.trim() || selectedCount === 0}
+              startIcon={tshirtSaving ? <CircularProgress size={16} color="inherit" /> : <Add />}
+              onClick={handleCreateTshirt}
+            >
+              Create Receipt
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ── Detail / Signing dialog ──────────────────────────────────────── */}
+        <Dialog open={!!tshirtDetailId} onClose={() => setTshirtDetailId(null)} maxWidth="md" fullWidth
+          PaperProps={{ sx: { maxHeight: '90vh' } }}>
+          {tshirtDetail && (() => {
+            const r = tshirtDetail;
+            return (
+              <>
+                <Box sx={{ bgcolor: BRAND.sidebarBg, px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+                      T-Shirt Receipt
+                    </Typography>
+                    <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700 }}>{r.title}</Typography>
+                    {r.event && <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>{r.event}</Typography>}
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Chip
+                      label={`${r.signed_count}/${r.total_entries} signed`}
+                      color={r.fully_signed ? 'success' : r.signed_count > 0 ? 'warning' : 'default'}
+                      sx={{ fontWeight: 700 }}
+                    />
+                    {r.created_by_name && (
+                      <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.6)', mt: 0.5 }}>
+                        Created by {r.created_by_name}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+
+                <DialogContent sx={{ p: 0 }}>
+                  <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+                    {[
+                      ['Colour', r.colour],
+                      ['Total BGEs', r.total_entries],
+                      ['Signed', r.signed_count],
+                      ['Pending', r.total_entries - r.signed_count],
+                      ['Created', r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'],
+                    ].map(([label, val]) => (
+                      <Box key={label}>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</Typography>
+                        <Typography variant="body2" fontWeight={600}>{val}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+
+                  <TableContainer sx={{ maxHeight: 420 }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell sx={{ fontWeight: 700 }}>#</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>BGE Name</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Size</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Qty</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Signature</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(r.entries || []).map((entry, idx) => (
+                          <TableRow key={entry.id} hover sx={{ bgcolor: entry.signed ? 'rgba(0,155,98,0.04)' : 'inherit' }}>
+                            <TableCell>
+                              <Typography variant="body2" color="text.secondary">{idx + 1}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={600}>{entry.bge_name}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="text.secondary">{entry.bge_code || '—'}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="text.secondary">{entry.bge_location || '—'}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={entry.size} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{entry.quantity}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              {entry.has_signature
+                                ? <Chip label="On file" size="small" color="success" variant="outlined" />
+                                : <Chip label="Missing" size="small" color="default" variant="outlined" />
+                              }
+                            </TableCell>
+                            <TableCell>
+                              {entry.signed ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <CheckCircle sx={{ fontSize: 16, color: '#009B62' }} />
+                                  <Typography variant="body2" color="success.main" fontWeight={600}>
+                                    Signed {entry.signed_at ? new Date(entry.signed_at).toLocaleDateString() : ''}
+                                  </Typography>
+                                </Box>
+                              ) : (
+                                <Chip label="Pending" size="small" color="default" />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </DialogContent>
+
+                <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={tshirtBulkSigning ? <CircularProgress size={16} /> : <DrawOutlined />}
+                    disabled={tshirtBulkSigning}
+                    onClick={() => handleTshirtBulkSign(r.id)}
+                  >
+                    Bulk Sign (Admin)
+                  </Button>
+                  <Box sx={{ flex: 1 }} />
+                  <Button
+                    startIcon={<Download />}
+                    onClick={() => handleDownloadTshirtPdf(r.id)}
+                  >
+                    Download PDF
+                  </Button>
+                  <Button onClick={() => setTshirtDetailId(null)}>Close</Button>
+                </DialogActions>
+              </>
+            );
+          })()}
+        </Dialog>
+      </Box>
+    );
+  };
+
   const sectionMap = {
     msmes: renderMSMEs,
     experts: renderExperts,
@@ -5558,6 +6039,7 @@ PRUDEV II BDS Team`
     workorders: renderWorkOrders,
     analytics: renderAnalytics,
     communications: renderCommunications,
+    tshirts: renderTshirtReceipts,
   };
 
   // ── main render ────────────────────────────────────────────────────────────

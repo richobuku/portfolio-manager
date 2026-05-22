@@ -1196,3 +1196,53 @@ class EmailSendLog(models.Model):
 
     def __str__(self):
         return f"{self.recipient_type}:{self.recipient_id} — {self.subject[:60]} ({self.sent_at:%Y-%m-%d})"
+
+
+# ── T-Shirt Receipt ────────────────────────────────────────────────────────
+
+class TshirtReceipt(models.Model):
+    title       = models.CharField(max_length=200, default="T-Shirt Collection Receipt")
+    event       = models.CharField(max_length=200, blank=True)   # e.g. "BGE TOT 2026 – Adjumani"
+    colour      = models.CharField(max_length=50, default="Blue")
+    notes       = models.TextField(blank=True)
+    created_by  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tshirt_receipts')
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} ({self.event}) – {self.created_at:%Y-%m-%d}"
+
+    @property
+    def total_entries(self):
+        return self.entries.count()
+
+    @property
+    def signed_count(self):
+        return self.entries.filter(signed=True).count()
+
+    @property
+    def fully_signed(self):
+        return self.total_entries > 0 and self.signed_count == self.total_entries
+
+
+class TshirtReceiptEntry(models.Model):
+    SIZE_CHOICES = [('L', 'L'), ('XL', 'XL'), ('2XL', '2XL')]
+
+    receipt     = models.ForeignKey(TshirtReceipt, related_name='entries', on_delete=models.CASCADE)
+    bge         = models.ForeignKey(BusinessGrowthExpert, on_delete=models.CASCADE, related_name='tshirt_entries')
+    size        = models.CharField(max_length=10, choices=SIZE_CHOICES, default='L')
+    quantity    = models.PositiveIntegerField(default=1)
+    signed      = models.BooleanField(default=False)
+    signed_at   = models.DateTimeField(null=True, blank=True)
+    order       = models.PositiveIntegerField(default=0)  # display order
+
+    class Meta:
+        ordering = ['order', 'bge__name']
+        unique_together = [('receipt', 'bge')]
+
+    def __str__(self):
+        status = "✓" if self.signed else "○"
+        return f"{status} {self.bge.name} — {self.size} x{self.quantity}"

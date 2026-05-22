@@ -23,7 +23,7 @@ from .models import (
     Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, PushSubscription, WorkOrder,
     GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
     TrainingFacilitationAssignment, TrainingReport, AnnualReviewReport,
-    MentorTrainingReport,
+    MentorTrainingReport, TshirtReceipt, TshirtReceiptEntry,
 )
 from .account_setup import ensure_bge_account, send_welcome_email
 
@@ -3379,3 +3379,270 @@ def bulk_email_log_view(request):
         ).values_list('recipient_id', flat=True).distinct()
     )
     return Response({'already_sent': already, 'count': len(already)})
+
+
+# ── T-Shirt Receipt ViewSets ───────────────────────────────────────────────
+
+from .serializers import TshirtReceiptSerializer, TshirtReceiptEntrySerializer
+from django.utils import timezone
+import base64, io as _io
+
+def _bge_signature_bytes(bge):
+    """Return raw PNG bytes of the BGE's stored signature, or None."""
+    if bge.signature_data:
+        return bytes(bge.signature_data)
+    if bge.signature:
+        try:
+            with open(bge.signature.path, 'rb') as f:
+                return f.read()
+        except Exception:
+            pass
+    return None
+
+
+def _build_tshirt_pdf(receipt):
+    """Generate a signed PDF for a TshirtReceipt using reportlab."""
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.units import cm, mm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        import PIL.Image as PILImage
+    except ImportError as e:
+        raise ImportError(f"reportlab/Pillow required: {e}")
+
+    buf = _io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=landscape(A4),
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm,
+        title=receipt.title,
+    )
+
+    styles = getSampleStyleSheet()
+    NAVY   = colors.HexColor("#1A2F4B")
+    ORANGE = colors.HexColor("#E65100")
+    LGREY  = colors.HexColor("#F2F2F2")
+
+    title_style = ParagraphStyle('Title', parent=styles['Title'],
+        fontSize=16, textColor=NAVY, spaceAfter=2, alignment=TA_CENTER)
+    sub_style   = ParagraphStyle('Sub', parent=styles['Normal'],
+        fontSize=10, textColor=colors.HexColor("#555555"), spaceAfter=2,
+        alignment=TA_CENTER, fontName='Helvetica-Oblique')
+    label_style = ParagraphStyle('Lbl', parent=styles['Normal'],
+        fontSize=9, textColor=colors.black, leading=12)
+    note_style  = ParagraphStyle('Note', parent=styles['Normal'],
+        fontSize=7.5, textColor=colors.HexColor("#666666"),
+        fontName='Helvetica-Oblique', alignment=TA_CENTER)
+    conf_style  = ParagraphStyle('Conf', parent=styles['Normal'],
+        fontSize=7, textColor=colors.HexColor("#888888"),
+        fontName='Helvetica-Oblique', alignment=TA_CENTER)
+
+    entries = list(receipt.entries.select_related('bge').order_by('order', 'bge__name'))
+
+    # ── Column widths (landscape A4 content ≈ 26.7 cm) ─────────────────
+    # #(0.8) Name(4.2) Code(3.2) Phone(2.8) Loc(2.5) Size(1.6) Qty(1.0) Sig(5.5) Date(3.1)
+    col_w = [0.8*cm, 4.2*cm, 3.2*cm, 2.8*cm, 2.5*cm, 1.6*cm, 1.0*cm, 5.5*cm, 3.1*cm]
+
+    SIG_H = 1.1*cm  # row height for data rows
+
+    header = ['#', 'BGE Name', 'BGE Code', 'Phone', 'Location',
+              'Size', 'Qty', 'Signature', 'Date Signed']
+
+    rows = [header]
+    sig_cells = {}  # (row_idx, col_idx) → Image
+
+    for idx, entry in enumerate(entries):
+        sig_bytes = _bge_signature_bytes(entry.bge)
+        sig_cell = ''
+        if entry.signed and sig_bytes:
+            try:
+                img_buf = _io.BytesIO(sig_bytes)
+                pil = PILImage.open(img_buf)
+                w_px, h_px = pil.size
+                aspect = w_px / h_px if h_px else 1
+                img_h = SIG_H * 0.85
+                img_w = min(img_h * aspect, col_w[7] - 4*mm)
+                img_buf.seek(0)
+                sig_cell = Image(img_buf, width=img_w, height=img_h)
+                sig_cells[(idx + 1, 7)] = True
+            except Exception:
+                sig_cell = '(signed)'
+        elif entry.signed:
+            sig_cell = '(signed)'
+
+        date_str = entry.signed_at.strftime('%d/%m/%Y') if entry.signed_at else ''
+        rows.append([
+            str(idx + 1),
+            entry.bge.name,
+            entry.bge.bge_code or '',
+            entry.bge.phone or '',
+            entry.bge.location or '',
+            entry.size,
+            str(entry.quantity),
+            sig_cell,
+            date_str,
+        ])
+
+    tbl = Table(rows, colWidths=col_w, repeatRows=1)
+
+    style_cmds = [
+        # Header
+        ('BACKGROUND',   (0, 0), (-1, 0), NAVY),
+        ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',     (0, 0), (-1, 0), 8),
+        ('ALIGN',        (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN',       (0, 0), (-1, 0), 'MIDDLE'),
+        ('TOPPADDING',   (0, 0), (-1, 0), 5),
+        ('BOTTOMPADDING',(0, 0), (-1, 0), 5),
+        # Body
+        ('FONTNAME',     (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',     (0, 1), (-1, -1), 8),
+        ('VALIGN',       (0, 1), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING',   (0, 1), (-1, -1), 3),
+        ('BOTTOMPADDING',(0, 1), (-1, -1), 3),
+        ('LEFTPADDING',  (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        # Grid
+        ('GRID',         (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
+        # Row heights
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, LGREY]),
+    ]
+    tbl.setStyle(TableStyle(style_cmds))
+
+    # Force row height for data rows to accommodate signature images
+    row_heights = [0.7*cm] + [SIG_H] * len(entries)
+    tbl._argH = row_heights
+
+    story = [
+        Paragraph("GOPA AFC  |  PRUDEV II PROGRAMME", ParagraphStyle(
+            'top', parent=styles['Normal'], fontSize=8, textColor=ORANGE,
+            alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=2)),
+        Paragraph(receipt.title, title_style),
+        Paragraph(f"{receipt.event}  —  Colour: {receipt.colour}", sub_style),
+        Spacer(1, 0.2*cm),
+        Paragraph(
+            f"Date: __________________________   "
+            f"Group Leader: __________________________________   "
+            f"Signature: __________________________",
+            label_style),
+        Spacer(1, 0.15*cm),
+        Paragraph(
+            "Bold names are team leaders. Signatures are embedded from the BGE's registered profile.",
+            note_style),
+        Spacer(1, 0.2*cm),
+        tbl,
+        Spacer(1, 0.25*cm),
+        Paragraph(f"Total BGEs: {len(entries)}   |   Signed: {receipt.signed_count}", label_style),
+        Spacer(1, 0.15*cm),
+        Paragraph(
+            "Distributed by: _________________________   Name: _________________________   Date: ____________   "
+            "Verified by: _________________________   Name: _________________________   Date: ____________",
+            label_style),
+        Spacer(1, 0.2*cm),
+        Paragraph("PRUDEV II Programme — GOPA AFC  |  Confidential", conf_style),
+    ]
+
+    doc.build(story)
+    buf.seek(0)
+    return buf.read()
+
+
+class TshirtReceiptViewSet(viewsets.ModelViewSet):
+    queryset           = TshirtReceipt.objects.prefetch_related('entries__bge').all()
+    serializer_class   = TshirtReceiptSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def get_queryset(self):
+        qs = TshirtReceipt.objects.prefetch_related('entries__bge').all()
+        user = self.request.user
+        # BGEs only see receipts that have an entry for them
+        if not (user.is_staff or user.is_superuser):
+            bge = getattr(user, 'bge_profile', None)
+            if bge:
+                qs = qs.filter(entries__bge=bge)
+        return qs
+
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        receipt = self.get_object()
+        try:
+            pdf_bytes = _build_tshirt_pdf(receipt)
+        except Exception as e:
+            logger.error("TshirtReceipt PDF error: %s", e, exc_info=True)
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        filename = f"tshirt_receipt_{receipt.id}.pdf"
+        resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return resp
+
+    @action(detail=True, methods=['post'], url_path='bulk-sign')
+    def bulk_sign(self, request, pk=None):
+        """Admin: embed all available signatures at once."""
+        receipt = self.get_object()
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can bulk-sign.")
+        now = timezone.now()
+        updated = 0
+        for entry in receipt.entries.select_related('bge').filter(signed=False):
+            if _bge_signature_bytes(entry.bge):
+                entry.signed    = True
+                entry.signed_at = now
+                entry.save(update_fields=['signed', 'signed_at'])
+                updated += 1
+        return Response({'signed': updated, 'total': receipt.total_entries})
+
+
+class TshirtReceiptEntryViewSet(viewsets.ModelViewSet):
+    queryset           = TshirtReceiptEntry.objects.select_related('bge', 'receipt').all()
+    serializer_class   = TshirtReceiptEntrySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = TshirtReceiptEntry.objects.select_related('bge', 'receipt').all()
+        receipt_id = self.request.query_params.get('receipt')
+        if receipt_id:
+            qs = qs.filter(receipt_id=receipt_id)
+        # BGEs only see their own entries
+        user = self.request.user
+        if not (user.is_staff or user.is_superuser):
+            bge = getattr(user, 'bge_profile', None)
+            if bge:
+                qs = qs.filter(bge=bge)
+            else:
+                return qs.none()
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='sign')
+    def sign(self, request, pk=None):
+        """BGE signs their own entry — embeds their stored signature."""
+        entry = self.get_object()
+        user  = request.user
+
+        # Allow the BGE whose entry this is, or staff
+        bge = getattr(user, 'bge_profile', None)
+        if not (user.is_staff or user.is_superuser):
+            if not bge or entry.bge_id != bge.id:
+                raise PermissionDenied("You can only sign your own receipt entry.")
+
+        if entry.signed:
+            return Response({'detail': 'Already signed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not _bge_signature_bytes(entry.bge):
+            return Response(
+                {'detail': 'No signature on file. Please upload your signature first.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        entry.signed    = True
+        entry.signed_at = timezone.now()
+        entry.save(update_fields=['signed', 'signed_at'])
+        return Response(TshirtReceiptEntrySerializer(entry, context={'request': request}).data)

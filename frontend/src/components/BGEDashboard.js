@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Paper, Chip,
+  TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, FormControl, InputLabel, Select, MenuItem, Alert,
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
@@ -14,10 +14,10 @@ import {
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
   Delete, School, People,
-  HelpOutline, Close, TrendingUp,
+  HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS } from '../config';
+import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS, TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
 import VisitReportForm from './VisitReportForm';
@@ -98,7 +98,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const [section, setSection] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get('section');
-    return ['msmes', 'groups', 'reports', 'workorders', 'training'].includes(requested) ? requested : 'msmes';
+    return ['msmes', 'groups', 'reports', 'workorders', 'training', 'tshirts'].includes(requested) ? requested : 'msmes';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -232,6 +232,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [growthSnapshots, setGrowthSnapshots] = useState([]);
   const [growthSaving, setGrowthSaving] = useState(false);
   const [growthError, setGrowthError] = useState('');
+
+  // T-shirt receipts (BGE signs their own entry)
+  const [tshirtEntries, setTshirtEntries] = useState([]);
+  const [tshirtEntriesLoading, setTshirtEntriesLoading] = useState(false);
+  const [tshirtSigningId, setTshirtSigningId] = useState(null); // entry id being signed
 
   const DIGITAL_TOOLS_OPTIONS = [
     'Zoho Books',
@@ -480,6 +485,53 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       setMentorSessions(enriched.filter(s => mentorIds.has(s.id)));
     } catch { /* silent */ }
   }, [token]);
+
+  const fetchTshirtEntries = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    setTshirtEntriesLoading(true);
+    try {
+      const res = await axios.get(API_ENDPOINTS.TSHIRT_ENTRIES, { headers: h });
+      setTshirtEntries(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      setTshirtEntries([]);
+    } finally {
+      setTshirtEntriesLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    if (section === 'tshirts') fetchTshirtEntries();
+  }, [section, fetchTshirtEntries]);
+
+  const handleSignTshirtEntry = async (entryId) => {
+    const h = { Authorization: `Bearer ${token}` };
+    setTshirtSigningId(entryId);
+    try {
+      await axios.post(TSHIRT_ENTRY_SIGN_URL(entryId), {}, { headers: h });
+      await fetchTshirtEntries();
+      setSnack({ open: true, msg: 'T-shirt receipt signed successfully!', severity: 'success' });
+    } catch (err) {
+      setSnack({ open: true, msg: err.response?.data?.detail || 'Signing failed. Please try again.', severity: 'error' });
+    } finally {
+      setTshirtSigningId(null);
+    }
+  };
+
+  const handleDownloadTshirtPdf = async (receiptId, receiptTitle) => {
+    const h = { Authorization: `Bearer ${token}`, responseType: 'blob' };
+    try {
+      const res = await axios.get(TSHIRT_RECEIPT_PDF_URL(receiptId), { headers: h, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tshirt-receipt-${(receiptTitle || receiptId).toString().replace(/\s+/g, '-')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setSnack({ open: true, msg: 'Failed to download PDF.', severity: 'error' });
+    }
+  };
 
   const openAttendance = async (session) => {
     fetchTrainingMsmes();
@@ -1005,6 +1057,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
     { key: 'training',   label: 'Training',       icon: <School />,
       badge: leadSessions.length + mentorSessions.length || undefined },
+    { key: 'tshirts',    label: 'T-Shirts',       icon: <Checkroom />,
+      badge: tshirtEntries.filter(e => !e.signed).length || undefined },
   ];
 
   const SidebarContent = () => (
@@ -1922,6 +1976,109 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 ))}
               </Box>
             )}
+          </Box>
+        )}
+
+        {/* ── T-Shirt Receipts tab ────────────────────────────────────────── */}
+        {section === 'tshirts' && (
+          <Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={700}>My T-Shirt Receipt</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sign to acknowledge receipt of your programme t-shirt.
+              </Typography>
+            </Box>
+
+            {tshirtEntriesLoading && <LinearProgress sx={{ mb: 2 }} />}
+
+            {!tshirtEntriesLoading && tshirtEntries.length === 0 && (
+              <Paper sx={{ p: 6, textAlign: 'center' }}>
+                <Checkroom sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                <Typography color="text.secondary" gutterBottom>No t-shirt receipts assigned to you yet.</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  The programme administrator will create a receipt when t-shirts are distributed.
+                </Typography>
+              </Paper>
+            )}
+
+            {tshirtEntries.map(entry => (
+              <Card key={entry.id} sx={{
+                mb: 2,
+                borderLeft: `4px solid ${entry.signed ? '#009B62' : '#F59E0B'}`,
+                '&:hover': { boxShadow: 3 },
+                transition: 'box-shadow 0.2s',
+              }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Checkroom sx={{ color: entry.signed ? '#009B62' : '#F59E0B', fontSize: 20 }} />
+                        <Typography fontWeight={700} fontSize={15}>
+                          {entry.receipt_title || 'T-Shirt Receipt'}
+                        </Typography>
+                        {entry.signed ? (
+                          <Chip label="Signed" size="small" color="success" icon={<CheckCircle />} />
+                        ) : (
+                          <Chip label="Pending Signature" size="small" color="warning" />
+                        )}
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+                        {[
+                          ['Size', entry.size],
+                          ['Qty', entry.quantity],
+                          ['Colour', entry.receipt_colour || 'Blue'],
+                        ].map(([label, val]) => (
+                          <Box key={label}>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</Typography>
+                            <Typography variant="body2" fontWeight={600}>{val}</Typography>
+                          </Box>
+                        ))}
+                        {entry.signed && entry.signed_at && (
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Signed on</Typography>
+                            <Typography variant="body2" fontWeight={600}>{new Date(entry.signed_at).toLocaleDateString()}</Typography>
+                          </Box>
+                        )}
+                      </Box>
+
+                      {!entry.has_signature && !entry.signed && (
+                        <Alert severity="warning" sx={{ mt: 1.5 }} icon={false}>
+                          <Typography variant="body2">
+                            Your signature is not on file. Please upload your signature in your profile before signing.
+                          </Typography>
+                        </Alert>
+                      )}
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
+                      {!entry.signed && (
+                        <Button
+                          variant="contained" size="small"
+                          startIcon={tshirtSigningId === entry.id
+                            ? <CircularProgress size={14} color="inherit" />
+                            : <DrawOutlined />}
+                          disabled={tshirtSigningId === entry.id || !entry.has_signature}
+                          onClick={() => handleSignTshirtEntry(entry.id)}
+                          sx={{ bgcolor: '#009B62', '&:hover': { bgcolor: '#007a4d' } }}
+                        >
+                          Confirm & Sign
+                        </Button>
+                      )}
+                      {entry.receipt_id && (
+                        <Button
+                          variant="outlined" size="small"
+                          startIcon={<Download />}
+                          onClick={() => handleDownloadTshirtPdf(entry.receipt_id, entry.receipt_title)}
+                        >
+                          PDF
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))}
           </Box>
         )}
       </Box>

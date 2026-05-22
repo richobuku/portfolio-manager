@@ -34,6 +34,8 @@ export const API_ENDPOINTS = {
   ANNUAL_REVIEWS:            `${API_BASE_URL}/api/annual-reviews/`,
   BULK_EMAIL:                `${API_BASE_URL}/api/bulk-email/`,
   MENTOR_REPORTS:            `${API_BASE_URL}/api/mentor-reports/`,
+  TSHIRT_RECEIPTS:           `${API_BASE_URL}/api/tshirt-receipts/`,
+  TSHIRT_ENTRIES:            `${API_BASE_URL}/api/tshirt-entries/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
@@ -45,6 +47,9 @@ export const WORK_ORDER_WITHDRAW_URL = (id) => `${API_BASE_URL}/api/work-orders/
 export const WORK_ORDER_PDF_URL        = (id) => `${API_BASE_URL}/api/work-orders/${id}/pdf/`;
 export const TRAINING_REPORT_PDF_URL   = (id) => `${API_BASE_URL}/api/training-reports/${id}/pdf/`;
 export const MENTOR_REPORT_PDF_URL     = (id) => `${API_BASE_URL}/api/mentor-reports/${id}/pdf/`;
+export const TSHIRT_RECEIPT_PDF_URL    = (id) => `${API_BASE_URL}/api/tshirt-receipts/${id}/pdf/`;
+export const TSHIRT_RECEIPT_BULK_SIGN  = (id) => `${API_BASE_URL}/api/tshirt-receipts/${id}/bulk-sign/`;
+export const TSHIRT_ENTRY_SIGN_URL     = (id) => `${API_BASE_URL}/api/tshirt-entries/${id}/sign/`;
 // legacy alias kept for any existing references
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/reports/${id}/revert/`;
