@@ -237,6 +237,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [tshirtEntries, setTshirtEntries] = useState([]);
   const [tshirtEntriesLoading, setTshirtEntriesLoading] = useState(false);
   const [tshirtSigningId, setTshirtSigningId] = useState(null); // entry id being signed
+  const [tshirtEdits, setTshirtEdits] = useState({}); // { [entryId]: { size, quantity } }
 
   const DIGITAL_TOOLS_OPTIONS = [
     'Zoho Books',
@@ -507,9 +508,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const handleSignTshirtEntry = async (entryId) => {
     const h = { Authorization: `Bearer ${token}` };
     setTshirtSigningId(entryId);
+    // Include any size/qty edits the BGE made before signing
+    const edits = tshirtEdits[entryId] || {};
+    const body = {};
+    if (edits.size)     body.size     = edits.size;
+    if (edits.quantity) body.quantity = edits.quantity;
     try {
-      await axios.post(TSHIRT_ENTRY_SIGN_URL(entryId), {}, { headers: h });
+      await axios.post(TSHIRT_ENTRY_SIGN_URL(entryId), body, { headers: h });
       await fetchTshirtEntries();
+      // Clear edits for this entry since it's now signed
+      setTshirtEdits(prev => { const next = { ...prev }; delete next[entryId]; return next; });
       setSnack({ open: true, msg: 'T-shirt receipt signed successfully!', severity: 'success' });
     } catch (err) {
       setSnack({ open: true, msg: err.response?.data?.detail || 'Signing failed. Please try again.', severity: 'error' });
@@ -2009,50 +2017,79 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 transition: 'box-shadow 0.2s',
               }}>
                 <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Checkroom sx={{ color: entry.signed ? '#009B62' : '#F59E0B', fontSize: 20 }} />
-                        <Typography fontWeight={700} fontSize={15}>
-                          {entry.receipt_title || 'T-Shirt Receipt'}
+                  {/* Title row */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Checkroom sx={{ color: entry.signed ? '#009B62' : '#F59E0B', fontSize: 20 }} />
+                    <Typography fontWeight={700} fontSize={15} sx={{ flex: 1 }}>
+                      {entry.receipt_title || 'T-Shirt Receipt'}
+                    </Typography>
+                    {entry.signed ? (
+                      <Chip label="Signed" size="small" color="success" icon={<CheckCircle />} />
+                    ) : (
+                      <Chip label="Pending Signature" size="small" color="warning" />
+                    )}
+                  </Box>
+
+                  {/* Colour + signed-date row (always read-only) */}
+                  <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: entry.signed ? 0 : 1.5 }}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Colour</Typography>
+                      <Typography variant="body2" fontWeight={600}>{entry.receipt_colour || 'Blue'}</Typography>
+                    </Box>
+                    {entry.signed && entry.signed_at && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Signed on</Typography>
+                        <Typography variant="body2" fontWeight={600}>{new Date(entry.signed_at).toLocaleDateString()}</Typography>
+                      </Box>
+                    )}
+                    {entry.signed && (
+                      <>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Size</Typography>
+                          <Typography variant="body2" fontWeight={600}>{entry.size}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Qty</Typography>
+                          <Typography variant="body2" fontWeight={600}>{entry.quantity}</Typography>
+                        </Box>
+                      </>
+                    )}
+                  </Box>
+
+                  {/* Editable size + qty — only shown before signing */}
+                  {!entry.signed && (
+                    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, mb: 0.5 }}>
+                          T-Shirt Size
                         </Typography>
-                        {entry.signed ? (
-                          <Chip label="Signed" size="small" color="success" icon={<CheckCircle />} />
-                        ) : (
-                          <Chip label="Pending Signature" size="small" color="warning" />
-                        )}
+                        <FormControl size="small" sx={{ minWidth: 100 }}>
+                          <Select
+                            value={(tshirtEdits[entry.id]?.size) ?? entry.size}
+                            onChange={e => setTshirtEdits(prev => ({ ...prev, [entry.id]: { ...(prev[entry.id] || {}), size: e.target.value } }))}
+                          >
+                            {['L', 'XL', '2XL'].map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                          </Select>
+                        </FormControl>
                       </Box>
-
-                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-                        {[
-                          ['Size', entry.size],
-                          ['Qty', entry.quantity],
-                          ['Colour', entry.receipt_colour || 'Blue'],
-                        ].map(([label, val]) => (
-                          <Box key={label}>
-                            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</Typography>
-                            <Typography variant="body2" fontWeight={600}>{val}</Typography>
-                          </Box>
-                        ))}
-                        {entry.signed && entry.signed_at && (
-                          <Box>
-                            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Signed on</Typography>
-                            <Typography variant="body2" fontWeight={600}>{new Date(entry.signed_at).toLocaleDateString()}</Typography>
-                          </Box>
-                        )}
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, mb: 0.5 }}>
+                          Quantity
+                        </Typography>
+                        <TextField
+                          type="number" size="small"
+                          value={(tshirtEdits[entry.id]?.quantity) ?? entry.quantity}
+                          inputProps={{ min: 1, max: 5, style: { width: 52, textAlign: 'center' } }}
+                          onChange={e => setTshirtEdits(prev => ({ ...prev, [entry.id]: { ...(prev[entry.id] || {}), quantity: Math.max(1, parseInt(e.target.value) || 1) } }))}
+                        />
                       </Box>
-
-                      {!entry.has_signature && !entry.signed && (
-                        <Alert severity="warning" sx={{ mt: 1.5 }} icon={false}>
-                          <Typography variant="body2">
-                            Your signature is not on file. Please upload your signature in your profile before signing.
-                          </Typography>
+                      <Box sx={{ flex: 1 }} />
+                      {!entry.has_signature && (
+                        <Alert severity="warning" sx={{ py: 0.5 }} icon={false}>
+                          <Typography variant="body2">No signature on file — upload yours in your profile first.</Typography>
                         </Alert>
                       )}
-                    </Box>
-
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
-                      {!entry.signed && (
+                      <Box sx={{ display: 'flex', gap: 1 }}>
                         <Button
                           variant="contained" size="small"
                           startIcon={tshirtSigningId === entry.id
@@ -2064,18 +2101,31 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         >
                           Confirm & Sign
                         </Button>
-                      )}
-                      {entry.receipt_id && (
-                        <Button
-                          variant="outlined" size="small"
-                          startIcon={<Download />}
-                          onClick={() => handleDownloadTshirtPdf(entry.receipt_id, entry.receipt_title)}
-                        >
-                          PDF
-                        </Button>
-                      )}
+                        {entry.receipt_id && (
+                          <Button
+                            variant="outlined" size="small"
+                            startIcon={<Download />}
+                            onClick={() => handleDownloadTshirtPdf(entry.receipt_id, entry.receipt_title)}
+                          >
+                            PDF
+                          </Button>
+                        )}
+                      </Box>
                     </Box>
-                  </Box>
+                  )}
+
+                  {/* Download button when already signed */}
+                  {entry.signed && entry.receipt_id && (
+                    <Box sx={{ mt: 1 }}>
+                      <Button
+                        variant="outlined" size="small"
+                        startIcon={<Download />}
+                        onClick={() => handleDownloadTshirtPdf(entry.receipt_id, entry.receipt_title)}
+                      >
+                        Download PDF
+                      </Button>
+                    </Box>
+                  )}
                 </CardContent>
               </Card>
             ))}

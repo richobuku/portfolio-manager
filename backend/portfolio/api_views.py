@@ -3401,79 +3401,146 @@ def _bge_signature_bytes(bge):
 
 
 def _build_tshirt_pdf(receipt):
-    """Generate a signed PDF for a TshirtReceipt using reportlab."""
+    """Generate a signed PDF for a TshirtReceipt using reportlab.
+
+    Landscape A4 with the standard PRUDEV II branded header:
+    GOPA AFC logo (left) | PRUDEV II wordmark (centre) | GIZ logo (right)
+    — identical to the visit-report and training-report headers.
+    """
     try:
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
         from reportlab.lib.units import cm, mm
-        from reportlab.platypus import (
-            SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-        )
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib.utils import ImageReader
         import PIL.Image as PILImage
     except ImportError as e:
         raise ImportError(f"reportlab/Pillow required: {e}")
 
+    # ── Logo paths (same static dir used by pdf_reports.py) ────────────────
+    import os as _os
+    _logo_dir  = _os.path.join(_os.path.dirname(__file__), 'static', 'portfolio', 'images')
+    GOPA_PATH  = _os.path.join(_logo_dir, 'gopa-logo.png')
+    GIZ_PATH   = _os.path.join(_logo_dir, 'giz-logo.png')
+
+    NAVY  = colors.HexColor("#1A2F4B")
+    RED   = colors.HexColor("#C8102E")
+    GREY  = colors.HexColor("#666666")
+    LGREY = colors.HexColor("#F2F2F2")
+
+    PAGE_W, PAGE_H = landscape(A4)   # 841.9 × 595.3 pt
+    BAND_H  = 24 * mm
+    RULE_H  = 1.5 * mm
+    TOP_M   = BAND_H + RULE_H + 8 * mm
+    SIDE_M  = 15 * mm
+    BOT_M   = 15 * mm
+
+    # ── Per-page header callback ────────────────────────────────────────────
+    def _draw_header(canvas, doc):
+        canvas.saveState()
+        w, h = landscape(A4)
+
+        # White band
+        canvas.setFillColorRGB(1, 1, 1)
+        canvas.rect(0, h - BAND_H, w, BAND_H, fill=1, stroke=0)
+        # GIZ-red rule
+        canvas.setFillColor(RED)
+        canvas.rect(0, h - BAND_H - RULE_H, w, RULE_H, fill=1, stroke=0)
+
+        # Left: GOPA logo (aspect ≈ 3.06)
+        if _os.path.isfile(GOPA_PATH):
+            logo_h = 14 * mm
+            logo_w = logo_h * 3.06
+            canvas.drawImage(
+                ImageReader(GOPA_PATH),
+                x=14 * mm, y=h - BAND_H + (BAND_H - logo_h) / 2,
+                width=logo_w, height=logo_h,
+                mask='auto', preserveAspectRatio=True,
+            )
+
+        # Right: GIZ logo (aspect ≈ 2.71)
+        if _os.path.isfile(GIZ_PATH):
+            logo_h = 16 * mm
+            logo_w = logo_h * 2.71
+            canvas.drawImage(
+                ImageReader(GIZ_PATH),
+                x=w - 14 * mm - logo_w, y=h - BAND_H + (BAND_H - logo_h) / 2,
+                width=logo_w, height=logo_h,
+                mask='auto', preserveAspectRatio=True,
+            )
+
+        # Centre: wordmark
+        cy = h - BAND_H / 2
+        canvas.setFillColor(NAVY)
+        canvas.setFont('Helvetica-Bold', 13)
+        canvas.drawCentredString(w / 2, cy + 2 * mm, 'PRUDEV II')
+        canvas.setFillColor(GREY)
+        canvas.setFont('Helvetica', 8)
+        canvas.drawCentredString(w / 2, cy - 2 * mm, 'T-Shirt Distribution Receipt')
+
+        # Page number
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(GREY)
+        canvas.drawRightString(w - SIDE_M, 8 * mm, f'Page {doc.page}')
+        canvas.restoreState()
+
     buf = _io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=landscape(A4),
-        leftMargin=1.5*cm, rightMargin=1.5*cm,
-        topMargin=1.5*cm, bottomMargin=1.5*cm,
+        leftMargin=SIDE_M, rightMargin=SIDE_M,
+        topMargin=TOP_M, bottomMargin=BOT_M,
         title=receipt.title,
+        onFirstPage=_draw_header,
+        onLaterPages=_draw_header,
     )
 
     styles = getSampleStyleSheet()
-    NAVY   = colors.HexColor("#1A2F4B")
-    ORANGE = colors.HexColor("#E65100")
-    LGREY  = colors.HexColor("#F2F2F2")
-
-    title_style = ParagraphStyle('Title', parent=styles['Title'],
-        fontSize=16, textColor=NAVY, spaceAfter=2, alignment=TA_CENTER)
-    sub_style   = ParagraphStyle('Sub', parent=styles['Normal'],
-        fontSize=10, textColor=colors.HexColor("#555555"), spaceAfter=2,
+    title_style = ParagraphStyle('TTitle', parent=styles['Title'],
+        fontSize=15, textColor=NAVY, spaceAfter=2, alignment=TA_CENTER)
+    sub_style   = ParagraphStyle('TSub', parent=styles['Normal'],
+        fontSize=10, textColor=GREY, spaceAfter=2,
         alignment=TA_CENTER, fontName='Helvetica-Oblique')
-    label_style = ParagraphStyle('Lbl', parent=styles['Normal'],
-        fontSize=9, textColor=colors.black, leading=12)
-    note_style  = ParagraphStyle('Note', parent=styles['Normal'],
-        fontSize=7.5, textColor=colors.HexColor("#666666"),
+    label_style = ParagraphStyle('TLbl', parent=styles['Normal'],
+        fontSize=9, textColor=colors.black, leading=13)
+    note_style  = ParagraphStyle('TNote', parent=styles['Normal'],
+        fontSize=7.5, textColor=GREY,
         fontName='Helvetica-Oblique', alignment=TA_CENTER)
-    conf_style  = ParagraphStyle('Conf', parent=styles['Normal'],
-        fontSize=7, textColor=colors.HexColor("#888888"),
+    conf_style  = ParagraphStyle('TConf', parent=styles['Normal'],
+        fontSize=7, textColor=GREY,
         fontName='Helvetica-Oblique', alignment=TA_CENTER)
 
     entries = list(receipt.entries.select_related('bge').order_by('order', 'bge__name'))
 
-    # ── Column widths (landscape A4 content ≈ 26.7 cm) ─────────────────
-    # #(0.8) Name(4.2) Code(3.2) Phone(2.8) Loc(2.5) Size(1.6) Qty(1.0) Sig(5.5) Date(3.1)
-    col_w = [0.8*cm, 4.2*cm, 3.2*cm, 2.8*cm, 2.5*cm, 1.6*cm, 1.0*cm, 5.5*cm, 3.1*cm]
+    # ── Column widths (landscape A4 content ≈ 811.9 pt − 30 mm = 727 pt ≈ 25.6 cm)
+    # #(0.7) Name(4.0) Code(3.0) Phone(2.8) Loc(2.6) Size(1.5) Qty(1.0) Sig(5.5) Date(3.0) = 24.1 cm; leave ≈1.5 cm slack
+    col_w = [0.7*cm, 4.0*cm, 3.0*cm, 2.8*cm, 2.6*cm, 1.5*cm, 1.0*cm, 5.5*cm, 3.0*cm]
 
-    SIG_H = 1.1*cm  # row height for data rows
+    SIG_ROW_H = 1.1 * cm
 
-    header = ['#', 'BGE Name', 'BGE Code', 'Phone', 'Location',
-              'Size', 'Qty', 'Signature', 'Date Signed']
-
-    rows = [header]
-    sig_cells = {}  # (row_idx, col_idx) → Image
+    hdr_row = ['#', 'BGE Name', 'BGE Code', 'Phone', 'Location',
+               'Size', 'Qty', 'BGE Signature', 'Date Signed']
+    rows = [hdr_row]
 
     for idx, entry in enumerate(entries):
         sig_bytes = _bge_signature_bytes(entry.bge)
-        sig_cell = ''
         if entry.signed and sig_bytes:
             try:
                 img_buf = _io.BytesIO(sig_bytes)
                 pil = PILImage.open(img_buf)
                 w_px, h_px = pil.size
                 aspect = w_px / h_px if h_px else 1
-                img_h = SIG_H * 0.85
-                img_w = min(img_h * aspect, col_w[7] - 4*mm)
+                img_h = SIG_ROW_H * 0.85
+                img_w = min(img_h * aspect, col_w[7] - 4 * mm)
                 img_buf.seek(0)
                 sig_cell = Image(img_buf, width=img_w, height=img_h)
-                sig_cells[(idx + 1, 7)] = True
             except Exception:
                 sig_cell = '(signed)'
         elif entry.signed:
             sig_cell = '(signed)'
+        else:
+            sig_cell = ''
 
         date_str = entry.signed_at.strftime('%d/%m/%Y') if entry.signed_at else ''
         rows.append([
@@ -3489,66 +3556,65 @@ def _build_tshirt_pdf(receipt):
         ])
 
     tbl = Table(rows, colWidths=col_w, repeatRows=1)
-
-    style_cmds = [
-        # Header
-        ('BACKGROUND',   (0, 0), (-1, 0), NAVY),
-        ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
-        ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE',     (0, 0), (-1, 0), 8),
-        ('ALIGN',        (0, 0), (-1, 0), 'CENTER'),
-        ('VALIGN',       (0, 0), (-1, 0), 'MIDDLE'),
-        ('TOPPADDING',   (0, 0), (-1, 0), 5),
-        ('BOTTOMPADDING',(0, 0), (-1, 0), 5),
+    tbl.setStyle(TableStyle([
+        # Header row
+        ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
+        ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, 0), 8),
+        ('ALIGN',         (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN',        (0, 0), (-1, 0), 'MIDDLE'),
+        ('TOPPADDING',    (0, 0), (-1, 0), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
         # Body
-        ('FONTNAME',     (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE',     (0, 1), (-1, -1), 8),
-        ('VALIGN',       (0, 1), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING',   (0, 1), (-1, -1), 3),
-        ('BOTTOMPADDING',(0, 1), (-1, -1), 3),
-        ('LEFTPADDING',  (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        # Grid
-        ('GRID',         (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
-        # Row heights
+        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',      (0, 1), (-1, -1), 8),
+        ('VALIGN',        (0, 1), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING',    (0, 1), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        # Alternating rows
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, LGREY]),
-    ]
-    tbl.setStyle(TableStyle(style_cmds))
-
-    # Force row height for data rows to accommodate signature images
-    row_heights = [0.7*cm] + [SIG_H] * len(entries)
+        # Grid
+        ('GRID',           (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
+    ]))
+    row_heights = [0.65 * cm] + [SIG_ROW_H] * len(entries)
     tbl._argH = row_heights
 
     story = [
-        Paragraph("GOPA AFC  |  PRUDEV II PROGRAMME", ParagraphStyle(
-            'top', parent=styles['Normal'], fontSize=8, textColor=ORANGE,
-            alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=2)),
         Paragraph(receipt.title, title_style),
-        Paragraph(f"{receipt.event}  —  Colour: {receipt.colour}", sub_style),
-        Spacer(1, 0.2*cm),
-        Paragraph(
-            f"Date: __________________________   "
-            f"Group Leader: __________________________________   "
-            f"Signature: __________________________",
-            label_style),
-        Spacer(1, 0.15*cm),
-        Paragraph(
-            "Bold names are team leaders. Signatures are embedded from the BGE's registered profile.",
-            note_style),
-        Spacer(1, 0.2*cm),
-        tbl,
-        Spacer(1, 0.25*cm),
-        Paragraph(f"Total BGEs: {len(entries)}   |   Signed: {receipt.signed_count}", label_style),
-        Spacer(1, 0.15*cm),
-        Paragraph(
-            "Distributed by: _________________________   Name: _________________________   Date: ____________   "
-            "Verified by: _________________________   Name: _________________________   Date: ____________",
-            label_style),
-        Spacer(1, 0.2*cm),
-        Paragraph("PRUDEV II Programme — GOPA AFC  |  Confidential", conf_style),
     ]
+    sub_parts = []
+    if receipt.event:
+        sub_parts.append(receipt.event)
+    sub_parts.append(f"Colour: {receipt.colour}")
+    story.append(Paragraph("  —  ".join(sub_parts), sub_style))
+    story.append(Spacer(1, 0.25 * cm))
+    story.append(Paragraph(
+        "Date: __________________________   "
+        "Group Leader: __________________________________   "
+        "Signature: __________________________",
+        label_style))
+    story.append(Spacer(1, 0.15 * cm))
+    story.append(Paragraph(
+        "Signatures below are embedded from each BGE's registered profile on the PRUDEV II system.",
+        note_style))
+    story.append(Spacer(1, 0.2 * cm))
+    story.append(tbl)
+    story.append(Spacer(1, 0.3 * cm))
+    story.append(Paragraph(
+        f"Total BGEs: {len(entries)}     Signed: {receipt.signed_count}     Pending: {len(entries) - receipt.signed_count}",
+        label_style))
+    story.append(Spacer(1, 0.15 * cm))
+    story.append(Paragraph(
+        "Distributed by: _________________________   Name: _________________________   Date: ____________   "
+        "Verified by: _________________________   Name: _________________________   Date: ____________",
+        label_style))
+    story.append(Spacer(1, 0.2 * cm))
+    story.append(Paragraph("PRUDEV II Programme — GOPA AFC in partnership with GIZ  |  Confidential", conf_style))
 
-    doc.build(story)
+    doc.build(story, onFirstPage=_draw_header, onLaterPages=_draw_header)
     buf.seek(0)
     return buf.read()
 
@@ -3623,7 +3689,11 @@ class TshirtReceiptEntryViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='sign')
     def sign(self, request, pk=None):
-        """BGE signs their own entry — embeds their stored signature."""
+        """BGE signs their own entry.
+
+        The BGE may update their size and/or quantity before signing by
+        including ``size`` and/or ``quantity`` in the POST body.
+        """
         entry = self.get_object()
         user  = request.user
 
@@ -3642,7 +3712,25 @@ class TshirtReceiptEntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Let the BGE confirm / adjust their size and quantity before signing
+        size     = request.data.get('size')
+        quantity = request.data.get('quantity')
+        update_fields = ['signed', 'signed_at']
+
+        if size and size in dict(entry.__class__.SIZE_CHOICES):
+            entry.size = size
+            update_fields.append('size')
+
+        if quantity is not None:
+            try:
+                qty = int(quantity)
+                if qty >= 1:
+                    entry.quantity = qty
+                    update_fields.append('quantity')
+            except (ValueError, TypeError):
+                pass
+
         entry.signed    = True
         entry.signed_at = timezone.now()
-        entry.save(update_fields=['signed', 'signed_at'])
+        entry.save(update_fields=update_fields)
         return Response(TshirtReceiptEntrySerializer(entry, context={'request': request}).data)
