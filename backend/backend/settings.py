@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import re
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -248,12 +249,17 @@ for origin in [o.strip() for o in _extra.split(',') if o.strip()]:
     if origin not in CORS_ALLOWED_ORIGINS:
         CORS_ALLOWED_ORIGINS.append(origin)
 
-# Accept Vercel preview/deployment URLs for this project only (deployment-specific
-# URLs change every push). Scoped to the 'frontend' project slug to prevent
-# other Vercel tenants from making credentialed requests to this API.
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://frontend-[a-z0-9-]+\.vercel\.app$",
-]
+# Accept Vercel preview/deployment URLs for this project only.
+# SECURITY: the regex must be anchored to the *exact* Vercel project slug so
+# that another Vercel tenant can't create `frontend-evil.vercel.app` and pass
+# the check while CORS_ALLOW_CREDENTIALS = True.
+# Read the slug from an env var; fall back to an empty list (no regex origins)
+# if not configured so deployments don't silently open the wildcard again.
+_vercel_slug = os.environ.get('VERCEL_PROJECT_SLUG', '').strip()
+CORS_ALLOWED_ORIGIN_REGEXES = (
+    [rf"^https://{re.escape(_vercel_slug)}-[a-z0-9]+\.vercel\.app$"]
+    if _vercel_slug else []
+)
 
 CORS_ALLOW_CREDENTIALS = True
 

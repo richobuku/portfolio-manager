@@ -1724,7 +1724,28 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
         qs = Attendance.objects.select_related('msme', 'session').all()
+
+        # SECURITY: scope attendance records to what the user is allowed to see.
+        # Staff / superusers see all. Programme managers see their groups.
+        # Viewers see all (read-only role). BGEs see only sessions they are
+        # assigned to facilitate or mentor — not all sessions system-wide.
+        if not (user.is_staff or user.is_superuser or _is_viewer(user)):
+            if _is_programme_manager(user):
+                group_ids = _managed_groups(user) or []
+                qs = qs.filter(session__businesses__programme_groups__in=group_ids).distinct()
+            else:
+                # Regular BGE: limit to sessions where this BGE has a facilitation assignment
+                try:
+                    bge = user.bge_profile
+                    assigned_session_ids = TrainingFacilitationAssignment.objects.filter(
+                        bge=bge
+                    ).values_list('session_id', flat=True)
+                    qs = qs.filter(session_id__in=assigned_session_ids)
+                except Exception:
+                    return Attendance.objects.none()
+
         sid = self.request.query_params.get('session')
         if sid:
             qs = qs.filter(session_id=sid)
@@ -2071,10 +2092,17 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         if not (user.is_staff or user.is_superuser):
             try:
                 bge = user.bge_profile
-                serializer.save(bge=bge)
-                return
             except Exception:
-                pass
+                raise PermissionDenied("No BGE profile associated with this account.")
+
+            # SECURITY: verify the BGE owns the MSME they are filing a report for
+            msme = serializer.validated_data.get('msme')
+            if msme and msme.assigned_bge_id != bge.id:
+                raise PermissionDenied(
+                    "You can only create reports for MSMEs assigned to you."
+                )
+            serializer.save(bge=bge)
+            return
         serializer.save()
 
     def perform_update(self, serializer):

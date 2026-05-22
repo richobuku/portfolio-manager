@@ -88,9 +88,17 @@ def _try_auto_link_bge(user, google_name, google_email):
     """
     Try to auto-link a Google user to a BGE profile.
     Matching priority:
-      1. BGE email == Google email (exact)
-      2. BGE name matches Google full name (case-insensitive)
-      3. BGE name contains Google given name (fallback)
+      1. BGE email == Google email   (exact — high confidence)
+      2. BGE name == Google full name (case-insensitive exact — medium confidence)
+
+    Tier 3 (given-name substring) has been intentionally removed.
+    A single first name like "Mary" would match any BGE whose name contains
+    "Mary" (e.g. "Mary Akello", "Rosemary Otim"), granting the attacker full
+    BGE-level access before any admin approval.  The two remaining tiers are
+    sufficient for normal onboarding; new BGEs who sign in via Google and have
+    neither an email nor a full-name match will be created as regular users and
+    must be linked by an admin.
+
     Returns the linked BGE profile or None.
     """
     # Already linked — nothing to do
@@ -99,32 +107,27 @@ def _try_auto_link_bge(user, google_name, google_email):
     except Exception:
         pass
 
-    # 1. Match by email
+    # 1. Match by email (strongest signal — email uniqueness enforced)
     if google_email:
-        bge = BusinessGrowthExpert.objects.filter(email__iexact=google_email, user__isnull=True).first()
+        bge = BusinessGrowthExpert.objects.filter(
+            email__iexact=google_email, user__isnull=True
+        ).first()
         if bge:
             bge.user = user
             bge.save()
             return bge
 
-    # 2. Match by full name (case-insensitive)
+    # 2. Match by exact full name (case-insensitive)
     if google_name:
-        bge = BusinessGrowthExpert.objects.filter(name__iexact=google_name, user__isnull=True).first()
+        bge = BusinessGrowthExpert.objects.filter(
+            name__iexact=google_name, user__isnull=True
+        ).first()
         if bge:
             bge.user = user
             bge.save()
             return bge
 
-        # 3. Partial name match (given name in BGE name)
-        parts = google_name.strip().split()
-        if parts:
-            first = parts[0]
-            bge = BusinessGrowthExpert.objects.filter(name__icontains=first, user__isnull=True).first()
-            if bge:
-                bge.user = user
-                bge.save()
-                return bge
-
+    # Tier 3 (first-name substring) removed — see docstring above.
     return None
 
 
