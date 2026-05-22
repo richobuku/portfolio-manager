@@ -3562,77 +3562,116 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         return { metric: label, '↑ Gained': gained, '✓ Maintained': maintained, '— Still No': stillNo, '↓ Lost': lost };
                       });
 
-                      // Per-MSME compliance grid: each MSME × each metric → status
-                      const statusColor = (before, after) => {
-                        if (after  && !before) return { bg: '#E8F5E9', color: '#2E7D32', label: '↑ Yes' };
-                        if (after  &&  before) return { bg: '#E3F2FD', color: '#1565C0', label: '✓ Yes' };
-                        if (!after && !before) return { bg: '#F5F5F5', color: '#9E9E9E', label: '— No'  };
-                        return                        { bg: '#FFEBEE', color: '#C62828', label: '↓ No'  };
-                      };
+                      // Which MSMEs changed on at least one metric?
+                      const changedMsmes = paired.filter(s =>
+                        compFields.some(f => !!s._first[f.key] !== !!s[f.key])
+                      );
 
                       return (
                         <>
-                          <ChartCard
-                            title="Compliance Transition — All Metrics"
-                            subtitle={`What changed for each of the ${paired.length} paired MSMEs (first → latest update)`}
-                            height={280}
-                          >
-                            <ResponsiveContainer width="100%" height={240}>
-                              <BarChart data={transData} margin={{ top: 8, right: 24, left: 0, bottom: 4 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
-                                <XAxis dataKey="metric" tick={{ fontSize: 11 }}/>
-                                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} label={{ value: '# MSMEs', angle: -90, position: 'insideLeft', offset: 10, fontSize: 10 }}/>
-                                <ReTooltip/>
-                                <Legend wrapperStyle={{ fontSize: 11 }}/>
-                                <Bar dataKey="↑ Gained"     stackId="a" fill="#2E7D32" radius={[0,0,0,0]}/>
-                                <Bar dataKey="✓ Maintained" stackId="a" fill="#1565C0" radius={[0,0,0,0]}/>
-                                <Bar dataKey="— Still No"   stackId="a" fill="#BDBDBD" radius={[0,0,0,0]}/>
-                                <Bar dataKey="↓ Lost"       stackId="a" fill="#C62828" radius={[4,4,0,0]}/>
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </ChartCard>
+                          {/* ── Six metric summary cards ── */}
+                          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                            Compliance — Before vs After ({paired.length} businesses with paired updates)
+                          </Typography>
+                          <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                            {transData.map(({ metric, ...counts }) => {
+                              const gained = counts['↑ Gained'];
+                              const lost   = counts['↓ Lost'];
+                              const afterYes = counts['↑ Gained'] + counts['✓ Maintained'];
+                              const beforeYes = counts['✓ Maintained'] + counts['↓ Lost'];
+                              const net = gained - lost;
+                              const pctAfter = paired.length ? Math.round(afterYes / paired.length * 100) : 0;
+                              const pctBefore = paired.length ? Math.round(beforeYes / paired.length * 100) : 0;
+                              return (
+                                <Grid item xs={6} sm={4} md={2} key={metric}>
+                                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, height: '100%' }}>
+                                    <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" noWrap>
+                                      {metric}
+                                    </Typography>
 
-                          {/* Per-MSME compliance status grid */}
-                          <Box sx={{ mt: 2, mb: 3 }}>
-                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                              Per-MSME Compliance Status
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                              <Box component="span" sx={{ display: 'inline-flex', gap: 1.5, flexWrap: 'wrap' }}>
-                                {[
-                                  { bg:'#E8F5E9', color:'#2E7D32', label:'↑ Gained (No→Yes)' },
-                                  { bg:'#E3F2FD', color:'#1565C0', label:'✓ Maintained Yes' },
-                                  { bg:'#F5F5F5', color:'#9E9E9E', label:'— Still No' },
-                                  { bg:'#FFEBEE', color:'#C62828', label:'↓ Lost (Yes→No)' },
-                                ].map(s => (
-                                  <Box key={s.label} component="span" sx={{ display:'inline-flex', alignItems:'center', gap:0.5 }}>
-                                    <Box sx={{ width:12, height:12, borderRadius:0.5, bgcolor:s.bg, border:`1px solid ${s.color}` }}/>
-                                    <span style={{ color: s.color, fontSize: 11 }}>{s.label}</span>
-                                  </Box>
-                                ))}
-                              </Box>
-                            </Typography>
-                            <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+                                    {/* Before → After counts */}
+                                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5, mt: 0.5 }}>
+                                      <Typography variant="body2" color="text.disabled" sx={{ fontSize: 13 }}>
+                                        {beforeYes}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.disabled">→</Typography>
+                                      <Typography variant="h6" fontWeight={800} color={net > 0 ? '#2E7D32' : net < 0 ? '#C62828' : 'text.primary'} sx={{ lineHeight: 1 }}>
+                                        {afterYes}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">/ {paired.length}</Typography>
+                                    </Box>
+
+                                    {/* Progress bar: before (grey) → after (coloured fill) */}
+                                    <Box sx={{ mt: 1, mb: 0.5 }}>
+                                      <Box sx={{ position: 'relative', height: 6, bgcolor: '#E0E0E0', borderRadius: 3 }}>
+                                        <Box sx={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pctBefore}%`, bgcolor: '#BDBDBD', borderRadius: 3 }}/>
+                                        <Box sx={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pctAfter}%`, bgcolor: net >= 0 ? '#2E7D32' : '#C62828', borderRadius: 3, opacity: 0.85 }}/>
+                                      </Box>
+                                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+                                        {pctBefore}% → {pctAfter}%
+                                      </Typography>
+                                    </Box>
+
+                                    {/* Net change badge */}
+                                    {(gained > 0 || lost > 0) && (
+                                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                                        {gained > 0 && (
+                                          <Chip label={`+${gained} gained`} size="small"
+                                            sx={{ fontSize: 10, height: 18, bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 700 }}/>
+                                        )}
+                                        {lost > 0 && (
+                                          <Chip label={`−${lost} lost`} size="small"
+                                            sx={{ fontSize: 10, height: 18, bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 700 }}/>
+                                        )}
+                                      </Box>
+                                    )}
+                                    {gained === 0 && lost === 0 && (
+                                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>No change</Typography>
+                                    )}
+                                  </Paper>
+                                </Grid>
+                              );
+                            })}
+                          </Grid>
+
+                          {/* ── Changes-only table ── */}
+                          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                            What Changed — businesses with at least one compliance shift
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                            Only showing {changedMsmes.length} of {paired.length} businesses where something moved.
+                            {changedMsmes.length === 0 && ' No compliance changes recorded yet.'}
+                          </Typography>
+                          {changedMsmes.length > 0 && (
+                            <TableContainer component={Paper} variant="outlined" sx={{ mb: 3, overflowX: 'auto' }}>
                               <Table size="small">
                                 <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                                   <TableRow>
-                                    <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>MSME</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Business</TableCell>
                                     {compFields.map(f => (
-                                      <TableCell key={f.key} align="center" sx={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>{f.label}</TableCell>
+                                      <TableCell key={f.key} align="center" sx={{ fontWeight: 700, fontSize: 11 }}>{f.label}</TableCell>
                                     ))}
                                   </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                  {paired.map(s => (
+                                  {changedMsmes.map(s => (
                                     <TableRow key={s.id} hover>
-                                      <TableCell sx={{ fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      <TableCell sx={{ fontSize: 11, fontWeight: 600, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {name(s)}
                                       </TableCell>
                                       {compFields.map(f => {
-                                        const st = statusColor(s._first[f.key], s[f.key]);
+                                        const before = !!s._first[f.key];
+                                        const after  = !!s[f.key];
+                                        if (after && !before) return (
+                                          <TableCell key={f.key} align="center" sx={{ fontSize: 12, color: '#2E7D32', fontWeight: 700 }}>↑ Gained</TableCell>
+                                        );
+                                        if (!after && before) return (
+                                          <TableCell key={f.key} align="center" sx={{ fontSize: 12, color: '#C62828', fontWeight: 700 }}>↓ Lost</TableCell>
+                                        );
+                                        // Unchanged — show muted current state
                                         return (
-                                          <TableCell key={f.key} align="center" sx={{ bgcolor: st.bg, fontSize: 11, fontWeight: 600, color: st.color, whiteSpace: 'nowrap' }}>
-                                            {st.label}
+                                          <TableCell key={f.key} align="center" sx={{ fontSize: 11, color: after ? '#1565C0' : '#BDBDBD' }}>
+                                            {after ? '✓' : '—'}
                                           </TableCell>
                                         );
                                       })}
@@ -3641,7 +3680,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                 </TableBody>
                               </Table>
                             </TableContainer>
-                          </Box>
+                          )}
                         </>
                       );
                     })()}
