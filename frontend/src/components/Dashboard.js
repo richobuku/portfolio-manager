@@ -3487,15 +3487,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   After:  (s.employees_pt_male||0)+(s.employees_pt_female||0),
                 })).filter(r => r.Before > 0 || r.After > 0);
 
-                // Per-compliance flag — show 0 or 1 per MSME
-                const compRows = compFields.map(({ label, key, color }) => ({
-                  label, key, color,
-                  rows: paired.map(s => ({
-                    name: name(s),
-                    Before: s._first[key] ? 1 : 0,
-                    After:  s[key]        ? 1 : 0,
-                  })),
-                }));
+
 
                 const rowH = 28; // px per MSME row in horizontal charts
                 const minH = 160;
@@ -3559,27 +3551,100 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       </Grid>
                     )}
 
-                    {/* One chart per compliance flag */}
-                    <Grid container spacing={2} sx={{ mb: 3 }}>
-                      {compRows.map(({ label, key, color, rows }) => (
-                        <Grid item xs={12} sm={6} md={4} key={key}>
-                          <ChartCard title={label} subtitle="0 = No, 1 = Yes — first vs latest update" height={h(rows)}>
-                            <ResponsiveContainer width="100%" height={h(rows)}>
-                              <BarChart layout="vertical" data={rows} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
-                                <XAxis type="number" domain={[0, 1]} ticks={[0, 1]} tick={{ fontSize: 10 }}
-                                  tickFormatter={v => v === 1 ? 'Yes' : 'No'}/>
-                                <YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 10 }}/>
-                                <ReTooltip formatter={v => [v === 1 ? 'Yes' : 'No', '']}/>
+                    {/* ── Compliance transition chart (replaces confusing 0/1 bars) ── */}
+                    {(() => {
+                      // For each metric, categorise each paired MSME into one of 4 buckets
+                      const transData = compFields.map(({ label, key }) => {
+                        const gained    = paired.filter(s => !s._first[key] && s[key]).length;
+                        const maintained= paired.filter(s =>  s._first[key] && s[key]).length;
+                        const stillNo   = paired.filter(s => !s._first[key] && !s[key]).length;
+                        const lost      = paired.filter(s =>  s._first[key] && !s[key]).length;
+                        return { metric: label, '↑ Gained': gained, '✓ Maintained': maintained, '— Still No': stillNo, '↓ Lost': lost };
+                      });
+
+                      // Per-MSME compliance grid: each MSME × each metric → status
+                      const statusColor = (before, after) => {
+                        if (after  && !before) return { bg: '#E8F5E9', color: '#2E7D32', label: '↑ Yes' };
+                        if (after  &&  before) return { bg: '#E3F2FD', color: '#1565C0', label: '✓ Yes' };
+                        if (!after && !before) return { bg: '#F5F5F5', color: '#9E9E9E', label: '— No'  };
+                        return                        { bg: '#FFEBEE', color: '#C62828', label: '↓ No'  };
+                      };
+
+                      return (
+                        <>
+                          <ChartCard
+                            title="Compliance Transition — All Metrics"
+                            subtitle={`What changed for each of the ${paired.length} paired MSMEs (first → latest update)`}
+                            height={280}
+                          >
+                            <ResponsiveContainer width="100%" height={240}>
+                              <BarChart data={transData} margin={{ top: 8, right: 24, left: 0, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                                <XAxis dataKey="metric" tick={{ fontSize: 11 }}/>
+                                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} label={{ value: '# MSMEs', angle: -90, position: 'insideLeft', offset: 10, fontSize: 10 }}/>
+                                <ReTooltip/>
                                 <Legend wrapperStyle={{ fontSize: 11 }}/>
-                                <Bar dataKey="Before" fill="#90A4AE" radius={[0,3,3,0]}/>
-                                <Bar dataKey="After"  fill={color}   radius={[0,3,3,0]}/>
+                                <Bar dataKey="↑ Gained"     stackId="a" fill="#2E7D32" radius={[0,0,0,0]}/>
+                                <Bar dataKey="✓ Maintained" stackId="a" fill="#1565C0" radius={[0,0,0,0]}/>
+                                <Bar dataKey="— Still No"   stackId="a" fill="#BDBDBD" radius={[0,0,0,0]}/>
+                                <Bar dataKey="↓ Lost"       stackId="a" fill="#C62828" radius={[4,4,0,0]}/>
                               </BarChart>
                             </ResponsiveContainer>
                           </ChartCard>
-                        </Grid>
-                      ))}
-                    </Grid>
+
+                          {/* Per-MSME compliance status grid */}
+                          <Box sx={{ mt: 2, mb: 3 }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                              Per-MSME Compliance Status
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                              <Box component="span" sx={{ display: 'inline-flex', gap: 1.5, flexWrap: 'wrap' }}>
+                                {[
+                                  { bg:'#E8F5E9', color:'#2E7D32', label:'↑ Gained (No→Yes)' },
+                                  { bg:'#E3F2FD', color:'#1565C0', label:'✓ Maintained Yes' },
+                                  { bg:'#F5F5F5', color:'#9E9E9E', label:'— Still No' },
+                                  { bg:'#FFEBEE', color:'#C62828', label:'↓ Lost (Yes→No)' },
+                                ].map(s => (
+                                  <Box key={s.label} component="span" sx={{ display:'inline-flex', alignItems:'center', gap:0.5 }}>
+                                    <Box sx={{ width:12, height:12, borderRadius:0.5, bgcolor:s.bg, border:`1px solid ${s.color}` }}/>
+                                    <span style={{ color: s.color, fontSize: 11 }}>{s.label}</span>
+                                  </Box>
+                                ))}
+                              </Box>
+                            </Typography>
+                            <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+                              <Table size="small">
+                                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                                  <TableRow>
+                                    <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>MSME</TableCell>
+                                    {compFields.map(f => (
+                                      <TableCell key={f.key} align="center" sx={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>{f.label}</TableCell>
+                                    ))}
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {paired.map(s => (
+                                    <TableRow key={s.id} hover>
+                                      <TableCell sx={{ fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {name(s)}
+                                      </TableCell>
+                                      {compFields.map(f => {
+                                        const st = statusColor(s._first[f.key], s[f.key]);
+                                        return (
+                                          <TableCell key={f.key} align="center" sx={{ bgcolor: st.bg, fontSize: 11, fontWeight: 600, color: st.color, whiteSpace: 'nowrap' }}>
+                                            {st.label}
+                                          </TableCell>
+                                        );
+                                      })}
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          </Box>
+                        </>
+                      );
+                    })()}
                   </>
                 );
               })()}
