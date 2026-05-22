@@ -527,7 +527,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   const handleDownloadTshirtPdf = async (receiptId, receiptTitle) => {
-    const h = { Authorization: `Bearer ${token}`, responseType: 'blob' };
+    const h = { Authorization: `Bearer ${token}` };
     try {
       const res = await axios.get(TSHIRT_RECEIPT_PDF_URL(receiptId), { headers: h, responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));

@@ -3520,8 +3520,6 @@ def _build_tshirt_pdf(receipt):
         leftMargin=SIDE_M, rightMargin=SIDE_M,
         topMargin=TOP_M, bottomMargin=BOT_M,
         title=receipt.title,
-        onFirstPage=_draw_header,
-        onLaterPages=_draw_header,
     )
 
     styles = getSampleStyleSheet()

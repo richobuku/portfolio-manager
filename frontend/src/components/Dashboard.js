@@ -5655,7 +5655,7 @@ PRUDEV II BDS Team`
   };
 
   const handleDownloadTshirtPdf = async (receiptId) => {
-    const h = { Authorization: `Bearer ${token}`, responseType: 'blob' };
+    const h = { Authorization: `Bearer ${token}` };
     try {
       const res = await axios.get(TSHIRT_RECEIPT_PDF_URL(receiptId), { headers: h, responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
