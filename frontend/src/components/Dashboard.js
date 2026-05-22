@@ -3954,14 +3954,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             .filter(d => d.count > 0);
 
           // BGE update scorecard — built from snapshots (collected_by_name), not MSME assignments.
-          // Using m.assigned_bge_name would miss all group-assigned MSMEs (null for those).
-          // collected_by_name is always populated on the snapshot by whoever submitted it.
+          // For snapshots submitted before BGE accounts were linked (collected_by=null), fall back
+          // to the assigned BGE of that MSME so pre-linking submissions are not lost in "Unassigned".
+          const msmeBgeFallback = {};
+          msmes.forEach(m => {
+            if (m.assigned_bge_name) msmeBgeFallback[m.id] = m.assigned_bge_name;
+          });
+          // Also build fallback from bge_workload assignment data for group-assigned MSMEs.
+          // bge_workload carries bge_name but not individual msme ids, so msme-level fallback
+          // is limited to direct assignments (assigned_bge_name). Group-assigned unlinked
+          // snapshots will still show as "Unassigned" until collected_by is backfilled.
           const bgeSnapBuckets = {};
           adminSnapshots.forEach(s => {
-            const bgeName = s.collected_by_name || 'Unassigned';
-            if (!bgeSnapBuckets[bgeName]) bgeSnapBuckets[bgeName] = { msmeSet: new Set(), snapCount: 0, lastDate: null };
+            const bgeName = s.collected_by_name || msmeBgeFallback[s.msme] || 'Unassigned';
+            if (!bgeSnapBuckets[bgeName]) bgeSnapBuckets[bgeName] = { msmeSet: new Set(), snapCount: 0, lastDate: null, hasUnlinked: false };
             bgeSnapBuckets[bgeName].msmeSet.add(s.msme);
             bgeSnapBuckets[bgeName].snapCount++;
+            if (!s.collected_by_name && bgeName !== 'Unassigned') bgeSnapBuckets[bgeName].hasUnlinked = true;
             if (!bgeSnapBuckets[bgeName].lastDate || s.snapshot_date > bgeSnapBuckets[bgeName].lastDate)
               bgeSnapBuckets[bgeName].lastDate = s.snapshot_date;
           });
@@ -3977,6 +3986,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               snapCount: d.snapCount,
               lastDate: d.lastDate,
               overdue90,
+              hasUnlinked: d.hasUnlinked || false,
             };
           }).sort((a, b) => b.overdue90 - a.overdue90);
 
@@ -4074,9 +4084,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <>
                   <SectionLabel>BGE Update Scorecard</SectionLabel>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                    Built from who actually <em>submitted</em> each update (collected_by field). "MSMEs Updated" = distinct MSMEs
-                    this BGE has ever submitted data for. "Overdue" = those MSMEs whose most recent update (by anyone) is 90+ days old.
-                    Sorted by most overdue first.
+                    Built from who actually <em>submitted</em> each update (collected_by field). Where collected_by is missing
+                    (submissions before account linking), the BGE is inferred from MSME assignment — those rows show a <strong style={{color:'#E65100'}}>~</strong> badge.
+                    "MSMEs Updated" = distinct MSMEs this BGE has submitted data for. "Overdue" = MSMEs whose most recent update is 90+ days old. Sorted by most overdue first.
                   </Typography>
                   <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
                     <Table size="small">
@@ -4093,7 +4103,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <TableBody>
                         {bgeScoreRows.map((b, i) => (
                           <TableRow key={i} hover sx={b.overdue90 > 0 ? { bgcolor: '#FFF8F8' } : {}}>
-                            <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{b.name}</TableCell>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                {b.name}
+                                {b.hasUnlinked && (
+                                  <Tooltip title="Some snapshots here were submitted before this BGE's account was linked — attributed by MSME assignment">
+                                    <Chip label="~" size="small" sx={{ fontSize: 9, height: 16, bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700, cursor: 'help' }}/>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
                             <TableCell align="center" sx={{ fontSize: 12, color: b.assigned ? 'inherit' : 'text.disabled' }}>
                               {b.assigned || '—'}
                             </TableCell>

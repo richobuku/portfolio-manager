@@ -271,19 +271,53 @@ class MSMEGrowthSnapshotViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        """Auto-set collected_by from the authenticated user's linked BGE profile.
+        """Auto-set collected_by from the logged-in user's identity.
 
-        If the request already supplies a collected_by value we respect it
-        (allows admin to attribute on behalf of a BGE). Otherwise we fall back
-        to the logged-in user's own bge_profile so that every BGE submission
-        is automatically attributed — even if the frontend omits the field.
+        Resolution order (first match wins):
+        1. Value already in the request — respect it (admin attribution on behalf of BGE).
+        2. user.bge_profile OneToOne — the clean path once accounts are linked.
+        3. Username match: BGE whose name slug equals the Django username (e.g. jimmy.ouni → Jimmy Ouni).
+        4. Email match: BGE whose email local-part equals the username.
+        Falls through silently so admin submissions (no bge_profile) still save.
         """
-        if not serializer.validated_data.get('collected_by'):
-            try:
-                serializer.save(collected_by=self.request.user.bge_profile)
+        if serializer.validated_data.get('collected_by'):
+            serializer.save()
+            return
+
+        user = self.request.user
+
+        # Path 2 — linked profile
+        try:
+            serializer.save(collected_by=user.bge_profile)
+            return
+        except Exception:
+            pass
+
+        # Path 3 — match BGE name slug to username  (e.g. "jimmy.ouni" → "Jimmy Ouni")
+        from .models import BusinessGrowthExpert
+        import re
+
+        def _slug(text):
+            s = re.sub(r'[^a-z0-9]+', '.', (text or '').lower()).strip('.')
+            return re.sub(r'\.+', '.', s)
+
+        uname = user.username.lower()
+        for bge in BusinessGrowthExpert.objects.filter(user__isnull=True):
+            if _slug(bge.name) == uname:
+                # Auto-link for next time so we don't need to re-scan
+                bge.user = user
+                bge.save(update_fields=['user'])
+                serializer.save(collected_by=bge)
                 return
-            except Exception:
-                pass  # user has no bge_profile (admin / viewer) — fall through
+
+        # Path 4 — email local-part match
+        for bge in BusinessGrowthExpert.objects.filter(user__isnull=True):
+            if bge.email and bge.email.split('@')[0].lower() == uname:
+                bge.user = user
+                bge.save(update_fields=['user'])
+                serializer.save(collected_by=bge)
+                return
+
         serializer.save()
 
     def destroy(self, request, *args, **kwargs):
