@@ -2573,11 +2573,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         <Paper variant="outlined" sx={{ mb: 2 }}>
           <Tabs value={analyticTab} onChange={(_, v) => setAnalyticTab(v)}
             textColor="primary" indicatorColor="primary" variant="scrollable" scrollButtons="auto">
-            <Tab label="Overview"       />
-            <Tab label="Diagnostic"     />
-            <Tab label="Performance"    />
-            <Tab label="Geography"      />
-            <Tab label="Growth Data"    />
+            <Tab label="Programme Health"  />
+            <Tab label="Growth & Impact"   />
+            <Tab label="Operations"        />
+            <Tab label="Business Profiles" />
           </Tabs>
         </Paper>
 
@@ -2586,65 +2585,100 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             ════════════════════════════════════════════════════════════════ */}
         {analyticTab === 0 && (
           <Box>
-            <SectionLabel>Key Metrics</SectionLabel>
+            {/* ── Programme context banner ── */}
+            <Box sx={{ mb: 2.5, p: 2, bgcolor: '#F0F4FA', borderRadius: 2, borderLeft: `4px solid ${BRAND.primaryMain}` }}>
+              <Typography variant="subtitle2" fontWeight={700} color={BRAND.primaryMain} gutterBottom>
+                About PRUDEV II
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                PRUDEV II is a GIZ-funded business growth programme that enrols micro and small enterprises (MSMEs),
+                assigns Business Growth Experts (BGEs) to coach them, and tracks progress through a series of
+                field visits and growth updates. This dashboard shows the programme at a glance — use the other
+                tabs to explore growth impact, operations performance, and the business baseline.
+              </Typography>
+            </Box>
+
+            {/* ── Headline numbers ── */}
+            <SectionLabel>Programme at a Glance</SectionLabel>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               {[
-                { val: totalMsmes,                                                              label: 'MSMEs',           sub: 'in filtered view',   color: BRAND.primaryMain },
-                { val: A.total_bges   || experts.length,                                        label: 'Experts (BGEs)',  sub: 'total registered',   color: BRAND.gizRed },
-                { val: A.total_groups || 0,                                                     label: 'BGE Groups',      sub: 'active teams',       color: '#0288D1' },
-                { val: (A.total_reports||0)+(A.total_group_reports||0),                         label: 'Reports Filed',   sub: 'all time',           color: '#2E7D32' },
-                { val: A.total_employees || 0,                                                  label: 'Employees',       sub: 'manual entries',     color: '#5D4037' },
-                { val: fmt(A.total_annual_revenue),                                             label: 'Annual Revenue',  sub: 'manual entries',     color: '#7B1FA2' },
+                { val: totalMsmes,                                          label: 'MSMEs Enrolled',    sub: 'in filtered view',   color: BRAND.primaryMain },
+                { val: A.total_bges || experts.length,                      label: 'BGE Experts',       sub: 'coaches in field',   color: BRAND.gizRed },
+                { val: A.total_groups || 0,                                 label: 'BGE Groups',        sub: 'active teams',       color: '#0288D1' },
+                { val: (A.total_reports||0)+(A.total_group_reports||0),     label: 'Reports Filed',     sub: 'MSME + group visits', color: '#2E7D32' },
+                { val: A.total_employees || 0,                              label: 'Total Employees',   sub: 'across all MSMEs',   color: '#5D4037' },
+                { val: fmt(A.total_annual_revenue),                         label: 'Total Revenue',     sub: 'self-reported',      color: '#7B1FA2' },
               ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
             </Grid>
 
-            <SectionLabel>Business Profile</SectionLabel>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={4}>
-                <ChartCard title="By Business Type" subtitle="Share of MSMEs by scale">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie data={pieData(A.business_type_stats, 'business_type')} dataKey="value" nameKey="name"
-                           outerRadius={80} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
-                        {(A.business_type_stats||[]).map((_,i)=><Cell key={i} fill={CHART_PALETTE[i%CHART_PALETTE.length]}/>)}
-                      </Pie>
-                      <ReTooltip /><Legend wrapperStyle={{fontSize:11}}/>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <ChartCard title="By Sector" subtitle="Industry distribution">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie data={pieData(A.sector_stats, 'sector')} dataKey="value" nameKey="name"
-                           innerRadius={45} outerRadius={80} paddingAngle={2}>
-                        {(A.sector_stats||[]).map((_,i)=><Cell key={i} fill={CHART_PALETTE[(i+2)%CHART_PALETTE.length]}/>)}
-                      </Pie>
-                      <ReTooltip /><Legend wrapperStyle={{fontSize:11}}/>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <ChartCard title="By Gender" subtitle="Founder demographics">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie data={pieData(A.gender_stats, 'gender')} dataKey="value" nameKey="name"
-                           innerRadius={45} outerRadius={80}>
-                        {(A.gender_stats||[]).map((_,i)=><Cell key={i} fill={['#1A2F4B','#C8102E','#999'][i%3]}/>)}
-                      </Pie>
-                      <ReTooltip /><Legend wrapperStyle={{fontSize:11}}/>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-            </Grid>
+            {/* ── Attention required ── */}
+            {(() => {
+              if (adminSnapshotsLoading) return null;
+              if (!adminSnapshots.length) return null;
+              const now2 = new Date();
+              const latB = {};
+              adminSnapshots.forEach(s => {
+                const cur = latB[s.msme];
+                if (!cur || s.snapshot_date > cur.snapshot_date) latB[s.msme] = s;
+              });
+              const allLatest = Object.values(latB);
+              const stale90 = allLatest.filter(s => (now2 - new Date(s.snapshot_date)) / 86400000 > 90);
+              const firstB = {};
+              adminSnapshots.forEach(s => {
+                const cur = firstB[s.msme];
+                if (!cur || s.snapshot_date < cur.snapshot_date) firstB[s.msme] = s;
+              });
+              const declining = allLatest.filter(s => {
+                const f = firstB[s.msme];
+                return f && f.id !== s.id &&
+                  Number(f.annual_turnover) > 0 && Number(s.annual_turnover) > 0 &&
+                  Number(s.annual_turnover) < Number(f.annual_turnover);
+              });
+              const zeroComp = allLatest.filter(s =>
+                !s.has_tin && !s.has_ursb && !s.has_business_bank && !s.has_mobile_money && !s.has_sacco
+              );
+              const noUpdate = msmes.filter(m => !latB[m.id]);
+              const attentionItems = [
+                { count: stale90.length,   label: 'No update in 90+ days',   sub: 'BGE visit overdue',         color: '#E65100', severity: 'warning' },
+                { count: noUpdate.length,  label: 'Never updated',           sub: 'no growth data at all',     color: '#C8102E', severity: 'error' },
+                { count: declining.length, label: 'Declining revenue',       sub: 'latest < first update',     color: '#B71C1C', severity: 'error' },
+                { count: zeroComp.length,  label: 'Zero compliance items',   sub: 'no TIN, URSB, Bank or SACCO', color: '#827717', severity: 'warning' },
+              ].filter(a => a.count > 0);
+              if (!attentionItems.length) return (
+                <Alert severity="success" sx={{ mb: 3 }}>
+                  All MSMEs with growth data are up-to-date and at least one compliance item is ticked.
+                </Alert>
+              );
+              return (
+                <>
+                  <SectionLabel>Action Required</SectionLabel>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {attentionItems.map((a, i) => (
+                      <Grid item xs={12} sm={6} md={3} key={i}>
+                        <Card variant="outlined" sx={{ borderLeft: `4px solid ${a.color}`, height: '100%' }}>
+                          <CardContent sx={{ py: '14px !important' }}>
+                            <Typography variant="h4" fontWeight={800} color={a.color}>{a.count}</Typography>
+                            <Typography variant="body2" fontWeight={700}>{a.label}</Typography>
+                            <Typography variant="caption" color="text.secondary">{a.sub}</Typography>
+                            <Box sx={{ mt: 1 }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                → See Growth &amp; Impact tab for details
+                              </Typography>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </>
+              );
+            })()}
 
-            <SectionLabel>Growth Over Time</SectionLabel>
+            {/* ── Enrolment trend & cohort ── */}
+            <SectionLabel>Enrolment Over Time</SectionLabel>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} md={8}>
-                <ChartCard title="MSMEs Onboarded Over Time" subtitle="Monthly additions" height={280}>
+                <ChartCard title="MSMEs Onboarded Over Time" subtitle="Monthly additions — all cohorts" height={260}>
                   <ResponsiveContainer>
                     <AreaChart data={monthlyData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
@@ -2657,7 +2691,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </ChartCard>
               </Grid>
               <Grid item xs={12} md={4}>
-                <ChartCard title="By Cohort" subtitle="Enrolment per cohort" height={280}>
+                <ChartCard title="By Cohort" subtitle="Enrolment per cohort" height={260}>
                   <ResponsiveContainer>
                     <BarChart data={(A.cohort_stats||[]).map(c=>({name:c.cohort__name||'Unassigned',count:c.count}))}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
@@ -2670,13 +2704,57 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </ChartCard>
               </Grid>
             </Grid>
+
+            {/* ── Quick sector + gender split ── */}
+            <SectionLabel>Who Is in the Programme?</SectionLabel>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={4}>
+                <ChartCard title="Business Type" subtitle="Scale of enrolled MSMEs" height={240}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={pieData(A.business_type_stats, 'business_type')} dataKey="value" nameKey="name"
+                           outerRadius={80} label={({ name, percent }) => `${(percent*100).toFixed(0)}%`}>
+                        {(A.business_type_stats||[]).map((_,i)=><Cell key={i} fill={CHART_PALETTE[i%CHART_PALETTE.length]}/>)}
+                      </Pie>
+                      <ReTooltip /><Legend wrapperStyle={{fontSize:11}}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <ChartCard title="Sector" subtitle="Industry distribution" height={240}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={pieData(A.sector_stats, 'sector')} dataKey="value" nameKey="name"
+                           innerRadius={45} outerRadius={80} paddingAngle={2}>
+                        {(A.sector_stats||[]).map((_,i)=><Cell key={i} fill={CHART_PALETTE[(i+2)%CHART_PALETTE.length]}/>)}
+                      </Pie>
+                      <ReTooltip /><Legend wrapperStyle={{fontSize:11}}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <ChartCard title="Owner Gender" subtitle="Founder demographics" height={240}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={pieData(A.gender_stats, 'gender')} dataKey="value" nameKey="name"
+                           innerRadius={45} outerRadius={80}>
+                        {(A.gender_stats||[]).map((_,i)=><Cell key={i} fill={['#1A2F4B','#C8102E','#999'][i%3]}/>)}
+                      </Pie>
+                      <ReTooltip /><Legend wrapperStyle={{fontSize:11}}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </Grid>
+            </Grid>
           </Box>
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            TAB 1 — Diagnostic Intelligence
+            TAB 3 — Business Profiles (was Diagnostic)
             ════════════════════════════════════════════════════════════════ */}
-        {analyticTab === 1 && (
+        {analyticTab === 3 && (
           <Box>
             {diagTotal === 0 ? (
               <DiagnosticImporter token={token} onImported={() => {
@@ -2806,7 +2884,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            TAB 2 — Performance
+            TAB 2 — Operations (Performance + Geography)
             ════════════════════════════════════════════════════════════════ */}
         {analyticTab === 2 && (
           <Box>
@@ -2893,32 +2971,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </ChartCard>
               </Grid>
             </Grid>
-          </Box>
-        )}
-
-        {/* ════════════════════════════════════════════════════════════════
-            TAB 3 — Geography
-            ════════════════════════════════════════════════════════════════ */}
-        {analyticTab === 3 && (
-          <Box>
+            {/* ── Geography (merged into Operations) ── */}
             <SectionLabel>Geographic Distribution</SectionLabel>
-            <Grid container spacing={2}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} md={6}>
-                <ChartCard title="Top Districts (System)" subtitle="From MSME profiles" height={340}>
-                  <ResponsiveContainer>
-                    <BarChart layout="vertical"
-                      data={(A.top_districts||[]).map(d=>({name:d.state,count:d.count}))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
-                      <XAxis type="number" tick={{fontSize:11}}/>
-                      <YAxis dataKey="name" type="category" width={110} tick={{fontSize:11}}/>
-                      <ReTooltip/>
-                      <Bar dataKey="count" fill="#1A2F4B" radius={[0,4,4,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <ChartCard title="Districts (Diagnostic)" subtitle="From application diagnostics — more complete" height={340}>
+                <ChartCard title="Districts (Diagnostic)" subtitle="From application forms — most complete coverage" height={340}>
                   <ResponsiveContainer>
                     <BarChart layout="vertical"
                       data={(A.diag_districts||[]).map(d=>({name:d.diag_district,count:d.count}))}>
@@ -2927,6 +2984,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <YAxis dataKey="name" type="category" width={110} tick={{fontSize:11}}/>
                       <ReTooltip/>
                       <Bar dataKey="count" fill="#4527A0" radius={[0,4,4,0]}/>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <ChartCard title="Districts (MSME Profile)" subtitle="From system registration" height={340}>
+                  <ResponsiveContainer>
+                    <BarChart layout="vertical"
+                      data={(A.top_districts||[]).map(d=>({name:d.state,count:d.count}))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                      <XAxis type="number" tick={{fontSize:11}}/>
+                      <YAxis dataKey="name" type="category" width={110} tick={{fontSize:11}}/>
+                      <ReTooltip/>
+                      <Bar dataKey="count" fill="#1A2F4B" radius={[0,4,4,0]}/>
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartCard>
@@ -2950,9 +3021,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            TAB 4 — Growth Analytics (before / after comparison + export)
+            TAB 1 — Growth & Impact (was Growth Data, Tab 4)
             ════════════════════════════════════════════════════════════════ */}
-        {analyticTab === 4 && (() => {
+        {analyticTab === 1 && (() => {
           if (adminSnapshotsLoading) return <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress /></Box>;
           if (!adminSnapshots.length) return (
             <Box sx={{ py: 8, textAlign: 'center' }}>
@@ -3449,109 +3520,160 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               </Grid>
 
               {/* ════════════════════════════════════════════════════════════
-                  PER-METRIC SIDE-BY-SIDE BAR CHARTS (paired MSMEs only)
+                  REVENUE DISTRIBUTION + PERFORMERS (scales to 200+ MSMEs)
                   ════════════════════════════════════════════════════════════ */}
               {paired.length > 0 && (() => {
-                // Build per-MSME rows for every chart — name truncated to 22 chars
-                const name = s => (s.msme_name || `MSME ${s.msme}`).slice(0, 22);
+                // Revenue bracket distribution — how many MSMEs fall into each revenue band
+                const revBrackets = [
+                  { label: '< 1M',      min: 0,          max: 1000000    },
+                  { label: '1M – 5M',   min: 1000000,    max: 5000000    },
+                  { label: '5M – 20M',  min: 5000000,    max: 20000000   },
+                  { label: '20M – 100M',min: 20000000,   max: 100000000  },
+                  { label: '100M+',     min: 100000000,  max: Infinity   },
+                ];
+                const revDist = revBrackets.map(b => ({
+                  band: b.label,
+                  Before: paired.filter(s => { const r = Number(s._first.annual_turnover)||0; return r > 0 && r >= b.min && r < b.max; }).length,
+                  After:  paired.filter(s => { const r = Number(s.annual_turnover)||0;        return r > 0 && r >= b.min && r < b.max; }).length,
+                })).filter(b => b.Before > 0 || b.After > 0);
 
-                // Revenue data (UGX thousands, to keep axis numbers readable)
-                const revRows = paired
-                  .filter(s => s._first.annual_turnover || s.annual_turnover)
+                // Top & declining performers (list-based — works at any scale)
+                const perfRows = withRevFirst
                   .map(s => ({
-                    name: name(s),
-                    Before: s._first.annual_turnover ? Math.round(Number(s._first.annual_turnover)/1000) : 0,
-                    After:  s.annual_turnover        ? Math.round(Number(s.annual_turnover)/1000)        : 0,
-                  }));
-
-                // Last-month revenue (UGX thousands)
-                const lmrRows = paired
-                  .filter(s => s._first.last_month_revenue || s.last_month_revenue)
-                  .map(s => ({
-                    name: name(s),
-                    Before: s._first.last_month_revenue ? Math.round(Number(s._first.last_month_revenue)/1000) : 0,
-                    After:  s.last_month_revenue        ? Math.round(Number(s.last_month_revenue)/1000)        : 0,
-                  }));
-
-                // FT Staff
-                const ftRows = paired.map(s => ({
-                  name: name(s),
-                  Before: (s._first.employees_ft_male||0)+(s._first.employees_ft_female||0),
-                  After:  (s.employees_ft_male||0)+(s.employees_ft_female||0),
-                })).filter(r => r.Before > 0 || r.After > 0);
-
-                // PT Staff
-                const ptRows = paired.map(s => ({
-                  name: name(s),
-                  Before: (s._first.employees_pt_male||0)+(s._first.employees_pt_female||0),
-                  After:  (s.employees_pt_male||0)+(s.employees_pt_female||0),
-                })).filter(r => r.Before > 0 || r.After > 0);
-
-
-
-                const rowH = 28; // px per MSME row in horizontal charts
-                const minH = 160;
-                const h = (rows) => Math.max(minH, rows.length * rowH + 40);
-
-                const HorizChart = ({ data, xLabel, tooltip }) => (
-                  <ResponsiveContainer width="100%" height={h(data)}>
-                    <BarChart layout="vertical" data={data} margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
-                      <XAxis type="number" tick={{ fontSize: 10 }} label={xLabel ? { value: xLabel, position: 'insideBottomRight', offset: -4, fontSize: 10 } : undefined}/>
-                      <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10 }}/>
-                      <ReTooltip formatter={tooltip || ((v, n) => [v, n])}/>
-                      <Legend wrapperStyle={{ fontSize: 11 }}/>
-                      <Bar dataKey="Before" fill="#90A4AE" radius={[0,3,3,0]}/>
-                      <Bar dataKey="After"  fill="#1A2F4B" radius={[0,3,3,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
-                );
+                    id: s.id,
+                    name: (s.msme_name || `MSME ${s.msme}`).slice(0, 32),
+                    before: Number(s._first.annual_turnover),
+                    after:  Number(s.annual_turnover),
+                    pct: ((Number(s.annual_turnover) / Number(s._first.annual_turnover) - 1) * 100),
+                  }))
+                  .sort((a, b) => b.pct - a.pct);
+                const topPerformers      = perfRows.filter(r => r.pct > 0).slice(0, 10);
+                const decliningPerformers = perfRows.filter(r => r.pct < 0).sort((a,b) => a.pct - b.pct).slice(0, 10);
 
                 return (
                   <>
-                    <SectionLabel>Per-MSME Side-by-Side Comparison — Before vs After</SectionLabel>
-
-                    {/* Financial metrics row */}
-                    <Grid container spacing={2} sx={{ mb: 2 }}>
-                      {revRows.length > 0 && (
-                        <Grid item xs={12} md={lmrRows.length > 0 ? 6 : 12}>
-                          <ChartCard title="Annual Revenue" subtitle="UGX thousands — first vs latest update" height={h(revRows)}>
-                            <HorizChart data={revRows} xLabel="UGX (K)"
-                              tooltip={(v) => [`UGX ${(v*1000).toLocaleString()}`, '']}/>
-                          </ChartCard>
-                        </Grid>
-                      )}
-                      {lmrRows.length > 0 && (
-                        <Grid item xs={12} md={revRows.length > 0 ? 6 : 12}>
-                          <ChartCard title="Last Month Revenue" subtitle="UGX thousands — first vs latest update" height={h(lmrRows)}>
-                            <HorizChart data={lmrRows} xLabel="UGX (K)"
-                              tooltip={(v) => [`UGX ${(v*1000).toLocaleString()}`, '']}/>
-                          </ChartCard>
-                        </Grid>
-                      )}
-                    </Grid>
-
-                    {/* Workforce metrics row */}
-                    {(ftRows.length > 0 || ptRows.length > 0) && (
-                      <Grid container spacing={2} sx={{ mb: 2 }}>
-                        {ftRows.length > 0 && (
-                          <Grid item xs={12} md={ptRows.length > 0 ? 6 : 12}>
-                            <ChartCard title="Full-Time Staff" subtitle="Headcount — first vs latest update" height={h(ftRows)}>
-                              <HorizChart data={ftRows}/>
+                    {/* Revenue distribution chart */}
+                    {revDist.length > 0 && (
+                      <>
+                        <SectionLabel>Revenue Distribution — Before vs After</SectionLabel>
+                        <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F3F6FA', borderRadius: 2, border: '1px solid #DDE4EE' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            How many of the <strong>{paired.length} paired MSMEs</strong> fall into each annual revenue bracket at first update vs latest update.
+                            Moving right = revenue growth; larger "After" bar = more businesses reaching that tier.
+                          </Typography>
+                        </Box>
+                        <Grid container spacing={2} sx={{ mb: 3 }}>
+                          <Grid item xs={12}>
+                            <ChartCard title="Annual Revenue Bands" subtitle="# MSMEs per bracket — first update vs latest update" height={260}>
+                              <ResponsiveContainer>
+                                <BarChart data={revDist} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                                  <XAxis dataKey="band" tick={{ fontSize: 11 }}/>
+                                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} label={{ value: '# MSMEs', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }}/>
+                                  <ReTooltip formatter={(v, n) => [`${v} MSMEs`, n]}/>
+                                  <Legend wrapperStyle={{ fontSize: 11 }}/>
+                                  <Bar dataKey="Before" name="First update"  fill="#90A4AE" radius={[3,3,0,0]}/>
+                                  <Bar dataKey="After"  name="Latest update" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                                </BarChart>
+                              </ResponsiveContainer>
                             </ChartCard>
                           </Grid>
-                        )}
-                        {ptRows.length > 0 && (
-                          <Grid item xs={12} md={ftRows.length > 0 ? 6 : 12}>
-                            <ChartCard title="Part-Time Staff" subtitle="Headcount — first vs latest update" height={h(ptRows)}>
-                              <HorizChart data={ptRows}/>
-                            </ChartCard>
-                          </Grid>
-                        )}
-                      </Grid>
+                        </Grid>
+                      </>
                     )}
 
-                    {/* ── Compliance transition chart (replaces confusing 0/1 bars) ── */}
+                    {/* Top & Declining performers */}
+                    {(topPerformers.length > 0 || decliningPerformers.length > 0) && (
+                      <>
+                        <SectionLabel>Revenue Performance — Top & Declining Businesses</SectionLabel>
+                        <Grid container spacing={2} sx={{ mb: 3 }}>
+                          {topPerformers.length > 0 && (
+                            <Grid item xs={12} md={decliningPerformers.length > 0 ? 6 : 12}>
+                              <Card variant="outlined">
+                                <CardContent>
+                                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                                    🏆 Top {topPerformers.length} — Highest Revenue Growth
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                                    Annual revenue % change, first → latest update
+                                  </Typography>
+                                  <Table size="small">
+                                    <TableHead>
+                                      <TableRow sx={{ bgcolor: '#F5F5F5' }}>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>Business</TableCell>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }} align="right">Before</TableCell>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }} align="right">After</TableCell>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }} align="right">Growth</TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {topPerformers.map(r => (
+                                        <TableRow key={r.id} hover>
+                                          <TableCell sx={{ fontSize: 11 }}>{r.name}</TableCell>
+                                          <TableCell sx={{ fontSize: 11, color: 'text.secondary' }} align="right">
+                                            {(r.before/1000).toFixed(0)}K
+                                          </TableCell>
+                                          <TableCell sx={{ fontSize: 11, fontWeight: 600 }} align="right">
+                                            {(r.after/1000).toFixed(0)}K
+                                          </TableCell>
+                                          <TableCell align="right">
+                                            <Chip size="small" label={`+${r.pct.toFixed(0)}%`}
+                                              sx={{ fontSize: 10, height: 18, bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 700 }}/>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </CardContent>
+                              </Card>
+                            </Grid>
+                          )}
+                          {decliningPerformers.length > 0 && (
+                            <Grid item xs={12} md={topPerformers.length > 0 ? 6 : 12}>
+                              <Card variant="outlined" sx={{ borderColor: '#FFCDD2' }}>
+                                <CardContent>
+                                  <Typography variant="subtitle2" fontWeight={700} color="#C62828" gutterBottom>
+                                    ⚠ Needs Attention — Declining Revenue ({decliningPerformers.length})
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                                    These businesses earn less now than when they first joined. Follow up with their BGEs.
+                                  </Typography>
+                                  <Table size="small">
+                                    <TableHead>
+                                      <TableRow sx={{ bgcolor: '#FFF8F8' }}>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }}>Business</TableCell>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }} align="right">Before</TableCell>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }} align="right">After</TableCell>
+                                        <TableCell sx={{ fontSize: 11, fontWeight: 700 }} align="right">Change</TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {decliningPerformers.map(r => (
+                                        <TableRow key={r.id} hover>
+                                          <TableCell sx={{ fontSize: 11 }}>{r.name}</TableCell>
+                                          <TableCell sx={{ fontSize: 11, color: 'text.secondary' }} align="right">
+                                            {(r.before/1000).toFixed(0)}K
+                                          </TableCell>
+                                          <TableCell sx={{ fontSize: 11, fontWeight: 600, color: '#C62828' }} align="right">
+                                            {(r.after/1000).toFixed(0)}K
+                                          </TableCell>
+                                          <TableCell align="right">
+                                            <Chip size="small" label={`${r.pct.toFixed(0)}%`}
+                                              sx={{ fontSize: 10, height: 18, bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 700 }}/>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </CardContent>
+                              </Card>
+                            </Grid>
+                          )}
+                        </Grid>
+                      </>
+                    )}
+
+                    {/* ── Compliance transition (unchanged) ── */}
                     {(() => {
                       // For each metric, categorise each paired MSME into one of 4 buckets
                       const transData = compFields.map(({ label, key }) => {
@@ -3657,7 +3779,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                   {changedMsmes.map(s => (
                                     <TableRow key={s.id} hover>
                                       <TableCell sx={{ fontSize: 11, fontWeight: 600, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {name(s)}
+                                        {(s.msme_name || `MSME ${s.msme}`).slice(0, 30)}
                                       </TableCell>
                                       {compFields.map(f => {
                                         const before = !!s._first[f.key];
