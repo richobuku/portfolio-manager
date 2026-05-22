@@ -270,6 +270,22 @@ class MSMEGrowthSnapshotViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 qs = qs.none()
         return qs
 
+    def perform_create(self, serializer):
+        """Auto-set collected_by from the authenticated user's linked BGE profile.
+
+        If the request already supplies a collected_by value we respect it
+        (allows admin to attribute on behalf of a BGE). Otherwise we fall back
+        to the logged-in user's own bge_profile so that every BGE submission
+        is automatically attributed — even if the frontend omits the field.
+        """
+        if not serializer.validated_data.get('collected_by'):
+            try:
+                serializer.save(collected_by=self.request.user.bge_profile)
+                return
+            except Exception:
+                pass  # user has no bge_profile (admin / viewer) — fall through
+        serializer.save()
+
     def destroy(self, request, *args, **kwargs):
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can delete snapshots.")
