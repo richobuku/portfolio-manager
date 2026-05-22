@@ -3953,25 +3953,32 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             .map(k => ({ updates: `${k} update${k === '1' ? '' : 's'}`, count: freqMap[k] || 0 }))
             .filter(d => d.count > 0);
 
-          // BGE update scorecard
-          const bgeScoreMap = {};
-          msmes.forEach(m => {
-            const bgeName = m.assigned_bge_name || 'Unassigned';
-            if (!bgeScoreMap[bgeName]) bgeScoreMap[bgeName] = { name: bgeName, assigned: 0, withData: 0, lastDate: null, overdue90: 0 };
-            bgeScoreMap[bgeName].assigned++;
-            const latest = latB3[m.id];
-            if (latest) {
-              bgeScoreMap[bgeName].withData++;
-              if (!bgeScoreMap[bgeName].lastDate || latest.snapshot_date > bgeScoreMap[bgeName].lastDate)
-                bgeScoreMap[bgeName].lastDate = latest.snapshot_date;
-              if (daysSince(latest) > 90) bgeScoreMap[bgeName].overdue90++;
-            } else {
-              bgeScoreMap[bgeName].overdue90++;
-            }
+          // BGE update scorecard — built from snapshots (collected_by_name), not MSME assignments.
+          // Using m.assigned_bge_name would miss all group-assigned MSMEs (null for those).
+          // collected_by_name is always populated on the snapshot by whoever submitted it.
+          const bgeSnapBuckets = {};
+          adminSnapshots.forEach(s => {
+            const bgeName = s.collected_by_name || 'Unassigned';
+            if (!bgeSnapBuckets[bgeName]) bgeSnapBuckets[bgeName] = { msmeSet: new Set(), snapCount: 0, lastDate: null };
+            bgeSnapBuckets[bgeName].msmeSet.add(s.msme);
+            bgeSnapBuckets[bgeName].snapCount++;
+            if (!bgeSnapBuckets[bgeName].lastDate || s.snapshot_date > bgeSnapBuckets[bgeName].lastDate)
+              bgeSnapBuckets[bgeName].lastDate = s.snapshot_date;
           });
-          const bgeScoreRows = Object.values(bgeScoreMap)
-            .filter(b => b.assigned > 0)
-            .sort((a, b) => (b.overdue90 / b.assigned) - (a.overdue90 / a.assigned));
+          // Join with analytics workload to get total-assigned count (handles direct + group assignments)
+          const workloadLookup = {};
+          (A.bge_workload || []).forEach(b => { workloadLookup[b.bge_name] = (b.direct||0) + (b.via_group||0); });
+          const bgeScoreRows = Object.entries(bgeSnapBuckets).map(([bgeName, d]) => {
+            const overdue90 = [...d.msmeSet].filter(id => { const lat = latB3[id]; return lat && daysSince(lat) > 90; }).length;
+            return {
+              name: bgeName,
+              assigned: workloadLookup[bgeName] || 0,
+              covered: d.msmeSet.size,
+              snapCount: d.snapCount,
+              lastDate: d.lastDate,
+              overdue90,
+            };
+          }).sort((a, b) => b.overdue90 - a.overdue90);
 
           // Stale list: never updated + updated but 60+ days ago
           const staleAll = [
@@ -4067,51 +4074,44 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <>
                   <SectionLabel>BGE Update Scorecard</SectionLabel>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                    How many of each BGE's assigned MSMEs have growth data, and how many are overdue (90+ days since last update, or never updated).
-                    Sorted by highest overdue proportion first — use this to follow up with BGEs who are behind.
+                    Built from who actually <em>submitted</em> each update (collected_by field). "MSMEs Updated" = distinct MSMEs
+                    this BGE has ever submitted data for. "Overdue" = those MSMEs whose most recent update (by anyone) is 90+ days old.
+                    Sorted by most overdue first.
                   </Typography>
                   <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
                     <Table size="small">
                       <TableHead sx={{ bgcolor: '#F5F5F5' }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>BGE Name</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Assigned</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>With Data</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Coverage</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Last Update</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Total Assigned</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>MSMEs Updated</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Total Snapshots</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Last Submitted</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, color: '#C8102E' }}>Overdue (90+ d)</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {bgeScoreRows.map((b, i) => {
-                          const covPct2 = b.assigned ? Math.round(b.withData / b.assigned * 100) : 0;
-                          return (
-                            <TableRow key={i} hover sx={b.overdue90 > 0 ? { bgcolor: '#FFF8F8' } : {}}>
-                              <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{b.name}</TableCell>
-                              <TableCell align="center" sx={{ fontSize: 12 }}>{b.assigned}</TableCell>
-                              <TableCell align="center" sx={{ fontSize: 12 }}>{b.withData}</TableCell>
-                              <TableCell align="center">
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
-                                  <LinearProgress variant="determinate" value={covPct2}
-                                    sx={{ width: 60, height: 6, borderRadius: 3, bgcolor: '#E8EDF2',
-                                      '& .MuiLinearProgress-bar': { bgcolor: covPct2 >= 80 ? '#2E7D32' : covPct2 >= 50 ? '#F9A825' : '#C8102E' } }}/>
-                                  <Typography variant="caption" sx={{ fontSize: 11 }}>{covPct2}%</Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>
-                                {b.lastDate
-                                  ? new Date(b.lastDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
-                                  : '—'}
-                              </TableCell>
-                              <TableCell align="center">
-                                {b.overdue90 > 0
-                                  ? <Chip label={b.overdue90} size="small"
-                                      sx={{ fontSize: 10, height: 20, bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 700 }}/>
-                                  : <Typography fontSize={12} color="text.disabled">—</Typography>}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                        {bgeScoreRows.map((b, i) => (
+                          <TableRow key={i} hover sx={b.overdue90 > 0 ? { bgcolor: '#FFF8F8' } : {}}>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{b.name}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, color: b.assigned ? 'inherit' : 'text.disabled' }}>
+                              {b.assigned || '—'}
+                            </TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 600 }}>{b.covered}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, color: 'text.secondary' }}>{b.snapCount}</TableCell>
+                            <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>
+                              {b.lastDate
+                                ? new Date(b.lastDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+                                : '—'}
+                            </TableCell>
+                            <TableCell align="center">
+                              {b.overdue90 > 0
+                                ? <Chip label={b.overdue90} size="small"
+                                    sx={{ fontSize: 10, height: 20, bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 700 }}/>
+                                : <Typography fontSize={12} color="text.disabled">—</Typography>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </TableContainer>
