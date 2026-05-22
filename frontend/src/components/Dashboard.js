@@ -19,13 +19,14 @@ import {
   Assignment, DragHandle, ExpandMore,
   Lock, LockOpen, Star, StarBorder, Download, Undo,
   Campaign, Send as SendIcon, Checkroom, DrawOutlined,
+  RotateLeft, RotateRight,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -1113,6 +1114,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (seq === expertFetchSeq.current) setViewItem(res.data);
     } catch {
       // keep the cached item already shown
+    }
+  };
+
+  // ── rotate BGE signature ───────────────────────────────────────────────────
+  const [rotatingSig, setRotatingSig] = useState(false);
+  const rotateBgeSignature = async (bgeId, direction) => {
+    setRotatingSig(true);
+    try {
+      const res = await axios.post(EXPERT_ROTATE_SIGNATURE_URL(bgeId), { direction }, { headers });
+      notify(`Signature rotated ${direction === 'ccw' ? '↺ CCW' : '↻ CW'} and saved.`);
+      // Refresh the view dialog so the updated signature_url appears
+      const fresh = await axios.get(`${API_ENDPOINTS.EXPERTS}${bgeId}/`, { headers });
+      setViewItem(fresh.data);
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Rotation failed.', 'error');
+    } finally {
+      setRotatingSig(false);
     }
   };
 
@@ -6154,6 +6172,54 @@ PRUDEV II BDS Team`
                   </Grid>
                 ))}
               </Grid>
+
+              <Divider sx={{ mb: 2 }} />
+
+              {/* Signature preview + admin rotation controls */}
+              {(viewItem.signature_url || viewItem.signature_data) && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Signature</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                    <Box sx={{
+                      border: '1px solid #e0e0e0', borderRadius: 1, p: 1,
+                      bgcolor: '#fafafa', display: 'inline-flex',
+                    }}>
+                      <img
+                        src={viewItem.signature_url}
+                        alt="BGE signature"
+                        style={{ maxHeight: 64, maxWidth: 200, objectFit: 'contain' }}
+                      />
+                    </Box>
+                    {isStaff && (
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Tooltip title="Rotate 90° counter-clockwise (left)">
+                          <span>
+                            <Button
+                              size="small" variant="outlined" disabled={rotatingSig}
+                              startIcon={rotatingSig ? <CircularProgress size={14}/> : <RotateLeft fontSize="small"/>}
+                              onClick={() => rotateBgeSignature(viewItem.id, 'ccw')}
+                            >CCW</Button>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Rotate 90° clockwise (right)">
+                          <span>
+                            <Button
+                              size="small" variant="outlined" disabled={rotatingSig}
+                              startIcon={rotatingSig ? <CircularProgress size={14}/> : <RotateRight fontSize="small"/>}
+                              onClick={() => rotateBgeSignature(viewItem.id, 'cw')}
+                            >CW</Button>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              )}
+              {isStaff && !viewItem.signature_url && !viewItem.signature_data && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.disabled">No signature uploaded yet.</Typography>
+                </Box>
+              )}
 
               <Divider sx={{ mb: 2 }} />
 

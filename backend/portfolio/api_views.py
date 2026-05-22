@@ -1439,6 +1439,43 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             'detail': 'Signature uploaded and processed successfully.',
         })
 
+    @action(detail=True, methods=['post'], url_path='rotate-signature')
+    def rotate_signature(self, request, pk=None):
+        """Admin: rotate a BGE's stored signature 90° CCW or CW and save permanently."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can rotate signatures.")
+        bge = self.get_object()
+        direction = request.data.get('direction', 'ccw')  # 'ccw' or 'cw'
+        # PIL rotate: positive degrees = counter-clockwise
+        degrees = 90 if direction == 'ccw' else -90
+
+        raw = _bge_signature_bytes(bge)
+        if not raw:
+            return Response({'detail': 'No signature found for this BGE.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        try:
+            from PIL import Image as _PilImg
+            img = _PilImg.open(_io.BytesIO(raw)).convert('RGBA')
+            rotated = img.rotate(degrees, expand=True)
+            buf = _io.BytesIO()
+            rotated.save(buf, format='PNG')
+            png_bytes = buf.getvalue()
+
+            from django.core.files.base import ContentFile
+            bge.signature_data = png_bytes
+            fname = f'sig_{bge.bge_code or bge.id}.png'
+            bge.signature.delete(save=False)
+            bge.signature.save(fname, ContentFile(png_bytes), save=False)
+            bge.save(update_fields=['signature', 'signature_data'])
+        except Exception as exc:
+            return Response({'detail': f'Rotation failed: {exc}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'detail': f'Signature rotated {direction.upper()} 90° and saved.',
+            'signature_url': request.build_absolute_uri(bge.signature.url) if bge.signature else None,
+        })
+
     @action(detail=False, methods=['post'], url_path='upload')
     def upload(self, request):
         """Upload BGE list from Excel. Matches PRUDEV II BGE list format."""
@@ -3428,6 +3465,38 @@ def _bge_signature_bytes(bge):
     return None
 
 
+def _clean_sig_for_pdf(raw_bytes):
+    """
+    Re-process a signature image before embedding in a PDF.
+
+    Applies luminance + saturation-based background removal so that
+    off-white or slightly yellowed paper backgrounds become fully
+    transparent, giving a clean floating signature on any background.
+    Returns PNG bytes ready for reportlab.
+    """
+    try:
+        import PIL.Image as _PIL
+        img = _PIL.open(_io.BytesIO(raw_bytes)).convert('RGBA')
+        pixels = list(img.getdata())
+        cleaned = []
+        for r, g, b, a in pixels:
+            lum = 0.299 * r + 0.587 * g + 0.114 * b
+            sat_range = max(r, g, b) - min(r, g, b)
+            # Bright (lum > 205) AND low saturation (sat_range < 45)
+            # → paper/background → transparent
+            if lum > 205 and sat_range < 45:
+                cleaned.append((r, g, b, 0))
+            else:
+                cleaned.append((r, g, b, a))
+        img.putdata(cleaned)
+        buf = _io.BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        return buf.read()
+    except Exception:
+        return raw_bytes  # fall back to original on any error
+
+
 def _build_tshirt_pdf(receipt):
     """Generate a signed PDF for a TshirtReceipt using reportlab.
 
@@ -3539,21 +3608,35 @@ def _build_tshirt_pdf(receipt):
 
     entries = list(receipt.entries.select_related('bge').order_by('order', 'bge__name'))
 
-    # ── Column widths (landscape A4 content ≈ 811.9 pt − 30 mm = 727 pt ≈ 25.6 cm)
-    # #(0.7) Name(4.0) Code(3.0) Phone(2.8) Loc(2.6) Size(1.5) Qty(1.0) Sig(5.5) Date(3.0) = 24.1 cm; leave ≈1.5 cm slack
-    col_w = [0.7*cm, 4.0*cm, 3.0*cm, 2.8*cm, 2.6*cm, 1.5*cm, 1.0*cm, 5.5*cm, 3.0*cm]
+    # ── Column widths — landscape A4 content = 297mm − 30mm margins = 267mm = 26.7cm
+    # #(0.5) Name(4.5) Code(3.0) Phone(3.3) Loc(2.2) Size(1.4) Qty(0.8) Sig(7.2) Date(2.8) = 25.7cm
+    col_w = [0.5*cm, 4.5*cm, 3.0*cm, 3.3*cm, 2.2*cm, 1.4*cm, 0.8*cm, 7.2*cm, 2.8*cm]
 
     SIG_ROW_H = 1.1 * cm
 
-    hdr_row = ['#', 'BGE Name', 'BGE Code', 'Phone', 'Location',
-               'Size', 'Qty', 'BGE Signature', 'Date Signed']
+    # Paragraph style for body cells — enables word-wrap so nothing overflows
+    cell_s = ParagraphStyle('TCell', parent=styles['Normal'],
+        fontSize=8, leading=10, wordWrap='LTR', splitLongWords=True)
+    # Header cell style (white text on navy background)
+    hdr_s = ParagraphStyle('THdrCell', parent=styles['Normal'],
+        fontSize=8, leading=10, textColor=colors.white,
+        fontName='Helvetica-Bold', alignment=TA_CENTER)
+
+    def _P(text, style=cell_s):
+        return Paragraph(str(text) if text else '', style)
+
+    hdr_row = [_P(h, hdr_s) for h in
+               ['#', 'BGE Name', 'BGE Code', 'Phone', 'Location',
+                'Size', 'Qty', 'BGE Signature', 'Date Signed']]
     rows = [hdr_row]
 
     for idx, entry in enumerate(entries):
         sig_bytes = _bge_signature_bytes(entry.bge)
         if entry.signed and sig_bytes:
             try:
-                img_buf = _io.BytesIO(sig_bytes)
+                # Clean background then embed
+                clean_bytes = _clean_sig_for_pdf(sig_bytes)
+                img_buf = _io.BytesIO(clean_bytes)
                 pil = PILImage.open(img_buf)
                 w_px, h_px = pil.size
                 aspect = w_px / h_px if h_px else 1
@@ -3562,40 +3645,34 @@ def _build_tshirt_pdf(receipt):
                 img_buf.seek(0)
                 sig_cell = Image(img_buf, width=img_w, height=img_h)
             except Exception:
-                sig_cell = '(signed)'
+                sig_cell = _P('(signed)')
         elif entry.signed:
-            sig_cell = '(signed)'
+            sig_cell = _P('(signed)')
         else:
-            sig_cell = ''
+            sig_cell = _P('')
 
         date_str = entry.signed_at.strftime('%d/%m/%Y') if entry.signed_at else ''
         rows.append([
-            str(idx + 1),
-            entry.bge.name,
-            entry.bge.bge_code or '',
-            entry.bge.phone or '',
-            entry.bge.location or '',
-            entry.size,
-            str(entry.quantity),
+            _P(str(idx + 1)),
+            _P(entry.bge.name),
+            _P(entry.bge.bge_code or ''),
+            _P(entry.bge.phone or ''),
+            _P(entry.bge.location or ''),
+            _P(entry.size),
+            _P(str(entry.quantity)),
             sig_cell,
-            date_str,
+            _P(date_str),
         ])
 
     row_heights = [0.65 * cm] + [SIG_ROW_H] * len(entries)
     tbl = Table(rows, colWidths=col_w, rowHeights=row_heights, repeatRows=1)
     tbl.setStyle(TableStyle([
-        # Header row
+        # Header row background (text style is in hdr_s ParagraphStyle)
         ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
-        ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
-        ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE',      (0, 0), (-1, 0), 8),
-        ('ALIGN',         (0, 0), (-1, 0), 'CENTER'),
         ('VALIGN',        (0, 0), (-1, 0), 'MIDDLE'),
         ('TOPPADDING',    (0, 0), (-1, 0), 5),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
         # Body
-        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE',      (0, 1), (-1, -1), 8),
         ('VALIGN',        (0, 1), (-1, -1), 'MIDDLE'),
         ('TOPPADDING',    (0, 1), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 3),

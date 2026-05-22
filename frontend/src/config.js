@@ -40,7 +40,8 @@ export const API_ENDPOINTS = {
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
 export const EXPERT_PREVIEW_EMAIL_URL = (id) => `${API_BASE_URL}/api/experts/${id}/preview-email/`;
-export const EXPERT_UPLOAD_SIGNATURE_URL = (id) => `${API_BASE_URL}/api/experts/${id}/upload-signature/`;
+export const EXPERT_UPLOAD_SIGNATURE_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/upload-signature/`;
+export const EXPERT_ROTATE_SIGNATURE_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/rotate-signature/`;
 export const WORK_ORDER_ISSUE_URL = (id) => `${API_BASE_URL}/api/work-orders/${id}/issue/`;
 export const WORK_ORDER_SIGN_URL  = (id) => `${API_BASE_URL}/api/work-orders/${id}/sign/`;
 export const WORK_ORDER_WITHDRAW_URL = (id) => `${API_BASE_URL}/api/work-orders/${id}/withdraw/`;
