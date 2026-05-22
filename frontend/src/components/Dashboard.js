@@ -1122,7 +1122,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const rotateBgeSignature = async (bgeId, direction) => {
     setRotatingSig(true);
     try {
-      const res = await axios.post(EXPERT_ROTATE_SIGNATURE_URL(bgeId), { direction }, { headers });
+      await axios.post(EXPERT_ROTATE_SIGNATURE_URL(bgeId), { direction }, { headers });
       notify(`Signature rotated ${direction === 'ccw' ? '↺ CCW' : '↻ CW'} and saved.`);
       // Refresh the view dialog so the updated signature_url appears
       const fresh = await axios.get(`${API_ENDPOINTS.EXPERTS}${bgeId}/`, { headers });
