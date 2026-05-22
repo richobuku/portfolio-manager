@@ -2577,6 +2577,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Tab label="Growth & Impact"   />
             <Tab label="Operations"        />
             <Tab label="Business Profiles" />
+            <Tab label="Data Updates"      />
           </Tabs>
         </Paper>
 
@@ -3902,6 +3903,557 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </TableBody>
                 </Table>
               </TableContainer>
+            </Box>
+          );
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════════
+            TAB 4 — Data Updates (coverage, freshness, BGE scorecard)
+            ════════════════════════════════════════════════════════════════ */}
+        {analyticTab === 4 && (() => {
+          if (adminSnapshotsLoading) return <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress /></Box>;
+
+          const now3 = new Date();
+          const daysSince = s => (now3 - new Date(s.snapshot_date)) / 86400000;
+
+          // Latest snapshot per MSME
+          const latB3 = {};
+          adminSnapshots.forEach(s => {
+            const cur = latB3[s.msme];
+            if (!cur || s.snapshot_date > cur.snapshot_date) latB3[s.msme] = s;
+          });
+          const updatedSnaps = Object.values(latB3);
+
+          // Update count per MSME
+          const updCounts = {};
+          adminSnapshots.forEach(s => { updCounts[s.msme] = (updCounts[s.msme] || 0) + 1; });
+
+          // Freshness buckets
+          const fresh30    = updatedSnaps.filter(s => daysSince(s) <= 30);
+          const stale3090  = updatedSnaps.filter(s => daysSince(s) > 30 && daysSince(s) <= 90);
+          const stale90180 = updatedSnaps.filter(s => daysSince(s) > 90 && daysSince(s) <= 180);
+          const stale180p  = updatedSnaps.filter(s => daysSince(s) > 180);
+          const neverUpdatedMsmes = msmes.filter(m => !latB3[m.id]);
+
+          const freshnessData = [
+            { label: '≤ 30 days',   count: fresh30.length,            fill: '#2E7D32' },
+            { label: '31–90 days',  count: stale3090.length,          fill: '#F9A825' },
+            { label: '91–180 days', count: stale90180.length,         fill: '#E65100' },
+            { label: '180+ days',   count: stale180p.length,          fill: '#C62828' },
+            { label: 'Never',       count: neverUpdatedMsmes.length,  fill: '#9E9E9E' },
+          ].filter(d => d.count > 0);
+
+          // Update frequency distribution
+          const freqMap = {};
+          Object.values(updCounts).forEach(n => {
+            const k = n >= 5 ? '5+' : String(n);
+            freqMap[k] = (freqMap[k] || 0) + 1;
+          });
+          const freqData = ['1','2','3','4','5+']
+            .map(k => ({ updates: `${k} update${k === '1' ? '' : 's'}`, count: freqMap[k] || 0 }))
+            .filter(d => d.count > 0);
+
+          // BGE update scorecard
+          const bgeScoreMap = {};
+          msmes.forEach(m => {
+            const bgeName = m.assigned_bge_name || 'Unassigned';
+            if (!bgeScoreMap[bgeName]) bgeScoreMap[bgeName] = { name: bgeName, assigned: 0, withData: 0, lastDate: null, overdue90: 0 };
+            bgeScoreMap[bgeName].assigned++;
+            const latest = latB3[m.id];
+            if (latest) {
+              bgeScoreMap[bgeName].withData++;
+              if (!bgeScoreMap[bgeName].lastDate || latest.snapshot_date > bgeScoreMap[bgeName].lastDate)
+                bgeScoreMap[bgeName].lastDate = latest.snapshot_date;
+              if (daysSince(latest) > 90) bgeScoreMap[bgeName].overdue90++;
+            } else {
+              bgeScoreMap[bgeName].overdue90++;
+            }
+          });
+          const bgeScoreRows = Object.values(bgeScoreMap)
+            .filter(b => b.assigned > 0)
+            .sort((a, b) => (b.overdue90 / b.assigned) - (a.overdue90 / a.assigned));
+
+          // Stale list: never updated + updated but 60+ days ago
+          const staleAll = [
+            ...neverUpdatedMsmes.map(m => ({
+              name: m.business_name, bgeName: m.assigned_bge_name || '—',
+              lastUpdate: null, days: Infinity,
+            })),
+            ...updatedSnaps
+              .filter(s => daysSince(s) > 60)
+              .map(s => {
+                const m = msmes.find(x => x.id === s.msme);
+                return {
+                  name: s.msme_name || `MSME ${s.msme}`,
+                  bgeName: m?.assigned_bge_name || '—',
+                  lastUpdate: s.snapshot_date,
+                  days: Math.floor(daysSince(s)),
+                };
+              }),
+          ].sort((a, b) => b.days - a.days);
+
+          const coveragePct = msmes.length ? Math.round(updatedSnaps.length / msmes.length * 100) : 0;
+          const avgUpd = updatedSnaps.length ? (adminSnapshots.length / updatedSnaps.length).toFixed(1) : '—';
+
+          return (
+            <Box>
+              {/* ── Coverage KPIs ── */}
+              <SectionLabel>Data Coverage</SectionLabel>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[
+                  { val: `${updatedSnaps.length} / ${msmes.length}`, label: 'MSMEs Updated',      sub: 'have at least one growth update',    color: BRAND.primaryMain, pct: coveragePct },
+                  { val: fresh30.length,                             label: 'Fresh (≤ 30 days)',  sub: 'updated in the last month',          color: '#2E7D32' },
+                  { val: neverUpdatedMsmes.length,                  label: 'Never Updated',       sub: 'no growth data at all',              color: '#C8102E' },
+                  { val: stale90180.length + stale180p.length,      label: 'Overdue (90+ days)',  sub: 'last update was 3+ months ago',      color: '#E65100' },
+                  { val: avgUpd,                                     label: 'Avg Updates / MSME',  sub: 'among MSMEs with any data',          color: '#0288D1' },
+                  { val: adminSnapshots.length,                      label: 'Total Snapshots',     sub: 'all updates ever submitted',         color: '#7B1FA2' },
+                ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
+              </Grid>
+
+              {/* ── Freshness + frequency + coverage rate ── */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={5}>
+                  <ChartCard title="Update Freshness" subtitle="Days since last growth update — how stale is the data?" height={240}>
+                    <ResponsiveContainer>
+                      <BarChart data={freshnessData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }}/>
+                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false}/>
+                        <ReTooltip formatter={v => [`${v} MSMEs`, '']}/>
+                        <Bar dataKey="count" radius={[4,4,0,0]}>
+                          {freshnessData.map((d, i) => <Cell key={i} fill={d.fill}/>)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <ChartCard title="Update Frequency" subtitle="How many snapshots has each MSME submitted?" height={240}>
+                    <ResponsiveContainer>
+                      <BarChart data={freqData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
+                        <XAxis dataKey="updates" tick={{ fontSize: 11 }}/>
+                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false}/>
+                        <ReTooltip formatter={v => [`${v} MSMEs`, '']}/>
+                        <Bar dataKey="count" fill="#1A2F4B" radius={[4,4,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" fontWeight={700} gutterBottom>Data Coverage Rate</Typography>
+                      <Typography variant="h3" fontWeight={800} sx={{ lineHeight: 1.1 }}
+                        color={coveragePct >= 80 ? '#2E7D32' : coveragePct >= 50 ? '#F9A825' : '#C8102E'}>
+                        {coveragePct}%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                        of enrolled MSMEs have at least one growth update
+                      </Typography>
+                      <LinearProgress variant="determinate" value={Math.min(coveragePct, 100)}
+                        sx={{ height: 8, borderRadius: 4, bgcolor: '#E8EDF2',
+                          '& .MuiLinearProgress-bar': { bgcolor: coveragePct >= 80 ? '#2E7D32' : coveragePct >= 50 ? '#F9A825' : '#C8102E' } }}/>
+                      <Typography variant="caption" color="text.secondary">
+                        {updatedSnaps.length} of {msmes.length} MSMEs
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* ── BGE Update Scorecard ── */}
+              {bgeScoreRows.length > 0 && (
+                <>
+                  <SectionLabel>BGE Update Scorecard</SectionLabel>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                    How many of each BGE's assigned MSMEs have growth data, and how many are overdue (90+ days since last update, or never updated).
+                    Sorted by highest overdue proportion first — use this to follow up with BGEs who are behind.
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#F5F5F5' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>BGE Name</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Assigned</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>With Data</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Coverage</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Last Update</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, color: '#C8102E' }}>Overdue (90+ d)</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {bgeScoreRows.map((b, i) => {
+                          const covPct2 = b.assigned ? Math.round(b.withData / b.assigned * 100) : 0;
+                          return (
+                            <TableRow key={i} hover sx={b.overdue90 > 0 ? { bgcolor: '#FFF8F8' } : {}}>
+                              <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{b.name}</TableCell>
+                              <TableCell align="center" sx={{ fontSize: 12 }}>{b.assigned}</TableCell>
+                              <TableCell align="center" sx={{ fontSize: 12 }}>{b.withData}</TableCell>
+                              <TableCell align="center">
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
+                                  <LinearProgress variant="determinate" value={covPct2}
+                                    sx={{ width: 60, height: 6, borderRadius: 3, bgcolor: '#E8EDF2',
+                                      '& .MuiLinearProgress-bar': { bgcolor: covPct2 >= 80 ? '#2E7D32' : covPct2 >= 50 ? '#F9A825' : '#C8102E' } }}/>
+                                  <Typography variant="caption" sx={{ fontSize: 11 }}>{covPct2}%</Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>
+                                {b.lastDate
+                                  ? new Date(b.lastDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+                                  : '—'}
+                              </TableCell>
+                              <TableCell align="center">
+                                {b.overdue90 > 0
+                                  ? <Chip label={b.overdue90} size="small"
+                                      sx={{ fontSize: 10, height: 20, bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 700 }}/>
+                                  : <Typography fontSize={12} color="text.disabled">—</Typography>}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+
+              {/* ── Data Completeness ── */}
+              {updatedSnaps.length > 0 && (() => {
+                const total4 = updatedSnaps.length;
+                const pct4 = n => total4 ? Math.round(n / total4 * 100) : 0;
+                const completenessFields = [
+                  { label: 'Annual Revenue',    filled: updatedSnaps.filter(s => s.annual_turnover != null && s.annual_turnover !== '').length },
+                  { label: 'Last Month Rev.',   filled: updatedSnaps.filter(s => s.last_month_revenue != null && s.last_month_revenue !== '').length },
+                  { label: 'Total Assets',      filled: updatedSnaps.filter(s => s.total_assets != null && s.total_assets !== '').length },
+                  { label: 'FT Staff',          filled: updatedSnaps.filter(s => s.employees_ft_male != null || s.employees_ft_female != null).length },
+                  { label: 'PT Staff',          filled: updatedSnaps.filter(s => s.employees_pt_male != null || s.employees_pt_female != null).length },
+                  { label: 'Refugee Staff',     filled: updatedSnaps.filter(s => (s.employees_ft_refugee||0) > 0 || (s.employees_pt_refugee||0) > 0).length },
+                  { label: 'TIN',               filled: updatedSnaps.filter(s => s.has_tin != null).length },
+                  { label: 'URSB',              filled: updatedSnaps.filter(s => s.has_ursb != null).length },
+                  { label: 'Business Bank',     filled: updatedSnaps.filter(s => s.has_business_bank != null).length },
+                  { label: 'Mobile Money',      filled: updatedSnaps.filter(s => s.has_mobile_money != null).length },
+                  { label: 'MOMO Pay Code',     filled: updatedSnaps.filter(s => s.has_momo_pay != null).length },
+                  { label: 'SACCO',             filled: updatedSnaps.filter(s => s.has_sacco != null).length },
+                  { label: 'Digital Tools',     filled: updatedSnaps.filter(s => (s.digital_tools||[]).length > 0).length },
+                  { label: 'Training Impact',   filled: updatedSnaps.filter(s => s.training_made_changes != null).length },
+                  { label: 'Notes / Context',   filled: updatedSnaps.filter(s => s.notes && s.notes.trim().length > 0).length },
+                ].map(f => ({ ...f, pct: pct4(f.filled) }));
+
+                const sourceData = (() => {
+                  const sc = {};
+                  updatedSnaps.forEach(s => { const k = s.source || 'unknown'; sc[k] = (sc[k]||0) + 1; });
+                  const labels = { bge_visit: 'BGE Visit', self_report: 'Self-Report', imported: 'Imported', other: 'Other', unknown: 'Unknown' };
+                  return Object.entries(sc).map(([k,v]) => ({ source: labels[k]||k, count: v })).sort((a,b)=>b.count-a.count);
+                })();
+
+                return (
+                  <>
+                    <SectionLabel>Data Completeness — What Fields Are Being Filled In?</SectionLabel>
+                    <Box sx={{ mb: 1.5, p: 1.5, bgcolor: '#F3F6FA', borderRadius: 2, border: '1px solid #DDE4EE' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Based on the latest snapshot for each of the <strong>{total4} MSMEs with data</strong>.
+                        Fields showing a low fill rate indicate areas where BGEs may need reminders to collect that information.
+                      </Typography>
+                    </Box>
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                      <Grid item xs={12} md={8}>
+                        <ChartCard title="Field Fill Rate" subtitle="% of latest snapshots where each field is filled in" height={330}>
+                          <ResponsiveContainer>
+                            <BarChart
+                              data={completenessFields}
+                              layout="vertical"
+                              margin={{ top: 4, right: 40, left: 0, bottom: 4 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
+                              <XAxis type="number" domain={[0,100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }}/>
+                              <YAxis dataKey="label" type="category" width={110} tick={{ fontSize: 10 }}/>
+                              <ReTooltip formatter={(v, _, props) => [`${v}% (${props.payload.filled}/${total4} MSMEs)`, '']}/>
+                              <Bar dataKey="pct" radius={[0,3,3,0]}>
+                                {completenessFields.map((f, i) => (
+                                  <Cell key={i} fill={f.pct >= 80 ? '#2E7D32' : f.pct >= 50 ? '#F9A825' : '#C8102E'}/>
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ChartCard>
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <ChartCard title="Update Source" subtitle="How was the data collected?" height={200}>
+                          <ResponsiveContainer>
+                            <BarChart data={sourceData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
+                              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false}/>
+                              <YAxis dataKey="source" type="category" width={90} tick={{ fontSize: 11 }}/>
+                              <ReTooltip formatter={v => [`${v} snapshots`, '']}/>
+                              <Bar dataKey="count" fill="#1A2F4B" radius={[0,3,3,0]}/>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ChartCard>
+                        <Card variant="outlined" sx={{ mt: 2, p: 1.5 }}>
+                          <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 0.5 }}>COMPLETENESS KEY</Typography>
+                          {[['#2E7D32','80–100% — good coverage'],['#F9A825','50–79% — needs attention'],['#C8102E','< 50% — field often skipped']].map(([c,l]) => (
+                            <Box key={c} sx={{ display:'flex', alignItems:'center', gap: 0.75, mb: 0.25 }}>
+                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c, flexShrink: 0 }}/>
+                              <Typography variant="caption" color="text.secondary">{l}</Typography>
+                            </Box>
+                          ))}
+                        </Card>
+                      </Grid>
+                    </Grid>
+                  </>
+                );
+              })()}
+
+              {/* ── Digital Tools & Training Impact ── */}
+              {updatedSnaps.length > 0 && (() => {
+                const toolCounts = {};
+                updatedSnaps.forEach(s => (s.digital_tools||[]).forEach(t => { toolCounts[t] = (toolCounts[t]||0)+1; }));
+                const toolData = Object.entries(toolCounts)
+                  .sort((a,b) => b[1]-a[1]).slice(0,12)
+                  .map(([tool, count]) => ({ tool: tool.length > 28 ? tool.slice(0,26)+'…' : tool, count }));
+
+                const trainingYes  = updatedSnaps.filter(s => s.training_made_changes === true).length;
+                const trainingNo   = updatedSnaps.filter(s => s.training_made_changes === false).length;
+                const trainingNull = updatedSnaps.length - trainingYes - trainingNo;
+                const trainingChanges = {};
+                updatedSnaps.forEach(s => (s.training_changes||[]).forEach(c => { trainingChanges[c] = (trainingChanges[c]||0)+1; }));
+                const trainingChangeData = Object.entries(trainingChanges)
+                  .sort((a,b)=>b[1]-a[1]).slice(0,10)
+                  .map(([chg,count]) => ({ change: chg.length > 28 ? chg.slice(0,26)+'…' : chg, count }));
+
+                return (
+                  <>
+                    <SectionLabel>Digital Tools Adoption &amp; Training Impact</SectionLabel>
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                      {toolData.length > 0 && (
+                        <Grid item xs={12} md={5}>
+                          <ChartCard title="Digital Tools in Use" subtitle="Top tools adopted across businesses (latest updates)" height={300}>
+                            <ResponsiveContainer>
+                              <BarChart data={toolData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
+                                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }}/>
+                                <YAxis dataKey="tool" type="category" width={130} tick={{ fontSize: 10 }}/>
+                                <ReTooltip formatter={v => [`${v} businesses`, '']}/>
+                                <Bar dataKey="count" fill="#0288D1" radius={[0,3,3,0]}/>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </ChartCard>
+                        </Grid>
+                      )}
+                      <Grid item xs={12} md={toolData.length > 0 ? 3 : 4}>
+                        <Card variant="outlined" sx={{ height: '100%' }}>
+                          <CardContent>
+                            <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                              Training Made a Difference?
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                              BGE-reported training impact across latest snapshots
+                            </Typography>
+                            {[
+                              { label: 'Yes — changes observed', count: trainingYes,  color: '#2E7D32' },
+                              { label: 'No change reported',     count: trainingNo,   color: '#C8102E' },
+                              { label: 'Not answered',           count: trainingNull, color: '#9E9E9E' },
+                            ].map(({ label, count, color }) => (
+                              <Box key={label} sx={{ mb: 1.5 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+                                  <Typography variant="body2" fontSize={12}>{label}</Typography>
+                                  <Typography variant="body2" fontWeight={700} color={color}>{count}</Typography>
+                                </Box>
+                                <LinearProgress variant="determinate"
+                                  value={updatedSnaps.length ? count/updatedSnaps.length*100 : 0}
+                                  sx={{ height: 6, borderRadius: 3, bgcolor: '#E8EDF2',
+                                    '& .MuiLinearProgress-bar': { bgcolor: color } }}/>
+                              </Box>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      {trainingChangeData.length > 0 && (
+                        <Grid item xs={12} md={4}>
+                          <ChartCard title="Training Change Areas" subtitle="What aspects improved after training?" height={300}>
+                            <ResponsiveContainer>
+                              <BarChart data={trainingChangeData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
+                                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }}/>
+                                <YAxis dataKey="change" type="category" width={130} tick={{ fontSize: 10 }}/>
+                                <ReTooltip formatter={v => [`${v} businesses`, '']}/>
+                                <Bar dataKey="count" fill="#2E7D32" radius={[0,3,3,0]}/>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </ChartCard>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </>
+                );
+              })()}
+
+              {/* ── Latest Snapshot Data Table ── */}
+              {updatedSnaps.length > 0 && (
+                <>
+                  <SectionLabel>Latest Snapshot — Full Data View ({updatedSnaps.length} MSMEs)</SectionLabel>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                    The most recent growth update submitted for each MSME. All key fields visible — scroll right to see more.
+                    Values in <span style={{ color: '#9E9E9E' }}>grey</span> were not filled in.
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 3, maxHeight: 520, overflowY: 'auto', overflowX: 'auto' }}>
+                    <Table size="small" stickyHeader sx={{ minWidth: 1200 }}>
+                      <TableHead>
+                        <TableRow>
+                          {[
+                            'Business','BGE','Date','Source',
+                            'Ann. Revenue','Last Mo. Rev.','Total Assets',
+                            'FT Staff','PT Staff','Refugee',
+                            'TIN','URSB','Bank','MoMo','MoMo Pay','SACCO',
+                            'Digital Tools','Training','Notes',
+                          ].map(h => (
+                            <TableCell key={h} sx={{ fontWeight: 700, fontSize: 10, bgcolor: '#F5F5F5', whiteSpace: 'nowrap' }}>{h}</TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[...updatedSnaps].sort((a,b) => b.snapshot_date.localeCompare(a.snapshot_date)).map(s => {
+                          const fmtUGX2 = v => (v == null || v === '') ? null : `${(Number(v)/1000).toFixed(0)}K`;
+                          const ft = (s.employees_ft_male||0)+(s.employees_ft_female||0);
+                          const pt = (s.employees_pt_male||0)+(s.employees_pt_female||0);
+                          const ref = (s.employees_ft_refugee||0)+(s.employees_pt_refugee||0);
+                          const Tick = ({ val, label }) => val == null
+                            ? <Typography fontSize={10} color="text.disabled">—</Typography>
+                            : <Chip size="small" label={val ? (label||'✓') : '✗'}
+                                sx={{ fontSize: 9, height: 16, fontWeight: 700,
+                                  bgcolor: val ? '#E8F5E9' : '#FFEBEE',
+                                  color: val ? '#2E7D32' : '#C62828' }}/>;
+                          return (
+                            <TableRow key={s.id} hover>
+                              <TableCell sx={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {s.msme_name || `MSME ${s.msme}`}
+                              </TableCell>
+                              <TableCell sx={{ fontSize: 10, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                {s.collected_by_name || '—'}
+                              </TableCell>
+                              <TableCell sx={{ fontSize: 10, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                {new Date(s.snapshot_date).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' })}
+                              </TableCell>
+                              <TableCell>
+                                <Chip size="small" label={s.source === 'bge_visit' ? 'BGE' : s.source === 'self_report' ? 'Self' : s.source || '?'}
+                                  sx={{ fontSize: 9, height: 16, bgcolor: s.source === 'bge_visit' ? '#E3F2FD' : '#F3E5F5', color: '#333' }}/>
+                              </TableCell>
+                              {[fmtUGX2(s.annual_turnover), fmtUGX2(s.last_month_revenue), fmtUGX2(s.total_assets)].map((v,i) => (
+                                <TableCell key={i} sx={{ fontSize: 10, whiteSpace: 'nowrap' }}>
+                                  {v ? <Typography fontSize={10} fontWeight={600}>{v}</Typography>
+                                     : <Typography fontSize={10} color="text.disabled">—</Typography>}
+                                </TableCell>
+                              ))}
+                              <TableCell sx={{ fontSize: 10 }}>
+                                {ft > 0 ? <><Typography fontSize={10} fontWeight={600} display="inline">{ft}</Typography><Typography fontSize={9} color="text.secondary" display="inline"> ({s.employees_ft_male||0}M/{s.employees_ft_female||0}F)</Typography></> : <Typography fontSize={10} color="text.disabled">—</Typography>}
+                              </TableCell>
+                              <TableCell sx={{ fontSize: 10 }}>
+                                {pt > 0 ? <><Typography fontSize={10} fontWeight={600} display="inline">{pt}</Typography><Typography fontSize={9} color="text.secondary" display="inline"> ({s.employees_pt_male||0}M/{s.employees_pt_female||0}F)</Typography></> : <Typography fontSize={10} color="text.disabled">—</Typography>}
+                              </TableCell>
+                              <TableCell sx={{ fontSize: 10 }}>
+                                {ref > 0 ? <Typography fontSize={10} fontWeight={600}>{ref}</Typography> : <Typography fontSize={10} color="text.disabled">—</Typography>}
+                              </TableCell>
+                              <TableCell><Tick val={s.has_tin}           label={s.tin_number || '✓'}/></TableCell>
+                              <TableCell><Tick val={s.has_ursb}          label={s.ursb_reg_number || '✓'}/></TableCell>
+                              <TableCell><Tick val={s.has_business_bank} label={s.bank_name || '✓'}/></TableCell>
+                              <TableCell><Tick val={s.has_mobile_money}/></TableCell>
+                              <TableCell><Tick val={s.has_momo_pay}      label={s.momo_pay_code || '✓'}/></TableCell>
+                              <TableCell><Tick val={s.has_sacco}/></TableCell>
+                              <TableCell sx={{ fontSize: 10 }}>
+                                {(s.digital_tools||[]).length > 0
+                                  ? <Chip size="small" label={`${(s.digital_tools||[]).length} tool${(s.digital_tools||[]).length > 1 ? 's' : ''}`}
+                                      sx={{ fontSize: 9, height: 16, bgcolor: '#E3F2FD', color: '#0277BD' }}/>
+                                  : <Typography fontSize={10} color="text.disabled">—</Typography>}
+                              </TableCell>
+                              <TableCell>
+                                {s.training_made_changes == null
+                                  ? <Typography fontSize={10} color="text.disabled">—</Typography>
+                                  : <Chip size="small" label={s.training_made_changes ? 'Yes' : 'No'}
+                                      sx={{ fontSize: 9, height: 16,
+                                        bgcolor: s.training_made_changes ? '#E8F5E9' : '#FFEBEE',
+                                        color:   s.training_made_changes ? '#2E7D32' : '#C62828', fontWeight: 700 }}/>}
+                              </TableCell>
+                              <TableCell sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {s.notes && s.notes.trim()
+                                  ? <Tooltip title={s.notes} placement="left">
+                                      <Typography fontSize={10} color="text.secondary" sx={{ cursor: 'default', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
+                                        {s.notes.trim().slice(0, 50)}{s.notes.trim().length > 50 ? '…' : ''}
+                                      </Typography>
+                                    </Tooltip>
+                                  : <Typography fontSize={10} color="text.disabled">—</Typography>}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+
+              {/* ── Stale MSME list ── */}
+              {staleAll.length > 0 && (
+                <>
+                  <SectionLabel>MSMEs Needing a Visit ({staleAll.length})</SectionLabel>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                    MSMEs that have never been updated, or whose last growth update was more than 60 days ago.
+                    Share this list with BGEs to prioritise field visits.
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 3, maxHeight: 440, overflowY: 'auto' }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 11, bgcolor: '#F5F5F5' }}>Business Name</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 11, bgcolor: '#F5F5F5' }}>Assigned BGE</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 11, bgcolor: '#F5F5F5' }}>Last Update</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, bgcolor: '#F5F5F5' }}>Days Since Update</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {staleAll.slice(0, 100).map((r, i) => (
+                          <TableRow key={i} hover
+                            sx={r.days === Infinity ? { bgcolor: '#FFF3E0' } : r.days > 180 ? { bgcolor: '#FFF8F8' } : {}}>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 600 }}>{r.name}</TableCell>
+                            <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>{r.bgeName}</TableCell>
+                            <TableCell sx={{ fontSize: 11 }}>
+                              {r.lastUpdate
+                                ? new Date(r.lastUpdate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+                                : <Chip size="small" label="Never updated"
+                                    sx={{ fontSize: 10, bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700 }}/>}
+                            </TableCell>
+                            <TableCell align="right">
+                              {r.days === Infinity
+                                ? <Chip size="small" label="No data"
+                                    sx={{ fontSize: 10, height: 18, bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700 }}/>
+                                : <Chip size="small" label={`${r.days} days`}
+                                    sx={{ fontSize: 10, height: 18, fontWeight: 700,
+                                      bgcolor: r.days > 180 ? '#FFEBEE' : r.days > 90 ? '#FFF3E0' : '#FFFDE7',
+                                      color:   r.days > 180 ? '#C62828' : r.days > 90 ? '#E65100' : '#F57F17' }}/>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {staleAll.length > 100 && (
+                          <TableRow>
+                            <TableCell colSpan={4} align="center" sx={{ color: 'text.secondary', fontSize: 11, py: 1.5 }}>
+                              Showing first 100 of {staleAll.length} — export the full list via the CSV button on the Growth &amp; Impact tab
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+
+              {adminSnapshots.length === 0 && (
+                <Box sx={{ py: 8, textAlign: 'center' }}>
+                  <Assessment sx={{ fontSize: 56, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary">No growth updates yet.</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    BGEs need to submit at least one growth update before data appears here.
+                  </Typography>
+                </Box>
+              )}
             </Box>
           );
         })()}
