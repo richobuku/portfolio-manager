@@ -991,7 +991,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   }, [token]);
 
   useEffect(() => {
-    if (section === 'tshirts') fetchTshirtReceipts();
+    if (section !== 'tshirts') return;
+    fetchTshirtReceipts();
+    // Ensure BGEs are loaded for the create-receipt dialog
+    if (experts.length === 0) {
+      const h = { Authorization: `Bearer ${token}` };
+      axios.get(API_ENDPOINTS.EXPERTS, { headers: h })
+        .then(res => setExperts(Array.isArray(res.data) ? res.data : res.data.results || []))
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, fetchTshirtReceipts]);
 
   // Lightweight, debounced refetch JUST for the MSME list when search/filter
@@ -5579,12 +5588,25 @@ PRUDEV II BDS Team`
   // ── T-Shirt Receipts helpers ───────────────────────────────────────────────
   const tshirtDetail = tshirtDetailId ? tshirtReceipts.find(r => r.id === tshirtDetailId) : null;
 
-  const openCreateTshirt = () => {
+  const openCreateTshirt = async () => {
     setTshirtForm({ title: 'PRUDEV II T-Shirt Collection', event: '', colour: 'Blue', notes: '' });
-    const sorted = [...experts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    setTshirtFormEntries(sorted.map((e, idx) => ({ bge_id: e.id, name: e.name, size: 'L', quantity: 1, order: idx })));
+    setTshirtFormEntries([]);
     setTshirtBgeSearch('');
     setTshirtDialog(true);
+
+    // Fetch experts fresh every time the dialog opens so the list is always current
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.EXPERTS, { headers: h });
+      const bgeList = Array.isArray(res.data) ? res.data : res.data.results || [];
+      setExperts(bgeList);
+      const sorted = [...bgeList].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setTshirtFormEntries(sorted.map((e, idx) => ({ bge_id: e.id, name: e.name, size: 'L', quantity: 1, order: idx })));
+    } catch {
+      // fall back to whatever is already in state
+      const sorted = [...experts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setTshirtFormEntries(sorted.map((e, idx) => ({ bge_id: e.id, name: e.name, size: 'L', quantity: 1, order: idx })));
+    }
   };
 
   const handleCreateTshirt = async () => {
@@ -5868,10 +5890,20 @@ PRUDEV II BDS Team`
                       </TableCell>
                     </TableRow>
                   ))}
-                  {filteredFormEntries.length === 0 && (
+                  {filteredFormEntries.length === 0 && tshirtFormEntries.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} align="center">
-                        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>No BGEs found.</Typography>
+                        <Box sx={{ py: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                          <CircularProgress size={16} />
+                          <Typography variant="body2" color="text.secondary">Loading BGE list…</Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {filteredFormEntries.length === 0 && tshirtFormEntries.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>No BGEs match your search.</Typography>
                       </TableCell>
                     </TableRow>
                   )}
