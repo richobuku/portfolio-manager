@@ -2181,13 +2181,8 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
                 bge = user.bge_profile
             except Exception:
                 raise PermissionDenied("No BGE profile associated with this account.")
-
-            # SECURITY: verify the BGE owns the MSME they are filing a report for
-            msme = serializer.validated_data.get('msme')
-            if msme and msme.assigned_bge_id != bge.id:
-                raise PermissionDenied(
-                    "You can only create reports for MSMEs assigned to you."
-                )
+            # Assignment check removed temporarily — BGEs can file reports for any
+            # MSME regardless of direct/group assignment while assignments are being set up.
             serializer.save(bge=bge)
             return
         serializer.save()
