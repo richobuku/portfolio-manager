@@ -2175,14 +2175,54 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         return qs.select_related('msme', 'bge')
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        from datetime import date as _date
+        import math
+
         user = self.request.user
         if not (user.is_staff or user.is_superuser):
             try:
                 bge = user.bge_profile
             except Exception:
                 raise PermissionDenied("No BGE profile associated with this account.")
-            # Assignment check removed temporarily — BGEs can file reports for any
-            # MSME regardless of direct/group assignment while assignments are being set up.
+
+            # Prevent a second BGE from filing an annual/quarterly review for an MSME
+            # that another BGE has already covered in the same period.
+            # The BGE who originally filed it can still edit/update their own report.
+            msme       = serializer.validated_data.get('msme')
+            visit_type = serializer.validated_data.get('visit_type', '')
+            visit_date = serializer.validated_data.get('visit_date') or _date.today()
+
+            if msme and visit_type in ('annual_review', 'quarterly_review'):
+                qs = MSMEReport.objects.filter(
+                    msme=msme,
+                    visit_type=visit_type,
+                    visit_date__year=visit_date.year,
+                ).exclude(bge=bge)
+
+                if visit_type == 'quarterly_review':
+                    # Scope conflict to the same calendar quarter (Q1–Q4)
+                    quarter = math.ceil(visit_date.month / 3)
+                    quarter_start = ((quarter - 1) * 3) + 1
+                    quarter_end   = quarter_start + 2
+                    qs = qs.filter(
+                        visit_date__month__gte=quarter_start,
+                        visit_date__month__lte=quarter_end,
+                    )
+
+                conflict = qs.select_related('bge').first()
+                if conflict:
+                    period_label = (
+                        f"Q{math.ceil(conflict.visit_date.month / 3)} {conflict.visit_date.year}"
+                        if visit_type == 'quarterly_review'
+                        else str(conflict.visit_date.year)
+                    )
+                    raise DRFValidationError(
+                        f"An {'annual' if visit_type == 'annual_review' else 'quarterly'} review "
+                        f"for this MSME has already been filed by {conflict.bge.name} "
+                        f"({period_label}). Only one BGE can file this review per period."
+                    )
+
             serializer.save(bge=bge)
             return
         serializer.save()

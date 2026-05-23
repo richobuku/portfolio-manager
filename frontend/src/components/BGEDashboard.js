@@ -388,7 +388,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       }
       setGrowthDialog(false);
     } catch (e) {
-      setGrowthError(e.response?.data ? JSON.stringify(e.response.data) : 'Save failed.');
+      // Extract a human-readable message from DRF validation errors
+      const errData = e.response?.data;
+      const errMsg =
+        typeof errData === 'string' ? errData :
+        Array.isArray(errData) ? errData[0] :
+        errData?.detail || errData?.non_field_errors?.[0] ||
+        (typeof errData === 'object' ? Object.values(errData).flat()[0] : null) ||
+        'Save failed.';
+      setGrowthError(String(errMsg));
     } finally { setGrowthSaving(false); }
   };
 
