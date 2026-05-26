@@ -3921,7 +3921,7 @@ def _build_tshirt_pdf(receipt):
         label_style))
     story.append(Spacer(1, 0.15 * cm))
     story.append(Paragraph(
-        "Distributed by:   Name: ________________________________   Date: _______________",
+        "Distributed by:   Name: Richard Obuku   Title: BDS Expert   Date: _______________",
         label_style))
     story.append(Spacer(1, 0.15 * cm))
     story.append(Paragraph(
