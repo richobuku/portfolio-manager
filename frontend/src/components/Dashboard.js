@@ -26,7 +26,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -1117,20 +1117,33 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
-  // ── rotate BGE signature ───────────────────────────────────────────────────
+  // ── rotate / clean BGE signature ─────────────────────────────────────────
   const [rotatingSig, setRotatingSig] = useState(false);
+  const [cleaningSig, setCleaningSig] = useState(false);
   const rotateBgeSignature = async (bgeId, direction) => {
     setRotatingSig(true);
     try {
       await axios.post(EXPERT_ROTATE_SIGNATURE_URL(bgeId), { direction }, { headers });
       notify(`Signature rotated ${direction === 'ccw' ? '↺ CCW' : '↻ CW'} and saved.`);
-      // Refresh the view dialog so the updated signature_url appears
       const fresh = await axios.get(`${API_ENDPOINTS.EXPERTS}${bgeId}/`, { headers });
       setViewItem(fresh.data);
     } catch (err) {
       notify(err.response?.data?.detail || 'Rotation failed.', 'error');
     } finally {
       setRotatingSig(false);
+    }
+  };
+  const cleanBgeSignature = async (bgeId) => {
+    setCleaningSig(true);
+    try {
+      await axios.post(EXPERT_CLEAN_SIGNATURE_URL(bgeId), {}, { headers });
+      notify('Signature background removed successfully.');
+      const fresh = await axios.get(`${API_ENDPOINTS.EXPERTS}${bgeId}/`, { headers });
+      setViewItem(fresh.data);
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Cleaning failed.', 'error');
+    } finally {
+      setCleaningSig(false);
     }
   };
 
@@ -6993,7 +7006,11 @@ PRUDEV II BDS Team`
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                     <Box sx={{
                       border: '1px solid #e0e0e0', borderRadius: 1, p: 1,
-                      bgcolor: '#fafafa', display: 'inline-flex',
+                      // checkered pattern so transparency is visible
+                      backgroundImage: 'linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%)',
+                      backgroundSize: '10px 10px',
+                      backgroundPosition: '0 0,0 5px,5px -5px,-5px 0',
+                      display: 'inline-flex',
                     }}>
                       <img
                         src={viewItem.signature_url}
@@ -7019,6 +7036,15 @@ PRUDEV II BDS Team`
                               startIcon={rotatingSig ? <CircularProgress size={14}/> : <RotateRight fontSize="small"/>}
                               onClick={() => rotateBgeSignature(viewItem.id, 'cw')}
                             >CW</Button>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Remove background — flood-fills from corners to erase white, grey or coloured backgrounds">
+                          <span>
+                            <Button
+                              size="small" variant="outlined" color="secondary" disabled={cleaningSig}
+                              startIcon={cleaningSig ? <CircularProgress size={14}/> : <DrawOutlined fontSize="small"/>}
+                              onClick={() => cleanBgeSignature(viewItem.id)}
+                            >Clean BG</Button>
                           </span>
                         </Tooltip>
                       </Box>

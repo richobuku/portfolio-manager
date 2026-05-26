@@ -1526,6 +1526,114 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             'signature_url': request.build_absolute_uri(bge.signature.url) if bge.signature else None,
         })
 
+    @action(detail=True, methods=['post'], url_path='clean-signature')
+    def clean_signature(self, request, pk=None):
+        """Admin: remove background from a BGE's stored signature.
+
+        Uses BFS flood-fill from all four corners to detect the background
+        colour and erase connected regions of similar colour. This handles
+        white, grey, cream, or any solid-colour background — not just pure white.
+        Tolerance is configurable via POST body {'tolerance': 40} (default 35).
+        """
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can clean signatures.")
+
+        bge = self.get_object()
+        raw = _bge_signature_bytes(bge)
+        if not raw:
+            return Response({'detail': 'No signature found for this BGE.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        tolerance = int(request.data.get('tolerance', 35))
+        tolerance = max(10, min(tolerance, 120))  # clamp to sane range
+
+        try:
+            from PIL import Image as _PilImg
+            import math as _math
+
+            img = _PilImg.open(_io.BytesIO(raw)).convert('RGBA')
+            width, height = img.size
+            pixels = img.load()
+
+            # ── Step 1: sample background colour from the image border ───────
+            edge_samples = []
+            step = max(1, min(width, height) // 20)
+            for x in range(0, width, step):
+                edge_samples.append(pixels[x, 0][:3])
+                edge_samples.append(pixels[x, height - 1][:3])
+            for y in range(0, height, step):
+                edge_samples.append(pixels[0, y][:3])
+                edge_samples.append(pixels[width - 1, y][:3])
+
+            bg_r = sum(s[0] for s in edge_samples) // len(edge_samples)
+            bg_g = sum(s[1] for s in edge_samples) // len(edge_samples)
+            bg_b = sum(s[2] for s in edge_samples) // len(edge_samples)
+
+            # ── Step 2: BFS flood-fill from all four corners ─────────────────
+            from collections import deque
+            visited = [[False] * height for _ in range(width)]
+            queue = deque()
+
+            seed_points = [
+                (0, 0), (width - 1, 0),
+                (0, height - 1), (width - 1, height - 1),
+            ]
+            for sx, sy in seed_points:
+                if not visited[sx][sy]:
+                    visited[sx][sy] = True
+                    queue.append((sx, sy))
+
+            neighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            while queue:
+                x, y = queue.popleft()
+                r, g, b, a = pixels[x, y]
+                dist = _math.sqrt((r - bg_r) ** 2 + (g - bg_g) ** 2 + (b - bg_b) ** 2)
+                if dist > tolerance:
+                    continue  # not background — stop expanding
+                pixels[x, y] = (r, g, b, 0)  # erase
+                for dx, dy in neighbours:
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < width and 0 <= ny < height and not visited[nx][ny]:
+                        visited[nx][ny] = True
+                        queue.append((nx, ny))
+
+            # ── Step 3: also erase any isolated near-background islands ──────
+            # (e.g. JPEG compression artefacts that weren't flood-connected)
+            data = list(img.getdata())
+            new_data = []
+            for r, g, b, a in data:
+                if a == 0:
+                    new_data.append((r, g, b, 0))
+                    continue
+                dist = _math.sqrt((r - bg_r) ** 2 + (g - bg_g) ** 2 + (b - bg_b) ** 2)
+                # Use a tighter threshold for the sweep pass to avoid eating ink
+                if dist < tolerance * 0.6:
+                    new_data.append((r, g, b, 0))
+                else:
+                    new_data.append((r, g, b, a))
+            img.putdata(new_data)
+
+            # ── Step 4: save ──────────────────────────────────────────────────
+            buf = _io.BytesIO()
+            img.save(buf, format='PNG')
+            png_bytes = buf.getvalue()
+
+            from django.core.files.base import ContentFile
+            bge.signature_data = png_bytes
+            fname = f'sig_{bge.bge_code or bge.id}.png'
+            bge.signature.delete(save=False)
+            bge.signature.save(fname, ContentFile(png_bytes), save=False)
+            bge.save(update_fields=['signature', 'signature_data'])
+
+        except Exception as exc:
+            return Response({'detail': f'Cleaning failed: {exc}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'detail': 'Signature background removed successfully.',
+            'signature_url': request.build_absolute_uri(bge.signature.url) if bge.signature else None,
+        })
+
     @action(detail=False, methods=['post'], url_path='upload')
     def upload(self, request):
         """Upload BGE list from Excel. Matches PRUDEV II BGE list format."""
