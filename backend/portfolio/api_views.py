@@ -1530,10 +1530,11 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
     def clean_signature(self, request, pk=None):
         """Admin: remove background from a BGE's stored signature.
 
-        Uses BFS flood-fill from all four corners to detect the background
+        Uses BFS flood-fill seeded from all four edges to detect the background
         colour and erase connected regions of similar colour. This handles
         white, grey, cream, or any solid-colour background — not just pure white.
-        Tolerance is configurable via POST body {'tolerance': 40} (default 35).
+        A luminance sweep pass follows to catch any disconnected bright patches.
+        Tolerance is configurable via POST body {'tolerance': 50} (default 50).
         """
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can clean signatures.")
@@ -1544,8 +1545,8 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             return Response({'detail': 'No signature found for this BGE.'},
                             status=status.HTTP_404_NOT_FOUND)
 
-        tolerance = int(request.data.get('tolerance', 35))
-        tolerance = max(10, min(tolerance, 120))  # clamp to sane range
+        tolerance = int(request.data.get('tolerance', 50))
+        tolerance = max(10, min(tolerance, 150))  # clamp to sane range
 
         try:
             from PIL import Image as _PilImg
@@ -1555,13 +1556,12 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             width, height = img.size
             pixels = img.load()
 
-            # ── Step 1: sample background colour from the image border ───────
+            # ── Step 1: sample background colour from ALL border pixels ──────
             edge_samples = []
-            step = max(1, min(width, height) // 20)
-            for x in range(0, width, step):
+            for x in range(width):
                 edge_samples.append(pixels[x, 0][:3])
                 edge_samples.append(pixels[x, height - 1][:3])
-            for y in range(0, height, step):
+            for y in range(1, height - 1):
                 edge_samples.append(pixels[0, y][:3])
                 edge_samples.append(pixels[width - 1, y][:3])
 
@@ -1569,19 +1569,22 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             bg_g = sum(s[1] for s in edge_samples) // len(edge_samples)
             bg_b = sum(s[2] for s in edge_samples) // len(edge_samples)
 
-            # ── Step 2: BFS flood-fill from all four corners ─────────────────
+            # ── Step 2: BFS flood-fill seeded from ALL four edges ────────────
             from collections import deque
             visited = [[False] * height for _ in range(width)]
             queue = deque()
 
-            seed_points = [
-                (0, 0), (width - 1, 0),
-                (0, height - 1), (width - 1, height - 1),
-            ]
-            for sx, sy in seed_points:
-                if not visited[sx][sy]:
-                    visited[sx][sy] = True
-                    queue.append((sx, sy))
+            # Seed every pixel on all four edges
+            for x in range(width):
+                for y_seed in (0, height - 1):
+                    if not visited[x][y_seed]:
+                        visited[x][y_seed] = True
+                        queue.append((x, y_seed))
+            for y in range(1, height - 1):
+                for x_seed in (0, width - 1):
+                    if not visited[x_seed][y]:
+                        visited[x_seed][y] = True
+                        queue.append((x_seed, y))
 
             neighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)]
             while queue:
@@ -1597,8 +1600,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                         visited[nx][ny] = True
                         queue.append((nx, ny))
 
-            # ── Step 3: also erase any isolated near-background islands ──────
-            # (e.g. JPEG compression artefacts that weren't flood-connected)
+            # ── Step 3: erase isolated near-background pixels (JPEG artefacts)
             data = list(img.getdata())
             new_data = []
             for r, g, b, a in data:
@@ -1606,14 +1608,29 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                     new_data.append((r, g, b, 0))
                     continue
                 dist = _math.sqrt((r - bg_r) ** 2 + (g - bg_g) ** 2 + (b - bg_b) ** 2)
-                # Use a tighter threshold for the sweep pass to avoid eating ink
-                if dist < tolerance * 0.6:
+                if dist < tolerance * 0.75:
                     new_data.append((r, g, b, 0))
                 else:
                     new_data.append((r, g, b, a))
             img.putdata(new_data)
 
-            # ── Step 4: save ──────────────────────────────────────────────────
+            # ── Step 4: luminance sweep to catch bright non-connected patches ─
+            # Handles off-white paper in scanned/photographed signatures
+            data2 = list(img.getdata())
+            new_data2 = []
+            for r, g, b, a in data2:
+                if a == 0:
+                    new_data2.append((r, g, b, 0))
+                    continue
+                lum = 0.299 * r + 0.587 * g + 0.114 * b
+                sat_range = max(r, g, b) - min(r, g, b)
+                if lum > 210 and sat_range < 40:
+                    new_data2.append((r, g, b, 0))
+                else:
+                    new_data2.append((r, g, b, a))
+            img.putdata(new_data2)
+
+            # ── Step 5: save ──────────────────────────────────────────────────
             buf = _io.BytesIO()
             img.save(buf, format='PNG')
             png_bytes = buf.getvalue()
@@ -3802,8 +3819,8 @@ def _build_tshirt_pdf(receipt):
     entries = list(receipt.entries.select_related('bge').order_by('order', 'bge__name'))
 
     # ── Column widths — landscape A4 content = 297mm − 30mm margins = 267mm = 26.7cm
-    # #(0.5) Name(4.5) Code(3.0) Phone(3.3) Loc(2.2) Size(1.4) Qty(0.8) Sig(7.2) Date(2.8) = 25.7cm
-    col_w = [0.5*cm, 4.5*cm, 3.0*cm, 3.3*cm, 2.2*cm, 1.4*cm, 0.8*cm, 7.2*cm, 2.8*cm]
+    # #(0.7) Name(4.5) Code(3.0) Phone(3.3) Loc(2.2) Size(1.4) Qty(0.8) Sig(6.0) Date(2.8) = 24.7cm
+    col_w = [0.7*cm, 4.5*cm, 3.0*cm, 3.3*cm, 2.2*cm, 1.4*cm, 0.8*cm, 6.0*cm, 2.8*cm]
 
     SIG_ROW_H = 1.1 * cm
 
@@ -3885,10 +3902,12 @@ def _build_tshirt_pdf(receipt):
     sub_parts.append(f"Colour: {receipt.colour}")
     story.append(Paragraph("  —  ".join(sub_parts), sub_style))
     story.append(Spacer(1, 0.25 * cm))
+    from datetime import date as _date, timedelta as _td
+    _today = _date.today()
+    _this_monday = _today - _td(days=_today.isocalendar()[2] - 1)
+    _last_friday = _this_monday - _td(days=3)
     story.append(Paragraph(
-        "Date: __________________________   "
-        "Group Leader: __________________________________   "
-        "Signature: __________________________",
+        f"Date: {_last_friday.strftime('%d/%m/%Y')}",
         label_style))
     story.append(Spacer(1, 0.15 * cm))
     story.append(Paragraph(
@@ -3902,8 +3921,11 @@ def _build_tshirt_pdf(receipt):
         label_style))
     story.append(Spacer(1, 0.15 * cm))
     story.append(Paragraph(
-        "Distributed by: _________________________   Name: _________________________   Date: ____________   "
-        "Verified by: _________________________   Name: _________________________   Date: ____________",
+        "Distributed by:   Name: ________________________________   Date: _______________",
+        label_style))
+    story.append(Spacer(1, 0.15 * cm))
+    story.append(Paragraph(
+        "Verified by: Stella Abote.   Date: _______",
         label_style))
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph("PRUDEV II Programme — GOPA AFC in partnership with GIZ  |  Confidential", conf_style))
