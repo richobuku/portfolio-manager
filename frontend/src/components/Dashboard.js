@@ -19,7 +19,8 @@ import {
   Assignment, DragHandle, ExpandMore,
   Lock, LockOpen, Star, StarBorder, Download, Undo,
   Campaign, Send as SendIcon, Checkroom, DrawOutlined,
-  RotateLeft, RotateRight,
+  RotateLeft, RotateRight, Dashboard as DashboardIcon,
+  ArrowForward, WarningAmber, TaskAlt,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -33,6 +34,7 @@ const ROWS_PER_PAGE = 15;
 const DRAWER_WIDTH = 220;
 
 const NAV_ITEMS = [
+  { key: 'overview',    label: 'Overview',        icon: <DashboardIcon /> },
   { key: 'msmes',       label: 'MSMEs',          icon: <Business /> },
   { key: 'experts',     label: 'BGE Experts',    icon: <People /> },
   { key: 'assignments', label: 'Assignments',    icon: <Assignment /> },
@@ -711,7 +713,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   const [section, setSection] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get('section');
-    return NAV_ITEMS.some((item) => item.key === requested) ? requested : 'msmes';
+    return NAV_ITEMS.some((item) => item.key === requested) ? requested : 'overview';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -2075,6 +2077,198 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       </TableContainer>
     </Box>
   );
+
+  // ── Overview / Home Dashboard ─────────────────────────────────────────────
+  const renderOverview = () => {
+    const A = analytics || {};
+    const fmt = (v) => v == null ? '—' : Number(v) >= 1_000_000
+      ? `${(Number(v)/1_000_000).toFixed(1)}M` : Number(v) >= 1_000
+      ? `${(Number(v)/1_000).toFixed(0)}K` : String(v);
+
+    const totalMsmes     = A.total_msmes  || msmes.length;
+    const totalBges      = A.total_bges   || experts.length;
+    const totalSessions  = trainingSessions.length;
+    const totalReports   = (A.total_reports || 0) + (A.total_group_reports || 0);
+    const totalGroups    = A.total_groups  || bgeGroups.length;
+    const totalRevenue   = fmt(A.total_annual_revenue);
+    const totalEmployees = A.total_employees || 0;
+    const diag_total     = A.diag_total || 0;
+
+    const kpiCards = [
+      { val: totalMsmes,    label: 'MSMEs Enrolled',   sub: 'programme participants', color: BRAND.primaryMain, key: 'msmes' },
+      { val: totalBges,     label: 'BGE Experts',      sub: 'coaches in field',       color: BRAND.gizRed,      key: 'experts' },
+      { val: totalSessions, label: 'Training Sessions',sub: 'conducted to date',      color: '#0288D1',         key: 'training' },
+      { val: totalReports,  label: 'Reports Filed',    sub: 'MSME + group visits',    color: '#2E7D32',         key: 'reports' },
+      { val: totalGroups,   label: 'BGE Groups',       sub: 'active teams',           color: '#E65100',         key: 'bgegroups' },
+      { val: totalEmployees,label: 'Total Employees',  sub: 'across all MSMEs',       color: '#5D4037',         key: 'analytics' },
+    ];
+
+    const quickLinks = [
+      { key: 'msmes',         label: 'MSMEs',             icon: <Business />,      desc: 'Browse and manage enrolled businesses' },
+      { key: 'experts',       label: 'BGE Experts',       icon: <People />,        desc: 'View coach profiles and assignments' },
+      { key: 'training',      label: 'Training',          icon: <School />,        desc: 'Sessions, attendance and reports' },
+      { key: 'reports',       label: 'Reports',           icon: <PictureAsPdf />,  desc: 'Field visit and mentor reports' },
+      { key: 'analytics',     label: 'Analytics',         icon: <Assessment />,    desc: 'Programme-wide insights and trends' },
+      { key: 'participation', label: 'Participation',     icon: <TrendingUp />,    desc: 'Per-session MSME participation' },
+      { key: 'workorders',    label: 'Work Orders',       icon: <Assignment />,    desc: 'Issue and track BGE work orders' },
+      { key: 'communications',label: 'Communications',    icon: <Campaign />,      desc: 'Email MSMEs and send bulk messages' },
+    ];
+
+    // Upcoming / recent sessions
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = trainingSessions
+      .filter(s => s.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 4);
+    const recent = trainingSessions
+      .filter(s => s.date < today)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 4);
+
+    return (
+      <Box>
+        {/* ── Welcome bar ── */}
+        <Box sx={{ mb: 3, p: 2.5, borderRadius: 2, background: `linear-gradient(135deg, ${BRAND.sidebarBg} 0%, #1a3a5c 100%)`, color: '#fff' }}>
+          <Typography variant="h5" fontWeight={800} gutterBottom>
+            PRUDEV II Programme Dashboard
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+            Welcome back{currentUser?.name ? `, ${currentUser.name}` : ''}. Here's the programme at a glance.
+          </Typography>
+        </Box>
+
+        {/* ── KPI cards ── */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {kpiCards.map(({ val, label, sub, color, key }) => (
+            <Grid item xs={6} sm={4} lg={2} key={key}>
+              <Card
+                variant="outlined"
+                sx={{ height: '100%', borderLeft: `4px solid ${color}`, cursor: 'pointer', '&:hover': { boxShadow: 3 } }}
+                onClick={() => startTransition(() => setSection(key))}
+              >
+                <CardContent sx={{ pb: '12px !important', pt: '14px !important' }}>
+                  <Typography variant="h5" fontWeight={800} color={color}>{val}</Typography>
+                  <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.2, mt: 0.5 }}>{label}</Typography>
+                  <Typography variant="caption" color="text.secondary">{sub}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* ── Revenue / diagnostic highlight ── */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card variant="outlined" sx={{ height: '100%', borderTop: `3px solid ${BRAND.primaryMain}` }}>
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">Total Self-Reported Revenue</Typography>
+                <Typography variant="h4" fontWeight={800} color={BRAND.primaryMain}>{totalRevenue}</Typography>
+                <Typography variant="caption" color="text.secondary">Aggregated across {totalMsmes} MSMEs</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card variant="outlined" sx={{ height: '100%', borderTop: '3px solid #2E7D32' }}>
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">Diagnostic Coverage</Typography>
+                <Typography variant="h4" fontWeight={800} color="#2E7D32">{diag_total}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  MSMEs with baseline diagnostic data
+                  {totalMsmes > 0 && ` (${Math.round(diag_total / totalMsmes * 100)}% coverage)`}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined" sx={{ height: '100%', borderTop: '3px solid #0288D1' }}>
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">Training Engagement</Typography>
+                <Typography variant="h4" fontWeight={800} color="#0288D1">{totalSessions}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Sessions held · {trainingSessions.reduce((t, s) => t + (s.attendance_count || 0), 0)} total attendances
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* ── Quick links grid ── */}
+        <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>Quick Access</Typography>
+        <Grid container spacing={1.5} sx={{ mb: 3 }}>
+          {quickLinks.map(({ key, label, icon, desc }) => (
+            <Grid item xs={12} sm={6} md={3} key={key}>
+              <Card
+                variant="outlined"
+                sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3, borderColor: BRAND.primaryMain } }}
+                onClick={() => startTransition(() => setSection(key))}
+              >
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '12px !important' }}>
+                  <Box sx={{ color: BRAND.primaryMain, display: 'flex', flexShrink: 0 }}>{icon}</Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle2" fontWeight={700}>{label}</Typography>
+                    <Typography variant="caption" color="text.secondary" noWrap>{desc}</Typography>
+                  </Box>
+                  <ArrowForward fontSize="small" sx={{ ml: 'auto', color: 'text.disabled', flexShrink: 0 }} />
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* ── Upcoming & recent sessions ── */}
+        {(upcoming.length > 0 || recent.length > 0) && (
+          <Grid container spacing={2}>
+            {upcoming.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  <TaskAlt fontSize="inherit" sx={{ mr: 0.5, verticalAlign: 'middle', color: '#2E7D32' }} />
+                  Upcoming Sessions
+                </Typography>
+                <Paper variant="outlined">
+                  {upcoming.map((s, i) => (
+                    <Box key={s.id} sx={{ px: 2, py: 1.5, borderBottom: i < upcoming.length - 1 ? '1px solid #eee' : 'none',
+                      display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <EventNote fontSize="small" sx={{ color: '#0288D1' }} />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {s.date} · {(s.team || []).find(m => m.role === 'lead')?.bge_name || 'Lead TBC'}
+                        </Typography>
+                      </Box>
+                      <Chip label={`${s.attendance_count ?? 0} attending`} size="small" />
+                    </Box>
+                  ))}
+                </Paper>
+              </Grid>
+            )}
+            {recent.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  <School fontSize="inherit" sx={{ mr: 0.5, verticalAlign: 'middle', color: BRAND.gizRed }} />
+                  Recent Sessions
+                </Typography>
+                <Paper variant="outlined">
+                  {recent.map((s, i) => (
+                    <Box key={s.id} sx={{ px: 2, py: 1.5, borderBottom: i < recent.length - 1 ? '1px solid #eee' : 'none',
+                      display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <EventNote fontSize="small" sx={{ color: BRAND.gizRed }} />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {s.date} · {(s.team || []).find(m => m.role === 'lead')?.bge_name || 'No lead'}
+                        </Typography>
+                      </Box>
+                      <Chip label={`${s.attendance_count ?? 0} attended`} size="small" variant="outlined" />
+                    </Box>
+                  ))}
+                </Paper>
+              </Grid>
+            )}
+          </Grid>
+        )}
+      </Box>
+    );
+  };
 
   const renderExperts = () => (
     <Box>
@@ -6901,6 +7095,7 @@ PRUDEV II BDS Team`
   };
 
   const sectionMap = {
+    overview: renderOverview,
     msmes: renderMSMEs,
     experts: renderExperts,
     assignments: renderAssignments,
