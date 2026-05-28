@@ -20,7 +20,7 @@ import {
   Lock, LockOpen, Star, StarBorder, Download, Undo,
   Campaign, Send as SendIcon, Checkroom, DrawOutlined,
   RotateLeft, RotateRight, Dashboard as DashboardIcon,
-  ArrowForward, WarningAmber, TaskAlt,
+  ArrowForward, TaskAlt,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
