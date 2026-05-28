@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, Sum, Q, Max
+from django.db.models import Count, Sum, Q, Max, Subquery, OuterRef
 from django.contrib.auth.models import User
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
@@ -953,8 +953,36 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         agg = qs.aggregate(
             total_investment_needed=Sum('investment_needed'),
             total_annual_revenue=Sum('annual_revenue'),
-            total_employees=Sum('employee_count'),
         )
+
+        # Total employees from the latest growth snapshot per MSME in scope.
+        # 1) Find the most recent snapshot date per MSME.
+        # 2) Pull employee columns from those rows and sum them.
+        msme_ids = list(qs.values_list('id', flat=True))
+        latest_snapshot_ids = (
+            MSMEGrowthSnapshot.objects
+            .filter(msme_id__in=msme_ids)
+            .order_by('msme_id', '-snapshot_date')
+            .distinct('msme_id')
+            .values_list('id', flat=True)
+        )
+        snap_emp_agg = MSMEGrowthSnapshot.objects.filter(id__in=latest_snapshot_ids).aggregate(
+            ft_male   = Sum('employees_ft_male'),
+            ft_female = Sum('employees_ft_female'),
+            pt_male   = Sum('employees_pt_male'),
+            pt_female = Sum('employees_pt_female'),
+            ft_refugee = Sum('employees_ft_refugee'),
+            pt_refugee = Sum('employees_pt_refugee'),
+        )
+        snapshot_employees = {
+            'ft_male':    snap_emp_agg['ft_male']    or 0,
+            'ft_female':  snap_emp_agg['ft_female']  or 0,
+            'pt_male':    snap_emp_agg['pt_male']    or 0,
+            'pt_female':  snap_emp_agg['pt_female']  or 0,
+            'ft_refugee': snap_emp_agg['ft_refugee'] or 0,
+            'pt_refugee': snap_emp_agg['pt_refugee'] or 0,
+        }
+        total_employees_from_snapshots = sum(snapshot_employees.values())
 
         # Reports / activity stats
         from .models import MSMEReport, GroupReport
@@ -1115,7 +1143,8 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             'total_msmes': qs.count(),
             'total_investment_needed': agg['total_investment_needed'] or 0,
             'total_annual_revenue':    agg['total_annual_revenue']    or 0,
-            'total_employees':         agg['total_employees']         or 0,
+            'total_employees':         total_employees_from_snapshots,
+            'snapshot_employees':      snapshot_employees,
             'total_bges':              BusinessGrowthExpert.objects.count(),
             'total_groups':            BGEGroup.objects.count(),
             'total_reports':           MSMEReport.objects.count(),

@@ -2091,8 +2091,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     const totalReports   = (A.total_reports || 0) + (A.total_group_reports || 0);
     const totalGroups    = A.total_groups  || bgeGroups.length;
     const totalRevenue   = fmt(A.total_annual_revenue);
-    const totalEmployees = A.total_employees || 0;
     const diag_total     = A.diag_total || 0;
+
+    // Employees from latest data-update snapshots
+    const snapEmp        = A.snapshot_employees || {};
+    const totalEmployees = A.total_employees || 0;
+    const ftTotal        = (snapEmp.ft_male || 0) + (snapEmp.ft_female || 0);
+    const ptTotal        = (snapEmp.pt_male || 0) + (snapEmp.pt_female || 0);
+    const refugeeTotal   = (snapEmp.ft_refugee || 0) + (snapEmp.pt_refugee || 0);
+    const empSub         = totalEmployees
+      ? `FT ${ftTotal} · PT ${ptTotal}${refugeeTotal ? ` · Refugee ${refugeeTotal}` : ''}`
+      : 'from latest data updates';
 
     const kpiCards = [
       { val: totalMsmes,    label: 'MSMEs Enrolled',   sub: 'programme participants', color: BRAND.primaryMain, key: 'msmes' },
@@ -2100,7 +2109,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       { val: totalSessions, label: 'Training Sessions',sub: 'conducted to date',      color: '#0288D1',         key: 'training' },
       { val: totalReports,  label: 'Reports Filed',    sub: 'MSME + group visits',    color: '#2E7D32',         key: 'reports' },
       { val: totalGroups,   label: 'BGE Groups',       sub: 'active teams',           color: '#E65100',         key: 'bgegroups' },
-      { val: totalEmployees,label: 'Total Employees',  sub: 'across all MSMEs',       color: '#5D4037',         key: 'analytics' },
+      { val: totalEmployees,label: 'Total Employees',  sub: empSub,                   color: '#5D4037',         key: 'analytics' },
     ];
 
     const quickLinks = [
@@ -2814,7 +2823,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 { val: A.total_bges || experts.length,                      label: 'BGE Experts',       sub: 'coaches in field',   color: BRAND.gizRed },
                 { val: A.total_groups || 0,                                 label: 'BGE Groups',        sub: 'active teams',       color: '#0288D1' },
                 { val: (A.total_reports||0)+(A.total_group_reports||0),     label: 'Reports Filed',     sub: 'MSME + group visits', color: '#2E7D32' },
-                { val: A.total_employees || 0,                              label: 'Total Employees',   sub: 'across all MSMEs',   color: '#5D4037' },
+                { val: A.total_employees || 0,                              label: 'Total Employees',   sub: 'from latest data updates', color: '#5D4037' },
                 { val: fmt(A.total_annual_revenue),                         label: 'Total Revenue',     sub: 'self-reported',      color: '#7B1FA2' },
               ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
             </Grid>
