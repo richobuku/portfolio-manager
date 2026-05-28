@@ -1138,6 +1138,32 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                    .order_by('-count')[:12]
         )
 
+        # MSMEs with at least one data update (growth snapshot)
+        msmes_with_updates = (
+            MSMEGrowthSnapshot.objects
+            .filter(msme_id__in=msme_ids)
+            .values('msme_id')
+            .distinct()
+            .count()
+        )
+
+        # BGEs active in the last 30 days (filed a snapshot or MSME report)
+        from datetime import timedelta
+        from django.utils import timezone
+        cutoff = timezone.now() - timedelta(days=30)
+        bges_via_snapshots = set(
+            MSMEGrowthSnapshot.objects
+            .filter(created_at__gte=cutoff, collected_by__isnull=False)
+            .values_list('collected_by_id', flat=True)
+        )
+        from .models import MSMEReport
+        bges_via_reports = set(
+            MSMEReport.objects
+            .filter(created_at__gte=cutoff)
+            .values_list('bge_id', flat=True)
+        )
+        active_bges_30d = len(bges_via_snapshots | bges_via_reports)
+
         return Response({
             # KPIs
             'total_msmes': qs.count(),
@@ -1145,6 +1171,8 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             'total_annual_revenue':    agg['total_annual_revenue']    or 0,
             'total_employees':         total_employees_from_snapshots,
             'snapshot_employees':      snapshot_employees,
+            'msmes_with_updates':      msmes_with_updates,
+            'active_bges_30d':         active_bges_30d,
             'total_bges':              BusinessGrowthExpert.objects.count(),
             'total_groups':            BGEGroup.objects.count(),
             'total_reports':           MSMEReport.objects.count(),

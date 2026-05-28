@@ -2165,25 +2165,33 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           ))}
         </Grid>
 
-        {/* ── Revenue / diagnostic highlight ── */}
+        {/* ── Highlight cards ── */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6} md={4}>
             <Card variant="outlined" sx={{ height: '100%', borderTop: `3px solid ${BRAND.primaryMain}` }}>
               <CardContent>
-                <Typography variant="overline" color="text.secondary">Total Self-Reported Revenue</Typography>
-                <Typography variant="h4" fontWeight={800} color={BRAND.primaryMain}>{totalRevenue}</Typography>
-                <Typography variant="caption" color="text.secondary">Aggregated across {totalMsmes} MSMEs</Typography>
+                <Typography variant="overline" color="text.secondary">Active BGEs (Last 30 Days)</Typography>
+                <Typography variant="h4" fontWeight={800} color={BRAND.primaryMain}>
+                  {A.active_bges_30d ?? '—'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  BGEs who filed a report or data update · out of {totalBges} total
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
             <Card variant="outlined" sx={{ height: '100%', borderTop: '3px solid #2E7D32' }}>
               <CardContent>
-                <Typography variant="overline" color="text.secondary">Diagnostic Coverage</Typography>
-                <Typography variant="h4" fontWeight={800} color="#2E7D32">{diag_total}</Typography>
+                <Typography variant="overline" color="text.secondary">Data Update Coverage</Typography>
+                <Typography variant="h4" fontWeight={800} color="#2E7D32">
+                  {A.msmes_with_updates ?? '—'}
+                </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  MSMEs with baseline diagnostic data
-                  {totalMsmes > 0 && ` (${Math.round(diag_total / totalMsmes * 100)}% coverage)`}
+                  MSMEs with at least one data update
+                  {totalMsmes > 0 && A.msmes_with_updates != null
+                    ? ` (${Math.round(A.msmes_with_updates / totalMsmes * 100)}% of enrolled)`
+                    : ''}
                 </Typography>
               </CardContent>
             </Card>
