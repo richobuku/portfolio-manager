@@ -3725,78 +3725,53 @@ def _normalise_phone(phone):
     return p
 
 
-def _mc_probe_balance(api_key, base_url):
-    """
-    Probe Message Carrier balance by sending a deliberately invalid-number request.
-    The API returns the current wallet balance in both success and error responses.
-    Returns (balance_float, raw_message_str).
-    """
-    import json as _json
-    import re as _re
+SMS_BALANCE_CACHE_KEY = 'mc_sms_wallet_balance'
 
-    endpoint = f'{base_url}/v1/api-keys/send-sms'
-    payload   = _json.dumps({'phone': '+2560000000000', 'message': 'ping'}).encode()
 
+def _cache_sms_balance(balance):
+    """Store the latest known SMS wallet balance in Django's cache (24h TTL)."""
     try:
-        import requests as _requests
-        resp = _requests.post(
-            endpoint,
-            data=payload,
-            headers={'Content-Type': 'application/json', 'x-api-key': api_key},
-            timeout=12,
-        )
-        # requests does NOT raise on 4xx — we read the body regardless
-        try:
-            body = resp.json()
-        except Exception:
-            return None, f'Non-JSON response (HTTP {resp.status_code}): {resp.text[:200]}'
-    except ImportError:
-        # Fall back to urllib if requests is not installed
-        import urllib.request as _req
-        import urllib.error as _uerr
-        req = _req.Request(endpoint, data=payload, method='POST')
-        req.add_header('Content-Type', 'application/json')
-        req.add_header('x-api-key', api_key)
-        try:
-            with _req.urlopen(req, timeout=12) as r:
-                body = _json.loads(r.read().decode())
-        except _uerr.HTTPError as exc:
-            body = _json.loads(exc.read().decode())
-        except Exception as exc:
-            return None, f'urllib error: {exc}'
-    except Exception as exc:
-        return None, f'requests error: {exc}'
+        from django.core.cache import cache
+        cache.set(SMS_BALANCE_CACHE_KEY, float(balance), timeout=86400)
+    except Exception:
+        pass
 
-    msg = body.get('message', '') if isinstance(body, dict) else str(body)
-    # Parse "Available: 10.00" from error or success body
-    m = _re.search(r'Available[:\s]+([0-9]+(?:\.[0-9]+)?)', msg, _re.I)
-    if m:
-        return float(m.group(1)), msg
-    # Success response may have walletBalance field
-    if isinstance(body, dict) and 'walletBalance' in body:
-        return float(body['walletBalance']), msg
-    return None, msg
+
+def _get_cached_sms_balance():
+    """Return the last known SMS wallet balance from cache, or None."""
+    try:
+        from django.core.cache import cache
+        return cache.get(SMS_BALANCE_CACHE_KEY)
+    except Exception:
+        return None
 
 
 @api_view(['GET'])
 @permission_classes([_IsAuth])
 def bulk_sms_balance_view(request):
-    """Return the current Message Carrier wallet balance."""
+    """Return the current Message Carrier wallet balance (from cache).
+
+    The cache is populated after every bulk SMS send (balanceAfter field).
+    Use ?seed=<amount> to manually seed the balance (admin only).
+    """
     if not (request.user.is_staff or request.user.is_superuser):
         raise PermissionDenied("Only administrators can view SMS balance.")
 
-    from django.conf import settings as _s
-    api_key  = _s.MESSAGE_CARRIER_API_KEY
-    base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.bravo.mystyler.xyz')
+    # Allow manual seeding: /api/bulk-sms/balance/?seed=465
+    seed = request.query_params.get('seed')
+    if seed:
+        try:
+            _cache_sms_balance(float(seed))
+        except ValueError:
+            pass
 
-    balance, msg = _mc_probe_balance(api_key, base_url)
-    logger.info('SMS balance probe: balance=%s msg=%r key_prefix=%s', balance, msg, api_key[:12] if api_key else 'MISSING')
+    balance = _get_cached_sms_balance()
     return Response({
         'balance': balance,
-        'message': msg if msg else ('Balance probe returned no data — check API key and network' if balance is None else ''),
         'currency': 'UGX',
         'cost_per_sms': 45,
         'ok': balance is not None,
+        'message': '' if balance is not None else 'Balance updates automatically after each SMS send.',
     })
 
 
@@ -3820,17 +3795,28 @@ def _do_send_sms(records, message, user_id):
         sent_by = None
 
     logs = []
+    last_balance = None
     for rec in records:
         phone = _normalise_phone(rec['phone'])
         personal_msg = message.replace('{{name}}', (rec['name'] or '').split()[0])
         try:
-            payload = _json.dumps({'phone': phone, 'message': personal_msg}).encode()
-            req = _urllib.Request(endpoint, data=payload, method='POST')
-            req.add_header('Content-Type', 'application/json')
-            req.add_header('x-api-key', api_key)
-            with _urllib.urlopen(req, timeout=15) as resp:
-                status = 'sent' if resp.status < 300 else 'failed'
-                err = '' if status == 'sent' else resp.read().decode()
+            import requests as _req_lib
+            resp_obj = _req_lib.post(
+                endpoint,
+                json={'phone': phone, 'message': personal_msg},
+                headers={'x-api-key': api_key},
+                timeout=15,
+            )
+            resp_data = resp_obj.json() if resp_obj.content else {}
+            if resp_obj.status_code < 300:
+                status = 'sent'
+                err = ''
+                # Capture balance from successful send
+                if 'balanceAfter' in resp_data:
+                    last_balance = resp_data['balanceAfter']
+            else:
+                status = 'failed'
+                err = resp_data.get('message', resp_obj.text[:200])
         except Exception as exc:
             status = 'failed'
             err = str(exc)
@@ -3845,6 +3831,10 @@ def _do_send_sms(records, message, user_id):
             status=status,
             error=err,
         ))
+
+    # Cache the latest balance so the balance endpoint can return it
+    if last_balance is not None:
+        _cache_sms_balance(last_balance)
 
     try:
         SmsSendLog.objects.bulk_create(logs, ignore_conflicts=True)
