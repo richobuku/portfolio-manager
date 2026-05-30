@@ -61,6 +61,7 @@ export const BULK_EMAIL = API_ENDPOINTS.BULK_EMAIL;
 export const BULK_EMAIL_LOG = `${API_BASE_URL}/api/bulk-email/log/`;
 export const BULK_SMS = `${API_BASE_URL}/api/bulk-sms/`;
 export const BULK_SMS_LOG = `${API_BASE_URL}/api/bulk-sms/log/`;
+export const BULK_SMS_BALANCE = `${API_BASE_URL}/api/bulk-sms/balance/`;
 export const MENTOR_REPORTS = API_ENDPOINTS.MENTOR_REPORTS;
 
 export default API_BASE_URL;

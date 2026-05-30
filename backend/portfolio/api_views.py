@@ -3830,6 +3830,39 @@ def bulk_sms_view(request):
 
 @api_view(['GET'])
 @permission_classes([_IsAuth])
+def bulk_sms_balance_view(request):
+    """Return current SMS credit balance from Message Carrier."""
+    import urllib.request as _urllib
+    import json as _json
+    from django.conf import settings as _s
+
+    api_key  = _s.MESSAGE_CARRIER_API_KEY
+    base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.messagecarrier.africa')
+
+    # Try common balance endpoints
+    for path in ('/v1/account/balance', '/v1/account', '/v1/wallet/balance', '/v1/balance'):
+        try:
+            req = _urllib.Request(f'{base_url}{path}', method='GET')
+            req.add_header('x-api-key', api_key)
+            req.add_header('Accept', 'application/json')
+            with _urllib.urlopen(req, timeout=8) as resp:
+                if resp.status == 200:
+                    data = _json.loads(resp.read().decode())
+                    # Normalise whichever key holds the balance
+                    balance = (
+                        data.get('balance') or data.get('credits') or
+                        data.get('sms_credits') or data.get('amount') or
+                        data.get('wallet_balance') or data.get('data', {}).get('balance')
+                    )
+                    return Response({'balance': balance, 'raw': data})
+        except Exception:
+            continue
+
+    return Response({'balance': None, 'detail': 'Balance unavailable'})
+
+
+@api_view(['GET'])
+@permission_classes([_IsAuth])
 def bulk_sms_log_view(request):
     """Return recent SMS send log entries for the given recipients."""
     from .models import SmsSendLog

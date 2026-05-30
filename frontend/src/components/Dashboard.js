@@ -27,7 +27,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -2081,9 +2081,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── Overview / Home Dashboard ─────────────────────────────────────────────
   const renderOverview = () => {
     const A = analytics || {};
-    const fmt = (v) => v == null ? '—' : Number(v) >= 1_000_000
-      ? `${(Number(v)/1_000_000).toFixed(1)}M` : Number(v) >= 1_000
-      ? `${(Number(v)/1_000).toFixed(0)}K` : String(v);
 
     const totalMsmes     = A.total_msmes  || msmes.length;
     const totalBges      = A.total_bges   || experts.length;
@@ -6356,6 +6353,9 @@ PRUDEV II BDS Team`,
   const [smsBody, setSmsBody] = React.useState('');
   const [smsSending, setSmsSending] = React.useState(false);
   const [smsConfirm, setSmsConfirm] = React.useState(false);
+  const [smsBalance, setSmsBalance] = React.useState(null);      // credits balance
+  const [smsBalanceLoading, setSmsBalanceLoading] = React.useState(false);
+  const [smsBalanceBefore, setSmsBalanceBefore] = React.useState(null); // snapshot before send
 
   // ── Session MSME notification dialog ────────────────────────────────────
   const [sessionNotifyDialog, setSessionNotifyDialog] = React.useState(false);
@@ -6511,6 +6511,16 @@ PRUDEV II BDS Team`
   };
 
   // ── SMS helpers ────────────────────────────────────────────────────────────
+  const fetchSmsBalance = React.useCallback(async () => {
+    setSmsBalanceLoading(true);
+    try {
+      const res = await axios.get(BULK_SMS_BALANCE, { headers });
+      setSmsBalance(res.data.balance ?? null);
+    } catch { setSmsBalance(null); }
+    finally { setSmsBalanceLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const SMS_TEMPLATES = [
     {
       key: 'data_reminder',
@@ -6551,6 +6561,7 @@ PRUDEV II BDS Team`
   const handleSmsSend = async () => {
     setSmsConfirm(false);
     setSmsSending(true);
+    setSmsBalanceBefore(smsBalance); // snapshot balance before send
     try {
       const selectedList = smsFiltered.filter(r => smsSelected.has(r.id));
       const res = await axios.post(BULK_SMS, {
@@ -6561,6 +6572,8 @@ PRUDEV II BDS Team`
       const d = res.data;
       notify(`Queued: ${d.queued} SMS message${d.queued !== 1 ? 's' : ''}${d.duplicates_removed > 0 ? ` · Duplicates removed: ${d.duplicates_removed}` : ''}`, 'success');
       setSmsSelected(new Set());
+      // Refresh balance after a short delay to let the provider update
+      setTimeout(() => fetchSmsBalance(), 3000);
     } catch (err) {
       const d = err.response?.data;
       notify(d?.detail || d?.error || 'Failed to send SMS', 'error');
@@ -6586,13 +6599,40 @@ PRUDEV II BDS Team`
           size="small"
           color={commChannel === 'sms' ? 'success' : 'primary'}
           startIcon={<span>💬</span>}
-          onClick={() => setCommChannel('sms')}
+          onClick={() => { setCommChannel('sms'); fetchSmsBalance(); }}
         >SMS</Button>
       </Paper>
 
       {commChannel === 'sms' ? (
         /* ── SMS panel ──────────────────────────────────────────────── */
         <Box>
+          {/* Wallet / balance card */}
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, bgcolor: 'success.50', borderColor: 'success.200' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ fontSize: 28 }}>💳</Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>SMS Credits</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, color: smsBalance == null ? 'text.disabled' : 'success.dark' }}>
+                  {smsBalanceLoading ? '…' : smsBalance != null ? smsBalance : '—'}
+                </Typography>
+                {smsBalanceBefore != null && smsBalance != null && smsBalanceBefore !== smsBalance && (
+                  <Typography variant="caption" color="text.secondary">
+                    Was {smsBalanceBefore} → now {smsBalance}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button size="small" variant="outlined" color="success" onClick={fetchSmsBalance} disabled={smsBalanceLoading}>
+                {smsBalanceLoading ? <CircularProgress size={14} /> : '↻ Refresh'}
+              </Button>
+              <Button size="small" variant="contained" color="success"
+                href="https://www.messagecarrier.africa/app/wallet" target="_blank" rel="noopener">
+                + Top Up
+              </Button>
+            </Box>
+          </Paper>
+
           <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>SMS Template</Typography>
             <FormControl size="small" fullWidth sx={{ mb: 2 }}>
