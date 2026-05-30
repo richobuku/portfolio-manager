@@ -3727,40 +3727,50 @@ def _normalise_phone(phone):
 
 def _mc_probe_balance(api_key, base_url):
     """
-    Probe Message Carrier balance by sending a request to an invalid number.
-    Both the success and error responses expose the current wallet balance.
+    Probe Message Carrier balance by sending a deliberately invalid-number request.
+    The API returns the current wallet balance in both success and error responses.
     Returns (balance_float, raw_message_str).
     """
-    import urllib.request as _req
     import json as _json
     import re as _re
 
     endpoint = f'{base_url}/v1/api-keys/send-sms'
-    payload = _json.dumps({'phone': '+2560000000000', 'message': 'ping'}).encode()
-    request = _req.Request(endpoint, data=payload, method='POST')
-    request.add_header('Content-Type', 'application/json')
-    request.add_header('x-api-key', api_key)
+    payload   = _json.dumps({'phone': '+2560000000000', 'message': 'ping'}).encode()
 
     try:
-        with _req.urlopen(request, timeout=10) as resp:
-            body = _json.loads(resp.read().decode())
-    except Exception as exc:
-        # urllib raises for non-2xx — read the error body
+        import requests as _requests
+        resp = _requests.post(
+            endpoint,
+            data=payload,
+            headers={'Content-Type': 'application/json', 'x-api-key': api_key},
+            timeout=12,
+        )
+        body = resp.json()
+    except ImportError:
+        # Fall back to urllib if requests is not installed
+        import urllib.request as _req
+        import urllib.error as _uerr
+        req = _req.Request(endpoint, data=payload, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('x-api-key', api_key)
         try:
+            with _req.urlopen(req, timeout=12) as r:
+                body = _json.loads(r.read().decode())
+        except _uerr.HTTPError as exc:
             body = _json.loads(exc.read().decode())
-        except Exception:
-            body = {'message': str(exc)}
+        except Exception as exc:
+            return None, str(exc)
+    except Exception as exc:
+        return None, str(exc)
 
-    msg = body.get('message', '')
+    msg = body.get('message', '') if isinstance(body, dict) else str(body)
     # Parse "Available: 10.00" from error or success body
     m = _re.search(r'Available[:\s]+([0-9]+(?:\.[0-9]+)?)', msg, _re.I)
     if m:
         return float(m.group(1)), msg
-
     # Success response may have walletBalance field
-    if 'walletBalance' in body:
+    if isinstance(body, dict) and 'walletBalance' in body:
         return float(body['walletBalance']), msg
-
     return None, msg
 
 
@@ -3776,11 +3786,13 @@ def bulk_sms_balance_view(request):
     base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.bravo.mystyler.xyz')
 
     balance, msg = _mc_probe_balance(api_key, base_url)
+    logger.info('SMS balance probe: balance=%s msg=%s', balance, msg)
     return Response({
         'balance': balance,
         'message': msg,
         'currency': 'UGX',
         'cost_per_sms': 45,
+        'ok': balance is not None,
     })
 
 

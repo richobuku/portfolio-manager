@@ -6355,6 +6355,7 @@ PRUDEV II BDS Team`,
   const [smsConfirm, setSmsConfirm] = React.useState(false);
   const [smsBalance, setSmsBalance] = React.useState(null);      // credits balance
   const [smsBalanceLoading, setSmsBalanceLoading] = React.useState(false);
+  const [smsBalanceError, setSmsBalanceError] = React.useState(null);
   const [smsBalanceBefore, setSmsBalanceBefore] = React.useState(null); // snapshot before send
 
   // ── Session MSME notification dialog ────────────────────────────────────
@@ -6513,13 +6514,30 @@ PRUDEV II BDS Team`
   // ── SMS helpers ────────────────────────────────────────────────────────────
   const fetchSmsBalance = React.useCallback(async () => {
     setSmsBalanceLoading(true);
+    setSmsBalanceError(null);
     try {
       const res = await axios.get(BULK_SMS_BALANCE, { headers });
-      setSmsBalance(res.data.balance ?? null);
-    } catch { setSmsBalance(null); }
-    finally { setSmsBalanceLoading(false); }
+      const bal = res.data.balance;
+      if (bal != null) {
+        setSmsBalance(bal);
+      } else {
+        setSmsBalance(null);
+        setSmsBalanceError(res.data.message || 'Could not read balance');
+      }
+    } catch (err) {
+      setSmsBalance(null);
+      setSmsBalanceError(err.response?.data?.detail || 'Failed to connect to SMS provider');
+    } finally {
+      setSmsBalanceLoading(false);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Auto-fetch balance when switching to SMS channel
+  React.useEffect(() => {
+    if (commChannel === 'sms') fetchSmsBalance();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commChannel]);
 
   const SMS_TEMPLATES = [
     {
@@ -6612,12 +6630,17 @@ PRUDEV II BDS Team`
               <Box sx={{ fontSize: 28 }}>💳</Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>SMS Credits</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, color: smsBalance == null ? 'text.disabled' : 'success.dark' }}>
-                  {smsBalanceLoading ? '…' : smsBalance != null ? smsBalance : '—'}
+                <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, color: smsBalanceLoading ? 'text.disabled' : smsBalance != null ? 'success.dark' : 'error.main' }}>
+                  {smsBalanceLoading ? '…' : smsBalance != null ? `UGX ${smsBalance}` : '—'}
                 </Typography>
+                {smsBalanceError && !smsBalanceLoading && (
+                  <Typography variant="caption" color="error.main" sx={{ display: 'block' }}>
+                    {smsBalanceError}
+                  </Typography>
+                )}
                 {smsBalanceBefore != null && smsBalance != null && smsBalanceBefore !== smsBalance && (
                   <Typography variant="caption" color="text.secondary">
-                    Was {smsBalanceBefore} → now {smsBalance}
+                    Was UGX {smsBalanceBefore} → now UGX {smsBalance}
                   </Typography>
                 )}
               </Box>
