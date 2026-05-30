@@ -3745,7 +3745,11 @@ def _mc_probe_balance(api_key, base_url):
             headers={'Content-Type': 'application/json', 'x-api-key': api_key},
             timeout=12,
         )
-        body = resp.json()
+        # requests does NOT raise on 4xx — we read the body regardless
+        try:
+            body = resp.json()
+        except Exception:
+            return None, f'Non-JSON response (HTTP {resp.status_code}): {resp.text[:200]}'
     except ImportError:
         # Fall back to urllib if requests is not installed
         import urllib.request as _req
@@ -3759,9 +3763,9 @@ def _mc_probe_balance(api_key, base_url):
         except _uerr.HTTPError as exc:
             body = _json.loads(exc.read().decode())
         except Exception as exc:
-            return None, str(exc)
+            return None, f'urllib error: {exc}'
     except Exception as exc:
-        return None, str(exc)
+        return None, f'requests error: {exc}'
 
     msg = body.get('message', '') if isinstance(body, dict) else str(body)
     # Parse "Available: 10.00" from error or success body
@@ -3786,10 +3790,10 @@ def bulk_sms_balance_view(request):
     base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.bravo.mystyler.xyz')
 
     balance, msg = _mc_probe_balance(api_key, base_url)
-    logger.info('SMS balance probe: balance=%s msg=%s', balance, msg)
+    logger.info('SMS balance probe: balance=%s msg=%r key_prefix=%s', balance, msg, api_key[:12] if api_key else 'MISSING')
     return Response({
         'balance': balance,
-        'message': msg,
+        'message': msg if msg else ('Balance probe returned no data — check API key and network' if balance is None else ''),
         'currency': 'UGX',
         'cost_per_sms': 45,
         'ok': balance is not None,
