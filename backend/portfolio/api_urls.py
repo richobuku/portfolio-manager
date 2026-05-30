@@ -12,6 +12,7 @@ from .api_views import (
     TshirtReceiptViewSet, TshirtReceiptEntryViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
     bulk_email_view, bulk_email_log_view,
+    bulk_sms_view, bulk_sms_log_view,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset
 from .blockchain.api_views import (
@@ -65,4 +66,6 @@ urlpatterns = [
     path('api/push/vapid-key/', push_vapid_key, name='push_vapid_key'),
     path('api/bulk-email/', bulk_email_view, name='bulk_email'),
     path('api/bulk-email/log/', bulk_email_log_view, name='bulk_email_log'),
+    path('api/bulk-sms/', bulk_sms_view, name='bulk_sms'),
+    path('api/bulk-sms/log/', bulk_sms_log_view, name='bulk_sms_log'),
 ]

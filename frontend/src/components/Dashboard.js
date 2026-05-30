@@ -27,7 +27,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_LOG, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -6338,6 +6338,7 @@ PRUDEV II BDS Team`,
     },
   ];
 
+  const [commChannel, setCommChannel] = React.useState('email'); // 'email' | 'sms'
   const [commTab, setCommTab] = React.useState(0); // 0=BGEs 1=MSMEs
   const [commSearch, setCommSearch] = React.useState('');
   const [commSelected, setCommSelected] = React.useState(new Set());
@@ -6348,6 +6349,13 @@ PRUDEV II BDS Team`,
   const [commConfirm, setCommConfirm] = React.useState(false);
   const [commSkipSent, setCommSkipSent] = React.useState(false);
   const [commAlreadySent, setCommAlreadySent] = React.useState([]);  // ids already sent this subject
+  // ── SMS state ──────────────────────────────────────────────────────────────
+  const [smsTab, setSmsTab] = React.useState(0); // 0=BGEs 1=MSMEs
+  const [smsSearch, setSmsSearch] = React.useState('');
+  const [smsSelected, setSmsSelected] = React.useState(new Set());
+  const [smsBody, setSmsBody] = React.useState('');
+  const [smsSending, setSmsSending] = React.useState(false);
+  const [smsConfirm, setSmsConfirm] = React.useState(false);
 
   // ── Session MSME notification dialog ────────────────────────────────────
   const [sessionNotifyDialog, setSessionNotifyDialog] = React.useState(false);
@@ -6502,9 +6510,195 @@ PRUDEV II BDS Team`
     }
   };
 
+  // ── SMS helpers ────────────────────────────────────────────────────────────
+  const SMS_TEMPLATES = [
+    {
+      key: 'data_reminder',
+      label: 'BGE — Data update reminder',
+      body: 'Dear {{name}}, please log in to the PRUDEV II portal and submit data updates for your MSMEs. Thank you. — PRUDEV II BDS Team',
+    },
+    {
+      key: 'visit_notify',
+      label: 'MSME — BGE visit notification',
+      body: 'Dear {{name}}, a PRUDEV II Business Growth Expert will visit your business this week to check on your progress. Kindly be available. — PRUDEV II BDS Team',
+    },
+    {
+      key: 'training_reminder',
+      label: 'MSME — Training session reminder',
+      body: 'Dear {{name}}, you are invited to a PRUDEV II training session. Please contact your BGE for the date and venue. — PRUDEV II BDS Team',
+    },
+  ];
+
+  const smsRecipients = smsTab === 0
+    ? experts.filter(e => e.phone)
+    : msmes.filter(m => m.phone);
+
+  const smsFiltered = smsRecipients.filter(r => {
+    const name = smsTab === 0 ? (r.name || '') : (r.business_name || r.owner_name || '');
+    return name.toLowerCase().includes(smsSearch.toLowerCase()) ||
+      (r.phone || '').includes(smsSearch);
+  });
+
+  const smsAllSelected = smsFiltered.length > 0 && smsFiltered.every(r => smsSelected.has(r.id));
+  const toggleSmsAll = () => {
+    if (smsAllSelected) {
+      setSmsSelected(prev => { const n = new Set(prev); smsFiltered.forEach(r => n.delete(r.id)); return n; });
+    } else {
+      setSmsSelected(prev => { const n = new Set(prev); smsFiltered.forEach(r => n.add(r.id)); return n; });
+    }
+  };
+
+  const handleSmsSend = async () => {
+    setSmsConfirm(false);
+    setSmsSending(true);
+    try {
+      const selectedList = smsFiltered.filter(r => smsSelected.has(r.id));
+      const res = await axios.post(BULK_SMS, {
+        recipient_type: smsTab === 0 ? 'bge' : 'msme',
+        recipient_ids: selectedList.map(r => r.id),
+        message: smsBody,
+      }, { headers });
+      const d = res.data;
+      notify(`Queued: ${d.queued} SMS message${d.queued !== 1 ? 's' : ''}${d.duplicates_removed > 0 ? ` · Duplicates removed: ${d.duplicates_removed}` : ''}`, 'success');
+      setSmsSelected(new Set());
+    } catch (err) {
+      const d = err.response?.data;
+      notify(d?.detail || d?.error || 'Failed to send SMS', 'error');
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
   const renderCommunications = () => (
     <Box>
-      <SectionHeader title="Communications" subtitle="Send bulk emails to BGEs or MSMEs" />
+      <SectionHeader title="Communications" subtitle="Send bulk emails or SMS to BGEs or MSMEs" />
+
+      {/* Channel toggle */}
+      <Paper variant="outlined" sx={{ p: 1.5, mb: 2, display: 'flex', gap: 1 }}>
+        <Button
+          variant={commChannel === 'email' ? 'contained' : 'outlined'}
+          size="small"
+          startIcon={<span>✉️</span>}
+          onClick={() => setCommChannel('email')}
+        >Email</Button>
+        <Button
+          variant={commChannel === 'sms' ? 'contained' : 'outlined'}
+          size="small"
+          color={commChannel === 'sms' ? 'success' : 'primary'}
+          startIcon={<span>💬</span>}
+          onClick={() => setCommChannel('sms')}
+        >SMS</Button>
+      </Paper>
+
+      {commChannel === 'sms' ? (
+        /* ── SMS panel ──────────────────────────────────────────────── */
+        <Box>
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>SMS Template</Typography>
+            <FormControl size="small" fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Load a template (optional)</InputLabel>
+              <Select
+                value={''}
+                label="Load a template (optional)"
+                onChange={e => { const t = SMS_TEMPLATES.find(x => x.key === e.target.value); if (t) setSmsBody(t.body); }}
+              >
+                <MenuItem value=""><em>— none —</em></MenuItem>
+                {SMS_TEMPLATES.map(t => <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Message"
+              value={smsBody}
+              onChange={e => setSmsBody(e.target.value)}
+              fullWidth multiline minRows={4}
+              inputProps={{ maxLength: 480 }}
+              helperText={`${smsBody.length} characters · ${Math.ceil(smsBody.length / 160) || 1} SMS part(s). Use {{name}} to personalise.`}
+            />
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+              <Tabs value={smsTab} onChange={(_, v) => { setSmsTab(v); setSmsSelected(new Set()); setSmsSearch(''); }}>
+                <Tab label={`BGE Experts (${experts.filter(e => e.phone).length})`} />
+                <Tab label={`MSMEs (${msmes.filter(m => m.phone).length})`} />
+              </Tabs>
+              {smsSelected.size > 0 && (
+                <Chip label={`${smsSelected.size} selected`} color="success" size="small" onDelete={() => setSmsSelected(new Set())} />
+              )}
+            </Box>
+
+            <TextField
+              size="small" placeholder="Search by name or phone…"
+              value={smsSearch} onChange={e => setSmsSearch(e.target.value)}
+              InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: 'text.secondary', fontSize: 18 }} /> }}
+              sx={{ mb: 1, width: { xs: '100%', sm: 280 } }}
+            />
+
+            <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, maxHeight: 320, overflowY: 'auto' }}>
+              <ListItemButton onClick={toggleSmsAll} dense sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
+                <ListItemIcon><Checkbox checked={smsAllSelected} indeterminate={smsSelected.size > 0 && !smsAllSelected} size="small" disableRipple tabIndex={-1} /></ListItemIcon>
+                <ListItemText primary={<Typography variant="body2" fontWeight={600}>{smsAllSelected ? 'Deselect all' : `Select all (${smsFiltered.length})`}</Typography>} />
+              </ListItemButton>
+              {smsFiltered.length === 0 && (
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">No recipients with phone numbers found.</Typography>
+                </Box>
+              )}
+              {smsFiltered.map(r => {
+                const name = smsTab === 0 ? (r.name || '—') : (r.business_name || '—');
+                const sub  = smsTab === 0 ? (r.location || r.bge_code || '') : (r.owner_name || '');
+                return (
+                  <ListItemButton key={r.id} onClick={() => setSmsSelected(prev => {
+                    const n = new Set(prev); n.has(r.id) ? n.delete(r.id) : n.add(r.id); return n;
+                  })} dense>
+                    <ListItemIcon><Checkbox checked={smsSelected.has(r.id)} size="small" disableRipple tabIndex={-1} /></ListItemIcon>
+                    <ListItemText
+                      primary={name}
+                      secondary={`📱 ${r.phone}${sub ? ' · ' + sub : ''}`}
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={smsSending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+                disabled={smsSelected.size === 0 || !smsBody.trim() || smsSending}
+                onClick={() => setSmsConfirm(true)}
+              >
+                Send SMS to {smsSelected.size} recipient{smsSelected.size !== 1 ? 's' : ''}
+              </Button>
+            </Box>
+          </Paper>
+
+          {/* SMS Confirm dialog */}
+          <Dialog open={smsConfirm} onClose={() => setSmsConfirm(false)} maxWidth="xs" fullWidth>
+            <DialogTitle>Confirm Bulk SMS</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                You are about to send an SMS to <strong>{smsSelected.size} recipient{smsSelected.size !== 1 ? 's' : ''}</strong>.
+              </Typography>
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'grey.50' }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: 12 }}>
+                  {smsBody.substring(0, 200)}{smsBody.length > 200 ? '…' : ''}
+                </Typography>
+              </Paper>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                {Math.ceil(smsBody.length / 160)} SMS part(s) per recipient · via Message Carrier
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSmsConfirm(false)}>Cancel</Button>
+              <Button variant="contained" color="success" startIcon={<SendIcon />} onClick={handleSmsSend}>Send</Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
+      ) : (
+        /* ── Email panel (existing) ──────────────────────────────────── */
+        <Box>
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
         <Typography variant="subtitle2" gutterBottom>Email Template</Typography>
@@ -6635,6 +6829,8 @@ PRUDEV II BDS Team`
           </Button>
         </DialogActions>
       </Dialog>
+    </Box>
+      )} {/* end email/sms ternary */}
     </Box>
   );
 

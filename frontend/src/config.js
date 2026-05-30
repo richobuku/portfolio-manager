@@ -59,6 +59,8 @@ export const GROUP_REPORT_REVERT_URL = (id) => `${API_BASE_URL}/api/group-report
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;
 export const BULK_EMAIL = API_ENDPOINTS.BULK_EMAIL;
 export const BULK_EMAIL_LOG = `${API_BASE_URL}/api/bulk-email/log/`;
+export const BULK_SMS = `${API_BASE_URL}/api/bulk-sms/`;
+export const BULK_SMS_LOG = `${API_BASE_URL}/api/bulk-sms/log/`;
 export const MENTOR_REPORTS = API_ENDPOINTS.MENTOR_REPORTS;
 
 export default API_BASE_URL;

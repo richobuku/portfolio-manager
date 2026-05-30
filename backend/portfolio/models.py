@@ -1198,6 +1198,32 @@ class EmailSendLog(models.Model):
         return f"{self.recipient_type}:{self.recipient_id} — {self.subject[:60]} ({self.sent_at:%Y-%m-%d})"
 
 
+class SmsSendLog(models.Model):
+    """Tracks every individual bulk SMS so we can skip duplicates on re-send."""
+    RECIPIENT_TYPE_CHOICES = [('bge', 'BGE Expert'), ('msme', 'MSME')]
+
+    recipient_type  = models.CharField(max_length=10, choices=RECIPIENT_TYPE_CHOICES)
+    recipient_id    = models.PositiveIntegerField()
+    recipient_phone = models.CharField(max_length=30)
+    message_preview = models.CharField(max_length=160)  # first 160 chars
+    sent_at         = models.DateTimeField(auto_now_add=True)
+    sent_by         = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='sms_sent',
+    )
+    status          = models.CharField(max_length=20, default='sent')  # sent / failed
+    error           = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['recipient_type', 'recipient_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.recipient_type}:{self.recipient_id} → {self.recipient_phone} ({self.sent_at:%Y-%m-%d})"
+
+
 # ── T-Shirt Receipt ────────────────────────────────────────────────────────
 
 class TshirtReceipt(models.Model):

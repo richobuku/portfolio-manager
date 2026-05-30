@@ -3713,6 +3713,151 @@ def bulk_email_log_view(request):
     return Response({'already_sent': already, 'count': len(already)})
 
 
+# ── Bulk SMS (Message Carrier) ────────────────────────────────────────────────
+
+def _normalise_phone(phone):
+    """Ensure phone number is in international format for Message Carrier."""
+    p = re.sub(r'[\s\-\(\)]', '', str(phone or ''))
+    if p.startswith('0'):
+        p = '+256' + p[1:]  # Uganda default
+    if not p.startswith('+'):
+        p = '+' + p
+    return p
+
+
+def _do_send_sms(records, message, user_id):
+    """Background thread: send SMS to each record via Message Carrier API."""
+    import urllib.request as _urllib
+    import json as _json
+    import django
+    django.setup() if not django.conf.settings.configured else None  # noqa
+    from django.conf import settings as _s
+    from .models import SmsSendLog
+    from django.contrib.auth.models import User as _User
+
+    api_key = _s.MESSAGE_CARRIER_API_KEY
+    base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.messagecarrier.africa')
+    endpoint = f'{base_url}/v1/api-keys/send-sms'
+
+    try:
+        sent_by = _User.objects.get(pk=user_id)
+    except Exception:
+        sent_by = None
+
+    logs = []
+    for rec in records:
+        phone = _normalise_phone(rec['phone'])
+        personal_msg = message.replace('{{name}}', (rec['name'] or '').split()[0])
+        try:
+            payload = _json.dumps({'phone': phone, 'message': personal_msg}).encode()
+            req = _urllib.Request(endpoint, data=payload, method='POST')
+            req.add_header('Content-Type', 'application/json')
+            req.add_header('x-api-key', api_key)
+            with _urllib.urlopen(req, timeout=15) as resp:
+                status = 'sent' if resp.status < 300 else 'failed'
+                err = '' if status == 'sent' else resp.read().decode()
+        except Exception as exc:
+            status = 'failed'
+            err = str(exc)
+            logger.error('SMS send failed for %s (%s): %s', rec['name'], phone, exc)
+
+        logs.append(SmsSendLog(
+            recipient_type=rec['rtype'],
+            recipient_id=rec['id'],
+            recipient_phone=phone,
+            message_preview=personal_msg[:160],
+            sent_by=sent_by,
+            status=status,
+            error=err,
+        ))
+
+    try:
+        SmsSendLog.objects.bulk_create(logs, ignore_conflicts=True)
+    except Exception as exc:
+        logger.error('Bulk SMS: failed to persist send logs: %s', exc)
+
+
+@api_view(['POST'])
+@permission_classes([_IsAuth])
+def bulk_sms_view(request):
+    """Admin-only: send bulk SMS to BGEs or MSMEs via Message Carrier."""
+    import threading
+
+    user = request.user
+    if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+        raise PermissionDenied("Only administrators can send bulk SMS.")
+
+    recipient_type = request.data.get('recipient_type', 'bge')
+    recipient_ids  = request.data.get('recipient_ids', [])
+    message        = (request.data.get('message') or '').strip()
+
+    if not message:
+        return Response({'detail': 'Message is required.'}, status=400)
+
+    if recipient_type == 'bge':
+        qs = BusinessGrowthExpert.objects.filter(phone__isnull=False).exclude(phone='')
+        if recipient_ids:
+            qs = qs.filter(id__in=recipient_ids)
+        records = [{'id': b.id, 'name': b.name or 'BGE', 'phone': b.phone, 'rtype': 'bge'} for b in qs]
+    else:
+        qs = MSME.objects.filter(phone__isnull=False).exclude(phone='')
+        if recipient_ids:
+            qs = qs.filter(id__in=recipient_ids)
+        records = [{'id': m.id, 'name': m.owner_name or m.business_name or 'Business', 'phone': m.phone, 'rtype': 'msme'} for m in qs]
+
+    # Deduplicate by phone number
+    seen = set()
+    deduped = []
+    for rec in records:
+        p = _normalise_phone(rec['phone'])
+        if p and p not in seen:
+            seen.add(p)
+            deduped.append(rec)
+    duplicates_removed = len(records) - len(deduped)
+
+    threading.Thread(
+        target=_do_send_sms,
+        args=(deduped, message, user.id),
+        daemon=True,
+    ).start()
+
+    return Response({
+        'queued': len(deduped),
+        'duplicates_removed': duplicates_removed,
+        'message': f'{len(deduped)} SMS message{"s" if len(deduped) != 1 else ""} queued for delivery.',
+    })
+
+
+@api_view(['GET'])
+@permission_classes([_IsAuth])
+def bulk_sms_log_view(request):
+    """Return recent SMS send log entries for the given recipients."""
+    from .models import SmsSendLog
+
+    recipient_type = request.query_params.get('recipient_type', 'bge')
+    ids_raw        = request.query_params.getlist('ids')
+    recipient_ids  = [int(i) for i in ids_raw if i.isdigit()]
+
+    if not recipient_ids:
+        return Response({'logs': []})
+
+    logs = SmsSendLog.objects.filter(
+        recipient_type=recipient_type,
+        recipient_id__in=recipient_ids,
+    ).order_by('-sent_at')[:200]
+
+    return Response({'logs': [
+        {
+            'recipient_id': l.recipient_id,
+            'phone': l.recipient_phone,
+            'preview': l.message_preview,
+            'sent_at': l.sent_at.isoformat(),
+            'status': l.status,
+        }
+        for l in logs
+    ]})
+
+
 # ── T-Shirt Receipt ViewSets ───────────────────────────────────────────────
 
 from .serializers import TshirtReceiptSerializer, TshirtReceiptEntrySerializer

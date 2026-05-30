@@ -226,6 +226,13 @@ BGE_WELCOME_EMAIL_BCC = os.environ.get(
     os.environ.get('ADMIN_EMAIL', ''),
 ).strip()
 
+# ── SMS Configuration (Message Carrier) ──────────────────────────────────────
+MESSAGE_CARRIER_API_KEY = os.environ.get(
+    'MESSAGE_CARRIER_API_KEY',
+    'mc_live_cf7e1bb6dedfd292725fc3e76b8567a8d2346b5b2b75e0249d833cb9a909db34',
+)
+MESSAGE_CARRIER_BASE_URL = 'https://api.messagecarrier.africa'
+
 # CORS Configuration for Frontend Integration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React development server
