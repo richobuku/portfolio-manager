@@ -3725,6 +3725,65 @@ def _normalise_phone(phone):
     return p
 
 
+def _mc_probe_balance(api_key, base_url):
+    """
+    Probe Message Carrier balance by sending a request to an invalid number.
+    Both the success and error responses expose the current wallet balance.
+    Returns (balance_float, raw_message_str).
+    """
+    import urllib.request as _req
+    import json as _json
+    import re as _re
+
+    endpoint = f'{base_url}/v1/api-keys/send-sms'
+    payload = _json.dumps({'phone': '+2560000000000', 'message': 'ping'}).encode()
+    request = _req.Request(endpoint, data=payload, method='POST')
+    request.add_header('Content-Type', 'application/json')
+    request.add_header('x-api-key', api_key)
+
+    try:
+        with _req.urlopen(request, timeout=10) as resp:
+            body = _json.loads(resp.read().decode())
+    except Exception as exc:
+        # urllib raises for non-2xx — read the error body
+        try:
+            body = _json.loads(exc.read().decode())
+        except Exception:
+            body = {'message': str(exc)}
+
+    msg = body.get('message', '')
+    # Parse "Available: 10.00" from error or success body
+    m = _re.search(r'Available[:\s]+([0-9]+(?:\.[0-9]+)?)', msg, _re.I)
+    if m:
+        return float(m.group(1)), msg
+
+    # Success response may have walletBalance field
+    if 'walletBalance' in body:
+        return float(body['walletBalance']), msg
+
+    return None, msg
+
+
+@api_view(['GET'])
+@permission_classes([_IsAuth])
+def bulk_sms_balance_view(request):
+    """Return the current Message Carrier wallet balance."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied("Only administrators can view SMS balance.")
+
+    from django.conf import settings as _s
+    api_key  = _s.MESSAGE_CARRIER_API_KEY
+    base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.bravo.mystyler.xyz')
+
+    balance, msg = _mc_probe_balance(api_key, base_url)
+    return Response({
+        'balance': balance,
+        'message': msg,
+        'currency': 'UGX',
+        'cost_per_sms': 45,
+    })
+
+
 def _do_send_sms(records, message, user_id):
     """Background thread: send SMS to each record via Message Carrier API."""
     import urllib.request as _urllib
@@ -3736,7 +3795,7 @@ def _do_send_sms(records, message, user_id):
     from django.contrib.auth.models import User as _User
 
     api_key = _s.MESSAGE_CARRIER_API_KEY
-    base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.messagecarrier.africa')
+    base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.bravo.mystyler.xyz')
     endpoint = f'{base_url}/v1/api-keys/send-sms'
 
     try:

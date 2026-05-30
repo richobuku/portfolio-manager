@@ -231,7 +231,7 @@ MESSAGE_CARRIER_API_KEY = os.environ.get(
     'MESSAGE_CARRIER_API_KEY',
     'mc_live_cf7e1bb6dedfd292725fc3e76b8567a8d2346b5b2b75e0249d833cb9a909db34',
 )
-MESSAGE_CARRIER_BASE_URL = 'https://api.messagecarrier.africa'
+MESSAGE_CARRIER_BASE_URL = 'https://api.bravo.mystyler.xyz'
 
 # CORS Configuration for Frontend Integration
 CORS_ALLOWED_ORIGINS = [
