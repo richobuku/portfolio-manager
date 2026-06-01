@@ -2904,6 +2904,8 @@ class BGEUserViewSet(viewsets.ViewSet):
                 type(bge).objects.filter(pk=bge.pk).update(user=user)
                 bge.user = user
                 send_welcome_email(bge, username, password)
+                from .account_setup import send_welcome_sms as _send_sms
+                _send_sms(bge, username, password)
             except BusinessGrowthExpert.DoesNotExist:
                 user.delete()
                 return Response({'error': 'BGE profile not found.'}, status=status.HTTP_404_NOT_FOUND)
