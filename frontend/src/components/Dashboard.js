@@ -356,6 +356,36 @@ const WO_DEFAULTS = {
       { task_num: 9, description: 'Submission of All Verified and Updated MSME Data',                      due_date: 'Monday, 1 June 2026' },
     ],
   },
+  msme_access_finance: {
+    objective: `To increase access to finance by digitizing the MSMEs and making them bankable through the credit and digital payment ecosystem. Each BGE will work with 15 assigned MSMEs from Cohort 1 and Cohort 2 over 7 working days, onboarding businesses onto digital financial platforms and mapping their interest in credit products for follow-up engagement.`,
+    key_tasks: `1. Attend orientation on the Access to Finance assignment, digital financial tools, and reporting expectations.
+2. Receive the list of 15 assigned MSMEs from Cohort 1 and Cohort 2 and develop a field visit plan.
+3. Visit each assigned MSME and onboard them onto at least two (2) of the following digital financial platforms:
+   • MOMO Pays
+   • Flexy Pay
+   • Wendi
+   • Online Banking
+   • Online Payments
+   • Business Accounts
+4. Document the specific platforms each MSME has been onboarded onto and capture evidence of registration (screenshots, confirmation messages, or account details).
+5. Conduct a credit needs assessment with each MSME — identify which credit product the MSME is interested in and from which financial institution.
+6. Compile a Credit Interest Mapping Report summarising MSME interest by product type, financial institution, and readiness level, to guide further engagement and follow-up.
+7. Document all field activities and MSME progress in the required PRUDEV II formats.
+8. Submit daily progress updates to the BDS Component Coordinator.
+9. Flag any MSMEs with barriers to digital onboarding (no smartphone, no ID, etc.) and document in the barrier register.
+10. Maintain confidentiality of all MSME data and financial information at all times.
+11. Submit completed invoice and signed timesheet with the final report.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Orientation on Access to Finance Assignment and Digital Financial Tools Completed', due_date: '3 June 2026' },
+      { task_num: 2, description: 'MSME Visit Plan — assignment list of 15 MSMEs from Cohort 1 & Cohort 2 with field schedule', due_date: '3 June 2026' },
+      { task_num: 3, description: 'MSME Digital Platform Onboarding Records — minimum 2 platforms per MSME with registration evidence', due_date: 'Rolling — throughout assignment' },
+      { task_num: 4, description: 'Digital Platform Registration Evidence per MSME (screenshots / confirmations)', due_date: 'Rolling — per MSME onboarded' },
+      { task_num: 5, description: 'Credit Interest Mapping Report — by MSME, product type, and financial institution with readiness assessment', due_date: '15 June 2026' },
+      { task_num: 6, description: 'Barrier Register — MSMEs with obstacles to digital onboarding and recommended follow-up', due_date: '15 June 2026' },
+      { task_num: 7, description: 'Final Access to Finance Field Report — summary of onboarding outcomes, credit interest, observations, and recommendations', due_date: '16 June 2026' },
+      { task_num: 8, description: 'Approved Invoice and Signed Timesheet', due_date: '16 June 2026' },
+    ],
+  },
   mobilisation: {
     objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
     key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
@@ -490,7 +520,15 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
 
   const applyWoDefaults = React.useCallback((type) => {
     const d = WO_DEFAULTS[type] || WO_DEFAULTS.other;
-    setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json }));
+    const extra = {};
+    if (type === 'msme_access_finance') {
+      extra.start_date = '2026-06-03';
+      extra.end_date   = '2026-06-16';
+      extra.duration   = '7 working days';
+      extra.max_days   = 7;
+      extra.location   = 'Acholi Sub-region, Northern Uganda';
+    }
+    setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
   const saveWo = React.useCallback(async () => {
@@ -583,6 +621,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
                 <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
                 <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
+                <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
@@ -5847,6 +5886,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
             <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
             <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
+            <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
