@@ -386,6 +386,26 @@ const WO_DEFAULTS = {
       { task_num: 8, description: 'Approved Invoice and Signed Timesheet', due_date: '16 June 2026' },
     ],
   },
+  biz_continuity: {
+    objective: `To develop a business continuity strategy and business operational plan for 05 agro-processors attached to you. These two documents are meant to help agro-processors to protect their businesses from disruptions.`,
+    key_tasks: `The BGE will visit the assigned agro-processors to specifically carry out the following:
+
+• Conduct a Business Impact Analysis (BIA): Identify time-sensitive operations, estimate the financial and operational impacts of disruptions, and determine their Maximum Tolerable Downtime (MTD) for critical processes.
+
+• Perform a Risk Assessment: Identify potential threats (e.g., inflation, raw material seasonality, cyberattacks, supply chain failures, natural disasters) and evaluate the probability and impact of each to prioritize mitigation efforts.
+
+• Develop Recovery Strategies: Outline specific, actionable steps to resume critical functions for the business.
+
+• Document the Plan: Create a clear, easily accessible written document detailing response procedures, team member roles and contact lists, communication protocols, among others.
+
+• Train and Test: Educate employees on their specific responsibilities during a crisis as per the strategy. Conduct a simulation exercise (tabletop or full-scale) to identify weaknesses and refine the strategy.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Business Continuity Strategy and Business Operational Plan', due_date: '1 week after deployment' },
+      { task_num: 2, description: 'Non-engagement register — documented record of any MSME that was unavailable or declined to participate, including reason and date of contact attempt', due_date: 'Rolling — updated within 2 days of each attempted contact' },
+      { task_num: 3, description: 'Close-out report', due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan' },
+      { task_num: 4, description: 'Approved invoice and signed timesheet', due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan' },
+    ],
+  },
   mobilisation: {
     objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
     key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
@@ -528,6 +548,12 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.max_days   = 7;
       extra.location   = 'Acholi Sub-region, Northern Uganda';
     }
+    if (type === 'biz_continuity') {
+      extra.duration   = 'Maximum of 4 days';
+      extra.max_days   = 4;
+      extra.location   = 'Northern Uganda (Gulu & Lira)';
+      extra.project_name = 'PRUDEV II Project – Financial Institution Mobilisation (Access to Finance Events)';
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
@@ -622,6 +648,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
                 <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
                 <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
+                <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
@@ -5887,6 +5914,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
             <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
             <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
+            <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>

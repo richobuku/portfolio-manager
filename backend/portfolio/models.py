@@ -982,6 +982,7 @@ class WorkOrder(models.Model):
         ('msme_data_update',      'MSME Data Update & Verification'),
         ('msme_finance_survey',   'MSME Finance Survey (Google Forms)'),
         ('msme_access_finance',   'Access to Finance & Digital Onboarding'),
+        ('biz_continuity',        'Business Continuity & Operational Planning'),
         ('mobilisation',          'Mobilisation / Outreach'),
         ('group_session',         'Peer-to-Peer Group Session'),
         ('training_facilitation', 'Training Facilitation — Senior BGE'),
