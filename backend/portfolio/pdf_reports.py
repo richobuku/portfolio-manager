@@ -588,23 +588,26 @@ def render_work_order(work_order):
 
     bge_col = [Paragraph('Accepted by BGE', s['label']), Spacer(1, 4)]
     sig_drawn = False
-    # Prefer DB-stored bytes (survives Render filesystem wipes), then file path
-    if getattr(bge, 'signature_data', None):
-        try:
-            bge_col.append(RLImage(io.BytesIO(bytes(bge.signature_data)),
-                                   width=40 * mm, height=SIG_H, kind='proportional'))
-            sig_drawn = True
-        except Exception:
-            pass
-    if not sig_drawn and bge.signature:
-        try:
-            sig_path = bge.signature.path
-            if os.path.isfile(sig_path):
-                bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
-                                       kind='proportional'))
+    # Only embed the BGE signature when they have actually signed — prevents
+    # the signature appearing on issued-but-unsigned work order previews.
+    if work_order.status == 'signed':
+        # Prefer DB-stored bytes (survives Render filesystem wipes), then file path
+        if getattr(bge, 'signature_data', None):
+            try:
+                bge_col.append(RLImage(io.BytesIO(bytes(bge.signature_data)),
+                                       width=40 * mm, height=SIG_H, kind='proportional'))
                 sig_drawn = True
-        except Exception:
-            pass
+            except Exception:
+                pass
+        if not sig_drawn and bge.signature:
+            try:
+                sig_path = bge.signature.path
+                if os.path.isfile(sig_path):
+                    bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
+                                           kind='proportional'))
+                    sig_drawn = True
+            except Exception:
+                pass
     if not sig_drawn:
         bge_col.append(Spacer(1, SIG_H))
 
