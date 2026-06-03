@@ -4462,19 +4462,29 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         Fields showing a low fill rate indicate areas where BGEs may need reminders to collect that information.
                       </Typography>
                     </Box>
+                    {/* Completeness Key legend strip */}
+                    <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap', mb: 1.5, px: 0.5 }}>
+                      {[['#2E7D32','80–100%','Good coverage'],['#F9A825','50–79%','Needs attention'],['#C8102E','< 50%','Often skipped']].map(([c,pct,lbl]) => (
+                        <Box key={c} sx={{ display:'flex', alignItems:'center', gap: 0.75 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: 1, bgcolor: c, flexShrink: 0 }}/>
+                          <Typography variant="caption" fontWeight={700} color={c}>{pct}</Typography>
+                          <Typography variant="caption" color="text.secondary">— {lbl}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                       <Grid item xs={12} md={8}>
-                        <ChartCard title="Field Fill Rate" subtitle="% of latest snapshots where each field is filled in" height={330}>
+                        <ChartCard title="Field Fill Rate" subtitle="% of latest snapshots where each field is filled in" height={360}>
                           <ResponsiveContainer>
                             <BarChart
                               data={completenessFields}
                               layout="vertical"
-                              margin={{ top: 4, right: 40, left: 0, bottom: 4 }}>
+                              margin={{ top: 4, right: 48, left: 4, bottom: 4 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
                               <XAxis type="number" domain={[0,100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }}/>
-                              <YAxis dataKey="label" type="category" width={110} tick={{ fontSize: 10 }}/>
+                              <YAxis dataKey="label" type="category" width={115} tick={{ fontSize: 10 }}/>
                               <ReTooltip formatter={(v, _, props) => [`${v}% (${props.payload.filled}/${total4} MSMEs)`, '']}/>
-                              <Bar dataKey="pct" radius={[0,3,3,0]}>
+                              <Bar dataKey="pct" radius={[0,4,4,0]} label={{ position:'right', fontSize:9, formatter: v => `${v}%` }}>
                                 {completenessFields.map((f, i) => (
                                   <Cell key={i} fill={f.pct >= 80 ? '#2E7D32' : f.pct >= 50 ? '#F9A825' : '#C8102E'}/>
                                 ))}
@@ -4484,26 +4494,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         </ChartCard>
                       </Grid>
                       <Grid item xs={12} md={4}>
-                        <ChartCard title="Update Source" subtitle="How was the data collected?" height={200}>
+                        <ChartCard title="Update Source" subtitle="How was the data collected?" height={360}>
                           <ResponsiveContainer>
-                            <BarChart data={sourceData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+                            <BarChart data={sourceData} layout="vertical" margin={{ top: 4, right: 32, left: 4, bottom: 4 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
                               <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false}/>
                               <YAxis dataKey="source" type="category" width={90} tick={{ fontSize: 11 }}/>
                               <ReTooltip formatter={v => [`${v} snapshots`, '']}/>
-                              <Bar dataKey="count" fill="#1A2F4B" radius={[0,3,3,0]}/>
+                              <Bar dataKey="count" fill="#1A2F4B" radius={[0,4,4,0]}
+                                label={{ position:'right', fontSize:10, fill:'#555' }}/>
                             </BarChart>
                           </ResponsiveContainer>
                         </ChartCard>
-                        <Card variant="outlined" sx={{ mt: 2, p: 1.5 }}>
-                          <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 0.5 }}>COMPLETENESS KEY</Typography>
-                          {[['#2E7D32','80–100% — good coverage'],['#F9A825','50–79% — needs attention'],['#C8102E','< 50% — field often skipped']].map(([c,l]) => (
-                            <Box key={c} sx={{ display:'flex', alignItems:'center', gap: 0.75, mb: 0.25 }}>
-                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c, flexShrink: 0 }}/>
-                              <Typography variant="caption" color="text.secondary">{l}</Typography>
-                            </Box>
-                          ))}
-                        </Card>
                       </Grid>
                     </Grid>
                   </>
@@ -4527,69 +4529,88 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   .sort((a,b)=>b[1]-a[1]).slice(0,10)
                   .map(([chg,count]) => ({ change: chg.length > 28 ? chg.slice(0,26)+'…' : chg, count }));
 
+                const trainingTotal = trainingYes + trainingNo + trainingNull;
                 return (
                   <>
                     <SectionLabel>Digital Tools Adoption &amp; Training Impact</SectionLabel>
-                    <Grid container spacing={2} sx={{ mb: 3 }}>
-                      {toolData.length > 0 && (
-                        <Grid item xs={12} md={5}>
-                          <ChartCard title="Digital Tools in Use" subtitle="Top tools adopted across businesses (latest updates)" height={300}>
+
+                    {/* Row 1: Digital Tools chart + Training impact side-by-side */}
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                      {/* Left: Digital Tools bar chart */}
+                      <Grid item xs={12} md={toolData.length > 0 ? 6 : 12}>
+                        {toolData.length > 0 ? (
+                          <ChartCard title="Digital Tools in Use" subtitle="Top tools adopted across businesses (latest data updates)" height={320}>
                             <ResponsiveContainer>
-                              <BarChart data={toolData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+                              <BarChart data={toolData} layout="vertical" margin={{ top: 4, right: 40, left: 4, bottom: 4 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
                                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }}/>
-                                <YAxis dataKey="tool" type="category" width={130} tick={{ fontSize: 10 }}/>
+                                <YAxis dataKey="tool" type="category" width={135} tick={{ fontSize: 10 }}/>
                                 <ReTooltip formatter={v => [`${v} businesses`, '']}/>
-                                <Bar dataKey="count" fill="#0288D1" radius={[0,3,3,0]}/>
+                                <Bar dataKey="count" fill="#0288D1" radius={[0,4,4,0]}
+                                  label={{ position:'right', fontSize:10, fill:'#0288D1' }}/>
                               </BarChart>
                             </ResponsiveContainer>
                           </ChartCard>
-                        </Grid>
-                      )}
-                      <Grid item xs={12} md={toolData.length > 0 ? 3 : 4}>
-                        <Card variant="outlined" sx={{ height: '100%' }}>
-                          <CardContent>
-                            <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                              Training Made a Difference?
-                            </Typography>
+                        ) : (
+                          <Card variant="outlined" sx={{ height: 320, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <Typography variant="body2" color="text.secondary">No digital tool data recorded yet.</Typography>
+                          </Card>
+                        )}
+                      </Grid>
+
+                      {/* Right: Training impact summary */}
+                      <Grid item xs={12} md={6}>
+                        <Card variant="outlined" sx={{ height: 320, display:'flex', flexDirection:'column' }}>
+                          <CardContent sx={{ flex: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Training Made a Difference?</Typography>
                             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
                               BGE-reported training impact across latest snapshots
                             </Typography>
                             {[
-                              { label: 'Yes — changes observed', count: trainingYes,  color: '#2E7D32' },
-                              { label: 'No change reported',     count: trainingNo,   color: '#C8102E' },
-                              { label: 'Not answered',           count: trainingNull, color: '#9E9E9E' },
-                            ].map(({ label, count, color }) => (
-                              <Box key={label} sx={{ mb: 1.5 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
-                                  <Typography variant="body2" fontSize={12}>{label}</Typography>
-                                  <Typography variant="body2" fontWeight={700} color={color}>{count}</Typography>
+                              { label: 'Yes — changes observed', count: trainingYes,  color: '#2E7D32', bg: '#E8F5E9' },
+                              { label: 'No change reported',     count: trainingNo,   color: '#C8102E', bg: '#FFEBEE' },
+                              { label: 'Not answered',           count: trainingNull, color: '#757575', bg: '#F5F5F5' },
+                            ].map(({ label, count, color, bg }) => (
+                              <Box key={label} sx={{ mb: 2 }}>
+                                <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', mb: 0.5 }}>
+                                  <Typography variant="body2" fontSize={12} fontWeight={500}>{label}</Typography>
+                                  <Box sx={{ display:'flex', alignItems:'center', gap: 0.75 }}>
+                                    <Typography variant="body2" fontWeight={700} color={color}>{count}</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      ({trainingTotal ? Math.round(count/trainingTotal*100) : 0}%)
+                                    </Typography>
+                                  </Box>
                                 </Box>
                                 <LinearProgress variant="determinate"
-                                  value={updatedSnaps.length ? count/updatedSnaps.length*100 : 0}
-                                  sx={{ height: 6, borderRadius: 3, bgcolor: '#E8EDF2',
-                                    '& .MuiLinearProgress-bar': { bgcolor: color } }}/>
+                                  value={trainingTotal ? count/trainingTotal*100 : 0}
+                                  sx={{ height: 10, borderRadius: 5, bgcolor: bg,
+                                    '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 5 } }}/>
                               </Box>
                             ))}
                           </CardContent>
                         </Card>
                       </Grid>
-                      {trainingChangeData.length > 0 && (
-                        <Grid item xs={12} md={4}>
-                          <ChartCard title="Training Change Areas" subtitle="What aspects improved after training?" height={300}>
+                    </Grid>
+
+                    {/* Row 2: Training Change Areas — full width */}
+                    {trainingChangeData.length > 0 && (
+                      <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={12}>
+                          <ChartCard title="Training Change Areas" subtitle="Which business aspects improved as a result of PRUDEV II training?" height={280}>
                             <ResponsiveContainer>
-                              <BarChart data={trainingChangeData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+                              <BarChart data={trainingChangeData} layout="vertical" margin={{ top: 4, right: 60, left: 4, bottom: 4 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false}/>
                                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }}/>
-                                <YAxis dataKey="change" type="category" width={130} tick={{ fontSize: 10 }}/>
+                                <YAxis dataKey="change" type="category" width={160} tick={{ fontSize: 10 }}/>
                                 <ReTooltip formatter={v => [`${v} businesses`, '']}/>
-                                <Bar dataKey="count" fill="#2E7D32" radius={[0,3,3,0]}/>
+                                <Bar dataKey="count" fill="#2E7D32" radius={[0,4,4,0]}
+                                  label={{ position:'right', fontSize:10, fill:'#2E7D32' }}/>
                               </BarChart>
                             </ResponsiveContainer>
                           </ChartCard>
                         </Grid>
-                      )}
-                    </Grid>
+                      </Grid>
+                    )}
                   </>
                 );
               })()}
