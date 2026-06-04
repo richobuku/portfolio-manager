@@ -270,7 +270,8 @@ class MSMEGrowthSnapshotViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 bge = BusinessGrowthExpert.objects.get(pk=bge_id)
                 group_msme_ids = MSME.objects.filter(assigned_group__in=bge.bge_groups.all()).values_list('id', flat=True)
                 direct_msme_ids = MSME.objects.filter(assigned_bge=bge).values_list('id', flat=True)
-                all_ids = set(list(direct_msme_ids) + list(group_msme_ids))
+                co_msme_ids = MSME.objects.filter(co_assigned_bges=bge).values_list('id', flat=True)
+                all_ids = set(list(direct_msme_ids) + list(group_msme_ids) + list(co_msme_ids))
                 qs = qs.filter(msme_id__in=all_ids)
             except BusinessGrowthExpert.DoesNotExist:
                 qs = qs.none()
@@ -357,7 +358,9 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                     bge = user.bge_profile
                     from django.db.models import Q
                     qs = qs.filter(
-                        Q(assigned_bge=bge) | Q(assigned_group__members=bge)
+                        Q(assigned_bge=bge) |
+                        Q(assigned_group__members=bge) |
+                        Q(co_assigned_bges=bge)
                     ).distinct()
                 except Exception:
                     qs = qs.none()
@@ -435,17 +438,32 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if bge_id:
             try:
                 bge = BusinessGrowthExpert.objects.get(pk=bge_id)
-                # Prevent assigning the same BGE twice
+                # Prevent assigning the same BGE twice as primary
                 if msme.assigned_bge_id and msme.assigned_bge_id == bge.id:
                     return Response(
                         {'error': f'{msme.business_name} is already assigned to {bge.name}.'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                if msme.assigned_bge_id and msme.assigned_bge_id != bge.id:
+                    # MSME already has a primary BGE — add the new BGE as co-assigned
+                    # so BOTH BGEs keep the MSME in their list (joint deployment).
+                    msme.co_assigned_bges.add(bge)
+                    msme.save()
+                    _notify_bge(
+                        bge,
+                        title='Joint MSME Assignment',
+                        body=f'You have been co-assigned to {msme.business_name} alongside {msme.assigned_bge.name}. Check your dashboard for details.',
+                        url='/bge'
+                    )
+                    return Response(MSMESerializer(msme).data)
+                # No existing primary — set this BGE as primary
                 msme.assigned_bge = bge
             except BusinessGrowthExpert.DoesNotExist:
                 return Response({'error': 'BGE not found'}, status=status.HTTP_404_NOT_FOUND)
         else:
+            # Unassign: clear primary and all co-assignees
             msme.assigned_bge = None
+            msme.co_assigned_bges.clear()
         msme.assignment_objectives = objectives
         msme.assignment_date = assignment_date
         msme.save()

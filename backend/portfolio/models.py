@@ -170,6 +170,11 @@ class MSME(models.Model):
     assigned_bge = models.ForeignKey(
         'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_msmes'
     )
+    co_assigned_bges = models.ManyToManyField(
+        'BusinessGrowthExpert', blank=True,
+        related_name='co_assigned_msmes',
+        help_text='Additional BGEs who are also deployed to this MSME alongside the primary BGE.',
+    )
     assigned_group = models.ForeignKey(
         'BGEGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_msmes',
         help_text='If set, every BGE in this group is considered assigned to this MSME.'

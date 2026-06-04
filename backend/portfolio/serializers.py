@@ -75,6 +75,7 @@ class MSMESerializer(serializers.ModelSerializer):
     assigned_bge_name = serializers.CharField(source='assigned_bge.name', read_only=True, allow_null=True)
     assigned_group_name = serializers.CharField(source='assigned_group.name', read_only=True, allow_null=True)
     assigned_group_objectives = serializers.CharField(source='assigned_group.objectives', read_only=True, allow_null=True)
+    co_assigned_bge_names = serializers.SerializerMethodField()
     total_reports = serializers.SerializerMethodField()
     last_support_date = serializers.SerializerMethodField()
     programme_groups_detail = ProgrammeGroupSerializer(source='programme_groups', many=True, read_only=True)
@@ -82,6 +83,9 @@ class MSMESerializer(serializers.ModelSerializer):
     class Meta:
         model = MSME
         fields = '__all__'
+
+    def get_co_assigned_bge_names(self, obj):
+        return [{'id': b.id, 'name': b.name, 'bge_code': b.bge_code} for b in obj.co_assigned_bges.all()]
 
     def get_total_reports(self, obj):
         # Use DB-level annotations when available (N+1 fix: avoids 2 COUNT queries per row)

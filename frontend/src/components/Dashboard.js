@@ -5846,16 +5846,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <Select value={addMsmePick} label="Select MSME" onChange={ev => setAddMsmePick(ev.target.value)}>
                       <MenuItem value=""><em>Choose…</em></MenuItem>
                       {filtered.map(m => {
-                        const isOwn  = m.assigned_bge === addMsmeDialog?.id;
-                        const isFree = !m.assigned_bge;
-                        const other  = !isFree && !isOwn ? m.assigned_bge_name : null;
+                        const isOwn    = m.assigned_bge === addMsmeDialog?.id;
+                        const isFree   = !m.assigned_bge;
+                        const primary  = !isFree && !isOwn ? m.assigned_bge_name : null;
+                        const coNames  = (m.co_assigned_bge_names || []).map(b => b.name);
+                        const isCoHere = (m.co_assigned_bge_names || []).some(b => b.id === addMsmeDialog?.id);
                         return (
                           <MenuItem key={m.id} value={m.id}
-                            sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
                             <span>{m.business_name}</span>
-                            {isOwn  && <Chip label="Already here" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E8F5E9', color:'#2E7D32' }}/>}
-                            {isFree && <Chip label="Unassigned"   size="small" sx={{ fontSize:10, height:18, bgcolor:'#E3F2FD', color:'#0277BD' }}/>}
-                            {other  && <Chip label={`→ ${other}`} size="small" sx={{ fontSize:10, height:18, bgcolor:'#FFF3E0', color:'#E65100' }}/>}
+                            <Box sx={{ display:'flex', gap:0.5, flexWrap:'wrap' }}>
+                              {isOwn    && <Chip label="Primary here" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E8F5E9', color:'#2E7D32' }}/>}
+                              {isCoHere && <Chip label="Co-assigned here" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E8F0FE', color:'#3949AB' }}/>}
+                              {isFree   && <Chip label="Unassigned" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E3F2FD', color:'#0277BD' }}/>}
+                              {primary  && <Chip label={`Primary: ${primary}`} size="small" sx={{ fontSize:10, height:18, bgcolor:'#FFF3E0', color:'#E65100' }}/>}
+                              {coNames.length > 0 && !isCoHere && <Chip label={`Co: ${coNames.join(', ')}`} size="small" sx={{ fontSize:10, height:18, bgcolor:'#F3E5F5', color:'#6A1B9A' }}/>}
+                            </Box>
                           </MenuItem>
                         );
                       })}
