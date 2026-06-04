@@ -1309,23 +1309,36 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         return Response(BusinessGrowthExpertSerializer(bges, many=True).data)
 
     @staticmethod
+    def _bge_all_msme_ids(bge):
+        """Return all MSME IDs visible to a BGE: direct assignments + group assignments."""
+        direct = set(bge.assigned_msmes.values_list('id', flat=True))
+        via_group = set(MSME.objects.filter(
+            assigned_group__in=bge.bge_groups.all()
+        ).values_list('id', flat=True))
+        return direct | via_group
+
+    @staticmethod
     def _already_assigned_bges(bge):
         """Return other BGEs whose issued/signed work orders overlap in date with
         any of this BGE's active work orders AND share at least one MSME.
 
-        Uses the msme_ids_snapshot stored at issue time so detection remains
-        accurate even after MSMEs have been re-assigned between BGEs.
+        Detection uses (in priority order):
+          1. msme_ids_snapshot — set at issue time, survives re-assignment
+          2. current direct + group MSME assignments — fallback for legacy records
+        Both sides use the union so legacy and new records all work.
         """
         from .models import WorkOrder as _WO
+
+        # Best-available MSME set for this BGE: snapshot union current
+        my_current = BusinessGrowthExpertViewSet._bge_all_msme_ids(bge)
         my_wos = _WO.objects.filter(bge=bge, status__in=['issued', 'signed'])
         already = {}
+
         for my_wo in my_wos:
             if not (my_wo.start_date and my_wo.end_date):
                 continue
-            my_msme_ids = set(my_wo.msme_ids_snapshot or [])
-            if not my_msme_ids:
-                # Fallback: use current assignments if no snapshot (legacy records)
-                my_msme_ids = set(bge.assigned_msmes.values_list('id', flat=True))
+            # Union snapshot with current so re-assigned MSMEs are still detected
+            my_msme_ids = set(my_wo.msme_ids_snapshot or []) | my_current
             if not my_msme_ids:
                 continue
 
@@ -1338,12 +1351,10 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             for owo in overlapping:
                 if owo.bge_id in already:
                     continue
-                other_msme_ids = set(owo.msme_ids_snapshot or [])
-                if not other_msme_ids:
-                    other_msme_ids = set(owo.bge.assigned_msmes.values_list('id', flat=True))
+                other_current = BusinessGrowthExpertViewSet._bge_all_msme_ids(owo.bge)
+                other_msme_ids = set(owo.msme_ids_snapshot or []) | other_current
                 shared_ids = my_msme_ids & other_msme_ids
                 if shared_ids:
-                    # Fetch names for the shared MSMEs
                     shared_msmes = list(
                         MSME.objects.filter(id__in=shared_ids)
                         .values('id', 'business_name', 'msme_code')
@@ -3397,22 +3408,22 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if recipients:
             # Check for other BGEs with overlapping date ranges AND shared MSMEs
             co_text = ''
-            if work_order.start_date and work_order.end_date and bge_msme_ids:
+            if work_order.start_date and work_order.end_date:
                 from .models import WorkOrder as _WO2
                 overlapping = _WO2.objects.filter(
                     status__in=['issued', 'signed'],
                     start_date__lte=work_order.end_date,
                     end_date__gte=work_order.start_date,
                 ).exclude(bge=bge).exclude(id=work_order.id).select_related('bge')
-                my_set = set(bge_msme_ids)
+                # Union snapshot with current (handles both new and legacy work orders)
+                my_set = set(bge_msme_ids) | BusinessGrowthExpertViewSet._bge_all_msme_ids(bge)
                 aa_lines = []
                 seen_bges = set()
                 for owo in overlapping:
                     if owo.bge_id in seen_bges:
                         continue
-                    other_ids = set(owo.msme_ids_snapshot or [])
-                    if not other_ids:
-                        other_ids = set(owo.bge.assigned_msmes.values_list('id', flat=True))
+                    other_current = BusinessGrowthExpertViewSet._bge_all_msme_ids(owo.bge)
+                    other_ids = set(owo.msme_ids_snapshot or []) | other_current
                     if not (my_set & other_ids):
                         continue  # no shared MSMEs — skip
                     seen_bges.add(owo.bge_id)
