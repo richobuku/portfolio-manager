@@ -258,6 +258,12 @@ class MSMEGrowthSnapshotViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if msme_id:
             qs = qs.filter(msme_id=msme_id)
         if bge_id:
+            # Security: non-admin users can only query their own BGE data (IDOR fix)
+            user = self.request.user
+            if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+                own_bge = getattr(user, 'bge_profile', None)
+                if not own_bge or str(own_bge.id) != str(bge_id):
+                    raise PermissionDenied("You can only access your own data.")
             # All snapshots for MSMEs directly assigned to this BGE or in their groups
             from .models import BusinessGrowthExpert, BGEGroup
             try:
@@ -1326,29 +1332,30 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         body_text = "\n".join(lines)
 
         # ── HTML version (renders beautifully in Outlook) ─────────────────────
+        from django.utils.html import escape as _esc
         objectives_html = ""
         if bge.deployment_objectives:
             objectives_html = f"""
             <div style="background:#f8f9fa;border-left:4px solid #1A2E42;padding:12px 16px;margin:16px 0;border-radius:0 4px 4px 0;">
               <p style="font-weight:700;color:#1A2E42;margin:0 0 6px 0;font-size:12px;text-transform:uppercase;letter-spacing:.05em;">Deployment Objectives</p>
-              <p style="margin:0;color:#333;white-space:pre-line;">{bge.deployment_objectives}</p>
+              <p style="margin:0;color:#333;white-space:pre-line;">{_esc(bge.deployment_objectives)}</p>
             </div>"""
 
         msme_rows_html = ""
         for i, m in enumerate(msmes, 1):
             details = []
-            if m.owner_name: details.append(f"<span style='color:#555;'>Owner:</span> {m.owner_name}")
-            if m.sector:     details.append(f"<span style='color:#555;'>Sector:</span> {m.sector}")
-            if m.city:       details.append(f"<span style='color:#555;'>Location:</span> {m.city}")
-            if m.phone:      details.append(f"<span style='color:#555;'>Phone:</span> {m.phone}")
+            if m.owner_name: details.append(f"<span style='color:#555;'>Owner:</span> {_esc(m.owner_name)}")
+            if m.sector:     details.append(f"<span style='color:#555;'>Sector:</span> {_esc(m.sector)}")
+            if m.city:       details.append(f"<span style='color:#555;'>Location:</span> {_esc(m.city)}")
+            if m.phone:      details.append(f"<span style='color:#555;'>Phone:</span> {_esc(m.phone)}")
             details_html = " &nbsp;·&nbsp; ".join(details)
             bg = "#ffffff" if i % 2 == 0 else "#f9fafb"
             msme_rows_html += f"""
             <tr style="background:{bg};">
               <td style="padding:10px 14px;font-weight:600;color:#1A2E42;width:28px;vertical-align:top;">{i}.</td>
               <td style="padding:10px 14px;">
-                <strong>{m.business_name}</strong>
-                <span style="color:#888;font-size:12px;margin-left:6px;">({m.msme_code or 'No code'})</span>
+                <strong>{_esc(m.business_name)}</strong>
+                <span style="color:#888;font-size:12px;margin-left:6px;">({_esc(m.msme_code or 'No code')})</span>
                 {'<br><span style="font-size:12px;color:#666;">' + details_html + '</span>' if details_html else ''}
               </td>
             </tr>"""
@@ -1375,7 +1382,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         <!-- Body -->
         <tr><td style="padding:28px 32px;">
-          <p style="margin:0 0 16px;color:#333;font-size:15px;">Dear <strong>{bge.name}</strong>,</p>
+          <p style="margin:0 0 16px;color:#333;font-size:15px;">Dear <strong>{_esc(bge.name)}</strong>,</p>
           <p style="margin:0 0 20px;color:#555;line-height:1.6;">
             Please find below your assignment details under the <strong>PRUDEV II Programme</strong>.
           </p>
@@ -3861,13 +3868,20 @@ def bulk_sms_view(request):
     if not message:
         return Response({'detail': 'Message is required.'}, status=400)
 
+    # Scope filter: programme managers can only message within their groups
+    group_ids = _managed_groups(user)  # None for superuser/staff, list for programme managers
+
     if recipient_type == 'bge':
         qs = BusinessGrowthExpert.objects.filter(phone__isnull=False).exclude(phone='')
+        if group_ids is not None:  # programme manager — restrict to managed groups
+            qs = qs.filter(bge_groups__programme_group__in=group_ids)
         if recipient_ids:
             qs = qs.filter(id__in=recipient_ids)
         records = [{'id': b.id, 'name': b.name or 'BGE', 'phone': b.phone, 'rtype': 'bge'} for b in qs]
     else:
         qs = MSME.objects.filter(phone__isnull=False).exclude(phone='')
+        if group_ids is not None:  # programme manager — restrict to managed groups
+            qs = qs.filter(assigned_group__in=group_ids)
         if recipient_ids:
             qs = qs.filter(id__in=recipient_ids)
         records = [{'id': m.id, 'name': m.owner_name or m.business_name or 'Business', 'phone': m.phone, 'rtype': 'msme'} for m in qs]

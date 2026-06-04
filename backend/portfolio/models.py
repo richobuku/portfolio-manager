@@ -1226,6 +1226,24 @@ class SmsSendLog(models.Model):
         return f"{self.recipient_type}:{self.recipient_id} → {self.recipient_phone} ({self.sent_at:%Y-%m-%d})"
 
 
+# ── User Security Profile ─────────────────────────────────────────────────
+class UserSecurityProfile(models.Model):
+    """Tracks password change requirements and last-changed date for every user."""
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='security_profile'
+    )
+    must_change_password  = models.BooleanField(default=True,
+        help_text='Force password change on next login (set on account creation).')
+    password_last_changed = models.DateTimeField(null=True, blank=True,
+        help_text='Set whenever the user successfully changes their password.')
+
+    class Meta:
+        verbose_name = 'User Security Profile'
+
+    def __str__(self):
+        return f"{self.user.username} — change required: {self.must_change_password}"
+
+
 # ── T-Shirt Receipt ────────────────────────────────────────────────────────
 
 class TshirtReceipt(models.Model):

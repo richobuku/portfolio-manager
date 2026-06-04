@@ -19,7 +19,10 @@ from django.core.mail import EmailMultiAlternatives
 
 log = logging.getLogger(__name__)
 
-DEFAULT_PASSWORD = 'bds123'
+def _generate_temp_password():
+    """Generate a unique random temporary password for each account."""
+    import secrets
+    return secrets.token_urlsafe(12)  # e.g. "X7kR2mNpQs4vWx"
 
 
 # ── Username helpers ────────────────────────────────────────────────────────
@@ -55,8 +58,23 @@ def unique_username(base):
 # ── Welcome email ───────────────────────────────────────────────────────────
 def _welcome_email_html(bge, username, password, login_url):
     """Branded HTML body matching the password-reset email."""
+    from django.contrib.auth.tokens import PasswordResetTokenGenerator
+    from django.utils.http import urlsafe_base64_encode
+    from django.utils.encoding import force_bytes
     name = (bge.name or 'BGE').split()[0]
     bge_code = bge.bge_code or '—'
+    # Generate a one-time password-reset link for the email CTA
+    reset_url = login_url
+    if bge.email:
+        try:
+            from django.contrib.auth.models import User as _User
+            u = _User.objects.get(email__iexact=bge.email)
+            gen = PasswordResetTokenGenerator()
+            uid = urlsafe_base64_encode(force_bytes(u.pk))
+            tok = gen.make_token(u)
+            reset_url = f"{login_url.rstrip('/login').rstrip('/')}/reset-password/{uid}/{tok}"
+        except Exception:
+            pass
     return f"""\
 <div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;background:#f5f5f5;">
   <div style="background:#1A2F4B;padding:24px;border-bottom:3px solid #C8102E;">
@@ -81,19 +99,18 @@ def _welcome_email_html(bge, username, password, login_url):
       <div style="color:#1A2F4B;font-family:monospace;font-size:14px;line-height:1.8;">
         <div><strong>URL:</strong> <a href="{login_url}" style="color:#C8102E;">{login_url}</a></div>
         <div><strong>Username:</strong> {username}</div>
-        <div><strong>Password:</strong> {password}</div>
       </div>
     </div>
 
-    <a href="{login_url}" style="display:inline-block;background:#C8102E;color:#fff;
+    <a href="{reset_url}" style="display:inline-block;background:#C8102E;color:#fff;
        text-decoration:none;font-weight:700;padding:12px 24px;border-radius:6px;margin-top:8px;">
-      Sign in to PRUDEV II →
+      Set Your Password &amp; Sign In →
     </a>
 
     <p style="color:#6b7280;font-size:13px;line-height:1.55;margin-top:24px;">
-      For your security, please change this password on first login —
-      use the <em>Forgot password?</em> link on the sign-in page if you'd
-      like a fresh reset link emailed to you.
+      Click the button above to set your password and access the portal.
+      The link expires in 3 days. If it expires, use <em>Forgot password?</em>
+      on the sign-in page to receive a fresh link.
     </p>
   </div>
   <div style="text-align:center;color:#9ca3af;font-size:11px;padding:14px;">
@@ -115,17 +132,37 @@ Welcome to PRUDEV II! Your Business Growth Expert account is ready.
 
   BDS Portal:  {login_url}
   Username:    {username}
-  Password:    {password}
 
-Please change your password on first login. Use "Forgot password?"
-on the sign-in page if you'd prefer a reset link sent to your email.
+Use "Forgot password?" on the sign-in page to set your password.
+A reset link will be emailed to you immediately.
 
 — PRUDEV II BDS Team · GIZ · GOPA AFC
 """
 
 
-def send_welcome_sms(bge, username, password):
-    """Send a welcome SMS to the BGE's phone via Message Carrier. Best-effort."""
+def _generate_sms_reset_link(email, base_url):
+    """Generate a password-reset URL that can be sent via SMS."""
+    try:
+        from django.contrib.auth.models import User
+        from django.contrib.auth.tokens import PasswordResetTokenGenerator
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+        user = User.objects.get(email__iexact=email)
+        gen   = PasswordResetTokenGenerator()
+        uid   = urlsafe_base64_encode(force_bytes(user.pk))
+        token = gen.make_token(user)
+        return f"{base_url}/reset-password/{uid}/{token}"
+    except Exception:
+        return f"{base_url}/login"
+
+
+def send_welcome_sms(bge, username, password=None):
+    """Send a welcome SMS to the BGE's phone via Message Carrier. Best-effort.
+
+    NOTE: We no longer include the password in the SMS. Instead we send a
+    password-reset link so credentials are never transmitted over SMS.
+    The `password` parameter is kept for backwards-compat but is ignored.
+    """
     if not bge.phone:
         log.info("Skipped welcome SMS for BGE #%s — no phone number.", bge.id)
         return False
@@ -137,15 +174,18 @@ def send_welcome_sms(bge, username, password):
     if not phone.startswith('+'):
         phone = '+' + phone
 
-    name  = (bge.name or 'BGE').split()[0]
-    code  = bge.bge_code or 'N/A'
+    name      = (bge.name or 'BGE').split()[0]
+    code      = bge.bge_code or 'N/A'
     login_url = getattr(settings, 'FRONTEND_URL', 'https://bds.glowi.africa').rstrip('/')
+
+    # Generate a secure password-reset link — never transmit the password itself
+    reset_link = _generate_sms_reset_link(bge.email, login_url) if bge.email else f'{login_url}/login'
 
     message = (
         f"Welcome to PRUDEV II, {name}! "
-        f"Your BGE Code: {code} — quote this on all engagements. "
-        f"BDS Portal: {login_url} | User: {username} | Pass: {password}. "
-        f"Change password on first login."
+        f"Your BGE Code: {code}. "
+        f"Set your password: {reset_link} "
+        f"Username: {username}"
     )
 
     api_key  = getattr(settings, 'MESSAGE_CARRIER_API_KEY', '')
@@ -232,10 +272,13 @@ def ensure_bge_account(bge, password=None, send_email=True):
 
     Returns one of: 'created', 'already_linked', 'skipped'.
 
-    `password` defaults to DEFAULT_PASSWORD ('bds123'). When `send_email`
-    is True (default) and a brand-new account is provisioned, the BGE
-    receives the welcome email with their credentials.
+    Each account receives a unique random temporary password.  The BGE is
+    sent a password-reset link (not the password itself) via email and SMS,
+    and is flagged must_change_password=True so they are prompted on first login.
     """
+    from .models import UserSecurityProfile
+    from django.utils import timezone as _tz
+
     if bge.user_id:
         return 'already_linked'
 
@@ -248,7 +291,8 @@ def ensure_bge_account(bge, password=None, send_email=True):
         )
         return 'skipped'
 
-    pw = password or DEFAULT_PASSWORD
+    # Generate a unique random password — never reuse a shared default
+    pw = password or _generate_temp_password()
     first, _, last = (bge.name or '').partition(' ')
     user = User.objects.create_user(
         username=username,
@@ -256,6 +300,13 @@ def ensure_bge_account(bge, password=None, send_email=True):
         first_name=first,
         last_name=last,
         password=pw,
+    )
+
+    # Mark must_change_password on first login
+    UserSecurityProfile.objects.create(
+        user=user,
+        must_change_password=True,
+        password_last_changed=None,
     )
 
     # Avoid recursive post_save — bypass the BGE signal by going through
@@ -267,6 +318,6 @@ def ensure_bge_account(bge, password=None, send_email=True):
 
     if send_email:
         send_welcome_email(bge, username, pw)
-        send_welcome_sms(bge, username, pw)
+        send_welcome_sms(bge, username)
 
     return 'created'

@@ -57,6 +57,7 @@ export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-
 export const REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/reports/${id}/revert/`;
 export const GROUP_REPORT_REVERT_URL = (id) => `${API_BASE_URL}/api/group-reports/${id}/revert/`;
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;
+export const CHANGE_PASSWORD_URL = `${API_BASE_URL}/api/auth/change-password/`;
 export const BULK_EMAIL = API_ENDPOINTS.BULK_EMAIL;
 export const BULK_EMAIL_LOG = `${API_BASE_URL}/api/bulk-email/log/`;
 export const BULK_SMS = `${API_BASE_URL}/api/bulk-sms/`;

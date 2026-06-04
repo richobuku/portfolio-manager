@@ -6,6 +6,73 @@ import Dashboard from './components/Dashboard';
 import BGEDashboard from './components/BGEDashboard';
 import ResetPassword from './components/ResetPassword';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import { CHANGE_PASSWORD_URL } from './config';
+
+// ── Forced password change modal ─────────────────────────────────────────────
+function PasswordChangeModal({ token, onSuccess }) {
+  const [current, setCurrent] = React.useState('');
+  const [next, setNext]       = React.useState('');
+  const [confirm, setConfirm] = React.useState('');
+  const [err, setErr]         = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr('');
+    if (next.length < 8) { setErr('Password must be at least 8 characters.'); return; }
+    if (next !== confirm) { setErr('Passwords do not match.'); return; }
+    setLoading(true);
+    try {
+      const res = await axios.post(CHANGE_PASSWORD_URL,
+        { current_password: current, new_password: next },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      onSuccess(res.data.token);
+    } catch (e) {
+      setErr(e.response?.data?.detail || 'Failed to change password. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:9999,
+      display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ background:'#fff', borderRadius:10, padding:'32px 36px', width:380,
+        maxWidth:'95vw', boxShadow:'0 8px 32px rgba(0,0,0,0.25)' }}>
+        <div style={{ background:'#1A2F4B', borderRadius:6, padding:'12px 16px', marginBottom:20 }}>
+          <div style={{ color:'#fff', fontWeight:800, fontSize:18 }}>PRUDEV II</div>
+          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:12 }}>Security — Password Update Required</div>
+        </div>
+        <h3 style={{ margin:'0 0 6px', color:'#1A2F4B', fontSize:16 }}>Set a new password</h3>
+        <p style={{ margin:'0 0 20px', color:'#555', fontSize:13, lineHeight:1.5 }}>
+          Your account requires a password change before you can continue.
+          Choose a strong password of at least 8 characters.
+        </p>
+        {err && <div style={{ background:'#FFEBEE', color:'#C62828', padding:'8px 12px',
+          borderRadius:4, marginBottom:12, fontSize:13 }}>{err}</div>}
+        <form onSubmit={submit}>
+          {[
+            { label:'Current password', val:current, set:setCurrent },
+            { label:'New password (min. 8 chars)', val:next, set:setNext },
+            { label:'Confirm new password', val:confirm, set:setConfirm },
+          ].map(({ label, val, set }) => (
+            <div key={label} style={{ marginBottom:14 }}>
+              <label style={{ display:'block', fontSize:12, color:'#555', marginBottom:4, fontWeight:600 }}>{label}</label>
+              <input type="password" value={val} onChange={e => set(e.target.value)}
+                required style={{ width:'100%', padding:'9px 12px', border:'1px solid #ccc',
+                  borderRadius:5, fontSize:14, boxSizing:'border-box' }} />
+            </div>
+          ))}
+          <button type="submit" disabled={loading}
+            style={{ width:'100%', background:'#C8102E', color:'#fff', border:'none',
+              borderRadius:6, padding:'11px 0', fontSize:15, fontWeight:700,
+              cursor: loading ? 'not-allowed' : 'pointer', marginTop:4 }}>
+            {loading ? 'Saving…' : 'Set Password & Continue'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -51,6 +118,17 @@ export default function App() {
     setCurrentUser(user);
   };
 
+  // Called when the user successfully changes their password in the modal
+  const handlePasswordChanged = (newToken) => {
+    const updatedUser = { ...currentUser, password_change_required: false };
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setToken(newToken);
+    setCurrentUser(updatedUser);
+  };
+
+  const passwordChangeRequired = !!(currentUser?.password_change_required);
+
   const handleLogout = React.useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -91,6 +169,10 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      {/* Force password change modal — blocks the entire app until resolved */}
+      {token && currentUser && passwordChangeRequired && (
+        <PasswordChangeModal token={token} onSuccess={handlePasswordChanged} />
+      )}
       <Router>
         <Routes>
           <Route path="/login" element={
@@ -111,6 +193,7 @@ export default function App() {
             ) : <Navigate to="/login" replace />
           } />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
           <Route path="*" element={<Navigate to={(token && (isAdmin || isBGE)) ? '/dashboard' : '/login'} replace />} />
         </Routes>
         <PWAInstallPrompt />

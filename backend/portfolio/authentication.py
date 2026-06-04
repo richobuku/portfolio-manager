@@ -18,8 +18,17 @@ import hmac
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+
+REVOCATION_PREFIX = 'revoked_token:'
+REVOCATION_TTL    = 86400 * 30  # keep revoked tokens for 30 days
+
+
+def revoke_token(token: str):
+    """Mark a token as revoked. Call from logout_view."""
+    cache.set(f'{REVOCATION_PREFIX}{token}', True, timeout=REVOCATION_TTL)
 
 
 def _sig(user_id, username):
@@ -60,6 +69,10 @@ class SimpleTokenAuthentication(BaseAuthentication):
         expected_sig = _sig(user_id, username)
         if not hmac.compare_digest(provided_sig, expected_sig):
             raise AuthenticationFailed("Invalid token signature. Please log in again.")
+
+        # Check server-side revocation list (populated on logout)
+        if cache.get(f'{REVOCATION_PREFIX}{token}'):
+            raise AuthenticationFailed("Token has been revoked. Please log in again.")
 
         try:
             user = User.objects.get(pk=user_id, username=username)

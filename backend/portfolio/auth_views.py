@@ -67,6 +67,30 @@ def _build_user_response(user):
     except Exception:
         pass
 
+    # ── Password change enforcement ──────────────────────────────────────────
+    from django.utils import timezone as _tz
+    from datetime import timedelta
+    password_change_required = False
+    try:
+        sec = user.security_profile
+        if sec.must_change_password:
+            password_change_required = True
+        elif sec.password_last_changed:
+            if (_tz.now() - sec.password_last_changed) > timedelta(days=30):
+                password_change_required = True
+        else:
+            # No record of last change — treat as requiring change if account > 1 day old
+            if (_tz.now() - user.date_joined) > timedelta(days=1):
+                password_change_required = True
+    except Exception:
+        # No security profile yet — create one and flag for change
+        try:
+            from .models import UserSecurityProfile
+            UserSecurityProfile.objects.get_or_create(user=user)
+            password_change_required = True
+        except Exception:
+            pass
+
     payload = {
         'token': token,
         'user': {
@@ -77,6 +101,7 @@ def _build_user_response(user):
             'is_superuser': user.is_superuser,
             'role': role,
             'bge_profile': bge_profile,
+            'password_change_required': password_change_required,
         }
     }
     if managed_cohort_ids is not None:
@@ -117,17 +142,11 @@ def _try_auto_link_bge(user, google_name, google_email):
             bge.save()
             return bge
 
-    # 2. Match by exact full name (case-insensitive)
-    if google_name:
-        bge = BusinessGrowthExpert.objects.filter(
-            name__iexact=google_name, user__isnull=True
-        ).first()
-        if bge:
-            bge.user = user
-            bge.save()
-            return bge
-
-    # Tier 3 (first-name substring) removed — see docstring above.
+    # Tier 2 (name-match) REMOVED — Google display names are user-controlled,
+    # so matching by name allows impersonation of any unlinked BGE.  Only the
+    # email tier (above) is safe for automatic linking.  Unmatched users get a
+    # regular account and must be linked by an admin via the link_bge_users
+    # management command or the admin dashboard.
     return None
 
 
@@ -155,7 +174,65 @@ def login_view(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
+    """Revoke the current token so it cannot be reused after logout."""
+    from .authentication import revoke_token
+    token = getattr(request, 'auth', None)
+    if token:
+        revoke_token(str(token))
     return Response({'message': 'Logged out successfully'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password_view(request):
+    """Authenticated users change their own password.
+
+    Body: { current_password, new_password }
+    On success: updates security profile, revokes old token, returns new token.
+    """
+    from .authentication import revoke_token, sign_token
+    from .models import UserSecurityProfile
+    from django.utils import timezone as _tz
+
+    current_password = request.data.get('current_password', '')
+    new_password     = request.data.get('new_password', '')
+
+    if not current_password or not new_password:
+        return Response({'detail': 'current_password and new_password are required.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if len(new_password) < 8:
+        return Response({'detail': 'New password must be at least 8 characters.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    user = request.user
+    if not user.check_password(current_password):
+        return Response({'detail': 'Current password is incorrect.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if current_password == new_password:
+        return Response({'detail': 'New password must be different from the current password.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Apply new password
+    user.set_password(new_password)
+    user.save(update_fields=['password'])
+
+    # Update security profile
+    sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
+    sec.must_change_password  = False
+    sec.password_last_changed = _tz.now()
+    sec.save(update_fields=['must_change_password', 'password_last_changed'])
+
+    # Revoke old token and issue a fresh one
+    old_token = getattr(request, 'auth', None)
+    if old_token:
+        revoke_token(str(old_token))
+    new_token = sign_token(user.id, user.username)
+
+    return Response({
+        'detail': 'Password changed successfully.',
+        'token': new_token,
+    })
 
 
 @api_view(['POST'])

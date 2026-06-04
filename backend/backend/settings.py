@@ -227,10 +227,13 @@ BGE_WELCOME_EMAIL_BCC = os.environ.get(
 ).strip()
 
 # ── SMS Configuration (Message Carrier) ──────────────────────────────────────
-MESSAGE_CARRIER_API_KEY = os.environ.get(
-    'MESSAGE_CARRIER_API_KEY',
-    'mc_live_cf7e1bb6dedfd292725fc3e76b8567a8d2346b5b2b75e0249d833cb9a909db34',
-)
+MESSAGE_CARRIER_API_KEY = os.environ.get('MESSAGE_CARRIER_API_KEY', '')
+if not MESSAGE_CARRIER_API_KEY:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        'MESSAGE_CARRIER_API_KEY is not set — bulk SMS will be disabled until '
+        'this environment variable is configured on the host.'
+    )
 MESSAGE_CARRIER_BASE_URL = 'https://api.bravo.mystyler.xyz'
 
 # CORS Configuration for Frontend Integration
