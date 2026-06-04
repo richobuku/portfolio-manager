@@ -7683,34 +7683,54 @@ PRUDEV II BDS Team`
 
               <Divider sx={{ mb: 2 }} />
 
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                Assigned MSMEs ({(viewItem.assigned_msmes_list || []).length})
-              </Typography>
-
-              {(viewItem.assigned_msmes_list || []).length === 0 ? (
-                <Typography variant="body2" color="text.secondary">No MSMEs assigned yet.</Typography>
-              ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {(viewItem.assigned_msmes_list || []).map((m, idx) => (
-                    <Box key={m.id} sx={{
-                      display: 'flex', alignItems: 'center', gap: 1.5,
-                      p: 1.2, borderRadius: 1.5,
-                      bgcolor: idx % 2 === 0 ? '#F8FAFC' : '#fff',
-                      border: '1px solid #E8EDF2',
-                    }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 24, color: 'text.disabled', fontSize: 11 }}>
-                        {idx + 1}.
+              {(() => {
+                const allMsmes = viewItem.assigned_msmes_list || [];
+                const primary = allMsmes.filter(m => !m.is_co_assigned);
+                const coAssigned = allMsmes.filter(m => m.is_co_assigned);
+                return (
+                  <>
+                    <Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', mb: 1.5 }}>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        Assigned MSMEs ({allMsmes.length})
                       </Typography>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>{m.business_name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {[m.msme_code, m.business_type, m.sector, m.city].filter(Boolean).join(' · ')}
-                        </Typography>
-                      </Box>
+                      {coAssigned.length > 0 && (
+                        <Chip size="small" label={`${primary.length} primary · ${coAssigned.length} joint`}
+                          sx={{ fontSize:11, height:20, bgcolor:'#EDE7F6', color:'#4527A0' }} />
+                      )}
                     </Box>
-                  ))}
-                </Box>
-              )}
+                    {allMsmes.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">No MSMEs assigned yet.</Typography>
+                    ) : (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {allMsmes.map((m, idx) => (
+                          <Box key={m.id} sx={{
+                            display: 'flex', alignItems: 'center', gap: 1.5,
+                            p: 1.2, borderRadius: 1.5,
+                            bgcolor: m.is_co_assigned ? '#F3E5F5' : (idx % 2 === 0 ? '#F8FAFC' : '#fff'),
+                            border: `1px solid ${m.is_co_assigned ? '#CE93D8' : '#E8EDF2'}`,
+                          }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 24, color: 'text.disabled', fontSize: 11 }}>
+                              {idx + 1}.
+                            </Typography>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Box sx={{ display:'flex', alignItems:'center', gap: 0.75 }}>
+                                <Typography variant="body2" fontWeight={600} noWrap>{m.business_name}</Typography>
+                                {m.is_co_assigned && (
+                                  <Chip label="Joint" size="small"
+                                    sx={{ fontSize:9, height:16, bgcolor:'#7B1FA2', color:'#fff' }} />
+                                )}
+                              </Box>
+                              <Typography variant="caption" color="text.secondary">
+                                {[m.msme_code, m.business_type, m.sector, m.city].filter(Boolean).join(' · ')}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </>
+                );
+              })()}
             </Box>
           ) : viewItem && viewType === 'msme' && msmeDetailTab === 0 ? (
             /* ── MSME Profile tab ── */

@@ -1388,7 +1388,13 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
     def _build_assignment_email(self, bge):
         """Build plain-text + HTML email for a BGE assignment. Shared by preview and send."""
-        msmes = bge.assigned_msmes.filter(is_active=True).order_by('business_name')
+        from django.db.models import Q
+        # Include both primary and co-assigned MSMEs so the email reflects everything
+        # the BGE is expected to work on — whether they are the primary or joint BGE.
+        msmes = MSME.objects.filter(
+            Q(assigned_bge=bge) | Q(co_assigned_bges=bge),
+            is_active=True,
+        ).distinct().order_by('business_name')
         count = msmes.count()
         already_assigned = self._already_assigned_bges(bge)
 

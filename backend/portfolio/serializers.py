@@ -134,30 +134,28 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
         # as plain JSON in a PATCH causes Django to reject the request.
         read_only_fields = ('signature', 'signature_data')
 
+    def _all_msmes(self, obj):
+        """Return combined queryset: primary assigned + co-assigned, deduped."""
+        from django.db.models import Q
+        from portfolio.models import MSME
+        return MSME.objects.filter(
+            Q(assigned_bge=obj) | Q(co_assigned_bges=obj),
+            is_active=True,
+        ).distinct().order_by('business_name')
+
     def get_assigned_msme_count(self, obj):
-        # Use the prefetch cache when available (avoids a DB round-trip per BGE)
-        if 'assigned_msmes' in getattr(obj, '_prefetched_objects_cache', {}):
-            return sum(1 for m in obj.assigned_msmes.all() if m.is_active)
-        return obj.assigned_msmes.filter(is_active=True).count()
+        return self._all_msmes(obj).count()
 
     def get_assigned_msmes_list(self, obj):
-        # Filter from the prefetch cache when available — re-querying with
-        # .filter() would bypass the cache and cause N queries for N BGEs.
-        if 'assigned_msmes' in getattr(obj, '_prefetched_objects_cache', {}):
-            return [
-                {
-                    'id': m.id, 'business_name': m.business_name,
-                    'msme_code': m.msme_code, 'business_type': m.business_type,
-                    'sector': m.sector, 'city': m.city,
-                    'assignment_objectives': m.assignment_objectives,
-                    'assignment_date': str(m.assignment_date) if m.assignment_date else None,
-                }
-                for m in obj.assigned_msmes.all() if m.is_active
-            ]
-        return list(
-            obj.assigned_msmes.filter(is_active=True)
-            .values('id', 'business_name', 'msme_code', 'business_type', 'sector', 'city', 'assignment_objectives', 'assignment_date')
+        rows = list(
+            self._all_msmes(obj)
+            .values('id', 'business_name', 'msme_code', 'business_type', 'sector', 'city',
+                    'assignment_objectives', 'assignment_date', 'assigned_bge')
         )
+        # Flag co-assigned so the UI can distinguish primary vs joint
+        for row in rows:
+            row['is_co_assigned'] = row.pop('assigned_bge') != obj.id
+        return rows
 
     def get_group_names(self, obj):
         # Same pattern — use prefetch cache if available
