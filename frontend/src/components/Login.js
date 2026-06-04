@@ -12,7 +12,7 @@ import { BRAND } from '../theme';
 const gizLogo = '/giz-logo.png';
 const gopaLogo = '/gopa-logo.png';
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, sessionExpired }) {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ export default function Login({ onLogin }) {
     try {
       const res = await axios.post(API_ENDPOINTS.LOGIN, credentials);
       if (res.data.token) {
-        onLogin(res.data.token, res.data.user);
+        onLogin(res.data.token, res.data.user, res.data.session_expires_at);
       } else {
         setError('Login failed. Please try again.');
       }
@@ -140,6 +140,11 @@ export default function Login({ onLogin }) {
                 </Typography>
               </Box>
 
+              {sessionExpired && (
+                <Alert severity="warning" sx={{ mb: 2, py: 0.5 }}>
+                  Your session has expired. Please log in again.
+                </Alert>
+              )}
               {error && <Alert severity="error" sx={{ mb: 2, py: 0.5 }}>{error}</Alert>}
               <Button
                 type="submit" fullWidth variant="contained" size="large"

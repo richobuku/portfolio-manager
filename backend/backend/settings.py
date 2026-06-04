@@ -227,6 +227,12 @@ BGE_WELCOME_EMAIL_BCC = os.environ.get(
 ).strip()
 
 # ── SMS Configuration (Message Carrier) ──────────────────────────────────────
+# ── Session lifetime ──────────────────────────────────────────────────────────
+# How long a token stays valid after it is issued.
+# Set SESSION_LIFETIME_SECONDS in the environment to override.
+# Examples: 28800 = 8 hours (default)  |  3600 = 1 hour  |  86400 = 24 hours
+SESSION_LIFETIME_SECONDS = int(os.environ.get('SESSION_LIFETIME_SECONDS', 8 * 3600))
+
 MESSAGE_CARRIER_API_KEY = os.environ.get('MESSAGE_CARRIER_API_KEY', '')
 if not MESSAGE_CARRIER_API_KEY:
     import logging as _logging

@@ -90,7 +90,7 @@ class ErrorBoundary extends React.Component {
             {error.stack}
           </pre>
           <button
-            onClick={() => { localStorage.clear(); window.location.replace('/login'); }}
+            onClick={() => { sessionStorage.clear(); localStorage.clear(); window.location.replace('/login'); }}
             style={{ marginTop: 16, padding: '8px 20px', cursor: 'pointer', fontSize: 14 }}
           >
             Clear session → Login
@@ -102,39 +102,71 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// ── Session storage ───────────────────────────────────────────────────────────
+// sessionStorage is cleared automatically when the browser tab / window is
+// closed, which gives us "log out on browser close" for free.
+// The server also enforces token expiry (default 8 hours via SESSION_LIFETIME_SECONDS).
+const S = sessionStorage;
+
+function isSessionExpired() {
+  const exp = parseInt(S.getItem('session_expires_at') || '0', 10);
+  return exp > 0 && Math.floor(Date.now() / 1000) > exp;
+}
+
+function getStoredToken() {
+  if (isSessionExpired()) { S.clear(); return null; }
+  return S.getItem('token');
+}
+
 function getStoredUser() {
-  try { return JSON.parse(localStorage.getItem('user') || 'null'); }
+  if (isSessionExpired()) { S.clear(); return null; }
+  try { return JSON.parse(S.getItem('user') || 'null'); }
   catch { return null; }
 }
 
 export default function App() {
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [token, setToken]             = useState(getStoredToken);
   const [currentUser, setCurrentUser] = useState(getStoredUser);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  const handleLogin = (newToken, user) => {
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(user));
+  const handleLogin = (newToken, user, sessionExpiresAt) => {
+    S.setItem('token', newToken);
+    S.setItem('user', JSON.stringify(user));
+    if (sessionExpiresAt) S.setItem('session_expires_at', String(sessionExpiresAt));
     setToken(newToken);
     setCurrentUser(user);
+    setSessionExpired(false);
   };
 
   // Called when the user successfully changes their password in the modal
   const handlePasswordChanged = (newToken) => {
     const updatedUser = { ...currentUser, password_change_required: false };
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    const exp = S.getItem('session_expires_at');
+    S.setItem('token', newToken);
+    S.setItem('user', JSON.stringify(updatedUser));
+    if (exp) S.setItem('session_expires_at', exp);
     setToken(newToken);
     setCurrentUser(updatedUser);
   };
 
   const passwordChangeRequired = !!(currentUser?.password_change_required);
 
-  const handleLogout = React.useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = React.useCallback((expired = false) => {
+    S.clear();
     setToken(null);
     setCurrentUser(null);
+    if (expired) setSessionExpired(true);
   }, []);
+
+  // Auto-expire timer: fires exactly when the session token becomes invalid
+  useEffect(() => {
+    const exp = parseInt(S.getItem('session_expires_at') || '0', 10);
+    if (!exp || !token) return;
+    const msUntilExpiry = exp * 1000 - Date.now();
+    if (msUntilExpiry <= 0) { handleLogout(true); return; }
+    const t = setTimeout(() => handleLogout(true), msUntilExpiry);
+    return () => clearTimeout(t);
+  }, [token, handleLogout]);
 
   const isAdmin = !!(currentUser?.is_staff || currentUser?.is_superuser ||
                      currentUser?.role === 'admin' ||
@@ -151,15 +183,13 @@ export default function App() {
     }
   }, [token, currentUser, isAdmin, isBGE, handleLogout]);
 
-  // Global 401 interceptor — once installed, any request that comes back with
-  // an expired/forged token clears local session and bounces the user to /login
-  // instead of leaving them on a broken dashboard.
+  // Global 401 interceptor — expired/revoked token → clear session + login
   useEffect(() => {
     const id = axios.interceptors.response.use(
       r => r,
       err => {
-        if (err?.response?.status === 401 && localStorage.getItem('token')) {
-          handleLogout();
+        if (err?.response?.status === 401 && S.getItem('token')) {
+          handleLogout(true);
         }
         return Promise.reject(err);
       }
@@ -178,7 +208,7 @@ export default function App() {
           <Route path="/login" element={
             (token && (isAdmin || isBGE))
               ? <Navigate to="/dashboard" replace />
-              : <Login onLogin={handleLogin} />
+              : <Login onLogin={handleLogin} sessionExpired={sessionExpired} />
           } />
           <Route path="/dashboard" element={
             !token ? <Navigate to="/login" replace /> :

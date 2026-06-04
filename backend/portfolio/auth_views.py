@@ -91,8 +91,14 @@ def _build_user_response(user):
         except Exception:
             pass
 
+    from django.conf import settings as _dj_settings
+    import time as _time
+    lifetime = int(getattr(_dj_settings, 'SESSION_LIFETIME_SECONDS', 8 * 3600))
+
     payload = {
         'token': token,
+        'session_expires_at': int(_time.time()) + lifetime,   # Unix timestamp
+        'session_lifetime_seconds': lifetime,
         'user': {
             'id': user.id,
             'username': user.username,
