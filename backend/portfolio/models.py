@@ -1017,11 +1017,23 @@ class WorkOrder(models.Model):
     # Deliverables — list of {task_num, description, due_date}
     deliverables_json = models.JSONField(default=list, blank=True)
 
+    # Snapshot of MSME IDs assigned to this BGE at the moment the work order
+    # is issued. Preserved so co-deployment overlap can be detected even after
+    # MSMEs are subsequently re-assigned to other BGEs.
+    msme_ids_snapshot = models.JSONField(default=list, blank=True)
+
     # Payment Terms – Schedule 2
     rate_per_day          = models.PositiveIntegerField(default=60000)
     max_days              = models.PositiveSmallIntegerField(default=4)
     transport_reimbursed  = models.BooleanField(default=True)
     payment_notes         = models.TextField(blank=True)
+
+    # Joint / co-deployment — other BGEs working with the same MSMEs in this period
+    co_bges = models.ManyToManyField(
+        'BusinessGrowthExpert', blank=True,
+        related_name='co_deployed_work_orders',
+        help_text='Other BGEs jointly deployed with this work order (for collaboration emails).',
+    )
 
     # Signatures
     team_leader_name     = models.CharField(max_length=200, default='Stephen Maxi Opwonya')

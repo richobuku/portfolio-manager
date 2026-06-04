@@ -1310,12 +1310,11 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
     @staticmethod
     def _already_assigned_bges(bge):
-        """Return other BGEs who already have issued/signed work orders in the same
-        period and same work-order type as any of this BGE's own active work orders.
+        """Return other BGEs whose issued/signed work orders overlap in date with
+        any of this BGE's active work orders AND share at least one MSME.
 
-        This covers the joint-deployment case where two independent BGEs are given
-        separate work orders to visit the same MSMEs — even when the MSMEs have
-        been re-assigned so there is no shared assigned_bge link remaining.
+        Uses the msme_ids_snapshot stored at issue time so detection remains
+        accurate even after MSMEs have been re-assigned between BGEs.
         """
         from .models import WorkOrder as _WO
         my_wos = _WO.objects.filter(bge=bge, status__in=['issued', 'signed'])
@@ -1323,14 +1322,28 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         for my_wo in my_wos:
             if not (my_wo.start_date and my_wo.end_date):
                 continue
+            my_msme_ids = set(my_wo.msme_ids_snapshot or [])
+            if not my_msme_ids:
+                # Fallback: use current assignments if no snapshot (legacy records)
+                my_msme_ids = set(bge.assigned_msmes.values_list('id', flat=True))
+            if not my_msme_ids:
+                continue
+
             overlapping = _WO.objects.filter(
-                work_order_type=my_wo.work_order_type,
                 status__in=['issued', 'signed'],
                 start_date__lte=my_wo.end_date,
                 end_date__gte=my_wo.start_date,
             ).exclude(bge=bge).exclude(id=my_wo.id).select_related('bge')
+
             for owo in overlapping:
-                if owo.bge_id not in already:
+                if owo.bge_id in already:
+                    continue
+                other_msme_ids = set(owo.msme_ids_snapshot or [])
+                if not other_msme_ids:
+                    # Fallback for legacy records without snapshot
+                    other_msme_ids = set(owo.bge.assigned_msmes.values_list('id', flat=True))
+                shared = my_msme_ids & other_msme_ids
+                if shared:
                     already[owo.bge_id] = {
                         'bge': owo.bge,
                         'work_order_number': owo.work_order_number,
@@ -3335,7 +3348,13 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             return Response({'detail': 'Already issued.'}, status=status.HTTP_200_OK)
 
         work_order.status = 'issued'
-        work_order.save(update_fields=['status'])
+        # Snapshot the BGE's current MSME assignments so co-deployment overlap
+        # can be detected even after MSMEs are later re-assigned to other BGEs.
+        bge_msme_ids = list(
+            work_order.bge.assigned_msmes.values_list('id', flat=True)
+        )
+        work_order.msme_ids_snapshot = bge_msme_ids
+        work_order.save(update_fields=['status', 'msme_ids_snapshot'])
 
         # Generate PDF
         from .pdf_reports import render_work_order
@@ -3348,21 +3367,26 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         recipients = [r for r in [recipient_email, admin_email] if r]
 
         if recipients:
-            # Check for other BGEs already issued work orders in the same period / type
+            # Check for other BGEs with overlapping date ranges AND shared MSMEs
             co_text = ''
-            if work_order.start_date and work_order.end_date:
+            if work_order.start_date and work_order.end_date and bge_msme_ids:
                 from .models import WorkOrder as _WO2
                 overlapping = _WO2.objects.filter(
-                    work_order_type=work_order.work_order_type,
                     status__in=['issued', 'signed'],
                     start_date__lte=work_order.end_date,
                     end_date__gte=work_order.start_date,
                 ).exclude(bge=bge).exclude(id=work_order.id).select_related('bge')
+                my_set = set(bge_msme_ids)
                 aa_lines = []
                 seen_bges = set()
                 for owo in overlapping:
                     if owo.bge_id in seen_bges:
                         continue
+                    other_ids = set(owo.msme_ids_snapshot or [])
+                    if not other_ids:
+                        other_ids = set(owo.bge.assigned_msmes.values_list('id', flat=True))
+                    if not (my_set & other_ids):
+                        continue  # no shared MSMEs — skip
                     seen_bges.add(owo.bge_id)
                     obj = (owo.objective or owo.bge.deployment_objectives or '').strip()
                     snippet = (obj[:250] + '…') if len(obj) > 250 else obj
