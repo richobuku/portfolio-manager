@@ -1340,14 +1340,20 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                     continue
                 other_msme_ids = set(owo.msme_ids_snapshot or [])
                 if not other_msme_ids:
-                    # Fallback for legacy records without snapshot
                     other_msme_ids = set(owo.bge.assigned_msmes.values_list('id', flat=True))
-                shared = my_msme_ids & other_msme_ids
-                if shared:
+                shared_ids = my_msme_ids & other_msme_ids
+                if shared_ids:
+                    # Fetch names for the shared MSMEs
+                    shared_msmes = list(
+                        MSME.objects.filter(id__in=shared_ids)
+                        .values('id', 'business_name', 'msme_code')
+                        .order_by('business_name')
+                    )
                     already[owo.bge_id] = {
                         'bge': owo.bge,
                         'work_order_number': owo.work_order_number,
                         'objectives': (owo.objective or owo.bge.deployment_objectives or '').strip(),
+                        'shared_msmes': shared_msmes,
                     }
         return list(already.values())
 
@@ -1378,13 +1384,17 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             lines.append("")
             for aa in already_assigned:
                 other = aa['bge']
-                lines.append(f"  BGE Name:  {other.name} ({other.bge_code or 'No code'})")
+                lines.append(f"  BGE Name:   {other.name} ({other.bge_code or 'No code'})")
                 lines.append(f"  Work Order: {aa['work_order_number']}")
-                if other.phone:  lines.append(f"  Phone:     {other.phone}")
-                if other.email:  lines.append(f"  Email:     {other.email}")
+                if other.phone:  lines.append(f"  Phone:      {other.phone}")
+                if other.email:  lines.append(f"  Email:      {other.email}")
+                if aa.get('shared_msmes'):
+                    lines.append(f"  Shared MSMEs ({len(aa['shared_msmes'])}):")
+                    for m in aa['shared_msmes']:
+                        lines.append(f"    • {m['business_name']} ({m['msme_code'] or 'No code'})")
                 if aa['objectives']:
                     lines.append(f"  Their Objectives:")
-                    lines.append(f"  {aa['objectives'][:300]}")
+                    lines.append(f"    {aa['objectives'][:300]}")
                 lines.append("")
 
         lines += [
@@ -1433,12 +1443,30 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                 if other.phone: contact_parts.append(f"📞 {_esc(other.phone)}")
                 if other.email: contact_parts.append(f"✉ {_esc(other.email)}")
                 contact_line = " &nbsp;·&nbsp; ".join(contact_parts)
+                # Build shared MSME list HTML
+                shared_msmes_html = ''
+                if aa.get('shared_msmes'):
+                    msme_items = ''.join(
+                        f'<li style="margin:3px 0;font-size:12px;color:#333;">'
+                        f'<strong>{_esc(m["business_name"])}</strong>'
+                        f'<span style="color:#888;margin-left:6px;">({_esc(m["msme_code"] or "No code")})</span>'
+                        f'</li>'
+                        for m in aa['shared_msmes']
+                    )
+                    shared_msmes_html = f"""
+                  <div style="background:#E8F5E9;border-left:3px solid #2E7D32;padding:8px 12px;border-radius:0 4px 4px 0;margin-top:8px;">
+                    <p style="margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#2E7D32;">
+                      Shared MSMEs ({len(aa['shared_msmes'])})
+                    </p>
+                    <ul style="margin:0;padding-left:16px;">{msme_items}</ul>
+                  </div>"""
                 aa_cards += f"""
                 <div style="background:#fff;border:1px solid #e8edf2;border-radius:6px;padding:14px 16px;margin-top:10px;">
                   <p style="margin:0 0 4px;font-weight:700;color:#1A2E42;font-size:14px;">{_esc(other.name)}</p>
                   <p style="margin:0 0 8px;font-size:11px;color:#888;">Work Order: {_esc(aa['work_order_number'])} &nbsp;·&nbsp; {_esc(other.bge_code or 'No code')}</p>
                   {f'<p style="margin:0 0 8px;font-size:12px;color:#555;">{contact_line}</p>' if contact_line else ''}
-                  <div style="background:#f8f9fa;border-left:3px solid #C8102E;padding:8px 12px;border-radius:0 4px 4px 0;">
+                  {shared_msmes_html}
+                  <div style="background:#f8f9fa;border-left:3px solid #C8102E;padding:8px 12px;border-radius:0 4px 4px 0;margin-top:8px;">
                     <p style="margin:0 0 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#C8102E;">Their Visit Objectives</p>
                     <p style="margin:0;font-size:12px;color:#555;line-height:1.55;white-space:pre-line;">{obj_snippet}</p>
                   </div>
