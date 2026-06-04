@@ -920,6 +920,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [savingObjectives, setSavingObjectives] = useState({});
   const [addMsmeDialog, setAddMsmeDialog] = useState(null); // bge object
   const [addMsmePick, setAddMsmePick] = useState('');
+  const [addMsmeSearch, setAddMsmeSearch] = useState('');
 
   // ── t-shirt receipts ──────────────────────────────────────────────────────
   const [tshirtReceipts, setTshirtReceipts] = useState([]);
@@ -5604,6 +5605,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setAssignTarget(null);
     setAddMsmeDialog(bge);
     setAddMsmePick('');
+    setAddMsmeSearch('');
   };
 
   const renderAssignments = () => {
@@ -5803,20 +5805,75 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         )}
 
         {/* Add MSME to BGE dialog */}
-        <Dialog open={!!addMsmeDialog} onClose={() => setAddMsmeDialog(null)} maxWidth="xs" fullWidth>
+        <Dialog open={!!addMsmeDialog} onClose={() => setAddMsmeDialog(null)} maxWidth="sm" fullWidth>
           <DialogTitle>Add MSME to {addMsmeDialog?.name}</DialogTitle>
           <DialogContent>
-            <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-              <InputLabel>Select MSME</InputLabel>
-              <Select value={addMsmePick} label="Select MSME" onChange={ev => setAddMsmePick(ev.target.value)}>
-                <MenuItem value=""><em>Choose...</em></MenuItem>
-                {msmes.filter(m => !m.assigned_bge || m.assigned_bge === addMsmeDialog?.id).map(m => (
-                  <MenuItem key={m.id} value={m.id}>
-                    {m.business_name} {m.assigned_bge ? '(reassign)' : ''}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {(() => {
+              const sortedMsmes = [...msmes].sort((a, b) => {
+                const aOwn = a.assigned_bge === addMsmeDialog?.id;
+                const bOwn = b.assigned_bge === addMsmeDialog?.id;
+                if (aOwn !== bOwn) return aOwn ? -1 : 1;
+                const aFree = !a.assigned_bge, bFree = !b.assigned_bge;
+                if (aFree !== bFree) return aFree ? -1 : 1;
+                return (a.business_name || '').localeCompare(b.business_name || '');
+              });
+              const filtered = sortedMsmes.filter(m =>
+                !addMsmeSearch || (m.business_name || '').toLowerCase().includes(addMsmeSearch.toLowerCase())
+              );
+              const alreadyElsewhere = addMsmePick
+                ? msmes.find(m => m.id === addMsmePick && m.assigned_bge && m.assigned_bge !== addMsmeDialog?.id)
+                : null;
+              return (
+                <>
+                  <Alert severity="info" sx={{ mb: 2, mt: 1 }} icon={false}>
+                    <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                      Deploying multiple BGEs to the same MSMEs?
+                    </Typography>
+                    <Typography variant="body2">
+                      All MSMEs are shown — including those assigned to other BGEs.
+                      MSMEs tagged <strong style={{color:'#E65100'}}>→ [BGE Name]</strong> are already assigned.
+                      Selecting one will move the primary assignment to <strong>{addMsmeDialog?.name}</strong>.
+                    </Typography>
+                  </Alert>
+                  <TextField
+                    size="small" fullWidth placeholder="Search MSMEs…"
+                    value={addMsmeSearch} onChange={e => setAddMsmeSearch(e.target.value)}
+                    sx={{ mb: 1.5 }}
+                    InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: 'text.secondary', fontSize: 18 }} /> }}
+                  />
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Select MSME</InputLabel>
+                    <Select value={addMsmePick} label="Select MSME" onChange={ev => setAddMsmePick(ev.target.value)}>
+                      <MenuItem value=""><em>Choose…</em></MenuItem>
+                      {filtered.map(m => {
+                        const isOwn  = m.assigned_bge === addMsmeDialog?.id;
+                        const isFree = !m.assigned_bge;
+                        const other  = !isFree && !isOwn ? m.assigned_bge_name : null;
+                        return (
+                          <MenuItem key={m.id} value={m.id}
+                            sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            <span>{m.business_name}</span>
+                            {isOwn  && <Chip label="Already here" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E8F5E9', color:'#2E7D32' }}/>}
+                            {isFree && <Chip label="Unassigned"   size="small" sx={{ fontSize:10, height:18, bgcolor:'#E3F2FD', color:'#0277BD' }}/>}
+                            {other  && <Chip label={`→ ${other}`} size="small" sx={{ fontSize:10, height:18, bgcolor:'#FFF3E0', color:'#E65100' }}/>}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </FormControl>
+                  {alreadyElsewhere && (
+                    <Alert severity="warning" sx={{ mt: 1.5 }} icon={false}>
+                      <Typography variant="body2">
+                        <strong>{alreadyElsewhere.business_name}</strong> is currently assigned to{' '}
+                        <strong>{alreadyElsewhere.assigned_bge_name}</strong>.
+                        Proceeding moves the primary assignment to <strong>{addMsmeDialog?.name}</strong>.
+                        Both BGEs retain access for reporting.
+                      </Typography>
+                    </Alert>
+                  )}
+                </>
+              );
+            })()}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setAddMsmeDialog(null)}>Cancel</Button>

@@ -1308,10 +1308,57 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                 .order_by('-support_count'))
         return Response(BusinessGrowthExpertSerializer(bges, many=True).data)
 
+    def _find_co_deployed_bges(self, bge, msme_ids):
+        """Find other BGEs who share MSMEs with this BGE via active work orders or groups.
+        Returns a list of dicts with collaboration info."""
+        from .models import WorkOrder as _WO
+
+        co = {}  # keyed by bge_id to deduplicate
+
+        # 1. BGEs in the same BGE groups (group-deployed co-visits)
+        for group in bge.bge_groups.all():
+            for other in group.members.exclude(id=bge.id).select_related():
+                other_ids = set(other.assigned_msmes.values_list('id', flat=True))
+                shared = msme_ids & other_ids
+                if shared and other.id not in co:
+                    co[other.id] = {
+                        'bge': other,
+                        'shared_count': len(shared),
+                        'objectives': other.deployment_objectives or '',
+                    }
+
+        # 2. BGEs with active/issued work orders whose date ranges overlap any
+        #    of this BGE's active work orders AND who share MSMEs
+        my_wos = _WO.objects.filter(bge=bge, status__in=['issued', 'signed'])
+        for my_wo in my_wos:
+            if not (my_wo.start_date and my_wo.end_date):
+                continue
+            overlapping = _WO.objects.filter(
+                status__in=['issued', 'signed'],
+                start_date__lte=my_wo.end_date,
+                end_date__gte=my_wo.start_date,
+            ).exclude(bge=bge).select_related('bge')
+            for other_wo in overlapping:
+                other = other_wo.bge
+                if other.id in co:
+                    continue
+                other_ids = set(other.assigned_msmes.values_list('id', flat=True))
+                shared = msme_ids & other_ids
+                if shared:
+                    co[other.id] = {
+                        'bge': other,
+                        'shared_count': len(shared),
+                        'objectives': other_wo.objective or other.deployment_objectives or '',
+                    }
+
+        return list(co.values())
+
     def _build_assignment_email(self, bge):
         """Build plain-text + HTML email for a BGE assignment. Shared by preview and send."""
         msmes = bge.assigned_msmes.filter(is_active=True).order_by('business_name')
         count = msmes.count()
+        msme_ids = set(msmes.values_list('id', flat=True))
+        co_bges = self._find_co_deployed_bges(bge, msme_ids)
 
         # ── Plain-text version ────────────────────────────────────────────────
         lines = [f"Dear {bge.name},", "", "Please find below your assignment details under the PRUDEV II Programme:", ""]
@@ -1325,6 +1372,24 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             if m.city:       lines.append(f"     Location: {m.city}")
             if m.phone:      lines.append(f"     Phone: {m.phone}")
             lines.append("")
+        if co_bges:
+            lines += ["JOINT DEPLOYMENT — COLLABORATION PARTNERS", "─" * 40]
+            lines.append(
+                "You are being deployed alongside the following BGE(s) who are also working "
+                "with some of the same MSMEs. Please coordinate with them to ensure "
+                "complementary coverage and avoid duplication."
+            )
+            lines.append("")
+            for cb in co_bges:
+                other = cb['bge']
+                lines.append(f"  Partner BGE:  {other.name} ({other.bge_code or 'No code'})")
+                if other.phone:  lines.append(f"  Phone:        {other.phone}")
+                if other.email:  lines.append(f"  Email:        {other.email}")
+                if cb['objectives']:
+                    lines.append(f"  Objectives:   {cb['objectives'][:300]}")
+                lines.append(f"  Shared MSMEs: {cb['shared_count']} business(es)")
+                lines.append("")
+
         lines += [
             "Please log in to the PRUDEV II Portfolio Management System to view full details and submit visit reports.",
             "", "Best regards,", "PRUDEV II BDS Team", "GIZ · GOPA AFC",
@@ -1359,6 +1424,47 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                 {'<br><span style="font-size:12px;color:#666;">' + details_html + '</span>' if details_html else ''}
               </td>
             </tr>"""
+
+        # ── Collaboration section (HTML) ──────────────────────────────────────
+        co_bge_html = ""
+        if co_bges:
+            co_cards = ""
+            for cb in co_bges:
+                other = cb['bge']
+                obj_snippet = _esc(cb['objectives'][:300]) + ('…' if len(cb['objectives']) > 300 else '') if cb['objectives'] else '<em style="color:#999;">No objectives recorded yet.</em>'
+                contact_parts = []
+                if other.phone: contact_parts.append(f"📞 {_esc(other.phone)}")
+                if other.email: contact_parts.append(f"✉ {_esc(other.email)}")
+                contact_line = " &nbsp;·&nbsp; ".join(contact_parts) if contact_parts else ""
+                co_cards += f"""
+                <div style="background:#fff;border:1px solid #e8edf2;border-radius:6px;padding:14px 16px;margin-top:10px;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <div style="background:#1A2E42;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">
+                      {_esc(other.name[:1])}
+                    </div>
+                    <div>
+                      <p style="margin:0;font-weight:700;color:#1A2E42;font-size:14px;">{_esc(other.name)}</p>
+                      <p style="margin:0;font-size:11px;color:#888;">{_esc(other.bge_code or 'No code')} &nbsp;·&nbsp; {cb['shared_count']} shared MSME(s)</p>
+                    </div>
+                  </div>
+                  {f'<p style="margin:0 0 6px;font-size:12px;color:#555;">{contact_line}</p>' if contact_line else ''}
+                  <div style="background:#f8f9fa;border-left:3px solid #F57F17;padding:8px 12px;border-radius:0 4px 4px 0;margin-top:8px;">
+                    <p style="margin:0 0 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#E65100;">Their Visit Objectives</p>
+                    <p style="margin:0;font-size:12px;color:#555;line-height:1.55;white-space:pre-line;">{obj_snippet}</p>
+                  </div>
+                </div>"""
+            co_bge_html = f"""
+            <div style="background:#FFF9E6;border:1px solid #FFE082;border-radius:8px;padding:18px 20px;margin-top:24px;">
+              <p style="margin:0 0 6px;font-weight:700;color:#E65100;font-size:13px;text-transform:uppercase;letter-spacing:.05em;">
+                🤝 Joint Deployment — Collaboration Partners
+              </p>
+              <p style="margin:0 0 12px;color:#555;font-size:13px;line-height:1.6;">
+                You are being deployed alongside the following BGE(s) who are also working with some of
+                the same MSMEs during this period. <strong>Please coordinate with them</strong> to ensure
+                complementary coverage, avoid duplication, and share findings from your visits.
+              </p>
+              {co_cards}
+            </div>"""
 
         body_html = f"""
 <!DOCTYPE html>
@@ -1406,6 +1512,9 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
           <p style="margin:24px 0 0;color:#555;font-size:13px;line-height:1.7;border-top:1px solid #e8edf2;padding-top:20px;">
             Please log in to the <strong>PRUDEV II Portfolio Management System</strong> to view full details and submit visit reports.
           </p>
+
+          {co_bge_html}
+
         </td></tr>
 
         <!-- Footer -->
@@ -3262,6 +3371,38 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         recipients = [r for r in [recipient_email, admin_email] if r]
 
         if recipients:
+            # Detect co-deployed BGEs (overlapping work orders sharing MSMEs)
+            bge_msme_ids = set(bge.assigned_msmes.values_list('id', flat=True))
+            co_text = ''
+            if work_order.start_date and work_order.end_date and bge_msme_ids:
+                from .models import WorkOrder as _WO2
+                overlapping = _WO2.objects.filter(
+                    status__in=['issued', 'signed'],
+                    start_date__lte=work_order.end_date,
+                    end_date__gte=work_order.start_date,
+                ).exclude(bge=bge).select_related('bge')
+                co_lines = []
+                for owo in overlapping:
+                    other_ids = set(owo.bge.assigned_msmes.values_list('id', flat=True))
+                    shared = bge_msme_ids & other_ids
+                    if shared:
+                        obj = (owo.objective or owo.bge.deployment_objectives or '').strip()
+                        snippet = (obj[:250] + '…') if len(obj) > 250 else obj
+                        co_lines.append(
+                            f"  Partner: {owo.bge.name} ({owo.bge.bge_code or 'No code'})"
+                            + (f"\n  Phone:   {owo.bge.phone}" if owo.bge.phone else '')
+                            + (f"\n  Objectives: {snippet}" if snippet else '')
+                            + f"\n  Shared MSMEs: {len(shared)}"
+                        )
+                if co_lines:
+                    co_text = (
+                        "\n\nJOINT DEPLOYMENT — COLLABORATION PARTNERS\n"
+                        + "─" * 40 + "\n"
+                        + "You are being deployed alongside the following BGE(s) working with "
+                        + "the same MSMEs. Please coordinate with them:\n\n"
+                        + "\n\n".join(co_lines)
+                    )
+
             subject = f'Work Order Issued — {work_order.work_order_number}'
             body = (
                 f'Dear {bge.name},\n\n'
@@ -3269,7 +3410,9 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'for the PRUDEV II programme.\n\n'
                 f'Work Order Type: {work_order.get_work_order_type_display()}\n'
                 f'Issue Date: {work_order.issue_date}\n'
-                f'Net Payable: UGX {work_order.rate_per_day * work_order.max_days - int(work_order.rate_per_day * work_order.max_days * 0.06):,}\n\n'
+                f'Period: {work_order.start_date or "TBD"} to {work_order.end_date or "TBD"}\n'
+                f'Net Payable: UGX {work_order.rate_per_day * work_order.max_days - int(work_order.rate_per_day * work_order.max_days * 0.06):,}\n'
+                f'{co_text}\n\n'
                 f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
             )
             email = EmailMultiAlternatives(subject, body,
