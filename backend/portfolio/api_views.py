@@ -1308,57 +1308,41 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                 .order_by('-support_count'))
         return Response(BusinessGrowthExpertSerializer(bges, many=True).data)
 
-    def _find_co_deployed_bges(self, bge, msme_ids):
-        """Find other BGEs who share MSMEs with this BGE via active work orders or groups.
-        Returns a list of dicts with collaboration info."""
+    @staticmethod
+    def _already_assigned_bges(bge):
+        """Return other BGEs who already have issued/signed work orders in the same
+        period and same work-order type as any of this BGE's own active work orders.
+
+        This covers the joint-deployment case where two independent BGEs are given
+        separate work orders to visit the same MSMEs — even when the MSMEs have
+        been re-assigned so there is no shared assigned_bge link remaining.
+        """
         from .models import WorkOrder as _WO
-
-        co = {}  # keyed by bge_id to deduplicate
-
-        # 1. BGEs in the same BGE groups (group-deployed co-visits)
-        for group in bge.bge_groups.all():
-            for other in group.members.exclude(id=bge.id).select_related():
-                other_ids = set(other.assigned_msmes.values_list('id', flat=True))
-                shared = msme_ids & other_ids
-                if shared and other.id not in co:
-                    co[other.id] = {
-                        'bge': other,
-                        'shared_count': len(shared),
-                        'objectives': other.deployment_objectives or '',
-                    }
-
-        # 2. BGEs with active/issued work orders whose date ranges overlap any
-        #    of this BGE's active work orders AND who share MSMEs
         my_wos = _WO.objects.filter(bge=bge, status__in=['issued', 'signed'])
+        already = {}
         for my_wo in my_wos:
             if not (my_wo.start_date and my_wo.end_date):
                 continue
             overlapping = _WO.objects.filter(
+                work_order_type=my_wo.work_order_type,
                 status__in=['issued', 'signed'],
                 start_date__lte=my_wo.end_date,
                 end_date__gte=my_wo.start_date,
-            ).exclude(bge=bge).select_related('bge')
-            for other_wo in overlapping:
-                other = other_wo.bge
-                if other.id in co:
-                    continue
-                other_ids = set(other.assigned_msmes.values_list('id', flat=True))
-                shared = msme_ids & other_ids
-                if shared:
-                    co[other.id] = {
-                        'bge': other,
-                        'shared_count': len(shared),
-                        'objectives': other_wo.objective or other.deployment_objectives or '',
+            ).exclude(bge=bge).exclude(id=my_wo.id).select_related('bge')
+            for owo in overlapping:
+                if owo.bge_id not in already:
+                    already[owo.bge_id] = {
+                        'bge': owo.bge,
+                        'work_order_number': owo.work_order_number,
+                        'objectives': (owo.objective or owo.bge.deployment_objectives or '').strip(),
                     }
-
-        return list(co.values())
+        return list(already.values())
 
     def _build_assignment_email(self, bge):
         """Build plain-text + HTML email for a BGE assignment. Shared by preview and send."""
         msmes = bge.assigned_msmes.filter(is_active=True).order_by('business_name')
         count = msmes.count()
-        msme_ids = set(msmes.values_list('id', flat=True))
-        co_bges = self._find_co_deployed_bges(bge, msme_ids)
+        already_assigned = self._already_assigned_bges(bge)
 
         # ── Plain-text version ────────────────────────────────────────────────
         lines = [f"Dear {bge.name},", "", "Please find below your assignment details under the PRUDEV II Programme:", ""]
@@ -1372,22 +1356,22 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             if m.city:       lines.append(f"     Location: {m.city}")
             if m.phone:      lines.append(f"     Phone: {m.phone}")
             lines.append("")
-        if co_bges:
-            lines += ["JOINT DEPLOYMENT — COLLABORATION PARTNERS", "─" * 40]
+        if already_assigned:
+            lines += ["PLEASE NOTE — ANOTHER BGE IS ALREADY ASSIGNED", "─" * 40]
             lines.append(
-                "You are being deployed alongside the following BGE(s) who are also working "
-                "with some of the same MSMEs. Please coordinate with them to ensure "
-                "complementary coverage and avoid duplication."
+                "Another BGE has already been assigned to work with some of the same MSMEs "
+                "during this period. Please be aware of their work and coordinate accordingly."
             )
             lines.append("")
-            for cb in co_bges:
-                other = cb['bge']
-                lines.append(f"  Partner BGE:  {other.name} ({other.bge_code or 'No code'})")
-                if other.phone:  lines.append(f"  Phone:        {other.phone}")
-                if other.email:  lines.append(f"  Email:        {other.email}")
-                if cb['objectives']:
-                    lines.append(f"  Objectives:   {cb['objectives'][:300]}")
-                lines.append(f"  Shared MSMEs: {cb['shared_count']} business(es)")
+            for aa in already_assigned:
+                other = aa['bge']
+                lines.append(f"  BGE Name:  {other.name} ({other.bge_code or 'No code'})")
+                lines.append(f"  Work Order: {aa['work_order_number']}")
+                if other.phone:  lines.append(f"  Phone:     {other.phone}")
+                if other.email:  lines.append(f"  Email:     {other.email}")
+                if aa['objectives']:
+                    lines.append(f"  Their Objectives:")
+                    lines.append(f"  {aa['objectives'][:300]}")
                 lines.append("")
 
         lines += [
@@ -1425,45 +1409,38 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
               </td>
             </tr>"""
 
-        # ── Collaboration section (HTML) ──────────────────────────────────────
+        # ── Already-assigned BGE notice (HTML) ───────────────────────────────
         co_bge_html = ""
-        if co_bges:
-            co_cards = ""
-            for cb in co_bges:
-                other = cb['bge']
-                obj_snippet = _esc(cb['objectives'][:300]) + ('…' if len(cb['objectives']) > 300 else '') if cb['objectives'] else '<em style="color:#999;">No objectives recorded yet.</em>'
+        if already_assigned:
+            aa_cards = ""
+            for aa in already_assigned:
+                other = aa['bge']
+                obj_snippet = (_esc(aa['objectives'][:300]) + ('…' if len(aa['objectives']) > 300 else '')) if aa['objectives'] else '<em style="color:#999;">No objectives recorded for this BGE yet.</em>'
                 contact_parts = []
                 if other.phone: contact_parts.append(f"📞 {_esc(other.phone)}")
                 if other.email: contact_parts.append(f"✉ {_esc(other.email)}")
-                contact_line = " &nbsp;·&nbsp; ".join(contact_parts) if contact_parts else ""
-                co_cards += f"""
+                contact_line = " &nbsp;·&nbsp; ".join(contact_parts)
+                aa_cards += f"""
                 <div style="background:#fff;border:1px solid #e8edf2;border-radius:6px;padding:14px 16px;margin-top:10px;">
-                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                    <div style="background:#1A2E42;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">
-                      {_esc(other.name[:1])}
-                    </div>
-                    <div>
-                      <p style="margin:0;font-weight:700;color:#1A2E42;font-size:14px;">{_esc(other.name)}</p>
-                      <p style="margin:0;font-size:11px;color:#888;">{_esc(other.bge_code or 'No code')} &nbsp;·&nbsp; {cb['shared_count']} shared MSME(s)</p>
-                    </div>
-                  </div>
-                  {f'<p style="margin:0 0 6px;font-size:12px;color:#555;">{contact_line}</p>' if contact_line else ''}
-                  <div style="background:#f8f9fa;border-left:3px solid #F57F17;padding:8px 12px;border-radius:0 4px 4px 0;margin-top:8px;">
-                    <p style="margin:0 0 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#E65100;">Their Visit Objectives</p>
+                  <p style="margin:0 0 4px;font-weight:700;color:#1A2E42;font-size:14px;">{_esc(other.name)}</p>
+                  <p style="margin:0 0 8px;font-size:11px;color:#888;">Work Order: {_esc(aa['work_order_number'])} &nbsp;·&nbsp; {_esc(other.bge_code or 'No code')}</p>
+                  {f'<p style="margin:0 0 8px;font-size:12px;color:#555;">{contact_line}</p>' if contact_line else ''}
+                  <div style="background:#f8f9fa;border-left:3px solid #C8102E;padding:8px 12px;border-radius:0 4px 4px 0;">
+                    <p style="margin:0 0 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#C8102E;">Their Visit Objectives</p>
                     <p style="margin:0;font-size:12px;color:#555;line-height:1.55;white-space:pre-line;">{obj_snippet}</p>
                   </div>
                 </div>"""
             co_bge_html = f"""
-            <div style="background:#FFF9E6;border:1px solid #FFE082;border-radius:8px;padding:18px 20px;margin-top:24px;">
-              <p style="margin:0 0 6px;font-weight:700;color:#E65100;font-size:13px;text-transform:uppercase;letter-spacing:.05em;">
-                🤝 Joint Deployment — Collaboration Partners
+            <div style="background:#FFF3E0;border:1px solid #FFCC80;border-radius:8px;padding:18px 20px;margin-top:24px;">
+              <p style="margin:0 0 8px;font-weight:700;color:#E65100;font-size:13px;">
+                ⚠ Please Note — Another BGE Has Already Been Assigned
               </p>
               <p style="margin:0 0 12px;color:#555;font-size:13px;line-height:1.6;">
-                You are being deployed alongside the following BGE(s) who are also working with some of
-                the same MSMEs during this period. <strong>Please coordinate with them</strong> to ensure
-                complementary coverage, avoid duplication, and share findings from your visits.
+                Another BGE has already been assigned to work with some of the same MSMEs during
+                this period. Please be aware of their work and coordinate accordingly to ensure
+                your visits are complementary and not duplicated.
               </p>
-              {co_cards}
+              {aa_cards}
             </div>"""
 
         body_html = f"""
@@ -3371,36 +3348,37 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         recipients = [r for r in [recipient_email, admin_email] if r]
 
         if recipients:
-            # Detect co-deployed BGEs (overlapping work orders sharing MSMEs)
-            bge_msme_ids = set(bge.assigned_msmes.values_list('id', flat=True))
+            # Check for other BGEs already issued work orders in the same period / type
             co_text = ''
-            if work_order.start_date and work_order.end_date and bge_msme_ids:
+            if work_order.start_date and work_order.end_date:
                 from .models import WorkOrder as _WO2
                 overlapping = _WO2.objects.filter(
+                    work_order_type=work_order.work_order_type,
                     status__in=['issued', 'signed'],
                     start_date__lte=work_order.end_date,
                     end_date__gte=work_order.start_date,
-                ).exclude(bge=bge).select_related('bge')
-                co_lines = []
+                ).exclude(bge=bge).exclude(id=work_order.id).select_related('bge')
+                aa_lines = []
+                seen_bges = set()
                 for owo in overlapping:
-                    other_ids = set(owo.bge.assigned_msmes.values_list('id', flat=True))
-                    shared = bge_msme_ids & other_ids
-                    if shared:
-                        obj = (owo.objective or owo.bge.deployment_objectives or '').strip()
-                        snippet = (obj[:250] + '…') if len(obj) > 250 else obj
-                        co_lines.append(
-                            f"  Partner: {owo.bge.name} ({owo.bge.bge_code or 'No code'})"
-                            + (f"\n  Phone:   {owo.bge.phone}" if owo.bge.phone else '')
-                            + (f"\n  Objectives: {snippet}" if snippet else '')
-                            + f"\n  Shared MSMEs: {len(shared)}"
-                        )
-                if co_lines:
+                    if owo.bge_id in seen_bges:
+                        continue
+                    seen_bges.add(owo.bge_id)
+                    obj = (owo.objective or owo.bge.deployment_objectives or '').strip()
+                    snippet = (obj[:250] + '…') if len(obj) > 250 else obj
+                    aa_lines.append(
+                        f"  BGE:        {owo.bge.name} ({owo.bge.bge_code or 'No code'})"
+                        + (f"\n  Work Order: {owo.work_order_number}")
+                        + (f"\n  Phone:      {owo.bge.phone}" if owo.bge.phone else '')
+                        + (f"\n  Objectives: {snippet}" if snippet else '')
+                    )
+                if aa_lines:
                     co_text = (
-                        "\n\nJOINT DEPLOYMENT — COLLABORATION PARTNERS\n"
+                        "\n\nPLEASE NOTE — ANOTHER BGE ALREADY ASSIGNED\n"
                         + "─" * 40 + "\n"
-                        + "You are being deployed alongside the following BGE(s) working with "
-                        + "the same MSMEs. Please coordinate with them:\n\n"
-                        + "\n\n".join(co_lines)
+                        + "Another BGE has already been assigned to work with some of the same "
+                        + "MSMEs during this period. Please coordinate accordingly:\n\n"
+                        + "\n\n".join(aa_lines)
                     )
 
             subject = f'Work Order Issued — {work_order.work_order_number}'
