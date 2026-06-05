@@ -12,7 +12,7 @@ from .api_views import (
     TshirtReceiptViewSet, TshirtReceiptEntryViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
     bulk_email_view, bulk_email_log_view,
-    bulk_sms_view, bulk_sms_log_view, bulk_sms_balance_view,
+    bulk_sms_view, bulk_sms_log_view, bulk_sms_balance_view, db_backup_view,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
 from .blockchain.api_views import (
@@ -70,4 +70,5 @@ urlpatterns = [
     path('api/bulk-sms/', bulk_sms_view, name='bulk_sms'),
     path('api/bulk-sms/balance/', bulk_sms_balance_view, name='bulk_sms_balance'),
     path('api/bulk-sms/log/', bulk_sms_log_view, name='bulk_sms_log'),
+    path('api/admin/db-backup/', db_backup_view, name='db_backup'),
 ]
