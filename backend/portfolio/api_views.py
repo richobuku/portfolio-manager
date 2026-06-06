@@ -447,14 +447,24 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 if msme.assigned_bge_id and msme.assigned_bge_id != bge.id:
                     # MSME already has a primary BGE — add the new BGE as co-assigned
                     # so BOTH BGEs keep the MSME in their list (joint deployment).
+                    existing_primary = msme.assigned_bge  # capture before save
                     msme.co_assigned_bges.add(bge)
                     msme.save()
+                    # Notify the new (co-assigned) BGE via push
                     _notify_bge(
                         bge,
                         title='Joint MSME Assignment',
-                        body=f'You have been co-assigned to {msme.business_name} alongside {msme.assigned_bge.name}. Check your dashboard for details.',
+                        body=f'You have been co-assigned to {msme.business_name} alongside {existing_primary.name}. Check your dashboard for details.',
                         url='/bge'
                     )
+                    # Notify the existing primary BGE via push + email
+                    _notify_bge(
+                        existing_primary,
+                        title='Joint Deployment Notice',
+                        body=f'{bge.name} has also been assigned to visit {msme.business_name}. Check your dashboard for details.',
+                        url='/bge'
+                    )
+                    _send_co_assignment_alert(existing_primary, bge, msme)
                     return Response(MSMESerializer(msme).data)
                 # No existing primary — set this BGE as primary
                 msme.assigned_bge = bge
@@ -3229,6 +3239,174 @@ def _notify_bge(bge, title, body, url='/'):
         return
     for sub in PushSubscription.objects.filter(user=bge.user):
         _send_push(sub, title, body, url)
+
+
+def _send_co_assignment_alert(existing_bge, new_bge, msme):
+    """Email the existing/primary BGE to inform them that a second BGE
+    has been co-assigned to visit the same MSME.
+
+    Fails silently so the assignment itself is never blocked by an email error.
+    """
+    if not existing_bge.email:
+        return
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    from django.utils.html import escape as _esc
+
+    subject = (
+        f"PRUDEV II — Joint Deployment Notice: "
+        f"{new_bge.name} has also been assigned to {msme.business_name}"
+    )
+
+    # ── Plain text ─────────────────────────────────────────────────────────────
+    lines = [
+        f"Dear {existing_bge.name},",
+        "",
+        "This is to inform you that a second Business Growth Expert (BGE) has been "
+        "co-assigned to visit one of the MSMEs currently in your portfolio.",
+        "",
+        "SHARED MSME",
+        "─" * 40,
+        f"  {msme.business_name} ({msme.msme_code or 'No code'})",
+    ]
+    if msme.owner_name: lines.append(f"  Owner:    {msme.owner_name}")
+    if msme.city:       lines.append(f"  Location: {msme.city}")
+    if msme.phone:      lines.append(f"  Phone:    {msme.phone}")
+    lines += ["", "CO-ASSIGNED BGE", "─" * 40,
+              f"  Name:  {new_bge.name} ({new_bge.bge_code or 'No code'})"]
+    if new_bge.phone:  lines.append(f"  Phone: {new_bge.phone}")
+    if new_bge.email:  lines.append(f"  Email: {new_bge.email}")
+    if new_bge.deployment_objectives:
+        obj_preview = new_bge.deployment_objectives[:300]
+        lines += ["  Objectives:", f"    {obj_preview}" + ("…" if len(new_bge.deployment_objectives) > 300 else "")]
+    lines += [
+        "",
+        "This BGE will submit a separate work order and report for their visit.",
+        "Please coordinate where possible to ensure visits are complementary and not duplicated.",
+        "",
+        "Best regards,",
+        "PRUDEV II BDS Team",
+        "GIZ · GOPA AFC",
+    ]
+    body_text = "\n".join(lines)
+
+    # ── HTML ────────────────────────────────────────────────────────────────────
+    msme_detail_parts = []
+    if msme.owner_name: msme_detail_parts.append(f"Owner: {_esc(msme.owner_name)}")
+    if msme.city:       msme_detail_parts.append(f"Location: {_esc(msme.city)}")
+    if msme.phone:      msme_detail_parts.append(f"Phone: {_esc(msme.phone)}")
+    msme_detail_html = " &nbsp;·&nbsp; ".join(msme_detail_parts)
+
+    contact_parts = []
+    if new_bge.phone: contact_parts.append(f"📞 {_esc(new_bge.phone)}")
+    if new_bge.email: contact_parts.append(f"✉ {_esc(new_bge.email)}")
+    contact_html = " &nbsp;·&nbsp; ".join(contact_parts)
+
+    obj_html = ""
+    if new_bge.deployment_objectives:
+        snippet = _esc(new_bge.deployment_objectives[:300]) + (
+            "…" if len(new_bge.deployment_objectives) > 300 else ""
+        )
+        obj_html = f"""
+            <div style="background:#f8f9fa;border-left:3px solid #C8102E;padding:8px 12px;
+                        border-radius:0 4px 4px 0;margin-top:8px;">
+              <p style="margin:0 0 3px;font-size:10px;font-weight:700;text-transform:uppercase;
+                        letter-spacing:.05em;color:#C8102E;">Their Visit Objectives</p>
+              <p style="margin:0;font-size:12px;color:#555;line-height:1.55;
+                        white-space:pre-line;">{snippet}</p>
+            </div>"""
+
+    body_html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0"
+             style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+
+        <!-- Header -->
+        <tr><td style="background:#1A2E42;padding:24px 32px;">
+          <table width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td><p style="margin:0;color:#fff;font-size:20px;font-weight:700;">PRUDEV II</p>
+                <p style="margin:2px 0 0;color:rgba(255,255,255,.65);font-size:12px;">
+                  MSME Portfolio Management Programme</p></td>
+            <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;
+                font-weight:700;letter-spacing:.05em;">GIZ · GOPA AFC</p></td>
+          </tr></table>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:28px 32px;">
+          <p style="margin:0 0 16px;color:#333;font-size:15px;">
+            Dear <strong>{_esc(existing_bge.name)}</strong>,
+          </p>
+          <p style="margin:0 0 20px;color:#555;line-height:1.6;">
+            This is to inform you that a second BGE has been co-assigned to visit one of the
+            MSMEs currently in your portfolio. They will submit their own separate work order
+            and visit report.
+          </p>
+
+          <!-- Shared MSME -->
+          <p style="font-weight:700;color:#1A2E42;font-size:12px;text-transform:uppercase;
+                    letter-spacing:.05em;margin:0 0 8px;">Shared MSME</p>
+          <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:6px;
+                      padding:14px 16px;margin-bottom:20px;">
+            <p style="margin:0;font-weight:700;color:#1A2E42;font-size:14px;">
+              {_esc(msme.business_name)}</p>
+            <p style="margin:2px 0 0;font-size:11px;color:#888;">
+              {_esc(msme.msme_code or 'No code')}</p>
+            {f'<p style="margin:6px 0 0;font-size:12px;color:#555;">{msme_detail_html}</p>'
+              if msme_detail_html else ''}
+          </div>
+
+          <!-- Co-Assigned BGE -->
+          <p style="font-weight:700;color:#1A2E42;font-size:12px;text-transform:uppercase;
+                    letter-spacing:.05em;margin:0 0 8px;">Co-Assigned BGE</p>
+          <div style="background:#FFF3E0;border:1px solid #FFCC80;border-radius:6px;
+                      padding:14px 16px;">
+            <p style="margin:0 0 4px;font-weight:700;color:#1A2E42;font-size:14px;">
+              {_esc(new_bge.name)}</p>
+            <p style="margin:0 0 6px;font-size:11px;color:#888;">
+              BGE Code: {_esc(new_bge.bge_code or 'No code')}</p>
+            {f'<p style="margin:0 0 8px;font-size:12px;color:#555;">{contact_html}</p>'
+              if contact_html else ''}
+            {obj_html}
+          </div>
+
+          <p style="margin:24px 0 0;color:#555;font-size:13px;line-height:1.7;
+                    border-top:1px solid #e8edf2;padding-top:20px;">
+            Please coordinate where possible to ensure visits are complementary and not
+            duplicated. Log in to the
+            <strong>PRUDEV II Portfolio Management System</strong> for full details.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #e8edf2;">
+          <p style="margin:0;color:#777;font-size:12px;">
+            Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA AFC</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    try:
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=body_text,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[existing_bge.email],
+            reply_to=[getattr(settings, 'EMAIL_REPLY_TO', 'richard.obuku@gopa.eu')],
+        )
+        msg.attach_alternative(body_html, "text/html")
+        msg.send(fail_silently=False)
+    except Exception as exc:
+        _log.warning("Co-assignment alert to %s failed: %s", existing_bge.email, exc)
 
 
 # ── Push subscription API views ────────────────────────────────────────────────
