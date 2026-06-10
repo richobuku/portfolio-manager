@@ -25,6 +25,28 @@ class Command(BaseCommand):
         L = list(latest.values())
         n = len(L)
 
+        # Baseline (diagnostic) snapshot per MSME — earliest diagnostic record
+        baseline = {}
+        for s in snaps:
+            if s.source == 'diagnostic':
+                if s.msme_id not in baseline or s.snapshot_date < baseline[s.msme_id].snapshot_date:
+                    baseline[s.msme_id] = s
+
+        # Matched MSMEs: have a baseline AND a later, different snapshot (i.e. updated since baseline)
+        matched_ids = [mid for mid in baseline if mid in latest and latest[mid].id != baseline[mid].id]
+
+        def _emp_totals(snap_map, ids):
+            ft = pt = ref = 0
+            for mid in ids:
+                s = snap_map[mid]
+                ft  += (s.employees_ft_male or 0) + (s.employees_ft_female or 0)
+                pt  += (s.employees_pt_male or 0) + (s.employees_pt_female or 0)
+                ref += (s.employees_ft_refugee or 0) + (s.employees_pt_refugee or 0)
+            return ft, pt, ref
+
+        baseline_ft, baseline_pt, baseline_ref = _emp_totals(baseline, matched_ids)
+        matched_curr_ft, matched_curr_pt, matched_curr_ref = _emp_totals(latest, matched_ids)
+
         def pct(count):
             return round(count / n * 100, 1) if n else 0
 
@@ -92,6 +114,26 @@ class Command(BaseCommand):
 
         dates = [s.snapshot_date for s in snaps if s.snapshot_date]
 
+        # Full data view — one row per MSME with latest snapshot
+        msme_detail = []
+        for s in sorted(L, key=lambda x: x.msme.business_name):
+            msme_detail.append({
+                'business_name': s.msme.business_name,
+                'msme_code':     s.msme.msme_code or '',
+                'bge':           s.collected_by.name if s.collected_by else 'Unassigned',
+                'snapshot_date': str(s.snapshot_date),
+                'source':        s.source,
+                'annual_turnover':  float(s.annual_turnover) if s.annual_turnover not in (None, '') else None,
+                'last_month_revenue': float(s.last_month_revenue) if s.last_month_revenue not in (None, '') else None,
+                'total_assets':  float(s.total_assets) if s.total_assets not in (None, '') else None,
+                'ft_employees':  (s.employees_ft_male or 0) + (s.employees_ft_female or 0),
+                'pt_employees':  (s.employees_pt_male or 0) + (s.employees_pt_female or 0),
+                'has_tin':   s.has_tin,
+                'tin_number': s.tin_number,
+                'has_ursb':  s.has_ursb,
+                'ursb_reg_number': s.ursb_reg_number,
+            })
+
         result = {
             'report_date':   str(date.today()),
             'total_msmes':   total_msmes,
@@ -103,6 +145,10 @@ class Command(BaseCommand):
             'bge_perf':      bge_perf,
             'completeness':  completeness,
             'ft': ft, 'pt': pt, 'ref': ref,
+            'matched_baseline_count': len(matched_ids),
+            'baseline_ft':  baseline_ft,  'baseline_pt':  baseline_pt,  'baseline_ref':  baseline_ref,
+            'matched_curr_ft': matched_curr_ft, 'matched_curr_pt': matched_curr_pt, 'matched_curr_ref': matched_curr_ref,
+            'msme_detail': msme_detail,
             'avg_rev':    round(sum(rev_vals) / len(rev_vals)) if rev_vals else 0,
             'total_rev':  round(sum(rev_vals)) if rev_vals else 0,
             'avg_assets': round(sum(asset_vals) / len(asset_vals)) if asset_vals else 0,
