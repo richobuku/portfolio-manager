@@ -107,6 +107,40 @@ class Command(BaseCommand):
                 tr_ch[c] = tr_ch.get(c, 0) + 1
         top_tr = sorted(tr_ch.items(), key=lambda x: -x[1])[:10]
 
+        # Baseline vs current adoption — digital tools & training-change areas,
+        # restricted to MSMEs that have both a diagnostic baseline and a later update.
+        def _tool_counts(snap_map, ids, field):
+            counts = {}
+            for mid in ids:
+                s = snap_map[mid]
+                for t in (getattr(s, field) or []):
+                    counts[t] = counts.get(t, 0) + 1
+            return counts
+
+        base_tool_counts = _tool_counts(baseline, matched_ids, 'digital_tools')
+        curr_tool_counts = _tool_counts(latest, matched_ids, 'digital_tools')
+        tool_change = sorted(
+            (
+                {'tool': t, 'baseline': base_tool_counts.get(t, 0),
+                 'current': curr_tool_counts.get(t, 0),
+                 'delta': curr_tool_counts.get(t, 0) - base_tool_counts.get(t, 0)}
+                for t in set(base_tool_counts) | set(curr_tool_counts)
+            ),
+            key=lambda x: -x['delta']
+        )[:10]
+
+        base_tr_counts = _tool_counts(baseline, matched_ids, 'training_changes')
+        curr_tr_counts = _tool_counts(latest, matched_ids, 'training_changes')
+        training_change = sorted(
+            (
+                {'area': a, 'baseline': base_tr_counts.get(a, 0),
+                 'current': curr_tr_counts.get(a, 0),
+                 'delta': curr_tr_counts.get(a, 0) - base_tr_counts.get(a, 0)}
+                for a in set(base_tr_counts) | set(curr_tr_counts)
+            ),
+            key=lambda x: -x['delta']
+        )[:10]
+
         sources = {}
         for s in snaps:
             k = s.source or 'unknown'
@@ -159,6 +193,8 @@ class Command(BaseCommand):
             'momo_pay': sum(1 for s in L if s.has_momo_pay is True),
             'sacco': sum(1 for s in L if s.has_sacco is True),
             'top_tools': top_tools,
+            'tool_change': tool_change,
+            'training_change': training_change,
             'tr_yes': tr_yes, 'tr_no': tr_no, 'tr_null': tr_null,
             'top_tr':   top_tr,
             'sources':  sources,
