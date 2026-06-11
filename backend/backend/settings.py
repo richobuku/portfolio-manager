@@ -25,19 +25,19 @@ load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+
 # SECURITY WARNING: keep the secret key used in production secret!
 _secret_key = os.environ.get('SECRET_KEY')
 if not _secret_key:
-    if os.environ.get('DJANGO_ENV') == 'production':
-        raise RuntimeError("SECRET_KEY environment variable must be set in production.")
+    if not DEBUG:
+        raise RuntimeError("SECRET_KEY environment variable must be set when DEBUG is False.")
     # Development-only fallback — never committed to production
     _secret_key = 'django-insecure-dev-only-do-not-use-in-production'
 SECRET_KEY = _secret_key
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
-
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Add Render domain to allowed hosts
 if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):

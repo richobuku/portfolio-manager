@@ -85,6 +85,28 @@ class MSMESerializer(serializers.ModelSerializer):
         model = MSME
         fields = '__all__'
 
+    # Assignment/relationship fields managed via the dedicated admin actions
+    # (assign_bge, assign_cohort, set_groups) — a BGE editing their own assigned
+    # MSME's profile data must not be able to reassign it, change its cohort/
+    # programme groups, or toggle is_active via a generic PATCH.
+    ADMIN_ONLY_FIELDS = (
+        'assigned_bge', 'co_assigned_bges', 'cohort', 'programme_groups',
+        'assigned_group', 'is_active', 'assignment_objectives', 'assignment_date',
+    )
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        if request is not None:
+            user = request.user
+            is_admin_or_pm = (
+                user.is_staff or user.is_superuser
+                or hasattr(user, 'cohort_admin_profile')
+            )
+            if not is_admin_or_pm:
+                for field in self.ADMIN_ONLY_FIELDS:
+                    validated_data.pop(field, None)
+        return super().update(instance, validated_data)
+
     def get_co_assigned_bge_names(self, obj):
         return [{'id': b.id, 'name': b.name, 'bge_code': b.bge_code} for b in obj.co_assigned_bges.all()]
 
@@ -135,6 +157,20 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
         # as plain JSON in a PATCH causes Django to reject the request.
         read_only_fields = ('signature', 'signature_data')
 
+    # Fields only an admin (staff/superuser) may set — a BGE editing their own
+    # profile must not be able to self-approve, promote themselves to senior,
+    # change their BGE code, or relink the account.
+    ADMIN_ONLY_FIELDS = ('status', 'user', 'is_senior', 'bge_code')
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        if request is not None:
+            user = request.user
+            if not (user.is_staff or user.is_superuser):
+                for field in self.ADMIN_ONLY_FIELDS:
+                    validated_data.pop(field, None)
+        return super().update(instance, validated_data)
+
     def _all_msmes(self, obj):
         """Return combined queryset: primary assigned + co-assigned, deduped."""
         from django.db.models import Q
@@ -165,12 +201,13 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
         return list(obj.bge_groups.values_list('name', flat=True))
 
     def get_signature_url(self, obj):
-        if not obj.signature:
+        if not (obj.signature_data or obj.signature):
             return None
+        path = f'/api/experts/{obj.id}/signature-image/'
         request = self.context.get('request')
         if request:
-            return request.build_absolute_uri(obj.signature.url)
-        return obj.signature.url
+            return request.build_absolute_uri(path)
+        return path
 
 
 class BGEGroupSerializer(serializers.ModelSerializer):

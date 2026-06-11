@@ -1,4 +1,5 @@
 import logging
+import re
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -102,6 +103,12 @@ class ProgrammeManagerReadOnlyMixin:
     def destroy(self, request, *args, **kwargs):
         self._check_not_pm()
         return super().destroy(request, *args, **kwargs)
+
+
+def _safe_filename(name):
+    """Strip characters that could break or inject into a Content-Disposition header."""
+    name = re.sub(r'[\r\n"]', '', str(name))
+    return name.strip() or 'download'
 
 
 from pywebpush import webpush, WebPushException
@@ -422,6 +429,11 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if not self._is_admin_or_cohort_admin(request):
             raise PermissionDenied("Only admins can delete MSMEs.")
         return super().destroy(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        if not self._is_admin_or_cohort_admin(request):
+            raise PermissionDenied("Only admins can create MSMEs.")
+        return super().create(request, *args, **kwargs)
 
     @action(detail=True, methods=['patch'])
     def assign_bge(self, request, pk=None):
@@ -1329,6 +1341,27 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             raise PermissionDenied("Only admins can delete experts.")
         return super().destroy(request, *args, **kwargs)
 
+    def create(self, request, *args, **kwargs):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can create expert profiles.")
+        return super().create(request, *args, **kwargs)
+
+    def _check_can_write(self, request, pk):
+        user = request.user
+        if user.is_staff or user.is_superuser:
+            return
+        own_bge = getattr(user, 'bge_profile', None)
+        if own_bge is None or str(own_bge.id) != str(pk):
+            raise PermissionDenied("You can only update your own profile.")
+
+    def update(self, request, *args, **kwargs):
+        self._check_can_write(request, kwargs.get('pk'))
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        self._check_can_write(request, kwargs.get('pk'))
+        return super().partial_update(request, *args, **kwargs)
+
     @action(detail=False, methods=['get'])
     def leaderboard(self, request):
         bges = (BusinessGrowthExpert.objects
@@ -1723,9 +1756,22 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                             status=status.HTTP_400_BAD_REQUEST)
 
         return Response({
-            'signature_url': request.build_absolute_uri(bge.signature.url) if bge.signature else None,
+            'signature_url': request.build_absolute_uri(f'/api/experts/{bge.id}/signature-image/') if _bge_signature_bytes(bge) else None,
             'detail': 'Signature uploaded and processed successfully.',
         })
+
+    @action(detail=True, methods=['get'], url_path='signature-image')
+    def signature_image(self, request, pk=None):
+        """Serve the BGE's stored signature as a PNG.
+
+        Reads from ``signature_data`` (DB-backed) so it works in production
+        where ``/media/`` is not served and the filesystem copy may be wiped.
+        """
+        bge = self.get_object()
+        raw = _bge_signature_bytes(bge)
+        if not raw:
+            return Response({'detail': 'No signature found for this BGE.'}, status=status.HTTP_404_NOT_FOUND)
+        return HttpResponse(raw, content_type='image/png')
 
     @action(detail=True, methods=['post'], url_path='rotate-signature')
     def rotate_signature(self, request, pk=None):
@@ -1761,7 +1807,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         return Response({
             'detail': f'Signature rotated {direction.upper()} 90° and saved.',
-            'signature_url': request.build_absolute_uri(bge.signature.url) if bge.signature else None,
+            'signature_url': request.build_absolute_uri(f'/api/experts/{bge.id}/signature-image/') if _bge_signature_bytes(bge) else None,
         })
 
     @action(detail=True, methods=['post'], url_path='clean-signature')
@@ -1886,7 +1932,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         return Response({
             'detail': 'Signature background removed successfully.',
-            'signature_url': request.build_absolute_uri(bge.signature.url) if bge.signature else None,
+            'signature_url': request.build_absolute_uri(f'/api/experts/{bge.id}/signature-image/') if _bge_signature_bytes(bge) else None,
         })
 
     @action(detail=False, methods=['post'], url_path='upload')
@@ -2168,10 +2214,28 @@ class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return Response(AttendanceSerializer(att).data)
 
 
-class AttendanceViewSet(viewsets.ModelViewSet):
+class AttendanceViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     queryset = Attendance.objects.select_related('msme', 'session').all()
     serializer_class = AttendanceSerializer
     permission_classes = [IsAuthenticated]
+
+    def _check_session_scope(self, request, session_id):
+        """BGEs may only record attendance for sessions they're assigned to facilitate/mentor."""
+        user = request.user
+        if user.is_staff or user.is_superuser or _is_programme_manager(user):
+            return
+        try:
+            bge = user.bge_profile
+        except Exception:
+            raise PermissionDenied("You do not have access to record attendance.")
+        if not TrainingFacilitationAssignment.objects.filter(bge=bge, session_id=session_id).exists():
+            raise PermissionDenied("You can only record attendance for sessions you are assigned to.")
+
+    def create(self, request, *args, **kwargs):
+        session_id = request.data.get('session')
+        if session_id:
+            self._check_session_scope(request, session_id)
+        return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         user = self.request.user
@@ -2674,7 +2738,7 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         Submitted reports return the stored snapshot; drafts are rendered on demand."""
         from .pdf_reports import render_msme_report
         report = self.get_object()
-        fname = f"MSMEReport_{report.msme.business_name[:30].replace(' ', '_')}_{report.visit_date}.pdf"
+        fname = _safe_filename(f"MSMEReport_{report.msme.business_name[:30].replace(' ', '_')}_{report.visit_date}.pdf")
         disposition = 'attachment' if request.query_params.get('dl') else 'inline'
         if report.submitted_pdf:
             try:
@@ -2837,7 +2901,7 @@ class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vie
         Submitted/approved reports return the stored snapshot; drafts are rendered on demand."""
         from .pdf_reports import render_group_report
         report = self.get_object()
-        fname = f"GroupReport_{report.group.name.replace(' ', '_')}_{report.visit_date}.pdf"
+        fname = _safe_filename(f"GroupReport_{report.group.name.replace(' ', '_')}_{report.visit_date}.pdf")
         disposition = 'attachment' if request.query_params.get('dl') else 'inline'
         if report.submitted_pdf:
             try:
@@ -3127,14 +3191,14 @@ class BGEUserViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='bulk-create-missing')
     def bulk_create_missing(self, request):
         """Create login accounts for every BGE that doesn't have one yet.
-        Admin-only. Returns counts of created / skipped."""
+        Admin-only. Each account gets a unique random temporary password,
+        sent to the BGE via welcome email/SMS. Returns counts of created / skipped."""
         self._require_admin(request)
-        password = request.data.get('password', 'bds123')
         unlinked = BusinessGrowthExpert.objects.filter(user__isnull=True).order_by('id')
         created = skipped = 0
         names = []
         for bge in unlinked:
-            outcome = ensure_bge_account(bge, password=password, send_email=True)
+            outcome = ensure_bge_account(bge, send_email=True)
             if outcome == 'created':
                 created += 1
                 names.append(bge.name or f'BGE #{bge.id}')
@@ -3590,7 +3654,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         is_owner = hasattr(user, 'bge_profile') and user.bge_profile == work_order.bge
         if not (is_admin or is_owner):
             raise PermissionDenied("You can only download your own work orders.")
-        fname = f'WorkOrder_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}.pdf'
+        fname = _safe_filename(f'WorkOrder_{(work_order.work_order_number or str(work_order.id)).replace(" ", "_")}.pdf')
         dl = request.query_params.get('dl', '0')
         disp = 'attachment' if dl == '1' else 'inline'
         # Prefer DB-stored signed bytes (survives Render filesystem wipes).
@@ -3801,7 +3865,7 @@ def push_vapid_key(request):
     return Response({'publicKey': settings.VAPID_PUBLIC_KEY})
 
 
-class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelViewSet):
+class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """
     CRUD for training session reports.
     - BGEs can create/edit reports for sessions linked to their assignments.
@@ -3846,7 +3910,7 @@ class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelViewSet
         from .pdf_reports import render_training_report
         report = self.get_object()
         safe = report.session.title[:40].replace(' ', '_')
-        fname = f"TrainingReport_{safe}_{report.session.date}.pdf"
+        fname = _safe_filename(f"TrainingReport_{safe}_{report.session.date}.pdf")
         dl = request.query_params.get('dl')
         buf = render_training_report(report)
         resp = HttpResponse(buf.read(), content_type='application/pdf')
@@ -3906,7 +3970,7 @@ class AnnualReviewReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMix
         serializer.save(**data)
 
 
-class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelViewSet):
+class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """
     Training reports filed by mentor BGEs.
     - A mentor BGE can only create/edit their own report for sessions they are assigned to.
@@ -3962,7 +4026,7 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, viewsets.ModelV
         from .pdf_reports import render_mentor_report
         report = self.get_object()
         safe = report.session.title[:40].replace(' ', '_')
-        fname = f"MentorReport_{safe}_{report.session.date}.pdf"
+        fname = _safe_filename(f"MentorReport_{safe}_{report.session.date}.pdf")
         dl = request.query_params.get('dl')
         buf = render_mentor_report(report)
         resp = HttpResponse(buf.read(), content_type='application/pdf')
@@ -4061,6 +4125,14 @@ def bulk_email_view(request):
         return Response({'detail': 'Subject is required.'}, status=400)
     if not body_text:
         return Response({'detail': 'Body is required.'}, status=400)
+    if len(subject) > 300:
+        return Response({'detail': 'Subject is too long (max 300 characters).'}, status=400)
+    if len(body_text) > 50000:
+        return Response({'detail': 'Body is too long (max 50,000 characters).'}, status=400)
+    if len(body_html) > 100000:
+        return Response({'detail': 'HTML body is too long (max 100,000 characters).'}, status=400)
+    if isinstance(recipient_ids, list) and len(recipient_ids) > 2000:
+        return Response({'detail': 'Too many recipients selected (max 2,000).'}, status=400)
 
     if recipient_type == 'bge':
         qs = BusinessGrowthExpert.objects.filter(email__isnull=False).exclude(email='')
@@ -4123,6 +4195,10 @@ def bulk_email_view(request):
 def bulk_email_log_view(request):
     """Return how many of the given recipients have already been sent a subject."""
     from .models import EmailSendLog
+
+    user = request.user
+    if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+        raise PermissionDenied("Only administrators can view bulk email logs.")
 
     subject        = request.query_params.get('subject', '')
     recipient_type = request.query_params.get('recipient_type', 'bge')
@@ -4286,6 +4362,10 @@ def bulk_sms_view(request):
 
     if not message:
         return Response({'detail': 'Message is required.'}, status=400)
+    if len(message) > 1600:
+        return Response({'detail': 'Message is too long (max 1,600 characters).'}, status=400)
+    if isinstance(recipient_ids, list) and len(recipient_ids) > 2000:
+        return Response({'detail': 'Too many recipients selected (max 2,000).'}, status=400)
 
     # Scope filter: programme managers can only message within their groups
     group_ids = _managed_groups(user)  # None for superuser/staff, list for programme managers
@@ -4330,42 +4410,13 @@ def bulk_sms_view(request):
 
 @api_view(['GET'])
 @permission_classes([_IsAuth])
-def bulk_sms_balance_view(request):
-    """Return current SMS credit balance from Message Carrier."""
-    import urllib.request as _urllib
-    import json as _json
-    from django.conf import settings as _s
-
-    api_key  = _s.MESSAGE_CARRIER_API_KEY
-    base_url = getattr(_s, 'MESSAGE_CARRIER_BASE_URL', 'https://api.messagecarrier.africa')
-
-    # Try common balance endpoints
-    for path in ('/v1/account/balance', '/v1/account', '/v1/wallet/balance', '/v1/balance'):
-        try:
-            req = _urllib.Request(f'{base_url}{path}', method='GET')
-            req.add_header('x-api-key', api_key)
-            req.add_header('Accept', 'application/json')
-            with _urllib.urlopen(req, timeout=8) as resp:
-                if resp.status == 200:
-                    data = _json.loads(resp.read().decode())
-                    # Normalise whichever key holds the balance
-                    balance = (
-                        data.get('balance') or data.get('credits') or
-                        data.get('sms_credits') or data.get('amount') or
-                        data.get('wallet_balance') or data.get('data', {}).get('balance')
-                    )
-                    return Response({'balance': balance, 'raw': data})
-        except Exception:
-            continue
-
-    return Response({'balance': None, 'detail': 'Balance unavailable'})
-
-
-@api_view(['GET'])
-@permission_classes([_IsAuth])
 def bulk_sms_log_view(request):
     """Return recent SMS send log entries for the given recipients."""
     from .models import SmsSendLog
+
+    user = request.user
+    if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+        raise PermissionDenied("Only administrators can view bulk SMS logs.")
 
     recipient_type = request.query_params.get('recipient_type', 'bge')
     ids_raw        = request.query_params.getlist('ids')
@@ -4824,6 +4875,11 @@ class WorkOrderSubmissionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             qs = qs.filter(work_order_id=wo_id)
         return qs
 
+    # XLSX files are ZIP archives (PK\x03\x04); legacy XLS files are OLE2
+    # compound documents (D0 CF 11 E0 A1 B1 1A E1).
+    _XLSX_MAGIC = b'PK\x03\x04'
+    _XLS_MAGIC = b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1'
+
     def _validate_file(self, f, label):
         if f is None:
             return
@@ -4832,6 +4888,10 @@ class WorkOrderSubmissionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             raise ValidationError(f'{label} must be an Excel file (.xlsx or .xls).')
         if f.size > self.MAX_FILE_SIZE:
             raise ValidationError(f'{label} must be under 10 MB.')
+        header = f.read(8)
+        f.seek(0)
+        if not (header.startswith(self._XLSX_MAGIC) or header.startswith(self._XLS_MAGIC)):
+            raise ValidationError(f'{label} does not look like a valid Excel file.')
 
     def _resolve_bge(self, work_order):
         user = self.request.user
@@ -4896,7 +4956,7 @@ class WorkOrderSubmissionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
 
     def _serve_file(self, instance, kind):
         data = getattr(instance, f'{kind}_data')
-        fname = getattr(instance, f'{kind}_filename') or f'{kind}.xlsx'
+        fname = _safe_filename(getattr(instance, f'{kind}_filename') or f'{kind}.xlsx')
         if not data:
             return Response({'error': f'No {kind} uploaded for this submission.'}, status=status.HTTP_404_NOT_FOUND)
         content_type = (

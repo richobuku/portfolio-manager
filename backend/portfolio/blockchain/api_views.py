@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.db.models import Sum, Count, Q
 from django.db import transaction
 from ..models import MSME, BusinessGrowthExpert
@@ -18,6 +18,17 @@ from .serializers import (
     TokenSerializer, TokenBalanceSerializer, MSMEFundingContractSerializer,
     InvestmentPoolSerializer, DecentralizedIdentitySerializer
 )
+
+
+class IsAdminOrProgrammeManager(BasePermission):
+    """Restrict mutating blockchain actions to staff/superusers and programme managers."""
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.is_staff or user.is_superuser:
+            return True
+        return hasattr(user, 'cohort_admin_profile')
 
 class BlockchainTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for blockchain transactions"""
@@ -37,7 +48,7 @@ class BlockchainTransactionViewSet(viewsets.ReadOnlyModelViewSet):
         address = self.request.query_params.get('address', None)
         if address:
             queryset = queryset.filter(
-                models.Q(from_address=address) | models.Q(to_address=address)
+                Q(from_address=address) | Q(to_address=address)
             )
         
         return queryset.order_by('-timestamp')
@@ -71,7 +82,12 @@ class SmartContractViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SmartContract.objects.filter(is_active=True)
     serializer_class = SmartContractSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_permissions(self):
+        if self.action == 'execute_function':
+            return [IsAuthenticated(), IsAdminOrProgrammeManager()]
+        return super().get_permissions()
+
     @action(detail=True, methods=['post'])
     def execute_function(self, request, pk=None):
         """Execute a smart contract function"""
@@ -94,7 +110,12 @@ class TokenViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Token.objects.filter(is_active=True)
     serializer_class = TokenSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_permissions(self):
+        if self.action == 'transfer':
+            return [IsAuthenticated(), IsAdminOrProgrammeManager()]
+        return super().get_permissions()
+
     @action(detail=True, methods=['post'])
     def transfer(self, request, pk=None):
         """Transfer tokens"""
@@ -141,7 +162,12 @@ class MSMEFundingContractViewSet(viewsets.ModelViewSet):
     queryset = MSMEFundingContract.objects.all()
     serializer_class = MSMEFundingContractSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminOrProgrammeManager()]
+
     @action(detail=True, methods=['post'])
     def contribute(self, request, pk=None):
         """Contribute to MSME funding"""
@@ -226,7 +252,12 @@ class InvestmentPoolViewSet(viewsets.ModelViewSet):
     queryset = InvestmentPool.objects.filter(is_active=True)
     serializer_class = InvestmentPoolSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminOrProgrammeManager()]
+
     @action(detail=True, methods=['post'])
     def invest(self, request, pk=None):
         """Invest in a pool"""
@@ -282,7 +313,12 @@ class DecentralizedIdentityViewSet(viewsets.ModelViewSet):
     queryset = DecentralizedIdentity.objects.all()
     serializer_class = DecentralizedIdentitySerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminOrProgrammeManager()]
+
     @action(detail=False, methods=['post'])
     def create_identity(self, request):
         """Create a new decentralized identity"""

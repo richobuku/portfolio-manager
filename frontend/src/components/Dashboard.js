@@ -977,7 +977,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
         axios.get(API_ENDPOINTS.TRAINING_TOPICS, { headers: h }),
         axios.get(`${API_ENDPOINTS.MSMES}analytics/`, { headers: h }),
-        axios.get(API_ENDPOINTS.BGE_USERS, { headers: h }).catch(() => ({ data: [] })),
+        isStaff
+          ? axios.get(API_ENDPOINTS.BGE_USERS, { headers: h }).catch(() => ({ data: [] }))
+          : Promise.resolve({ data: [] }),
         axios.get(`${API_ENDPOINTS.REPORTS}?${reportParams}`, { headers: h }),
         axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h }).catch(() => ({ data: [] })),
         axios.get(API_ENDPOINTS.PROGRAMME_GROUPS, { headers: h }).catch(() => ({ data: [] })),
@@ -1764,10 +1766,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const bulkCreateMissingAccounts = async () => {
     setUserLoading(true);
     try {
-      const res = await axios.post(`${API_ENDPOINTS.BGE_USERS}bulk-create-missing/`, { password: 'bds123' }, { headers });
+      const res = await axios.post(`${API_ENDPOINTS.BGE_USERS}bulk-create-missing/`, {}, { headers });
       const { created, skipped, names } = res.data;
       if (created > 0) {
-        notify(`Created ${created} account${created !== 1 ? 's' : ''}: ${names.join(', ')}. Welcome emails sent. Default password: bds123`);
+        notify(`Created ${created} account${created !== 1 ? 's' : ''}: ${names.join(', ')}. Welcome emails with login details sent.`);
       } else {
         notify('All BGE experts already have accounts.');
       }
