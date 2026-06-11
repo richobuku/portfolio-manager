@@ -27,7 +27,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -6104,6 +6104,21 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const [woPaymentNotifying, setWoPaymentNotifying] = useState(null);
+
+  const notifyBgePayment = async (payment) => {
+    setWoPaymentNotifying(payment.id);
+    try {
+      const res = await axios.post(WORK_ORDER_PAYMENT_NOTIFY_URL(payment.id), {}, { headers });
+      setWoPayments(prev => prev.map(p => p.id === payment.id ? res.data : p));
+      notify('BGE notified by email');
+    } catch {
+      notify('Failed to notify BGE', 'error');
+    } finally {
+      setWoPaymentNotifying(null);
+    }
+  };
+
   const renderWorkOrders = () => (
     <Box>
       <SectionHeader title="Work Orders" subtitle={`${workOrders.length} work orders`}>
@@ -6333,6 +6348,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                   <TableCell>Reference</TableCell>
                                   <TableCell>Notes</TableCell>
                                   <TableCell>Recorded by</TableCell>
+                                  <TableCell>Status</TableCell>
                                   <TableCell align="right">Actions</TableCell>
                                 </TableRow>
                               </TableHead>
@@ -6344,7 +6360,35 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                     <TableCell>{p.reference || '—'}</TableCell>
                                     <TableCell>{p.notes || '—'}</TableCell>
                                     <TableCell>{p.recorded_by_name || '—'}</TableCell>
+                                    <TableCell>
+                                      {p.confirmed_by_bge ? (
+                                        <Chip
+                                          size="small" color="success" icon={<CheckCircle />}
+                                          label={`Confirmed ${new Date(p.confirmed_at).toLocaleDateString()}`}
+                                        />
+                                      ) : p.notified_at ? (
+                                        <Chip
+                                          size="small" variant="outlined"
+                                          label={`Notified ${new Date(p.notified_at).toLocaleDateString()}`}
+                                        />
+                                      ) : (
+                                        <Typography variant="caption" color="text.disabled">Not notified</Typography>
+                                      )}
+                                    </TableCell>
                                     <TableCell align="right">
+                                      {!p.confirmed_by_bge && (
+                                        <Tooltip title="Email BGE about this payment">
+                                          <span>
+                                            <IconButton
+                                              size="small" color="primary"
+                                              disabled={woPaymentNotifying === p.id}
+                                              onClick={() => notifyBgePayment(p)}
+                                            >
+                                              {woPaymentNotifying === p.id ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                                            </IconButton>
+                                          </span>
+                                        </Tooltip>
+                                      )}
                                       <Tooltip title="Delete payment">
                                         <IconButton size="small" color="error" onClick={() => deleteWoPayment(p)}>
                                           <Delete fontSize="small" />

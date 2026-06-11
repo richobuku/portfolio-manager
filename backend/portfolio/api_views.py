@@ -4988,3 +4988,87 @@ class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if not self._is_admin():
             raise PermissionDenied("Only admins can delete payments.")
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='notify')
+    def notify(self, request, pk=None):
+        """Admin-only: email the BGE that a payment has been recorded."""
+        if not self._is_admin():
+            raise PermissionDenied("Only admins can notify BGEs about payments.")
+        payment = self.get_object()
+        work_order = payment.work_order
+        bge = work_order.bge
+        recipient_email = (bge.email or '').strip()
+        if not recipient_email:
+            raise ValidationError("This BGE has no email address on file.")
+
+        notes_line = f'\nNotes: {payment.notes}\n' if payment.notes else ''
+        reference_line = f'Reference: {payment.reference}\n' if payment.reference else ''
+        subject = f'Payment Recorded — {work_order.work_order_number}'
+        body = (
+            f'Dear {bge.name},\n\n'
+            f'A payment has been recorded against your work order ({work_order.work_order_number}):\n\n'
+            f'Date: {payment.payment_date}\n'
+            f'Amount: UGX {payment.amount:,.0f}\n'
+            f'{reference_line}'
+            f'{notes_line}\n'
+            f'Please log in to confirm receipt of this payment.\n\n'
+            f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+        )
+        try:
+            msg = EmailMultiAlternatives(
+                subject, body,
+                getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
+                [recipient_email],
+            )
+            msg.send(fail_silently=True)
+        except Exception:
+            pass
+
+        payment.notified_at = timezone.now()
+        payment.save(update_fields=['notified_at'])
+        return Response(self.get_serializer(payment).data)
+
+    @action(detail=True, methods=['post'], url_path='confirm')
+    def confirm(self, request, pk=None):
+        """BGE-only: confirm receipt of a logged payment, notifying admin by email."""
+        payment = self.get_object()
+        work_order = payment.work_order
+        user = request.user
+        if not self._is_admin():
+            try:
+                bge = user.bge_profile
+            except Exception:
+                raise PermissionDenied("Only the BGE on this work order can confirm receipt.")
+            if bge.id != work_order.bge_id and not work_order.co_bges.filter(id=bge.id).exists():
+                raise PermissionDenied("Only the BGE on this work order can confirm receipt.")
+
+        payment.confirmed_by_bge = True
+        payment.confirmed_at = timezone.now()
+        payment.save(update_fields=['confirmed_by_bge', 'confirmed_at'])
+
+        notify_email = getattr(settings, 'PAYMENT_CONFIRMATION_NOTIFY_EMAIL', '')
+        if notify_email:
+            notes_line = f'\nNotes: {payment.notes}\n' if payment.notes else ''
+            reference_line = f'Reference: {payment.reference}\n' if payment.reference else ''
+            subject = f'Payment Receipt Confirmed — {work_order.work_order_number}'
+            body = (
+                f'{work_order.bge.name} has confirmed receipt of a payment against '
+                f'work order {work_order.work_order_number}:\n\n'
+                f'Date: {payment.payment_date}\n'
+                f'Amount: UGX {payment.amount:,.0f}\n'
+                f'{reference_line}'
+                f'{notes_line}\n'
+                f'Confirmed at: {payment.confirmed_at:%Y-%m-%d %H:%M}\n\n'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+            )
+            try:
+                msg = EmailMultiAlternatives(
+                    subject, body,
+                    getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
+                    [notify_email],
+                )
+                msg.send(fail_silently=True)
+            except Exception:
+                pass
+
+        return Response(self.get_serializer(payment).data)

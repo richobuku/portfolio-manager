@@ -263,6 +263,12 @@ GOOGLE_LOGIN_ALLOWED_DOMAINS = [
     d.strip().lower() for d in os.environ.get('GOOGLE_LOGIN_ALLOWED_DOMAINS', '').split(',') if d.strip()
 ]
 
+# ── Work order payment confirmation ──────────────────────────────────────────
+# Mailbox notified when a BGE confirms receipt of a logged payment.
+PAYMENT_CONFIRMATION_NOTIFY_EMAIL = os.environ.get(
+    'PAYMENT_CONFIRMATION_NOTIFY_EMAIL', 'stella.abote@gopa.eu'
+)
+
 # Add canonical frontend URL to CORS allow-list
 if FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)

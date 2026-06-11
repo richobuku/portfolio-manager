@@ -21,6 +21,7 @@ import {
   API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS,
   TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL,
   WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
+  WORK_ORDER_PAYMENT_CONFIRM_URL,
 } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -212,6 +213,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [submissionUploading, setSubmissionUploading] = useState(false);
   const timesheetInputRef = useRef(null);
   const invoiceInputRef = useRef(null);
+
+  // Payments against work orders
+  const [payments, setPayments] = useState([]);
+  const [paymentConfirming, setPaymentConfirming] = useState(null);
 
   // Signature upload
   const [sigFile, setSigFile] = useState(null);
@@ -485,6 +490,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchPayments = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDER_PAYMENTS, { headers: h });
+      setPayments(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // silent
+    }
+  }, [token]);
+
 
   const fetchSessions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -710,13 +725,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchGroupReports();
     fetchWorkOrders();
     fetchSubmissions();
+    fetchPayments();
     fetchSessions();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchSessions, token]);
+  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchSessions, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -1143,6 +1159,20 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       URL.revokeObjectURL(blobUrl);
     } catch {
       notify(`Failed to download ${kind}`, 'error');
+    }
+  };
+
+  // ── payments ─────────────────────────────────────────────────────────────────
+  const confirmPayment = async (payment) => {
+    setPaymentConfirming(payment.id);
+    try {
+      const res = await axios.post(WORK_ORDER_PAYMENT_CONFIRM_URL(payment.id), {}, { headers });
+      setPayments(prev => prev.map(p => p.id === payment.id ? res.data : p));
+      notify('Payment receipt confirmed');
+    } catch {
+      notify('Failed to confirm receipt', 'error');
+    } finally {
+      setPaymentConfirming(null);
     }
   };
 
@@ -1972,6 +2002,52 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 </Box>
               )}
             </Card>
+
+            {/* Payments */}
+            {payments.length > 0 && (
+              <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>Payments</Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Work Order</TableCell>
+                        <TableCell>Date</TableCell>
+                        <TableCell align="right">Amount (UGX)</TableCell>
+                        <TableCell>Reference</TableCell>
+                        <TableCell align="right">Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {payments.map(p => (
+                        <TableRow key={p.id}>
+                          <TableCell>{p.work_order_number}</TableCell>
+                          <TableCell>{p.payment_date}</TableCell>
+                          <TableCell align="right">{Number(p.amount).toLocaleString()}</TableCell>
+                          <TableCell>{p.reference || '—'}</TableCell>
+                          <TableCell align="right">
+                            {p.confirmed_by_bge ? (
+                              <Chip
+                                size="small" color="success" icon={<CheckCircle />}
+                                label={`Confirmed ${new Date(p.confirmed_at).toLocaleDateString()}`}
+                              />
+                            ) : (
+                              <Button
+                                variant="outlined" size="small"
+                                disabled={paymentConfirming === p.id}
+                                onClick={() => confirmPayment(p)}
+                              >
+                                {paymentConfirming === p.id ? <CircularProgress size={14} /> : 'Confirm Received'}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Card>
+            )}
 
             <Box sx={{ mb: 2 }}>
               <Typography variant="h6" fontWeight={700}>Issued Work Orders</Typography>

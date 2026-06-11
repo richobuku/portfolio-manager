@@ -1374,6 +1374,12 @@ class WorkOrderPayment(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    notified_at      = models.DateTimeField(null=True, blank=True,
+        help_text='When the BGE was last emailed about this payment.')
+    confirmed_by_bge = models.BooleanField(default=False,
+        help_text='True once the BGE has confirmed receipt of this payment.')
+    confirmed_at     = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['-payment_date', '-created_at']
         verbose_name = "Work Order Payment"

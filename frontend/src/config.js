@@ -56,6 +56,8 @@ export const TSHIRT_RECEIPT_BULK_SIGN  = (id) => `${API_BASE_URL}/api/tshirt-rec
 export const TSHIRT_ENTRY_SIGN_URL     = (id) => `${API_BASE_URL}/api/tshirt-entries/${id}/sign/`;
 export const WORK_ORDER_SUBMISSION_TIMESHEET_URL = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-timesheet/`;
 export const WORK_ORDER_SUBMISSION_INVOICE_URL   = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-invoice/`;
+export const WORK_ORDER_PAYMENT_NOTIFY_URL  = (id) => `${API_BASE_URL}/api/work-order-payments/${id}/notify/`;
+export const WORK_ORDER_PAYMENT_CONFIRM_URL = (id) => `${API_BASE_URL}/api/work-order-payments/${id}/confirm/`;
 // legacy alias kept for any existing references
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/reports/${id}/revert/`;
