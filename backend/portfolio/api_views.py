@@ -3756,37 +3756,6 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return Response(self.get_serializer(work_order).data)
 
 
-@api_view(['GET'])
-@permission_classes([_IsAuth])
-def db_backup_view(request):
-    """Superuser-only: download a full dumpdata JSON backup as a file.
-    Visit /api/admin/db-backup/ in the browser while logged in as admin.
-    Remove this endpoint after the database migration is complete.
-    """
-    if not (request.user.is_superuser or request.user.is_staff):
-        raise PermissionDenied("Superuser access required.")
-
-    import io
-    from django.core import management
-
-    buf = io.StringIO()
-    management.call_command(
-        'dumpdata',
-        '--natural-foreign', '--natural-primary',
-        '--exclude', 'contenttypes',
-        '--exclude', 'auth.permission',
-        '--indent', '2',
-        stdout=buf,
-    )
-    data = buf.getvalue().encode('utf-8')
-    from django.utils import timezone as _tz
-    filename = f"prudev2_backup_{_tz.now().strftime('%Y%m%d_%H%M%S')}.json"
-    resp = HttpResponse(data, content_type='application/json')
-    resp['Content-Disposition'] = f'attachment; filename="{filename}"'
-    resp['Content-Length'] = len(data)
-    return resp
-
-
 @api_view(['POST'])
 @permission_classes([_IsAuth])
 def push_subscribe(request):

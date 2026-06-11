@@ -6,7 +6,7 @@ This guide will help you deploy your React frontend to Vercel.
 
 1. A GitHub account with your code pushed to a repository
 2. A Vercel account (free tier available)
-3. Your backend API deployed separately (e.g., on Render, Railway, or Heroku)
+3. Your backend API deployed separately (e.g., on Render or Heroku)
 
 ## Step 1: Prepare Your Repository
 
