@@ -6792,6 +6792,34 @@ Best regards,
 PRUDEV II BDS Team`,
     },
     {
+      key: 'bge_timesheet_payment_update',
+      label: 'BGE — Timesheet, Invoice & Payment Tracking Update',
+      subject: 'Important Update: New Timesheet, Invoice & Payment Tracking on the Portfolio System',
+      body: `Dear {{name}},
+
+We've added new features to the portfolio system to make submitting your timesheets and invoices, and tracking payments, faster and more reliable.
+
+1. Upload Timesheets & Invoices Directly on the System
+Go to your Dashboard → Work Orders. There you'll find a "Submit Timesheet & Invoice" section where you can:
+- Select the relevant Work Order
+- Upload your timesheet and/or invoice (Excel format)
+
+This replaces sending these documents by email. We're making this change because emails often get mixed up, lost, or sent to the wrong inbox — uploading directly to the system ensures your documents are linked to the correct work order and are always accessible to the admin team.
+
+Important: When preparing your invoice, please make sure to use your exact BGE number/code (as shown on your work order) so payments can be matched and processed correctly.
+
+2. Payment Notifications & Confirmation
+When a payment is recorded against your work order, you may receive an email notification with the payment details. Please log in to your Dashboard → Work Orders → Payments section and click "Confirm Received" once you have received the payment. This helps us keep accurate records and resolve any payment queries quickly.
+
+If you have any questions about these changes, please don't hesitate to reach out.
+
+Thank you for your continued cooperation.
+
+Regards,
+PRUDEV II BDS Team
+GOPA AFC / GIZ`,
+    },
+    {
       key: 'msme_data_visit',
       label: 'MSME — Upcoming Data Visit Notification',
       subject: 'A Quick Check-In From the PRUDEV II Team',
