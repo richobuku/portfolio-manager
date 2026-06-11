@@ -71,6 +71,7 @@ def _build_user_response(user):
     from django.utils import timezone as _tz
     from datetime import timedelta
     password_change_required = False
+    sec = None
     try:
         sec = user.security_profile
         if sec.must_change_password:
@@ -86,10 +87,17 @@ def _build_user_response(user):
         # No security profile yet — create one and flag for change
         try:
             from .models import UserSecurityProfile
-            UserSecurityProfile.objects.get_or_create(user=user)
+            sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
             password_change_required = True
         except Exception:
             pass
+
+    # ── Pending-approval gate ─────────────────────────────────────────────────
+    # Viewer accounts created from an out-of-allowlist Google sign-in start
+    # with viewer_approved=False and have no data access until an admin
+    # approves them.
+    if role == 'viewer' and sec is not None and not sec.viewer_approved:
+        role = 'pending'
 
     from django.conf import settings as _dj_settings
     import time as _time
@@ -399,6 +407,22 @@ def google_login_view(request):
     # Try to auto-link to a BGE profile if not already linked and not admin
     if not (user.is_staff or user.is_superuser):
         _try_auto_link_bge(user, google_name, email)
+
+    # Newly-created accounts that couldn't be linked to a BGE/cohort_admin
+    # profile fall back to 'viewer'. Only auto-approve that viewer access if
+    # the email domain is on the allowlist — otherwise the account is held
+    # in a pending-approval state with no data access until an admin approves.
+    if created and not (
+        user.is_staff or user.is_superuser
+        or hasattr(user, 'cohort_admin_profile')
+        or hasattr(user, 'bge_profile')
+    ):
+        from .models import UserSecurityProfile
+        domain = email.rsplit('@', 1)[-1].lower()
+        allowed_domains = getattr(settings, 'GOOGLE_LOGIN_ALLOWED_DOMAINS', [])
+        sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
+        sec.viewer_approved = domain in allowed_domains
+        sec.save(update_fields=['viewer_approved'])
 
     login(request, user)
     data = _build_user_response(user)

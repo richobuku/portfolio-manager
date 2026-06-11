@@ -24,6 +24,7 @@ from .models import (
     GroupReportAttendance, CohortAdmin, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
     TrainingFacilitationAssignment, TrainingReport, AnnualReviewReport,
     MentorTrainingReport, TshirtReceipt, TshirtReceiptEntry,
+    WorkOrderSubmission, WorkOrderPayment,
 )
 from .account_setup import ensure_bge_account, send_welcome_email
 
@@ -115,6 +116,7 @@ from .serializers import (
     VisitReportTemplateSerializer,
     GroupReportAttendanceSerializer, MSMEGrowthSnapshotSerializer,
     AnnualReviewReportSerializer, MentorTrainingReportSerializer,
+    WorkOrderSubmissionSerializer, WorkOrderPaymentSerializer,
 )
 
 
@@ -3032,7 +3034,7 @@ class BGEUserViewSet(viewsets.ViewSet):
     def list(self, request):
         if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
             raise PermissionDenied("Only admins can manage users.")
-        users = User.objects.filter(is_staff=False, is_superuser=False).select_related('bge_profile')
+        users = User.objects.filter(is_staff=False, is_superuser=False).select_related('bge_profile', 'security_profile')
         data = []
         for u in users:
             try:
@@ -3048,6 +3050,12 @@ class BGEUserViewSet(viewsets.ViewSet):
             except CohortAdmin.DoesNotExist:
                 managed_groups = []
                 role = 'bge' if bge_info else 'viewer'
+            try:
+                viewer_approved = u.security_profile.viewer_approved
+            except Exception:
+                viewer_approved = True
+            if role == 'viewer' and not viewer_approved:
+                role = 'pending'
             data.append({
                 'id': u.id,
                 'username': u.username,
@@ -3057,8 +3065,33 @@ class BGEUserViewSet(viewsets.ViewSet):
                 'bge_profile': bge_info,
                 'role': role,
                 'managed_groups': managed_groups,
+                'viewer_approved': viewer_approved,
             })
         return Response(data)
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        """Admin: approve a pending Google sign-in, granting it read-only viewer access."""
+        self._require_admin(request)
+        user, err = self._get_target_non_admin_user(pk, request)
+        if err is not None:
+            return err
+        from .models import UserSecurityProfile
+        sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
+        sec.viewer_approved = True
+        sec.save(update_fields=['viewer_approved'])
+        return Response({'message': f'{user.username} approved for viewer access.'})
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        """Admin: reject a pending Google sign-in, deactivating the account."""
+        self._require_admin(request)
+        user, err = self._get_target_non_admin_user(pk, request)
+        if err is not None:
+            return err
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+        return Response({'message': f'{user.username} rejected and deactivated.'})
 
     def create(self, request):
         self._require_admin(request)
@@ -4783,3 +4816,175 @@ class TshirtReceiptEntryViewSet(viewsets.ModelViewSet):
         entry.signed_at = timezone.now()
         entry.save(update_fields=update_fields)
         return Response(TshirtReceiptEntrySerializer(entry, context={'request': request}).data)
+
+
+class WorkOrderSubmissionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
+    """BGE timesheet & invoice (Excel) uploads against a work order.
+
+    BGEs upload for their own work orders (or work orders they're co-assigned
+    to). Admins/programme managers/viewers see everything, organised per BGE
+    via the ``?bge=`` filter, and can download any file.
+    """
+    serializer_class = WorkOrderSubmissionSerializer
+    permission_classes = [IsAuthenticated]
+
+    ALLOWED_EXTENSIONS = ('.xlsx', '.xls')
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+    def _is_admin(self):
+        u = self.request.user
+        return u.is_staff or u.is_superuser or _managed_groups(u) is not None
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = WorkOrderSubmission.objects.select_related('work_order', 'bge', 'uploaded_by')
+        bge_id = self.request.query_params.get('bge')
+        wo_id = self.request.query_params.get('work_order')
+        if self._is_admin() or _is_viewer(user):
+            if bge_id:
+                qs = qs.filter(bge_id=bge_id)
+            if wo_id:
+                qs = qs.filter(work_order_id=wo_id)
+            return qs
+        try:
+            bge = user.bge_profile
+        except Exception:
+            return qs.none()
+        qs = qs.filter(bge=bge)
+        if wo_id:
+            qs = qs.filter(work_order_id=wo_id)
+        return qs
+
+    def _validate_file(self, f, label):
+        if f is None:
+            return
+        name = (f.name or '').lower()
+        if not name.endswith(self.ALLOWED_EXTENSIONS):
+            raise ValidationError(f'{label} must be an Excel file (.xlsx or .xls).')
+        if f.size > self.MAX_FILE_SIZE:
+            raise ValidationError(f'{label} must be under 10 MB.')
+
+    def _resolve_bge(self, work_order):
+        user = self.request.user
+        if self._is_admin():
+            return work_order.bge
+        try:
+            bge = user.bge_profile
+        except Exception:
+            raise PermissionDenied("Only BGEs or admins can upload timesheets/invoices.")
+        if bge.id != work_order.bge_id and not work_order.co_bges.filter(id=bge.id).exists():
+            raise PermissionDenied("You can only upload documents for your own work orders.")
+        return bge
+
+    def _apply_files(self, instance, timesheet, invoice):
+        from django.core.files.base import ContentFile
+        update_fields = []
+        if timesheet:
+            data = timesheet.read()
+            instance.timesheet_data = data
+            instance.timesheet_filename = timesheet.name
+            instance.timesheet_file.save(timesheet.name, ContentFile(data), save=False)
+            update_fields += ['timesheet_data', 'timesheet_filename', 'timesheet_file']
+        if invoice:
+            data = invoice.read()
+            instance.invoice_data = data
+            instance.invoice_filename = invoice.name
+            instance.invoice_file.save(invoice.name, ContentFile(data), save=False)
+            update_fields += ['invoice_data', 'invoice_filename', 'invoice_file']
+        if update_fields:
+            instance.save(update_fields=update_fields)
+
+    def perform_create(self, serializer):
+        work_order = serializer.validated_data.get('work_order')
+        bge = self._resolve_bge(work_order)
+        timesheet = serializer.validated_data.pop('timesheet', None)
+        invoice = serializer.validated_data.pop('invoice', None)
+        self._validate_file(timesheet, 'Timesheet')
+        self._validate_file(invoice, 'Invoice')
+        if not timesheet and not invoice:
+            raise ValidationError("Upload at least a timesheet or an invoice file.")
+        instance = serializer.save(bge=bge, uploaded_by=self.request.user)
+        self._apply_files(instance, timesheet, invoice)
+
+    def _check_owner_or_admin(self, instance):
+        user = self.request.user
+        is_owner = hasattr(user, 'bge_profile') and user.bge_profile_id == instance.bge_id
+        if not (self._is_admin() or is_owner):
+            raise PermissionDenied("You can only manage your own submissions.")
+
+    def perform_update(self, serializer):
+        self._check_owner_or_admin(serializer.instance)
+        timesheet = serializer.validated_data.pop('timesheet', None)
+        invoice = serializer.validated_data.pop('invoice', None)
+        self._validate_file(timesheet, 'Timesheet')
+        self._validate_file(invoice, 'Invoice')
+        instance = serializer.save()
+        self._apply_files(instance, timesheet, invoice)
+
+    def destroy(self, request, *args, **kwargs):
+        self._check_owner_or_admin(self.get_object())
+        return super().destroy(request, *args, **kwargs)
+
+    def _serve_file(self, instance, kind):
+        data = getattr(instance, f'{kind}_data')
+        fname = getattr(instance, f'{kind}_filename') or f'{kind}.xlsx'
+        if not data:
+            return Response({'error': f'No {kind} uploaded for this submission.'}, status=status.HTTP_404_NOT_FOUND)
+        content_type = (
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            if fname.lower().endswith('.xlsx') else 'application/vnd.ms-excel'
+        )
+        resp = HttpResponse(bytes(data), content_type=content_type)
+        resp['Content-Disposition'] = f'attachment; filename="{fname}"'
+        return resp
+
+    @action(detail=True, methods=['get'], url_path='download-timesheet')
+    def download_timesheet(self, request, pk=None):
+        return self._serve_file(self.get_object(), 'timesheet')
+
+    @action(detail=True, methods=['get'], url_path='download-invoice')
+    def download_invoice(self, request, pk=None):
+        return self._serve_file(self.get_object(), 'invoice')
+
+
+class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
+    """Payment log against work orders.
+
+    Admins record/edit/delete payments. BGEs and viewers have read-only
+    access, scoped (for BGEs) to payments against their own work orders.
+    """
+    serializer_class = WorkOrderPaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def _is_admin(self):
+        u = self.request.user
+        return u.is_staff or u.is_superuser or _managed_groups(u) is not None
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = WorkOrderPayment.objects.select_related('work_order', 'work_order__bge', 'recorded_by')
+        wo_id = self.request.query_params.get('work_order')
+        if wo_id:
+            qs = qs.filter(work_order_id=wo_id)
+        if self._is_admin() or _is_viewer(user):
+            return qs
+        try:
+            bge = user.bge_profile
+        except Exception:
+            return qs.none()
+        return qs.filter(work_order__bge=bge)
+
+    def perform_create(self, serializer):
+        if not self._is_admin():
+            raise PermissionDenied("Only admins can record payments.")
+        serializer.save(recorded_by=self.request.user)
+
+    def perform_update(self, serializer):
+        if not self._is_admin():
+            raise PermissionDenied("Only admins can edit payments.")
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        if not self._is_admin():
+            raise PermissionDenied("Only admins can delete payments.")
+        return super().destroy(request, *args, **kwargs)

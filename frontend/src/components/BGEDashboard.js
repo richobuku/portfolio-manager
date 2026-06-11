@@ -13,11 +13,15 @@ import {
   Business, Add, Visibility, Menu as MenuIcon,
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
-  Delete, School, People,
+  Delete, School, People, CloudUpload,
   HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS, TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL } from '../config';
+import {
+  API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS,
+  TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL,
+  WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
+} from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
 import VisitReportForm from './VisitReportForm';
@@ -199,6 +203,15 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [woReview, setWoReview] = useState(null);       // WO being reviewed in dialog
   const [woSigning, setWoSigning] = useState(null);     // id of WO being signed
   const [woPdfBlob, setWoPdfBlob] = useState(null);     // blob URL for PDF preview
+
+  // Timesheet & invoice submissions
+  const [submissions, setSubmissions] = useState([]);
+  const [submissionWoId, setSubmissionWoId] = useState('');
+  const [timesheetFile, setTimesheetFile] = useState(null);
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [submissionUploading, setSubmissionUploading] = useState(false);
+  const timesheetInputRef = useRef(null);
+  const invoiceInputRef = useRef(null);
 
   // Signature upload
   const [sigFile, setSigFile] = useState(null);
@@ -462,6 +475,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchSubmissions = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDER_SUBMISSIONS, { headers: h });
+      setSubmissions(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // silent
+    }
+  }, [token]);
+
 
   const fetchSessions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -686,13 +709,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchGroups();
     fetchGroupReports();
     fetchWorkOrders();
+    fetchSubmissions();
     fetchSessions();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSessions, token]);
+  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchSessions, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -1063,6 +1087,63 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     if (woPdfBlob) URL.revokeObjectURL(woPdfBlob);
     setWoPdfBlob(null);
     setWoReview(null);
+  };
+
+  // ── timesheet & invoice submissions ─────────────────────────────────────────
+  const uploadSubmission = async () => {
+    if (!submissionWoId) { notify('Select a work order first', 'error'); return; }
+    if (!timesheetFile && !invoiceFile) { notify('Choose a timesheet and/or invoice file (.xlsx or .xls)', 'error'); return; }
+    setSubmissionUploading(true);
+    try {
+      const form = new FormData();
+      form.append('work_order', submissionWoId);
+      if (timesheetFile) form.append('timesheet', timesheetFile);
+      if (invoiceFile) form.append('invoice', invoiceFile);
+      await axios.post(API_ENDPOINTS.WORK_ORDER_SUBMISSIONS, form, {
+        headers: { ...headers, 'Content-Type': 'multipart/form-data' },
+      });
+      notify('Timesheet/invoice uploaded successfully');
+      setTimesheetFile(null);
+      setInvoiceFile(null);
+      if (timesheetInputRef.current) timesheetInputRef.current.value = '';
+      if (invoiceInputRef.current) invoiceInputRef.current.value = '';
+      fetchSubmissions();
+    } catch (err) {
+      const errData = err.response?.data;
+      const msg = errData?.error || errData?.detail ||
+        (typeof errData === 'object' ? Object.values(errData).flat()[0] : null) ||
+        'Failed to upload files';
+      notify(String(msg), 'error');
+    } finally {
+      setSubmissionUploading(false);
+    }
+  };
+
+  const deleteSubmission = async (sub) => {
+    if (!window.confirm('Delete this submission? This cannot be undone.')) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.WORK_ORDER_SUBMISSIONS}${sub.id}/`, { headers });
+      setSubmissions(prev => prev.filter(s => s.id !== sub.id));
+      notify('Submission deleted');
+    } catch {
+      notify('Failed to delete submission', 'error');
+    }
+  };
+
+  const downloadSubmissionFile = async (sub, kind) => {
+    const url = kind === 'timesheet' ? WORK_ORDER_SUBMISSION_TIMESHEET_URL(sub.id) : WORK_ORDER_SUBMISSION_INVOICE_URL(sub.id);
+    const filename = kind === 'timesheet' ? sub.timesheet_filename : sub.invoice_filename;
+    try {
+      const res = await axios.get(url, { headers, responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename || `${kind}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      notify(`Failed to download ${kind}`, 'error');
+    }
   };
 
   // ── sidebar ─────────────────────────────────────────────────────────────────
@@ -1788,6 +1869,108 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   )}
                 </Box>
               </Box>
+            </Card>
+
+            {/* Timesheet & invoice upload */}
+            <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} gutterBottom>Submit Timesheet & Invoice</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Upload your timesheet and/or invoice (Excel format only) against one of your work orders.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <FormControl size="small" sx={{ minWidth: 240 }}>
+                  <InputLabel>Work Order</InputLabel>
+                  <Select
+                    label="Work Order"
+                    value={submissionWoId}
+                    onChange={e => setSubmissionWoId(e.target.value)}
+                  >
+                    {workOrders.map(wo => (
+                      <MenuItem key={wo.id} value={wo.id}>{wo.work_order_number}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  ref={timesheetInputRef}
+                  style={{ display: 'none' }}
+                  onChange={e => setTimesheetFile(e.target.files[0] || null)}
+                />
+                <Button variant="outlined" size="small" startIcon={<CloudUpload />} onClick={() => timesheetInputRef.current?.click()}>
+                  {timesheetFile ? timesheetFile.name : 'Choose Timesheet'}
+                </Button>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  ref={invoiceInputRef}
+                  style={{ display: 'none' }}
+                  onChange={e => setInvoiceFile(e.target.files[0] || null)}
+                />
+                <Button variant="outlined" size="small" startIcon={<CloudUpload />} onClick={() => invoiceInputRef.current?.click()}>
+                  {invoiceFile ? invoiceFile.name : 'Choose Invoice'}
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={submissionUploading}
+                  onClick={uploadSubmission}
+                >
+                  {submissionUploading ? <CircularProgress size={14} color="inherit" /> : 'Upload'}
+                </Button>
+              </Box>
+
+              {submissions.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>My Submissions</Typography>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Work Order</TableCell>
+                          <TableCell>Submitted</TableCell>
+                          <TableCell>Timesheet</TableCell>
+                          <TableCell>Invoice</TableCell>
+                          <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {submissions.map(sub => (
+                          <TableRow key={sub.id}>
+                            <TableCell>{sub.work_order_number}</TableCell>
+                            <TableCell>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              {sub.has_timesheet ? (
+                                <Tooltip title={sub.timesheet_filename}>
+                                  <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'timesheet')}>
+                                    <Download fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                            </TableCell>
+                            <TableCell>
+                              {sub.has_invoice ? (
+                                <Tooltip title={sub.invoice_filename}>
+                                  <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'invoice')}>
+                                    <Download fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                            </TableCell>
+                            <TableCell align="right">
+                              <Tooltip title="Delete submission">
+                                <IconButton size="small" color="error" onClick={() => deleteSubmission(sub)}>
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
             </Card>
 
             <Box sx={{ mb: 2 }}>

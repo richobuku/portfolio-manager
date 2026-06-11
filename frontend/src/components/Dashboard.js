@@ -20,14 +20,14 @@ import {
   Lock, LockOpen, Star, StarBorder, Download, Undo,
   Campaign, Send as SendIcon, Checkroom, DrawOutlined,
   RotateLeft, RotateRight, Dashboard as DashboardIcon,
-  ArrowForward, TaskAlt,
+  ArrowForward, TaskAlt, Payments, Description,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -824,6 +824,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [woWithdrawDialog, setWoWithdrawDialog] = useState(false);
   const [woWithdrawTarget, setWoWithdrawTarget] = useState(null);
   const [woWithdrawReason, setWoWithdrawReason] = useState('');
+  const [woSubmissions, setWoSubmissions] = useState([]);
+  const [woPayments, setWoPayments] = useState([]);
+  const [woPaymentForms, setWoPaymentForms] = useState({});   // { [workOrderId]: { amount, payment_date, reference, notes } }
+  const [woPaymentSaving, setWoPaymentSaving] = useState(null);
 
   // ── filters ────────────────────────────────────────────────────────────────
   const [msmeSearch, setMsmeSearch] = useState('');
@@ -1045,6 +1049,33 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   }, [token, woFilterBge, woFilterStatus, woFilterType]);
 
   useEffect(() => { fetchWorkOrders(); }, [fetchWorkOrders]);
+
+  const fetchWoSubmissions = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDER_SUBMISSIONS, { headers: h });
+      setWoSubmissions(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      setWoSubmissions([]);
+    }
+  }, [token]);
+
+  const fetchWoPayments = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDER_PAYMENTS, { headers: h });
+      setWoPayments(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      setWoPayments([]);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (section === 'workorders') {
+      fetchWoSubmissions();
+      fetchWoPayments();
+    }
+  }, [section, fetchWoSubmissions, fetchWoPayments]);
 
   const fetchTshirtReceipts = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -1801,6 +1832,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify(`${user.username} ${user.is_active ? 'deactivated' : 'activated'}`);
       fetchAll();
     } catch { notify('Failed to update user', 'error'); }
+  };
+
+  const approveUser = async (user) => {
+    try {
+      await axios.post(`${API_ENDPOINTS.BGE_USERS}${user.id}/approve/`, {}, { headers });
+      notify(`${user.username} approved for viewer access.`);
+      fetchAll();
+    } catch (e) { notify(e.response?.data?.error || 'Failed to approve user', 'error'); }
+  };
+
+  const rejectUser = async (user) => {
+    if (!window.confirm(`Reject and deactivate ${user.username}? They will not be able to sign in.`)) return;
+    try {
+      await axios.post(`${API_ENDPOINTS.BGE_USERS}${user.id}/reject/`, {}, { headers });
+      notify(`${user.username} rejected and deactivated.`);
+      fetchAll();
+    } catch (e) { notify(e.response?.data?.error || 'Failed to reject user', 'error'); }
   };
 
   const unlinkBGE = async (userId) => {
@@ -4789,7 +4837,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     );
   };
 
-  const renderUsers = () => (
+  const renderUsers = () => {
+    const pendingUsers = bgeUsers.filter(u => u.role === 'pending');
+    return (
     <Box>
       <SectionHeader title="User Accounts" subtitle={`${bgeUsers.length} account${bgeUsers.length !== 1 ? 's' : ''} — BGEs, Programme Managers, Viewers`}>
         {experts.some(e => !bgeUsers.some(u => u.bge_profile?.id === e.id)) && (
@@ -4801,6 +4851,31 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           Create Account
         </Button>
       </SectionHeader>
+
+      {pendingUsers.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography fontWeight={700} sx={{ mb: 1 }}>
+            {pendingUsers.length} account{pendingUsers.length !== 1 ? 's' : ''} awaiting approval
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1.5 }}>
+            These signed in with Google but aren't linked to a BGE/Programme Manager profile and have no data access until approved.
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {pendingUsers.map(u => (
+              <Box key={u.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography fontSize={13} fontWeight={600}>{u.username}</Typography>
+                <Typography fontSize={13} color="text.secondary">{u.email}</Typography>
+                <Button size="small" variant="contained" color="success" onClick={() => approveUser(u)}>
+                  Approve as Viewer
+                </Button>
+                <Button size="small" variant="outlined" color="error" onClick={() => rejectUser(u)}>
+                  Reject
+                </Button>
+              </Box>
+            ))}
+          </Box>
+        </Alert>
+      )}
 
       <Alert severity="info" sx={{ mb: 2 }}>
         Create and manage login accounts for all users. <strong>BGE</strong> accounts are linked to an expert profile and see only their assigned MSMEs. <strong>Programme Managers</strong> see all MSMEs in their assigned groups. <strong>Viewers</strong> have read-only access to everything. Use the <ManageAccounts sx={{ fontSize: 14, verticalAlign: 'middle' }} /> icon on any row to change a user's role.
@@ -4855,6 +4930,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       ) : u.role === 'bge' ? (
                         <Chip label="BGE" size="small" color="success" variant="outlined"
                           onClick={() => openRoleDialog(u)} sx={{ cursor: 'pointer' }} />
+                      ) : u.role === 'pending' ? (
+                        <Chip label="Pending Approval" size="small" color="warning" />
                       ) : (
                         <Chip label="Viewer" size="small" color="default" variant="outlined"
                           onClick={() => openRoleDialog(u)} sx={{ cursor: 'pointer' }} />
@@ -4901,7 +4978,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </TableContainer>
       )}
     </Box>
-  );
+    );
+  };
 
   const REPORT_STATUS_COLORS = { draft: 'default', submitted: 'primary', reviewed: 'success' };
   const VISIT_LABELS = { initial: 'Initial', followup: 'Follow-up', final: 'Final', training: 'Training', mentoring: 'Mentoring' };
@@ -5966,6 +6044,66 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } catch { notify('Failed to download PDF', 'error'); }
   };
 
+  const downloadSubmissionFile = async (sub, kind) => {
+    const url = kind === 'timesheet' ? WORK_ORDER_SUBMISSION_TIMESHEET_URL(sub.id) : WORK_ORDER_SUBMISSION_INVOICE_URL(sub.id);
+    const filename = kind === 'timesheet' ? sub.timesheet_filename : sub.invoice_filename;
+    try {
+      const res = await axios.get(url, { headers, responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename || `${kind}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      notify(`Failed to download ${kind}`, 'error');
+    }
+  };
+
+  const setWoPaymentField = (woId, field, value) => {
+    setWoPaymentForms(prev => ({ ...prev, [woId]: { ...prev[woId], [field]: value } }));
+  };
+
+  const addWoPayment = async (wo) => {
+    const form = woPaymentForms[wo.id] || {};
+    if (!form.amount || !form.payment_date) {
+      notify('Enter an amount and payment date', 'error');
+      return;
+    }
+    setWoPaymentSaving(wo.id);
+    try {
+      await axios.post(API_ENDPOINTS.WORK_ORDER_PAYMENTS, {
+        work_order: wo.id,
+        amount: form.amount,
+        payment_date: form.payment_date,
+        reference: form.reference || '',
+        notes: form.notes || '',
+      }, { headers });
+      notify('Payment recorded');
+      setWoPaymentForms(prev => ({ ...prev, [wo.id]: { amount: '', payment_date: '', reference: '', notes: '' } }));
+      fetchWoPayments();
+    } catch (err) {
+      const errData = err.response?.data;
+      const msg = errData?.error || errData?.detail ||
+        (typeof errData === 'object' ? Object.values(errData).flat()[0] : null) ||
+        'Failed to record payment';
+      notify(String(msg), 'error');
+    } finally {
+      setWoPaymentSaving(null);
+    }
+  };
+
+  const deleteWoPayment = async (payment) => {
+    if (!window.confirm('Delete this payment record?')) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.WORK_ORDER_PAYMENTS}${payment.id}/`, { headers });
+      setWoPayments(prev => prev.filter(p => p.id !== payment.id));
+      notify('Payment deleted');
+    } catch {
+      notify('Failed to delete payment', 'error');
+    }
+  };
+
   const renderWorkOrders = () => (
     <Box>
       <SectionHeader title="Work Orders" subtitle={`${workOrders.length} work orders`}>
@@ -6114,6 +6252,151 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     Net: <strong>UGX {(wo.rate_per_day * wo.max_days * 0.94).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
                   </Typography>
                 </Box>
+
+                {(() => {
+                  const subs = woSubmissions.filter(s => s.work_order === wo.id);
+                  const payments = woPayments.filter(p => p.work_order === wo.id);
+                  const amountDue = Number(wo.amount_due || 0);
+                  const totalPaid = Number(wo.total_paid || 0);
+                  const outstanding = Number(wo.outstanding ?? (amountDue - totalPaid));
+                  const pf = woPaymentForms[wo.id] || {};
+                  return (
+                    <Accordion variant="outlined" sx={{ mt: 1.5 }} disableGutters>
+                      <AccordionSummary expandIcon={<ExpandMore />}>
+                        <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Typography variant="caption" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Description fontSize="inherit" /> {subs.length} submission{subs.length !== 1 ? 's' : ''}
+                          </Typography>
+                          <Typography variant="caption" fontWeight={700} color={outstanding > 0 ? 'warning.main' : 'success.main'}
+                            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Payments fontSize="inherit" />
+                            Paid UGX {totalPaid.toLocaleString()} of {amountDue.toLocaleString()}
+                            {outstanding > 0 ? ` · UGX ${outstanding.toLocaleString()} outstanding` : ' · fully paid'}
+                          </Typography>
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        {/* Timesheet & invoice submissions */}
+                        <Typography variant="subtitle2" fontWeight={700} gutterBottom>Timesheets & Invoices</Typography>
+                        {subs.length === 0 ? (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            No submissions from {wo.bge_name} yet.
+                          </Typography>
+                        ) : (
+                          <TableContainer sx={{ mb: 2 }}>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Submitted</TableCell>
+                                  <TableCell>Timesheet</TableCell>
+                                  <TableCell>Invoice</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {subs.map(sub => (
+                                  <TableRow key={sub.id}>
+                                    <TableCell>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
+                                    <TableCell>
+                                      {sub.has_timesheet ? (
+                                        <Tooltip title={sub.timesheet_filename}>
+                                          <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'timesheet')}>
+                                            <Download fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                                    </TableCell>
+                                    <TableCell>
+                                      {sub.has_invoice ? (
+                                        <Tooltip title={sub.invoice_filename}>
+                                          <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'invoice')}>
+                                            <Download fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        )}
+
+                        {/* Payment log */}
+                        <Typography variant="subtitle2" fontWeight={700} gutterBottom>Payment Log</Typography>
+                        {payments.length > 0 && (
+                          <TableContainer sx={{ mb: 1.5 }}>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Date</TableCell>
+                                  <TableCell align="right">Amount (UGX)</TableCell>
+                                  <TableCell>Reference</TableCell>
+                                  <TableCell>Notes</TableCell>
+                                  <TableCell>Recorded by</TableCell>
+                                  <TableCell align="right">Actions</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {payments.map(p => (
+                                  <TableRow key={p.id}>
+                                    <TableCell>{p.payment_date}</TableCell>
+                                    <TableCell align="right">{Number(p.amount).toLocaleString()}</TableCell>
+                                    <TableCell>{p.reference || '—'}</TableCell>
+                                    <TableCell>{p.notes || '—'}</TableCell>
+                                    <TableCell>{p.recorded_by_name || '—'}</TableCell>
+                                    <TableCell align="right">
+                                      <Tooltip title="Delete payment">
+                                        <IconButton size="small" color="error" onClick={() => deleteWoPayment(p)}>
+                                          <Delete fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        )}
+
+                        {/* Add payment */}
+                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <TextField
+                            size="small" type="date" label="Date" InputLabelProps={{ shrink: true }}
+                            value={pf.payment_date || ''}
+                            onChange={e => setWoPaymentField(wo.id, 'payment_date', e.target.value)}
+                            sx={{ width: 160 }}
+                          />
+                          <TextField
+                            size="small" type="number" label="Amount (UGX)"
+                            value={pf.amount || ''}
+                            onChange={e => setWoPaymentField(wo.id, 'amount', e.target.value)}
+                            sx={{ width: 150 }}
+                          />
+                          <TextField
+                            size="small" label="Reference"
+                            value={pf.reference || ''}
+                            onChange={e => setWoPaymentField(wo.id, 'reference', e.target.value)}
+                            sx={{ width: 180 }}
+                          />
+                          <TextField
+                            size="small" label="Notes"
+                            value={pf.notes || ''}
+                            onChange={e => setWoPaymentField(wo.id, 'notes', e.target.value)}
+                            sx={{ flex: '1 1 200px' }}
+                          />
+                          <Button
+                            variant="contained" size="small"
+                            startIcon={woPaymentSaving === wo.id ? <CircularProgress size={14} color="inherit" /> : <Add />}
+                            disabled={woPaymentSaving === wo.id}
+                            onClick={() => addWoPayment(wo)}
+                          >
+                            Add Payment
+                          </Button>
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  );
+                })()}
               </CardContent>
             </Card>
           ))}

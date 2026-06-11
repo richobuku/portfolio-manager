@@ -10,6 +10,7 @@ from .api_views import (
     VisitReportTemplateViewSet, TrainingFacilitationAssignmentViewSet,
     TrainingReportViewSet, AnnualReviewReportViewSet, MentorTrainingReportViewSet,
     TshirtReceiptViewSet, TshirtReceiptEntryViewSet,
+    WorkOrderSubmissionViewSet, WorkOrderPaymentViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
     bulk_email_view, bulk_email_log_view,
     bulk_sms_view, bulk_sms_log_view, bulk_sms_balance_view, db_backup_view,
@@ -40,6 +41,8 @@ router.register(r'group-report-contributions', GroupReportContributionViewSet, b
 router.register(r'group-report-attendance', GroupReportAttendanceViewSet, basename='group-report-attendance')
 router.register(r'bge-users', BGEUserViewSet, basename='bge-user')
 router.register(r'work-orders', WorkOrderViewSet, basename='work-order')
+router.register(r'work-order-submissions', WorkOrderSubmissionViewSet, basename='work-order-submission')
+router.register(r'work-order-payments', WorkOrderPaymentViewSet, basename='work-order-payment')
 router.register(r'visit-templates', VisitReportTemplateViewSet, basename='visit-template')
 router.register(r'facilitation-assignments', TrainingFacilitationAssignmentViewSet, basename='facilitation-assignment')
 router.register(r'training-reports', TrainingReportViewSet, basename='training-report')

@@ -1253,6 +1253,10 @@ class UserSecurityProfile(models.Model):
         help_text='Force password change on next login (set on account creation).')
     password_last_changed = models.DateTimeField(null=True, blank=True,
         help_text='Set whenever the user successfully changes their password.')
+    viewer_approved = models.BooleanField(default=True,
+        help_text='False = account is pending admin approval and has no data access. '
+                   'Set to False automatically for Google sign-ins outside the allowed domain '
+                   'list that could not be linked to a BGE/programme-manager profile.')
 
     class Meta:
         verbose_name = 'User Security Profile'
@@ -1309,3 +1313,71 @@ class TshirtReceiptEntry(models.Model):
     def __str__(self):
         status = "✓" if self.signed else "○"
         return f"{status} {self.bge.name} — {self.size} x{self.quantity}"
+
+
+# ── Work Order Timesheet & Invoice Submissions ────────────────────────────
+
+class WorkOrderSubmission(models.Model):
+    """A BGE-uploaded timesheet and/or invoice (Excel) for a specific work order.
+
+    Files are stored both on the filesystem and as raw bytes in the DB
+    (mirroring the signed_pdf/signed_pdf_data pattern) so they survive
+    Render filesystem wipes.
+    """
+    work_order = models.ForeignKey(
+        'WorkOrder', on_delete=models.CASCADE, related_name='submissions'
+    )
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.CASCADE, related_name='work_order_submissions'
+    )
+
+    timesheet_file     = models.FileField(upload_to='work_orders/timesheets/', null=True, blank=True)
+    timesheet_data     = models.BinaryField(null=True, blank=True)
+    timesheet_filename = models.CharField(max_length=255, blank=True)
+
+    invoice_file     = models.FileField(upload_to='work_orders/invoices/', null=True, blank=True)
+    invoice_data     = models.BinaryField(null=True, blank=True)
+    invoice_filename = models.CharField(max_length=255, blank=True)
+
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='work_order_submissions',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Timesheet & Invoice Submission"
+        verbose_name_plural = "Timesheet & Invoice Submissions"
+
+    def __str__(self):
+        return f"{self.bge.name} — {self.work_order.work_order_number} ({self.created_at:%Y-%m-%d})"
+
+
+# ── Work Order Payment Tracking ────────────────────────────────────────────
+
+class WorkOrderPayment(models.Model):
+    """A single payment made against a work order. Multiple entries per
+    work order form a running payment log/audit trail."""
+    work_order = models.ForeignKey(
+        'WorkOrder', on_delete=models.CASCADE, related_name='payments'
+    )
+    amount       = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_date = models.DateField()
+    reference    = models.CharField(max_length=200, blank=True,
+        help_text='Bank/mobile money transaction reference, cheque number, etc.')
+    notes        = models.TextField(blank=True)
+    recorded_by  = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='recorded_work_order_payments',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-payment_date', '-created_at']
+        verbose_name = "Work Order Payment"
+        verbose_name_plural = "Work Order Payments"
+
+    def __str__(self):
+        return f"{self.work_order.work_order_number} — UGX {self.amount:,.0f} on {self.payment_date}"

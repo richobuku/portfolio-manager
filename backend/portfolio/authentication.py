@@ -107,4 +107,20 @@ class SimpleTokenAuthentication(BaseAuthentication):
         if not user.is_active:
             raise AuthenticationFailed("User inactive.")
 
+        if _is_pending_approval(user):
+            raise AuthenticationFailed("Your account is pending administrator approval.")
+
         return (user, token)
+
+
+def _is_pending_approval(user):
+    """True for accounts awaiting admin approval (no BGE/programme-manager
+    role and not yet approved as a viewer) — blocked from all API access."""
+    if user.is_staff or user.is_superuser:
+        return False
+    if hasattr(user, 'cohort_admin_profile') or hasattr(user, 'bge_profile'):
+        return False
+    try:
+        return not user.security_profile.viewer_approved
+    except Exception:
+        return False

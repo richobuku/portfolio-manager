@@ -74,6 +74,39 @@ function PasswordChangeModal({ token, onSuccess }) {
   );
 }
 
+// ── Pending account approval screen ──────────────────────────────────────────
+function PendingApproval({ currentUser, onLogout }) {
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#f5f6fa', fontFamily: 'system-ui, sans-serif', padding: 24,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 10, padding: '36px 32px', maxWidth: 440,
+        width: '100%', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+        <h2 style={{ margin: '0 0 8px', color: '#1A2F4B' }}>Account Pending Approval</h2>
+        <p style={{ color: '#555', lineHeight: 1.6, margin: '0 0 4px' }}>
+          Your account ({currentUser?.email || currentUser?.username}) signed in successfully,
+          but an administrator needs to approve access before you can view programme data.
+        </p>
+        <p style={{ color: '#777', fontSize: 13, lineHeight: 1.6, margin: '12px 0 20px' }}>
+          You'll be able to sign in normally once your account has been approved. Please check
+          back later or contact your programme administrator.
+        </p>
+        <button
+          onClick={() => onLogout()}
+          style={{ background: '#C8102E', color: '#fff', border: 'none', borderRadius: 6,
+            padding: '10px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -173,15 +206,16 @@ export default function App() {
                      currentUser?.role === 'cohort_admin' ||
                      currentUser?.role === 'viewer');
   const isBGE   = !!(currentUser?.role === 'bge');
+  const isPending = currentUser?.role === 'pending';
 
   // If token exists but user role is unrecognised, clear (in an effect, not the
   // render body — mutating storage during render causes a stale read on the
   // very same render and was previously leaving the app in a half-logged-in state).
   useEffect(() => {
-    if (token && currentUser && !isAdmin && !isBGE) {
+    if (token && currentUser && !isAdmin && !isBGE && !isPending) {
       handleLogout();
     }
-  }, [token, currentUser, isAdmin, isBGE, handleLogout]);
+  }, [token, currentUser, isAdmin, isBGE, isPending, handleLogout]);
 
   // Global 401 interceptor — expired/revoked token → clear session + login
   useEffect(() => {
@@ -206,7 +240,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/login" element={
-            (token && (isAdmin || isBGE))
+            (token && (isAdmin || isBGE || isPending))
               ? <Navigate to="/dashboard" replace />
               : <Login onLogin={handleLogin} sessionExpired={sessionExpired} />
           } />
@@ -220,11 +254,13 @@ export default function App() {
               <ErrorBoundary>
                 <BGEDashboard token={token} currentUser={currentUser} onLogout={handleLogout} />
               </ErrorBoundary>
+            ) : isPending ? (
+              <PendingApproval currentUser={currentUser} onLogout={handleLogout} />
             ) : <Navigate to="/login" replace />
           } />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
-          <Route path="*" element={<Navigate to={(token && (isAdmin || isBGE)) ? '/dashboard' : '/login'} replace />} />
+          <Route path="*" element={<Navigate to={(token && (isAdmin || isBGE || isPending)) ? '/dashboard' : '/login'} replace />} />
         </Routes>
         <PWAInstallPrompt />
       </Router>

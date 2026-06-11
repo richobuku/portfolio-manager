@@ -253,6 +253,16 @@ CORS_ALLOWED_ORIGINS = [
 # Expose as a proper settings attribute so auth_views can use it
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://bds.glowi.africa')
 
+# ── Google sign-in domain allowlist ──────────────────────────────────────────
+# Comma-separated list of email domains (e.g. "gopa.eu,giz.de") that are
+# automatically granted read-only 'viewer' access on first Google sign-in.
+# New Google sign-ins from any other domain that cannot be auto-linked to a
+# BGE/programme-manager profile are created with viewer_approved=False and
+# must be approved by an admin before they can access any data.
+GOOGLE_LOGIN_ALLOWED_DOMAINS = [
+    d.strip().lower() for d in os.environ.get('GOOGLE_LOGIN_ALLOWED_DOMAINS', '').split(',') if d.strip()
+]
+
 # Add canonical frontend URL to CORS allow-list
 if FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
