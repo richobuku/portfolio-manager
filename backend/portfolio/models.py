@@ -423,6 +423,10 @@ class BusinessGrowthExpert(models.Model):
     # Signature bytes stored in DB — survives filesystem wipes on Render deploys.
     signature_data = models.BinaryField(null=True, blank=True)
     is_senior = models.BooleanField(default=False, help_text='Designate as Senior BGE (can be assigned training facilitation)')
+    allow_concurrent_work_orders = models.BooleanField(
+        default=False,
+        help_text='Allow this BGE to have multiple work orders with overlapping date ranges.'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

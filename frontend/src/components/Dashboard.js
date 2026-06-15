@@ -492,6 +492,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   React.useEffect(() => {
     const { bge, start_date, end_date } = woForm;
     if (!bge || !start_date || !end_date) { setWoConflict(null); return; }
+    if (experts.find(e => e.id === bge)?.allow_concurrent_work_orders) { setWoConflict(null); return; }
     let cancelled = false;
     axios.get(API_ENDPOINTS.WORK_ORDERS, {
       headers,

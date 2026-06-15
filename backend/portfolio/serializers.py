@@ -160,7 +160,7 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
     # Fields only an admin (staff/superuser) may set — a BGE editing their own
     # profile must not be able to self-approve, promote themselves to senior,
     # change their BGE code, or relink the account.
-    ADMIN_ONLY_FIELDS = ('status', 'user', 'is_senior', 'bge_code')
+    ADMIN_ONLY_FIELDS = ('status', 'user', 'is_senior', 'bge_code', 'allow_concurrent_work_orders')
 
     def update(self, instance, validated_data):
         request = self.context.get('request')

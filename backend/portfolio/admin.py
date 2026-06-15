@@ -108,9 +108,9 @@ class MSMEAdmin(admin.ModelAdmin):
 
 @admin.register(BusinessGrowthExpert)
 class BusinessGrowthExpertAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'email', 'phone', 'location', 'status', 'is_senior', 'years_of_experience', 'created_at')
+    list_display = ('name', 'user', 'email', 'phone', 'location', 'status', 'is_senior', 'allow_concurrent_work_orders', 'years_of_experience', 'created_at')
     search_fields = ('name', 'email', 'location', 'user__username')
-    list_filter = ('status', 'is_senior', 'location')
+    list_filter = ('status', 'is_senior', 'allow_concurrent_work_orders', 'location')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('user',)
 

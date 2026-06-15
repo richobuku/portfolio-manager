@@ -2447,19 +2447,33 @@ class AttendanceViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             for wid in wos:
                 wo_to_sessions.setdefault(wid, set()).add(sid)
 
-        rep_by_bge = {}
-        for item in rep_qs.values('bge_id', 'msme_id'):
-            bid = item['bge_id']
-            if bid not in rep_by_bge:
-                rep_by_bge[bid] = {'count': 0, 'msmes': set()}
-            rep_by_bge[bid]['count'] += 1
-            rep_by_bge[bid]['msmes'].add(item['msme_id'])
+        # Reports per BGE with their visit dates. A BGE may have multiple work
+        # orders (possibly overlapping), so each report is attributed to a work
+        # order based on whether its visit_date falls within that order's
+        # start_date/end_date — rather than counting it against every work
+        # order the BGE has.
+        rep_rows_by_bge = {}
+        for item in rep_qs.values('bge_id', 'msme_id', 'visit_date'):
+            rep_rows_by_bge.setdefault(item['bge_id'], []).append(item)
+
+        def _in_range(visit_date, start, end):
+            if not visit_date:
+                return False
+            if start and visit_date < start:
+                return False
+            if end and visit_date > end:
+                return False
+            return True
 
         wo_data = []
         for wo in WorkOrder.objects.select_related('bge').order_by('-issue_date'):
             wo_sids = wo_to_sessions.get(wo.id, set())
             w_rows  = [r for r in att_rows if r['session_id'] in wo_sids]
-            w_rep   = rep_by_bge.get(wo.bge_id, {'count': 0, 'msmes': set()})
+            w_rep_items = [
+                r for r in rep_rows_by_bge.get(wo.bge_id, [])
+                if _in_range(r['visit_date'], wo.start_date, wo.end_date)
+            ]
+            w_rep = {'count': len(w_rep_items), 'msmes': {r['msme_id'] for r in w_rep_items}}
             if not w_rows and not w_rep['count']:
                 continue
             row = _dem_rows(w_rows)
@@ -3559,6 +3573,10 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
 
     def _check_date_overlap(self, bge_id, start_date, end_date, exclude_id=None):
         if not bge_id or not start_date or not end_date:
+            return
+        if BusinessGrowthExpert.objects.filter(
+            pk=bge_id, allow_concurrent_work_orders=True
+        ).exists():
             return
         qs = WorkOrder.objects.filter(
             bge_id=bge_id,
