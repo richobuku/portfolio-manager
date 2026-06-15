@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('portfolio', '0071_usersecurityprofile_email_verified'),
+        ('portfolio', '0070_workorderpayment_confirmed_at_and_more'),
     ]
 
     operations = [
