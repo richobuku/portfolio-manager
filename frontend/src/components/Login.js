@@ -17,6 +17,9 @@ export default function Login({ onLogin, sessionExpired }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailUnverified, setEmailUnverified] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendInfo, setResendInfo] = useState('');
 
   // Forgot password dialog
   const [resetOpen, setResetOpen] = useState(false);
@@ -32,6 +35,8 @@ export default function Login({ onLogin, sessionExpired }) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setEmailUnverified(false);
+    setResendInfo('');
     try {
       const res = await axios.post(API_ENDPOINTS.LOGIN, credentials);
       if (res.data.token) {
@@ -41,8 +46,22 @@ export default function Login({ onLogin, sessionExpired }) {
       }
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.error || 'Invalid username or password.');
+      setEmailUnverified(!!err.response?.data?.email_unverified);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    setResendInfo('');
+    try {
+      const res = await axios.post(API_ENDPOINTS.RESEND_VERIFICATION, { email: credentials.username });
+      setResendInfo(res.data.message || 'If that email belongs to an unverified account, a new verification link has been sent.');
+    } catch {
+      setResendInfo('Something went wrong. Please try again.');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -146,6 +165,20 @@ export default function Login({ onLogin, sessionExpired }) {
                 </Alert>
               )}
               {error && <Alert severity="error" sx={{ mb: 2, py: 0.5 }}>{error}</Alert>}
+              {emailUnverified && (
+                <Box sx={{ mb: 2 }}>
+                  {resendInfo ? (
+                    <Alert severity="success" sx={{ py: 0.5 }}>{resendInfo}</Alert>
+                  ) : (
+                    <Button
+                      size="small" onClick={handleResendVerification} disabled={resendLoading}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      {resendLoading ? <CircularProgress size={16} color="inherit" /> : 'Resend verification email'}
+                    </Button>
+                  )}
+                </Box>
+              )}
               <Button
                 type="submit" fullWidth variant="contained" size="large"
                 disabled={loading}

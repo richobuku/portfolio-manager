@@ -1261,6 +1261,11 @@ class UserSecurityProfile(models.Model):
         help_text='False = account is pending admin approval and has no data access. '
                    'Set to False automatically for Google sign-ins outside the allowed domain '
                    'list that could not be linked to a BGE/programme-manager profile.')
+    email_verified = models.BooleanField(default=True,
+        help_text='False = account was created with an unverified email and cannot log in '
+                   'until the user clicks the verification link sent to their inbox. '
+                   'Defaults to True for accounts that pre-date this feature and for '
+                   'Google sign-ins (Google already verifies the email address).')
 
     class Meta:
         verbose_name = 'User Security Profile'

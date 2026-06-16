@@ -175,21 +175,23 @@ REST_FRAMEWORK = {
         'user': '2000/day',       # authenticated users — normal usage ceiling
         'login': '10/minute',     # brute-force protection on login endpoint
         'password_reset': '5/hour', # prevent password-reset token enumeration
+        'email_verification': '5/hour', # prevent verification-link enumeration/spam
     },
 }
 
-# ── Email Configuration (Gmail SMTP) ─────────────────────────────────────────
-# Sends via richobuku@gmail.com using a Google App Password.
+# ── Email Configuration (Zoho Mail SMTP) ─────────────────────────────────────
+# Sends via a Zoho Mail account using a Zoho App Password
+# (Zoho Mail → Settings → Security → App Passwords).
 # Reply-To is set to richard.obuku@gopa.eu so replies land in the official inbox.
-GMAIL_HOST_USER   = os.environ.get('GMAIL_HOST_USER',   'richobuku@gmail.com')
-GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
+ZOHO_HOST_USER    = os.environ.get('ZOHO_HOST_USER',    'noreply@smartvet.africa')
+ZOHO_APP_PASSWORD = os.environ.get('ZOHO_APP_PASSWORD', '')
 EMAIL_REPLY_TO    = os.environ.get('EMAIL_REPLY_TO',    'richard.obuku@gopa.eu')
 
 # GOPA AFC expert who endorses printed visit reports
 REPORT_ENDORSER_NAME     = os.environ.get('REPORT_ENDORSER_NAME',     'Stephen Maxi Opwonya')
 REPORT_ENDORSER_POSITION = os.environ.get('REPORT_ENDORSER_POSITION', 'Team Leader, PRUDEV II — GOPA AFC')
 
-if GMAIL_APP_PASSWORD:
+if ZOHO_APP_PASSWORD:
     # Properly configured — use SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 elif DEBUG:
@@ -202,18 +204,18 @@ else:
     # and log a loud startup warning so the misconfiguration is visible.
     import logging as _logging
     _logging.getLogger(__name__).error(
-        "GMAIL_APP_PASSWORD is not set in production. Email sending will fail "
+        "ZOHO_APP_PASSWORD is not set in production. Email sending will fail "
         "with an authentication error until this environment variable is "
         "configured on the host."
     )
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-EMAIL_HOST        = 'smtp.gmail.com'
+EMAIL_HOST        = 'smtp.zoho.com'
 EMAIL_PORT        = 587
 EMAIL_USE_TLS     = True
-EMAIL_HOST_USER   = GMAIL_HOST_USER
-EMAIL_HOST_PASSWORD = GMAIL_APP_PASSWORD
-DEFAULT_FROM_EMAIL  = f'PRUDEV II BDS Team <{GMAIL_HOST_USER}>'
+EMAIL_HOST_USER   = ZOHO_HOST_USER
+EMAIL_HOST_PASSWORD = ZOHO_APP_PASSWORD
+DEFAULT_FROM_EMAIL  = f'PRUDEV II BDS Team <{ZOHO_HOST_USER}>'
 
 EMAIL_TIMEOUT      = 30
 EMAIL_FAIL_SILENTLY = False
