@@ -266,84 +266,6 @@ def send_welcome_email(bge, username, password):
         return False
 
 
-def send_verification_email(user):
-    """Best-effort 'verify your email' message for a newly-created account.
-
-    Failures are logged, never raised, so a misconfigured email backend
-    can't block account provisioning.
-    """
-    if not user.email:
-        log.info("Skipped verification email for user #%s — no email address.", user.id)
-        return False
-
-    from django.utils.http import urlsafe_base64_encode
-    from django.utils.encoding import force_bytes
-    # Deferred import: auth_views imports send_verification_email from this
-    # module inside resend_verification_view, so importing it back here at
-    # module load time would create a circular import.
-    from .auth_views import _verify_token_gen
-
-    frontend_url = getattr(settings, 'FRONTEND_URL', 'https://bds.glowi.africa').rstrip('/')
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-    token = _verify_token_gen.make_token(user)
-    verify_url = f"{frontend_url}/verify-email?uid={uid}&token={token}"
-
-    name = (user.first_name or user.username or '').strip() or 'there'
-    subject = 'Verify your email address — PRUDEV II BDS Portal'
-    text = f"""\
-Hello {name},
-
-Please confirm your email address to activate your PRUDEV II BDS Portal account.
-
-  {verify_url}
-
-If you didn't request this account, you can ignore this email.
-
-— PRUDEV II BDS Team · GIZ · GOPA AFC
-"""
-    html = f"""\
-<div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;background:#f5f5f5;">
-  <div style="background:#1A2F4B;padding:24px;border-bottom:3px solid #C8102E;">
-    <div style="color:#fff;font-weight:800;font-size:22px;letter-spacing:-0.3px;">PRUDEV II</div>
-    <div style="color:rgba(255,255,255,0.7);font-size:12px;">MSME Portfolio Management</div>
-  </div>
-  <div style="background:#fff;padding:30px 24px;">
-    <h2 style="color:#1A2F4B;margin-top:0;">Verify your email, {name}</h2>
-    <p style="color:#374151;line-height:1.55;">
-      Please confirm your email address to activate your PRUDEV II BDS Portal account.
-      You won't be able to sign in until it's verified.
-    </p>
-    <a href="{verify_url}" style="display:inline-block;background:#C8102E;color:#fff;
-       text-decoration:none;font-weight:700;padding:12px 24px;border-radius:6px;margin-top:8px;">
-      Verify Email Address →
-    </a>
-    <p style="color:#6b7280;font-size:13px;line-height:1.55;margin-top:24px;">
-      If you didn't request this account, you can safely ignore this email.
-    </p>
-  </div>
-  <div style="text-align:center;color:#9ca3af;font-size:11px;padding:14px;">
-    PRUDEV II BDS Team · GIZ · GOPA AFC
-  </div>
-</div>"""
-
-    try:
-        reply_to = [getattr(settings, 'EMAIL_REPLY_TO', '')] if getattr(settings, 'EMAIL_REPLY_TO', '') else None
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=text,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user.email],
-            reply_to=reply_to,
-        )
-        msg.attach_alternative(html, 'text/html')
-        msg.send(fail_silently=False)
-        log.info("Verification email sent to %s for user #%s", user.email, user.id)
-        return True
-    except Exception as exc:
-        log.error("Verification email failed for user #%s (%s): %s", user.id, user.email, exc)
-        return False
-
-
 # ── The thing every code path calls ─────────────────────────────────────────
 def ensure_bge_account(bge, password=None, send_email=True):
     """Idempotently provision a Django User for `bge`.
@@ -380,14 +302,11 @@ def ensure_bge_account(bge, password=None, send_email=True):
         password=pw,
     )
 
-    # Mark must_change_password on first login. New accounts with an email
-    # address must verify it before they can log in; accounts without an
-    # email (no way to verify) default to email_verified=True.
+    # Mark must_change_password on first login
     UserSecurityProfile.objects.create(
         user=user,
         must_change_password=True,
         password_last_changed=None,
-        email_verified=not bool(bge.email),
     )
 
     # Avoid recursive post_save — bypass the BGE signal by going through
@@ -400,7 +319,5 @@ def ensure_bge_account(bge, password=None, send_email=True):
     if send_email:
         send_welcome_email(bge, username, pw)
         send_welcome_sms(bge, username)
-        if bge.email:
-            send_verification_email(user)
 
     return 'created'

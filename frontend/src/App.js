@@ -5,7 +5,6 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import BGEDashboard from './components/BGEDashboard';
 import ResetPassword from './components/ResetPassword';
-import VerifyEmail from './components/VerifyEmail';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { CHANGE_PASSWORD_URL } from './config';
 
@@ -261,7 +260,6 @@ export default function App() {
           } />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="*" element={<Navigate to={(token && (isAdmin || isBGE || isPending)) ? '/dashboard' : '/login'} replace />} />
         </Routes>
         <PWAInstallPrompt />

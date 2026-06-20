@@ -6,8 +6,6 @@ export const API_ENDPOINTS = {
   GOOGLE_LOGIN:       `${API_BASE_URL}/api/auth/google/`,
   PASSWORD_RESET:         `${API_BASE_URL}/api/auth/password-reset/`,
   PASSWORD_RESET_CONFIRM: `${API_BASE_URL}/api/auth/password-reset/confirm/`,
-  VERIFY_EMAIL:           `${API_BASE_URL}/api/auth/verify-email/`,
-  RESEND_VERIFICATION:    `${API_BASE_URL}/api/auth/resend-verification/`,
   MSMES:              `${API_BASE_URL}/api/msmes/`,
   EXPERTS:            `${API_BASE_URL}/api/experts/`,
   COHORTS:            `${API_BASE_URL}/api/cohorts/`,

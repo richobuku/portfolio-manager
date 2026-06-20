@@ -5,7 +5,7 @@ import {
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, FormControl, InputLabel, Select, MenuItem, Alert,
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
-  Tooltip, Checkbox, FormControlLabel, Card, CardContent, Grid, Drawer, List,
+  Tooltip, Checkbox, Card, CardContent, Grid, Drawer, List,
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
   Badge, Accordion, AccordionSummary, AccordionDetails,
   Tab, Tabs, ListSubheader,
@@ -492,7 +492,6 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   React.useEffect(() => {
     const { bge, start_date, end_date } = woForm;
     if (!bge || !start_date || !end_date) { setWoConflict(null); return; }
-    if (experts.find(e => e.id === bge)?.allow_concurrent_work_orders) { setWoConflict(null); return; }
     let cancelled = false;
     axios.get(API_ENDPOINTS.WORK_ORDERS, {
       headers,
@@ -8219,20 +8218,6 @@ PRUDEV II BDS Team`
                   <TextField fullWidth size="small" label={l} value={editForm[f] || ''} onChange={e => setEditForm({...editForm, [f]: e.target.value})} />
                 </Grid>
               ))}
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={<Checkbox checked={!!editForm.is_senior}
-                    onChange={e => setEditForm({...editForm, is_senior: e.target.checked})} />}
-                  label="Senior BGE (can be assigned training facilitation)"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={<Checkbox checked={!!editForm.allow_concurrent_work_orders}
-                    onChange={e => setEditForm({...editForm, allow_concurrent_work_orders: e.target.checked})} />}
-                  label="Allow overlapping work orders"
-                />
-              </Grid>
             </Grid>
           )}
         </DialogContent>

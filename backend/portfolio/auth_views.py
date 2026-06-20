@@ -18,10 +18,6 @@ class LoginRateThrottle(AnonRateThrottle):
 class PasswordResetThrottle(AnonRateThrottle):
     scope = 'password_reset'
 
-
-class EmailVerificationThrottle(AnonRateThrottle):
-    scope = 'email_verification'
-
 logger = logging.getLogger(__name__)
 try:
     from google.oauth2 import id_token
@@ -40,15 +36,6 @@ from .models import BusinessGrowthExpert, CohortAdmin
 # timestamp) with SECRET_KEY — invalidated on password change automatically,
 # expires after PASSWORD_RESET_TIMEOUT (default 3 days).
 _reset_token_gen = PasswordResetTokenGenerator()
-
-
-class EmailVerificationTokenGenerator(PasswordResetTokenGenerator):
-    """Same stateless mechanism as password-reset tokens, but salted
-    differently so a verification link can never double as a reset link."""
-    key_salt = "portfolio.auth_views.EmailVerificationTokenGenerator"
-
-
-_verify_token_gen = EmailVerificationTokenGenerator()
 
 import os as _os
 GOOGLE_CLIENT_ID = _os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -194,18 +181,6 @@ def login_view(request):
     if not user.is_active:
         return Response({'message': 'This account has been disabled.'}, status=status.HTTP_403_FORBIDDEN)
 
-    from .models import UserSecurityProfile
-    sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
-    if not sec.email_verified:
-        return Response(
-            {
-                'message': 'Please verify your email address before logging in. '
-                            'Check your inbox for the verification link we sent you.',
-                'email_unverified': True,
-            },
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
     login(request, user)
     return Response(_build_user_response(user))
 
@@ -283,10 +258,10 @@ def request_password_reset(request):
         return Response({'message': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Check that SMTP is actually configured — if not, tell the admin rather than silently failing
-    zoho_pw = getattr(settings, 'ZOHO_APP_PASSWORD', '')
-    if not zoho_pw:
+    gmail_pw = getattr(settings, 'GMAIL_APP_PASSWORD', '')
+    if not gmail_pw:
         logger.error(
-            "Password reset requested but ZOHO_APP_PASSWORD is not set. "
+            "Password reset requested but GMAIL_APP_PASSWORD is not set. "
             "Set it as an environment variable on your hosting platform."
         )
         return Response(
@@ -366,66 +341,6 @@ def confirm_password_reset(request):
     user.set_password(password)
     user.save()
     return Response({'message': 'Password reset successfully. You can now sign in.'})
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-@throttle_classes([EmailVerificationThrottle])
-def verify_email_view(request):
-    """Confirm a newly-created account's email address.
-
-    Body: { uid, token } — both taken from the verification link emailed to
-    the user. On success, flips UserSecurityProfile.email_verified to True
-    so the account can log in.
-    """
-    from .models import UserSecurityProfile
-
-    token  = (request.data.get('token') or '').strip()
-    uidb64 = (request.data.get('uid')   or '').strip()
-    if not token or not uidb64:
-        return Response({'message': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        user_id = int(force_str(urlsafe_base64_decode(uidb64)))
-        user = User.objects.filter(pk=user_id).first()
-    except (TypeError, ValueError, OverflowError):
-        user = None
-
-    if not user or not _verify_token_gen.check_token(user, token):
-        return Response({'message': 'Invalid or expired verification link.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
-    if not sec.email_verified:
-        sec.email_verified = True
-        sec.save(update_fields=['email_verified'])
-
-    return Response({'message': 'Email verified successfully. You can now sign in.'})
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-@throttle_classes([EmailVerificationThrottle])
-def resend_verification_view(request):
-    """Resend the verification email for an unverified account.
-
-    Body: { email }. Always returns a generic success message to avoid
-    leaking whether an email address is registered.
-    """
-    from .models import UserSecurityProfile
-    from .account_setup import send_verification_email
-
-    email = (request.data.get('email') or '').strip().lower()
-    generic = {'message': 'If that email belongs to an unverified account, a new verification link has been sent.'}
-    if not email:
-        return Response(generic)
-
-    user = User.objects.filter(email__iexact=email).first()
-    if user:
-        sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
-        if not sec.email_verified:
-            send_verification_email(user)
-
-    return Response(generic)
 
 
 @api_view(['POST'])

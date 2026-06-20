@@ -15,7 +15,7 @@ from .api_views import (
     bulk_email_view, bulk_email_log_view,
     bulk_sms_view, bulk_sms_log_view, bulk_sms_balance_view,
 )
-from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view, verify_email_view, resend_verification_view
+from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
 from .blockchain.api_views import (
     BlockchainTransactionViewSet, SmartContractViewSet, TokenViewSet,
     MSMEFundingContractViewSet, InvestmentPoolViewSet, DecentralizedIdentityViewSet,
@@ -65,8 +65,6 @@ urlpatterns = [
     path('api/auth/password-reset/', request_password_reset, name='api_password_reset'),
     path('api/auth/password-reset/confirm/', confirm_password_reset, name='api_password_reset_confirm'),
     path('api/auth/change-password/', change_password_view, name='api_change_password'),
-    path('api/auth/verify-email/', verify_email_view, name='api_verify_email'),
-    path('api/auth/resend-verification/', resend_verification_view, name='api_resend_verification'),
     path('api/push/subscribe/', push_subscribe, name='push_subscribe'),
     path('api/push/unsubscribe/', push_unsubscribe, name='push_unsubscribe'),
     path('api/push/vapid-key/', push_vapid_key, name='push_vapid_key'),
