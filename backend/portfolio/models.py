@@ -1076,8 +1076,14 @@ class WorkOrder(models.Model):
             code = self.bge.bge_code or ''
             m = re.search(r'BGE-([A-Z0-9]+)-', code)
             short = m.group(1) if m else str(self.bge_id)
-            seq = WorkOrder.objects.filter(bge=self.bge).count() + 1
             prefix = 'TF' if self.work_order_type == 'training_facilitation' else 'BGE'
+            # Start from count+1 but skip any numbers already taken (handles
+            # gaps left by deleted work orders so we never hit a uniqueness clash).
+            seq = WorkOrder.objects.filter(bge=self.bge).count() + 1
+            while WorkOrder.objects.filter(
+                work_order_number=f"PRUDEV II-{prefix}-{short}-{seq:02d}"
+            ).exists():
+                seq += 1
             self.work_order_number = f"PRUDEV II-{prefix}-{short}-{seq:02d}"
         super().save(*args, **kwargs)
 
