@@ -27,7 +27,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL } from '../config';
 import { BRAND } from '../theme';
 
 const ROWS_PER_PAGE = 15;
@@ -1510,10 +1510,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   const revertReport = async (kind, id) => {
-    const label = kind === 'group' ? 'group report' : 'visit report';
+    const label = kind === 'group' ? 'group report' : kind === 'training' ? 'training report' : kind === 'mentor' ? 'mentor report' : 'visit report';
     if (!window.confirm(`Revert this ${label} to draft? The BGE will be able to edit and resubmit it.`)) return;
     try {
-      const url = kind === 'group' ? GROUP_REPORT_REVERT_URL(id) : REPORT_REVERT_URL(id);
+      const url = kind === 'group' ? GROUP_REPORT_REVERT_URL(id)
+        : kind === 'training' ? TRAINING_REPORT_REVERT_URL(id)
+        : kind === 'mentor' ? MENTOR_REPORT_REVERT_URL(id)
+        : REPORT_REVERT_URL(id);
       await axios.post(url, {}, { headers });
       notify(`${label.charAt(0).toUpperCase() + label.slice(1)} reverted to draft`);
       fetchAll();
@@ -5226,6 +5229,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                               <Download fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          {isAdmin && r.status !== 'draft' && (
+                            <Tooltip title="Revert to draft">
+                              <IconButton size="small" color="warning" onClick={() => revertReport('training', r.id)}>
+                                <Undo fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -5287,6 +5297,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                               <Download fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          {isAdmin && r.status !== 'draft' && (
+                            <Tooltip title="Revert to draft">
+                              <IconButton size="small" color="warning" onClick={() => revertReport('mentor', r.id)}>
+                                <Undo fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>

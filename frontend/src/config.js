@@ -60,8 +60,10 @@ export const WORK_ORDER_PAYMENT_NOTIFY_URL  = (id) => `${API_BASE_URL}/api/work-
 export const WORK_ORDER_PAYMENT_CONFIRM_URL = (id) => `${API_BASE_URL}/api/work-order-payments/${id}/confirm/`;
 // legacy alias kept for any existing references
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
-export const REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/reports/${id}/revert/`;
-export const GROUP_REPORT_REVERT_URL = (id) => `${API_BASE_URL}/api/group-reports/${id}/revert/`;
+export const REPORT_REVERT_URL              = (id) => `${API_BASE_URL}/api/reports/${id}/revert/`;
+export const GROUP_REPORT_REVERT_URL        = (id) => `${API_BASE_URL}/api/group-reports/${id}/revert/`;
+export const TRAINING_REPORT_REVERT_URL     = (id) => `${API_BASE_URL}/api/training-reports/${id}/revert/`;
+export const MENTOR_REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/mentor-reports/${id}/revert/`;
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;
 export const CHANGE_PASSWORD_URL = `${API_BASE_URL}/api/auth/change-password/`;
 export const BULK_EMAIL = API_ENDPOINTS.BULK_EMAIL;

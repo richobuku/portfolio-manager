@@ -3904,6 +3904,20 @@ class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, 
             data['submitted_at'] = timezone.now()
         serializer.save(**data)
 
+    @action(detail=True, methods=['post'], url_path='revert')
+    def revert(self, request, pk=None):
+        """Admin-only: revert a submitted training report back to draft."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can revert reports.")
+        report = self.get_object()
+        if report.status == 'draft':
+            return Response({'detail': 'Report is already a draft.'}, status=status.HTTP_400_BAD_REQUEST)
+        report.status = 'draft'
+        report.submitted_at = None
+        report.save(update_fields=['status', 'submitted_at'])
+        from .serializers import TrainingReportSerializer
+        return Response(TrainingReportSerializer(report, context={'request': request}).data)
+
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
         """Render this training report as a branded PDF."""
@@ -4019,6 +4033,20 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         if serializer.validated_data.get('status') == 'submitted':
             data['submitted_at'] = timezone.now()
         serializer.save(**data)
+
+    @action(detail=True, methods=['post'], url_path='revert')
+    def revert(self, request, pk=None):
+        """Admin-only: revert a submitted mentor report back to draft."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can revert reports.")
+        report = self.get_object()
+        if report.status == 'draft':
+            return Response({'detail': 'Report is already a draft.'}, status=status.HTTP_400_BAD_REQUEST)
+        report.status = 'draft'
+        report.submitted_at = None
+        report.save(update_fields=['status', 'submitted_at'])
+        from .serializers import MentorTrainingReportSerializer
+        return Response(MentorTrainingReportSerializer(report, context={'request': request}).data)
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
