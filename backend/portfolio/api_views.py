@@ -3511,7 +3511,7 @@ def _send_co_assignment_alert(existing_bge, new_bge, msme):
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated as _IsAuth, AllowAny as _AllowAny
 
-class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
+class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """Work Order management.
 
     Visibility:
@@ -3519,14 +3519,14 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     - BGEs see only their own work orders with status 'issued' or 'signed'.
 
     Mutation (create / update / delete / issue):
-    - Admin-only. BGEs have read-only access.
+    - Admin-only. BGEs, programme managers and viewers have read-only access.
     """
     serializer_class = WorkOrderSerializer
     permission_classes = [IsAuthenticated]
 
     def _is_admin(self):
         u = self.request.user
-        return u.is_staff or u.is_superuser or _managed_groups(u) is not None
+        return u.is_staff or u.is_superuser
 
     def get_queryset(self):
         user = self.request.user

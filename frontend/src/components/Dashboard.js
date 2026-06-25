@@ -6218,7 +6218,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       size="small"
                       color={wo.status === 'signed' ? 'success' : wo.status === 'issued' ? 'primary' : 'default'}
                     />
-                    {wo.status === 'draft' && (
+                    {isStaff && wo.status === 'draft' && (
                       <Tooltip title="Issue & email PDF to BGE">
                         <span>
                           <Button
@@ -6232,7 +6232,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         </span>
                       </Tooltip>
                     )}
-                    {(wo.status === 'issued' || wo.status === 'signed') && (
+                    {isStaff && (wo.status === 'issued' || wo.status === 'signed') && (
                       <Tooltip title="Withdraw work order back to draft">
                         <Button
                           variant="outlined" size="small" color="warning"
