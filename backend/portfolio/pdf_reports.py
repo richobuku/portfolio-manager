@@ -484,8 +484,6 @@ def render_work_order(work_order):
     if deliverables:
         story.append(Spacer(1, 6))
         story.append(Paragraph('Deliverables', s['sectiontitle']))
-        # Cell styles for body rows — Paragraph ensures long text wraps instead
-        # of overflowing into adjacent columns.
         cell_style = ParagraphStyle('del_cell', parent=s['body'],
                                     fontSize=9, leading=12, spaceAfter=0)
         hdr_style  = ParagraphStyle('del_hdr',  parent=cell_style,
@@ -516,6 +514,59 @@ def render_work_order(work_order):
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
         ]))
         story.append(t)
+
+        # Results-Based Payment Matrix — rendered only when outcome fields are present
+        outcome_rows = [d for d in deliverables if any(d.get(k) for k in (
+            'quantitative_result', 'qualitative_result', 'means_of_verification',
+            'unit_rate', 'payment_condition',
+        ))]
+        if outcome_rows:
+            story.append(Spacer(1, 10))
+            story.append(Paragraph('SCHEDULE 1A — RESULTS-BASED PAYMENT MATRIX', s['sectiontitle']))
+            note_style = ParagraphStyle('rbm_note', parent=s['body'],
+                                        fontSize=8, leading=11,
+                                        textColor=HexColor('#333333'), spaceAfter=6)
+            story.append(Paragraph(
+                '<b>A BGE must achieve BOTH:</b> Quantitative Targets = 50% <b>AND</b> '
+                'Qualitative Outcomes = 50% to qualify for payment.',
+                note_style,
+            ))
+            sm = ParagraphStyle('rbm_cell', parent=s['body'],
+                                fontSize=7.5, leading=10, spaceAfter=0)
+            hm = ParagraphStyle('rbm_hdr', parent=sm,
+                                fontName='Helvetica-Bold',
+                                textColor=HexColor('#FFFFFF'))
+            matrix_rows = [[
+                Paragraph('#',                            hm),
+                Paragraph('Quantitative Result Required', hm),
+                Paragraph('Qualitative Result Required',  hm),
+                Paragraph('Means of Verification',       hm),
+                Paragraph('Unit Rate (UGX)',              hm),
+                Paragraph('Payment Condition',            hm),
+            ]]
+            for d in outcome_rows:
+                matrix_rows.append([
+                    Paragraph(str(d.get('task_num', '')),                       sm),
+                    Paragraph(_safe_html(d.get('quantitative_result', '—')),    sm),
+                    Paragraph(_safe_html(d.get('qualitative_result', '—')),     sm),
+                    Paragraph(_safe_html(d.get('means_of_verification', '—')), sm),
+                    Paragraph(_safe_html(str(d.get('unit_rate', '—'))),         sm),
+                    Paragraph(_safe_html(d.get('payment_condition', '—')),      sm),
+                ])
+            # Col widths: # 8 | Quant 38 | Qual 38 | Means 35 | Rate 22 | Condition 29 = 170mm
+            mt = Table(matrix_rows, hAlign='LEFT',
+                       colWidths=[8*mm, 38*mm, 38*mm, 35*mm, 22*mm, 29*mm], repeatRows=1)
+            mt.setStyle(TableStyle([
+                ('BACKGROUND',     (0, 0), (-1, 0),  NAVY),
+                ('LINEBELOW',      (0, 0), (-1, -1), 0.25, LIGHT_GREY),
+                ('BOTTOMPADDING',  (0, 0), (-1, -1), 5),
+                ('TOPPADDING',     (0, 0), (-1, -1), 5),
+                ('LEFTPADDING',    (0, 0), (-1, -1), 3),
+                ('RIGHTPADDING',   (0, 0), (-1, -1), 3),
+                ('VALIGN',         (0, 0), (-1, -1), 'TOP'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
+            ]))
+            story.append(mt)
 
     story.append(Spacer(1, 8))
 

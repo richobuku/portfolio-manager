@@ -300,15 +300,15 @@ const WO_DEFAULTS = {
 10. Document all field activities, session notes, and MSME progress in the required PRUDEV II formats.
 11. Maintain confidentiality of all MSME data and business information at all times.`,
     deliverables_json: [
-      { task_num: 1, description: 'MSME mobilisation list – names and contacts of all MSMEs confirmed for the peer-to-peer session', due_date: 'End of Week 1' },
-      { task_num: 2, description: 'MSME non-engagement register – documented record of any MSME that was unavailable or declined', due_date: 'Rolling – within 2 days of each contact attempt' },
-      { task_num: 3, description: 'Signed MSME registration forms for the selected CRM platform', due_date: 'Rolling – per MSME onboarded' },
-      { task_num: 4, description: 'CRM set-up confirmation report – evidence that each MSME has an active account and customer list uploaded', due_date: 'End of Week 2' },
-      { task_num: 5, description: 'Updated customer list per MSME – cleaned, verified, and entered into the CRM system', due_date: 'End of Week 2' },
-      { task_num: 6, description: '1-on-1 session notes for each MSME (using standardised PRUDEV II template)', due_date: 'Within 2 days of each session' },
-      { task_num: 7, description: 'Signed peer-to-peer session attendance sheets submitted to the Senior BGE', due_date: 'Per session, day of event' },
-      { task_num: 8, description: 'Monthly field activity report covering CRM adoption, sessions conducted, and key MSME challenges', due_date: 'Last working day of each month' },
-      { task_num: 9, description: 'Approved invoice and signed timesheet', due_date: 'With monthly report submission' },
+      { task_num: 1, description: 'MSME mobilisation list – names and contacts of all MSMEs confirmed for the peer-to-peer session', due_date: 'End of Week 1', quantitative_result: 'Mobilisation list submitted with names and contacts of all confirmed MSMEs', qualitative_result: 'List is accurate, complete, and submitted on time', means_of_verification: 'Submitted mobilisation list', unit_rate: '', payment_condition: 'Required for payment processing' },
+      { task_num: 2, description: 'MSME non-engagement register – documented record of any MSME that was unavailable or declined', due_date: 'Rolling – within 2 days of each contact attempt', quantitative_result: '100% of non-engaging MSMEs documented within 2 days of each contact attempt', qualitative_result: 'Register is complete with reasons documented and Senior BGE notified promptly', means_of_verification: 'Completed non-engagement register', unit_rate: '', payment_condition: 'Included in monthly deliverable' },
+      { task_num: 3, description: 'Signed MSME registration forms for the selected CRM platform', due_date: 'Rolling – per MSME onboarded', quantitative_result: 'Signed registration form submitted for each onboarded MSME', qualitative_result: 'Forms are accurate, complete, and submitted within the required timeline', means_of_verification: 'Signed CRM registration forms per MSME', unit_rate: '', payment_condition: 'Per MSME onboarded and verified' },
+      { task_num: 4, description: 'CRM set-up confirmation report – evidence that each MSME has an active account and customer list uploaded', due_date: 'End of Week 2', quantitative_result: 'CRM set-up confirmation report submitted with evidence of active accounts for all assigned MSMEs', qualitative_result: 'Report demonstrates that each MSME has an active account with a verified customer list uploaded', means_of_verification: 'CRM set-up confirmation report with screenshots or system evidence', unit_rate: '', payment_condition: 'Pay only if set-up confirmed for minimum 80% of assigned MSMEs' },
+      { task_num: 5, description: 'Updated customer list per MSME – cleaned, verified, and entered into the CRM system', due_date: 'End of Week 2', quantitative_result: 'Customer list updated and verified for each assigned MSME', qualitative_result: 'Lists are cleaned, structured, and accurately entered into the CRM system', means_of_verification: 'CRM system records showing updated customer lists per MSME', unit_rate: '', payment_condition: 'Pay only if both quantitative and qualitative targets are achieved' },
+      { task_num: 6, description: '1-on-1 session notes for each MSME (using standardised PRUDEV II template)', due_date: 'Within 2 days of each session', quantitative_result: '1-on-1 session notes submitted for each assigned MSME within 2 days', qualitative_result: 'Notes capture key business challenges, agreed actions, and MSME progress using the PRUDEV II template', means_of_verification: 'Completed session notes using PRUDEV II template', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
+      { task_num: 7, description: 'Signed peer-to-peer session attendance sheets submitted to the Senior BGE', due_date: 'Per session, day of event', quantitative_result: 'Signed attendance sheet submitted for every peer-to-peer session on the day of the event', qualitative_result: 'Attendance sheets are complete, legible, and accurately reflect participation', means_of_verification: 'Original signed attendance sheets', unit_rate: '', payment_condition: 'Required for payment — must be submitted on the day of each session' },
+      { task_num: 8, description: 'Monthly field activity report covering CRM adoption, sessions conducted, and key MSME challenges', due_date: 'Last working day of each month', quantitative_result: 'Monthly field activity report submitted by the last working day of each month', qualitative_result: 'Report clearly covers CRM adoption rates, sessions conducted, key MSME challenges, and recommended actions', means_of_verification: 'Submitted monthly field activity report', unit_rate: '', payment_condition: 'Pay only if report submitted on time and approved' },
+      { task_num: 9, description: 'Approved invoice and signed timesheet', due_date: 'With monthly report submission', quantitative_result: '1 invoice and 1 signed timesheet submitted monthly with the report', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of monthly deliverables' },
     ],
   },
   msme_data_update: {
@@ -324,13 +324,13 @@ const WO_DEFAULTS = {
 9. Upload and synchronize all verified updates into the BDS system accurately and in a timely manner.
 10. Submit feedback on challenges, observations, and recommendations arising from the field verification process.`,
     deliverables_json: [
-      { task_num: 1, description: 'Orientation on the BDS System and Assignment Expectations Completed',                 due_date: 'Day 1' },
-      { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                               due_date: 'Day 1' },
-      { task_num: 3, description: 'Assigned MSME Visit Plan',                                                            due_date: 'Day 1' },
-      { task_num: 4, description: 'MSME Field Visits and Data Collection Conducted',                                    due_date: 'Day 2 – Day 5' },
-      { task_num: 5, description: 'Verified and Updated MSME Records in the BDS System',                                due_date: 'Day 2 – Day 5' },
-      { task_num: 6, description: 'Summary Report on Key Findings, Gaps, and Recommendations',                          due_date: 'Final Day' },
-      { task_num: 7, description: 'Submission of Supporting Documentation and Completed Updates',                       due_date: 'Final Day' },
+      { task_num: 1, description: 'Orientation on the BDS System and Assignment Expectations Completed', due_date: 'Day 1', quantitative_result: 'BGE confirms full understanding of BDS system and assignment expectations on Day 1', qualitative_result: 'BGE demonstrates readiness to conduct field visits independently', means_of_verification: 'Signed orientation confirmation', unit_rate: '', payment_condition: 'Required prerequisite — no separate payment' },
+      { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts', due_date: 'Day 1', quantitative_result: 'Field materials and T-shirt received on Day 1', qualitative_result: 'BGE acknowledges receipt and agrees to wear branded T-shirt during all field visits', means_of_verification: 'Signed receipt of materials', unit_rate: '', payment_condition: 'Required prerequisite — no separate payment' },
+      { task_num: 3, description: 'Assigned MSME Visit Plan', due_date: 'Day 1', quantitative_result: 'Visit plan covering all assigned MSMEs submitted on Day 1', qualitative_result: 'Plan is realistic, logically sequenced, and accounts for geography and scheduling constraints', means_of_verification: 'Submitted visit plan with MSME names, dates, and locations', unit_rate: '', payment_condition: 'Required before field visits commence' },
+      { task_num: 4, description: 'MSME Field Visits and Data Collection Conducted', due_date: 'Day 2 – Day 5', quantitative_result: 'All assigned MSMEs visited and data collected (minimum 10 MSMEs)', qualitative_result: 'Data is accurate, complete, and validated directly with MSME owners or managers', means_of_verification: 'Field visit records and completed data collection forms', unit_rate: '', payment_condition: 'Pay only if minimum 80% of assigned MSMEs visited and data submitted' },
+      { task_num: 5, description: 'Verified and Updated MSME Records in the BDS System', due_date: 'Day 2 – Day 5', quantitative_result: 'All MSME records updated and synchronised in the BDS system within the assignment period', qualitative_result: 'Records are accurate, consistent, and free of missing or duplicate entries', means_of_verification: 'Updated BDS system records with timestamps of last update', unit_rate: '', payment_condition: 'Pay only if both quantitative and qualitative targets are achieved' },
+      { task_num: 6, description: 'Summary Report on Key Findings, Gaps, and Recommendations', due_date: 'Final Day', quantitative_result: '1 summary report submitted on the final day covering all visited MSMEs', qualitative_result: 'Report clearly identifies gaps, key findings, and actionable recommendations', means_of_verification: 'Submitted summary report', unit_rate: '', payment_condition: 'Pay only if submitted on final day and approved' },
+      { task_num: 7, description: 'Submission of Supporting Documentation and Completed Updates', due_date: 'Final Day', quantitative_result: 'All supporting documents submitted on the final day of the assignment', qualitative_result: 'Documents are complete, legible, and correctly organised', means_of_verification: 'Complete submission package of supporting documentation', unit_rate: '', payment_condition: 'Payment processed upon approval of all submitted documents' },
     ],
   },
   msme_finance_survey: {
@@ -345,15 +345,15 @@ const WO_DEFAULTS = {
 8. Provide daily progress updates and field feedback to the coordination team.
 9. Identify MSMEs requiring additional business development or financial support services.`,
     deliverables_json: [
-      { task_num: 1, description: 'Orientation on Finance Questionnaire and Google Forms Tool Completed',  due_date: 'Monday, 18 May 2026' },
-      { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts',                  due_date: 'Monday, 18 May 2026' },
-      { task_num: 3, description: 'MSME Field Visit Schedule and Assignment Plan',                         due_date: 'Monday, 18 May 2026' },
-      { task_num: 4, description: 'Completion of Field Visits to at Least 25 MSMEs',                       due_date: '19 May – 31 May 2026' },
-      { task_num: 5, description: 'Completed Finance Questionnaires Submitted through Google Forms',       due_date: '19 May – 31 May 2026' },
-      { task_num: 6, description: 'Updated MSME Records in the BDS System',                                due_date: 'Throughout Assignment Period' },
-      { task_num: 7, description: 'Daily Progress Updates Submitted',                                      due_date: 'Daily' },
-      { task_num: 8, description: 'Final Summary Report with Key Findings and Recommendations',            due_date: 'Monday, 1 June 2026' },
-      { task_num: 9, description: 'Submission of All Verified and Updated MSME Data',                      due_date: 'Monday, 1 June 2026' },
+      { task_num: 1, description: 'Orientation on Finance Questionnaire and Google Forms Tool Completed', due_date: 'Monday, 18 May 2026', quantitative_result: 'BGE confirms full understanding of finance questionnaire and Google Forms tool on Day 1', qualitative_result: 'BGE demonstrates ability to administer the questionnaire independently', means_of_verification: 'Signed orientation confirmation', unit_rate: '', payment_condition: 'Required prerequisite — no separate payment' },
+      { task_num: 2, description: 'Distribution of Field Materials and Branded T-Shirts', due_date: 'Monday, 18 May 2026', quantitative_result: 'Field materials and T-shirt received on Day 1', qualitative_result: 'BGE acknowledges receipt and agrees to wear branded T-shirt during all field visits', means_of_verification: 'Signed receipt of materials', unit_rate: '', payment_condition: 'Required prerequisite — no separate payment' },
+      { task_num: 3, description: 'MSME Field Visit Schedule and Assignment Plan', due_date: 'Monday, 18 May 2026', quantitative_result: 'Assignment plan with field schedule for at least 25 MSMEs submitted on Day 1', qualitative_result: 'Plan is logically sequenced and accounts for geography and scheduling constraints', means_of_verification: 'Submitted field visit schedule with MSME names, dates, and locations', unit_rate: '', payment_condition: 'Required before field visits commence' },
+      { task_num: 4, description: 'Completion of Field Visits to at Least 25 MSMEs', due_date: '19 May – 31 May 2026', quantitative_result: 'Minimum 25 MSME field visits completed between 19 May – 31 May 2026', qualitative_result: 'Visits are structured, data collected is accurate, and MSMEs are adequately engaged', means_of_verification: 'Field visit logs and completed finance questionnaire submissions', unit_rate: '', payment_condition: 'Pay only if minimum 25 visits completed and verified' },
+      { task_num: 5, description: 'Completed Finance Questionnaires Submitted through Google Forms', due_date: '19 May – 31 May 2026', quantitative_result: 'Finance questionnaire submitted for each visited MSME through Google Forms', qualitative_result: 'Questionnaires are complete, accurate, and submitted within 24 hours of each visit', means_of_verification: 'Google Forms submission records with timestamps', unit_rate: '', payment_condition: 'Pay only if both quantitative and qualitative targets are achieved' },
+      { task_num: 6, description: 'Updated MSME Records in the BDS System', due_date: 'Throughout Assignment Period', quantitative_result: 'BDS system records updated for all visited MSMEs throughout the assignment period', qualitative_result: 'Records are accurate, consistent, and reflect the latest verified information', means_of_verification: 'Updated BDS system records with timestamps', unit_rate: '', payment_condition: 'Pay only if records updated and verified for minimum 80% of visited MSMEs' },
+      { task_num: 7, description: 'Daily Progress Updates Submitted', due_date: 'Daily', quantitative_result: 'Daily progress update submitted for every working day of the assignment', qualitative_result: 'Updates are informative, timely, and flag any challenges or issues requiring attention', means_of_verification: 'Daily update messages or reports received by coordination team', unit_rate: '', payment_condition: 'Required for payment — consistent updates demonstrate active engagement' },
+      { task_num: 8, description: 'Final Summary Report with Key Findings and Recommendations', due_date: 'Monday, 1 June 2026', quantitative_result: '1 final summary report submitted by Monday, 1 June 2026', qualitative_result: 'Report provides clear key findings, data quality observations, and actionable recommendations', means_of_verification: 'Submitted and approved final summary report', unit_rate: '', payment_condition: 'Pay only if submitted on time and approved' },
+      { task_num: 9, description: 'Submission of All Verified and Updated MSME Data', due_date: 'Monday, 1 June 2026', quantitative_result: 'All verified MSME data submitted by Monday, 1 June 2026', qualitative_result: 'Data is accurate, complete, and formatted per PRUDEV II standards', means_of_verification: 'Verified MSME data submission confirmed by coordination team', unit_rate: '', payment_condition: 'Payment processed upon approval of final submission' },
     ],
   },
   msme_access_finance: {
@@ -376,14 +376,14 @@ const WO_DEFAULTS = {
 10. Maintain confidentiality of all MSME data and financial information at all times.
 11. Submit completed invoice and signed timesheet with the final report.`,
     deliverables_json: [
-      { task_num: 1, description: 'Orientation on Access to Finance Assignment and Digital Financial Tools Completed', due_date: '3 June 2026' },
-      { task_num: 2, description: 'MSME Visit Plan — assignment list of 15 MSMEs from Cohort 1 & Cohort 2 with field schedule', due_date: '3 June 2026' },
-      { task_num: 3, description: 'MSME Digital Platform Onboarding Records — minimum 2 platforms per MSME with registration evidence', due_date: 'Rolling — throughout assignment' },
-      { task_num: 4, description: 'Digital Platform Registration Evidence per MSME (screenshots / confirmations)', due_date: 'Rolling — per MSME onboarded' },
-      { task_num: 5, description: 'Credit Interest Mapping Report — by MSME, product type, and financial institution with readiness assessment', due_date: '15 June 2026' },
-      { task_num: 6, description: 'Barrier Register — MSMEs with obstacles to digital onboarding and recommended follow-up', due_date: '15 June 2026' },
-      { task_num: 7, description: 'Final Access to Finance Field Report — summary of onboarding outcomes, credit interest, observations, and recommendations', due_date: '16 June 2026' },
-      { task_num: 8, description: 'Approved Invoice and Signed Timesheet', due_date: '16 June 2026' },
+      { task_num: 1, description: 'Orientation on Access to Finance Assignment and Digital Financial Tools Completed', due_date: '3 June 2026', quantitative_result: 'BGE confirms understanding of Access to Finance assignment and digital tools on Day 1', qualitative_result: 'BGE demonstrates readiness to conduct MSME onboarding and credit assessments independently', means_of_verification: 'Signed orientation confirmation', unit_rate: '', payment_condition: 'Required prerequisite — no separate payment' },
+      { task_num: 2, description: 'MSME Visit Plan — assignment list of 15 MSMEs from Cohort 1 & Cohort 2 with field schedule', due_date: '3 June 2026', quantitative_result: 'Field visit plan for all 15 assigned MSMEs submitted on 3 June 2026', qualitative_result: 'Plan is logically sequenced with visit dates, MSME details, and geographic routing', means_of_verification: 'Submitted MSME visit plan', unit_rate: '', payment_condition: 'Required before field visits commence' },
+      { task_num: 3, description: 'MSME Digital Platform Onboarding Records — minimum 2 platforms per MSME with registration evidence', due_date: 'Rolling — throughout assignment', quantitative_result: 'Minimum 2 digital financial platforms onboarded per MSME for all 15 assigned MSMEs', qualitative_result: 'Onboarding is complete, verified with the MSME owner, and platforms are active and accessible', means_of_verification: 'Onboarding records with platform names and evidence of registration per MSME', unit_rate: '', payment_condition: 'Pay only if minimum 2 platforms onboarded per MSME for at least 80% of assigned MSMEs' },
+      { task_num: 4, description: 'Digital Platform Registration Evidence per MSME (screenshots / confirmations)', due_date: 'Rolling — per MSME onboarded', quantitative_result: 'Registration evidence submitted for each MSME and each platform onboarded', qualitative_result: 'Evidence is clear, legible, and confirms active account creation per platform', means_of_verification: 'Screenshots or confirmation messages per MSME per platform', unit_rate: '', payment_condition: 'Required for verification — included in onboarding deliverable' },
+      { task_num: 5, description: 'Credit Interest Mapping Report — by MSME, product type, and financial institution with readiness assessment', due_date: '15 June 2026', quantitative_result: '1 credit interest mapping report covering all 15 MSMEs submitted by 15 June 2026', qualitative_result: 'Report accurately maps MSME interest by product type, financial institution, and readiness level with actionable follow-up recommendations', means_of_verification: 'Submitted credit interest mapping report', unit_rate: '', payment_condition: 'Pay only if submitted on time and approved' },
+      { task_num: 6, description: 'Barrier Register — MSMEs with obstacles to digital onboarding and recommended follow-up', due_date: '15 June 2026', quantitative_result: 'All MSMEs with barriers to digital onboarding documented in the barrier register by 15 June 2026', qualitative_result: 'Register is complete, identifies specific barriers per MSME, and includes recommended follow-up actions', means_of_verification: 'Completed barrier register', unit_rate: '', payment_condition: 'Required for payment — demonstrates thorough field engagement' },
+      { task_num: 7, description: 'Final Access to Finance Field Report — summary of onboarding outcomes, credit interest, observations, and recommendations', due_date: '16 June 2026', quantitative_result: '1 final field report submitted by 16 June 2026', qualitative_result: 'Report provides a comprehensive summary of onboarding outcomes, credit interest mapping, challenges, and recommendations', means_of_verification: 'Submitted and approved final field report', unit_rate: '', payment_condition: 'Pay only if submitted on time and approved' },
+      { task_num: 8, description: 'Approved Invoice and Signed Timesheet', due_date: '16 June 2026', quantitative_result: '1 invoice and 1 signed timesheet submitted by 16 June 2026', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of all deliverables' },
     ],
   },
   biz_continuity: {
@@ -400,10 +400,46 @@ const WO_DEFAULTS = {
 
 • Train and Test: Educate employees on their specific responsibilities during a crisis as per the strategy. Conduct a simulation exercise (tabletop or full-scale) to identify weaknesses and refine the strategy.`,
     deliverables_json: [
-      { task_num: 1, description: 'Business Continuity Strategy and Business Operational Plan', due_date: '1 week after deployment' },
-      { task_num: 2, description: 'Non-engagement register — documented record of any MSME that was unavailable or declined to participate, including reason and date of contact attempt', due_date: 'Rolling — updated within 2 days of each attempted contact' },
-      { task_num: 3, description: 'Close-out report', due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan' },
-      { task_num: 4, description: 'Approved invoice and signed timesheet', due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan' },
+      {
+        task_num: 1,
+        description: 'Business Continuity Strategy and Business Operational Plan',
+        due_date: '1 week after deployment',
+        quantitative_result: '5 Business Continuity and Operational Plans developed (1 per MSME) with all required sections completed',
+        qualitative_result: 'Each plan demonstrates deep understanding of the MSME\'s specific risks; recovery strategies are realistic, actionable, and validated by the business owner',
+        means_of_verification: 'Completed and signed Business Continuity Strategy document per MSME',
+        unit_rate: '',
+        payment_condition: 'Pay only if both quantitative and qualitative targets are achieved',
+      },
+      {
+        task_num: 2,
+        description: 'Non-engagement register — documented record of any MSME that was unavailable or declined to participate, including reason and date of contact attempt',
+        due_date: 'Rolling — updated within 2 days of each attempted contact',
+        quantitative_result: '100% of assigned MSMEs contacted at least 3 times with all contact attempts documented',
+        qualitative_result: 'Register is complete, accurate, and includes documented reasons for non-engagement with recommended follow-up actions',
+        means_of_verification: 'Completed non-engagement register with dates, contact details, and outcomes',
+        unit_rate: '',
+        payment_condition: 'Included in overall assignment deliverable — no separate payment',
+      },
+      {
+        task_num: 3,
+        description: 'Close-out report',
+        due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan',
+        quantitative_result: '1 close-out report submitted covering all 5 MSMEs with key findings and lessons learned',
+        qualitative_result: 'Report provides a clear, reflective account of challenges encountered, BGE performance, and actionable recommendations for future assignments',
+        means_of_verification: 'Submitted and approved close-out report',
+        unit_rate: '',
+        payment_condition: 'Pay only if submitted on time and approved by Programme Manager',
+      },
+      {
+        task_num: 4,
+        description: 'Approved invoice and signed timesheet',
+        due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan',
+        quantitative_result: '1 invoice and 1 signed timesheet submitted',
+        qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms',
+        means_of_verification: 'Approved invoice and countersigned timesheet',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of all deliverables',
+      },
     ],
   },
   mobilisation: {
@@ -415,10 +451,10 @@ const WO_DEFAULTS = {
 5. Provide follow-up SMS reminders to confirmed participants with dates, venue details, and what to bring.
 6. Track confirmed vs. declined applicants and provide updates to the BDS Component Coordinator.`,
     deliverables_json: [
-      { task_num: 1, description: 'Daily Call Log – record of each call made, time, outcome, and notes', due_date: 'Daily' },
-      { task_num: 2, description: 'Applicant Information Sheet – confirmed participants, qualifications verified, logistics information', due_date: 'End of mobilisation period' },
-      { task_num: 3, description: 'Barrier Report – summary of identified barriers and recommendations for support', due_date: 'End of mobilisation period' },
-      { task_num: 4, description: 'Final Mobilisation Summary Report – confirmation rates, analysis of no-shows/declines, final participant count', due_date: 'Day after mobilisation closes' },
+      { task_num: 1, description: 'Daily Call Log – record of each call made, time, outcome, and notes', due_date: 'Daily', quantitative_result: 'Daily call log submitted for every working day of the mobilisation period', qualitative_result: 'Log records each call with time, outcome, and notes — no calls omitted', means_of_verification: 'Submitted daily call logs', unit_rate: '', payment_condition: 'Required for payment — demonstrates consistent outreach effort' },
+      { task_num: 2, description: 'Applicant Information Sheet – confirmed participants, qualifications verified, logistics information', due_date: 'End of mobilisation period', quantitative_result: 'Applicant information sheet submitted by end of mobilisation period with all confirmed participants', qualitative_result: 'Sheet captures full name, contact number, district, qualifications, smartphone access, and logistics information for each confirmed applicant', means_of_verification: 'Completed applicant information sheet', unit_rate: '', payment_condition: 'Pay only if submitted on time and verified' },
+      { task_num: 3, description: 'Barrier Report – summary of identified barriers and recommendations for support', due_date: 'End of mobilisation period', quantitative_result: 'Barrier report submitted by end of mobilisation period covering all identified challenges', qualitative_result: 'Report clearly identifies barriers by category and provides specific, actionable recommendations', means_of_verification: 'Submitted barrier report', unit_rate: '', payment_condition: 'Pay only if submitted on time and approved' },
+      { task_num: 4, description: 'Final Mobilisation Summary Report – confirmation rates, analysis of no-shows/declines, final participant count', due_date: 'Day after mobilisation closes', quantitative_result: 'Final mobilisation summary report submitted the day after mobilisation closes', qualitative_result: 'Report provides accurate confirmation rates, analysis of no-shows and declines, and final verified participant count', means_of_verification: 'Submitted and approved final mobilisation summary report', unit_rate: '', payment_condition: 'Payment processed upon approval of final report' },
     ],
   },
   group_session: {
@@ -430,9 +466,9 @@ const WO_DEFAULTS = {
 5. Support individual MSMEs with queries or follow-up actions arising from the session.
 6. Submit session notes and attendance records within the required timelines.`,
     deliverables_json: [
-      { task_num: 1, description: 'Signed attendance sheet – original submitted to Senior BGE on the day of the session', due_date: 'Day of session' },
-      { task_num: 2, description: 'Session notes – key topics discussed, challenges raised, and agreed follow-up actions', due_date: 'Within 2 days of session' },
-      { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session' },
+      { task_num: 1, description: 'Signed attendance sheet – original submitted to Senior BGE on the day of the session', due_date: 'Day of session', quantitative_result: 'Signed attendance sheet submitted to Senior BGE on the day of every session', qualitative_result: 'Sheet is complete, legible, and accurately captures all attendees', means_of_verification: 'Original signed attendance sheet', unit_rate: '', payment_condition: 'Required for payment — must be submitted on the day of each session' },
+      { task_num: 2, description: 'Session notes – key topics discussed, challenges raised, and agreed follow-up actions', due_date: 'Within 2 days of session', quantitative_result: 'Session notes submitted within 2 days of every peer-to-peer session', qualitative_result: 'Notes cover key topics discussed, challenges raised, outcomes agreed, and next steps', means_of_verification: 'Submitted session notes using PRUDEV II template', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
+      { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session', quantitative_result: 'Follow-up log submitted within 2 days of each session for all MSMEs who attended', qualitative_result: 'Log captures specific, actionable follow-up points agreed with each MSME', means_of_verification: 'Completed individual MSME follow-up log', unit_rate: '', payment_condition: 'Pay only if both quantitative and qualitative targets are achieved' },
     ],
   },
   training_facilitation: {
@@ -448,13 +484,13 @@ const WO_DEFAULTS = {
 9. Compile and share a detailed Training Report and Lessons Learnt document with the programme team after each training.
 10. Maintain training records, attendance sheets, and all programme documentation in the required PRUDEV II formats.`,
     deliverables_json: [
-      { task_num: 1, description: 'Training Content Package – session plans, facilitator guides, and participant materials approved by the BDS Expert', due_date: 'Before first training session' },
-      { task_num: 2, description: 'Signed attendance sheets – collected and submitted for every session', due_date: 'Day of each session' },
-      { task_num: 3, description: 'Participant Feedback Summary – consolidated analysis of feedback forms from each training', due_date: 'Within 3 days of each session' },
-      { task_num: 4, description: 'Post-Training Review Notes – documented debrief with the facilitation team', due_date: 'Within 3 days of each session' },
-      { task_num: 5, description: 'Detailed Training Report – covering objectives, activities, key findings, observations, and recommendations', due_date: 'Within 5 days of each session' },
-      { task_num: 6, description: 'Lessons Learnt Report – structured document capturing insights for future training design and delivery', due_date: 'End of assignment' },
-      { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Monthly, with report submission' },
+      { task_num: 1, description: 'Training Content Package – session plans, facilitator guides, and participant materials approved by the BDS Expert', due_date: 'Before first training session', quantitative_result: 'Complete training content package approved by BDS Expert before the first training session', qualitative_result: 'Content is well-structured, contextually relevant, and meets PRUDEV II quality standards', means_of_verification: 'Approved training content package with sign-off from BDS Expert', unit_rate: '', payment_condition: 'Required before training commences — no separate payment' },
+      { task_num: 2, description: 'Signed attendance sheets – collected and submitted for every session', due_date: 'Day of each session', quantitative_result: 'Signed attendance sheet collected and submitted for every training session on the day of delivery', qualitative_result: 'Sheets are complete, legible, and accurately capture participant attendance', means_of_verification: 'Original signed attendance sheets per session', unit_rate: '', payment_condition: 'Required for payment — must be submitted on the day of each session' },
+      { task_num: 3, description: 'Participant Feedback Summary – consolidated analysis of feedback forms from each training', due_date: 'Within 3 days of each session', quantitative_result: 'Participant feedback summary submitted within 3 days of each training session', qualitative_result: 'Summary provides consolidated analysis of feedback, identifies key themes, and highlights areas for improvement', means_of_verification: 'Submitted feedback summary with original feedback forms attached', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
+      { task_num: 4, description: 'Post-Training Review Notes – documented debrief with the facilitation team', due_date: 'Within 3 days of each session', quantitative_result: 'Post-training review notes submitted within 3 days of each session', qualitative_result: 'Notes reflect a structured debrief, capture team observations, and include agreed improvement actions', means_of_verification: 'Submitted post-training review notes', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
+      { task_num: 5, description: 'Detailed Training Report – covering objectives, activities, key findings, observations, and recommendations', due_date: 'Within 5 days of each session', quantitative_result: 'Detailed training report submitted within 5 days of each training session', qualitative_result: 'Report covers objectives, activities, key findings, observations, and recommendations with sufficient depth', means_of_verification: 'Submitted detailed training report', unit_rate: '', payment_condition: 'Pay only if submitted within 5 days and approved by BDS Expert' },
+      { task_num: 6, description: 'Lessons Learnt Report – structured document capturing insights for future training design and delivery', due_date: 'End of assignment', quantitative_result: '1 lessons learnt report submitted at the end of the assignment', qualitative_result: 'Report provides structured, insightful reflections that can genuinely improve future training design and delivery', means_of_verification: 'Submitted lessons learnt report', unit_rate: '', payment_condition: 'Pay only if submitted on time and approved' },
+      { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Monthly, with report submission', quantitative_result: '1 invoice and 1 signed timesheet submitted monthly with the report', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of monthly deliverables' },
     ],
   },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
@@ -689,51 +725,73 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
           {/* Deliverables table */}
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="subtitle2" fontWeight={700}>Deliverables</Typography>
+              <Typography variant="subtitle2" fontWeight={700}>Deliverables &amp; Outcomes</Typography>
               <Button size="small" startIcon={<Add />} onClick={() => setWoForm(f => ({
                 ...f,
-                deliverables_json: [...f.deliverables_json, { task_num: f.deliverables_json.length + 1, description: '', due_date: '' }],
+                deliverables_json: [...f.deliverables_json, {
+                  task_num: f.deliverables_json.length + 1,
+                  description: '',
+                  due_date: '',
+                  quantitative_result: '',
+                  qualitative_result: '',
+                  means_of_verification: '',
+                  unit_rate: '',
+                  payment_condition: '',
+                }],
               }))}>Add row</Button>
             </Box>
-            {(woForm.deliverables_json || []).map((d, i) => (
-              <Box
-                key={i}
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(170px, 220px) 40px' },
-                  gap: 1,
-                  mb: 1,
-                  alignItems: 'flex-start',
-                }}
-              >
-                <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
-                <TextField size="small" fullWidth multiline minRows={1} label="Deliverable description"
-                  value={d.description}
-                  onChange={e => {
-                    const upd = [...woForm.deliverables_json];
-                    upd[i] = { ...d, description: e.target.value };
-                    setWoForm(f => ({ ...f, deliverables_json: upd }));
-                  }} />
-                <TextField
-                  size="small"
-                  fullWidth
-                  label="Due date"
-                  sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
-                  value={d.due_date}
-                  onChange={e => {
-                    const upd = [...woForm.deliverables_json];
-                    upd[i] = { ...d, due_date: e.target.value };
-                    setWoForm(f => ({ ...f, deliverables_json: upd }));
-                  }} />
-                <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
-                  const upd = woForm.deliverables_json.filter((_, j) => j !== i)
-                    .map((x, j) => ({ ...x, task_num: j + 1 }));
-                  setWoForm(f => ({ ...f, deliverables_json: upd }));
-                }}>
-                  <Delete fontSize="small" />
-                </IconButton>
-              </Box>
-            ))}
+            {(woForm.deliverables_json || []).map((d, i) => {
+              const updField = (field, val) => {
+                const upd = [...woForm.deliverables_json];
+                upd[i] = { ...d, [field]: val };
+                setWoForm(f => ({ ...f, deliverables_json: upd }));
+              };
+              return (
+                <Box key={i} sx={{ mb: 1.5, pl: 0 }}>
+                  <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(150px, 200px) 40px' },
+                    gap: 1,
+                    alignItems: 'flex-start',
+                  }}>
+                    <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
+                    <TextField size="small" fullWidth multiline minRows={1} label="Deliverable / Task"
+                      value={d.description}
+                      onChange={e => updField('description', e.target.value)} />
+                    <TextField size="small" fullWidth label="Due date"
+                      sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
+                      value={d.due_date}
+                      onChange={e => updField('due_date', e.target.value)} />
+                    <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
+                      const upd = woForm.deliverables_json.filter((_, j) => j !== i)
+                        .map((x, j) => ({ ...x, task_num: j + 1 }));
+                      setWoForm(f => ({ ...f, deliverables_json: upd }));
+                    }}>
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  </Box>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1, mt: 0.75, pl: { xs: 0, sm: '36px' } }}>
+                    <TextField size="small" fullWidth multiline minRows={1} label="Quantitative Result Required"
+                      value={d.quantitative_result || ''}
+                      onChange={e => updField('quantitative_result', e.target.value)} />
+                    <TextField size="small" fullWidth multiline minRows={1} label="Qualitative Result Required"
+                      value={d.qualitative_result || ''}
+                      onChange={e => updField('qualitative_result', e.target.value)} />
+                    <TextField size="small" fullWidth multiline minRows={1} label="Means of Verification"
+                      value={d.means_of_verification || ''}
+                      onChange={e => updField('means_of_verification', e.target.value)} />
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                      <TextField size="small" fullWidth label="Unit Rate (UGX)"
+                        value={d.unit_rate || ''}
+                        onChange={e => updField('unit_rate', e.target.value)} />
+                      <TextField size="small" fullWidth label="Payment Condition"
+                        value={d.payment_condition || ''}
+                        onChange={e => updField('payment_condition', e.target.value)} />
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            })}
           </Grid>
 
           <Grid item xs={12} sm={4}>
