@@ -722,10 +722,10 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
               value={woForm.key_tasks} onChange={e => setWoForm(f => ({ ...f, key_tasks: e.target.value }))} />
           </Grid>
 
-          {/* Deliverables table */}
+          {/* ── SECTION: Deliverables ── */}
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="subtitle2" fontWeight={700}>Deliverables &amp; Outcomes</Typography>
+              <Typography variant="subtitle2" fontWeight={700}>Deliverables</Typography>
               <Button size="small" startIcon={<Add />} onClick={() => setWoForm(f => ({
                 ...f,
                 deliverables_json: [...f.deliverables_json, {
@@ -740,58 +740,91 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 }],
               }))}>Add row</Button>
             </Box>
-            {(woForm.deliverables_json || []).map((d, i) => {
-              const updField = (field, val) => {
-                const upd = [...woForm.deliverables_json];
-                upd[i] = { ...d, [field]: val };
-                setWoForm(f => ({ ...f, deliverables_json: upd }));
-              };
-              return (
-                <Box key={i} sx={{ mb: 1.5, pl: 0 }}>
-                  <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(150px, 200px) 40px' },
-                    gap: 1,
-                    alignItems: 'flex-start',
+            {(woForm.deliverables_json || []).map((d, i) => (
+              <Box key={i} sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(150px, 200px) 40px' },
+                gap: 1,
+                mb: 1,
+                alignItems: 'flex-start',
+              }}>
+                <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
+                <TextField size="small" fullWidth multiline minRows={1} label="Deliverable / Task"
+                  value={d.description}
+                  onChange={e => {
+                    const upd = [...woForm.deliverables_json];
+                    upd[i] = { ...d, description: e.target.value };
+                    setWoForm(f => ({ ...f, deliverables_json: upd }));
+                  }} />
+                <TextField size="small" fullWidth label="Due date"
+                  sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
+                  value={d.due_date}
+                  onChange={e => {
+                    const upd = [...woForm.deliverables_json];
+                    upd[i] = { ...d, due_date: e.target.value };
+                    setWoForm(f => ({ ...f, deliverables_json: upd }));
+                  }} />
+                <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
+                  const upd = woForm.deliverables_json.filter((_, j) => j !== i)
+                    .map((x, j) => ({ ...x, task_num: j + 1 }));
+                  setWoForm(f => ({ ...f, deliverables_json: upd }));
+                }}>
+                  <Delete fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
+          </Grid>
+
+          {/* ── SECTION: Results-Based Outcomes ── */}
+          <Grid item xs={12}>
+            <Box sx={{ borderTop: '2px solid', borderColor: 'primary.main', pt: 1.5, mt: 0.5 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                Results-Based Outcomes
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                A BGE must achieve BOTH: Quantitative Targets = 50% AND Qualitative Outcomes = 50% to qualify for payment.
+              </Typography>
+              {(woForm.deliverables_json || []).map((d, i) => {
+                const updField = (field, val) => {
+                  const upd = [...woForm.deliverables_json];
+                  upd[i] = { ...d, [field]: val };
+                  setWoForm(f => ({ ...f, deliverables_json: upd }));
+                };
+                return (
+                  <Box key={i} sx={{
+                    mb: 2,
+                    p: 1.5,
+                    borderRadius: 1,
+                    bgcolor: i % 2 === 0 ? 'grey.50' : 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
                   }}>
-                    <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
-                    <TextField size="small" fullWidth multiline minRows={1} label="Deliverable / Task"
-                      value={d.description}
-                      onChange={e => updField('description', e.target.value)} />
-                    <TextField size="small" fullWidth label="Due date"
-                      sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
-                      value={d.due_date}
-                      onChange={e => updField('due_date', e.target.value)} />
-                    <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
-                      const upd = woForm.deliverables_json.filter((_, j) => j !== i)
-                        .map((x, j) => ({ ...x, task_num: j + 1 }));
-                      setWoForm(f => ({ ...f, deliverables_json: upd }));
-                    }}>
-                      <Delete fontSize="small" />
-                    </IconButton>
-                  </Box>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1, mt: 0.75, pl: { xs: 0, sm: '36px' } }}>
-                    <TextField size="small" fullWidth multiline minRows={1} label="Quantitative Result Required"
-                      value={d.quantitative_result || ''}
-                      onChange={e => updField('quantitative_result', e.target.value)} />
-                    <TextField size="small" fullWidth multiline minRows={1} label="Qualitative Result Required"
-                      value={d.qualitative_result || ''}
-                      onChange={e => updField('qualitative_result', e.target.value)} />
-                    <TextField size="small" fullWidth multiline minRows={1} label="Means of Verification"
-                      value={d.means_of_verification || ''}
-                      onChange={e => updField('means_of_verification', e.target.value)} />
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                      <TextField size="small" fullWidth label="Unit Rate (UGX)"
-                        value={d.unit_rate || ''}
-                        onChange={e => updField('unit_rate', e.target.value)} />
-                      <TextField size="small" fullWidth label="Payment Condition"
-                        value={d.payment_condition || ''}
-                        onChange={e => updField('payment_condition', e.target.value)} />
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                      Task {d.task_num}{d.description ? ` — ${d.description}` : ''}
+                    </Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
+                      <TextField size="small" fullWidth multiline minRows={2} label="Quantitative Result Required"
+                        value={d.quantitative_result || ''}
+                        onChange={e => updField('quantitative_result', e.target.value)} />
+                      <TextField size="small" fullWidth multiline minRows={2} label="Qualitative Result Required"
+                        value={d.qualitative_result || ''}
+                        onChange={e => updField('qualitative_result', e.target.value)} />
+                      <TextField size="small" fullWidth multiline minRows={1} label="Means of Verification"
+                        value={d.means_of_verification || ''}
+                        onChange={e => updField('means_of_verification', e.target.value)} />
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                        <TextField size="small" fullWidth label="Unit Rate (UGX)"
+                          value={d.unit_rate || ''}
+                          onChange={e => updField('unit_rate', e.target.value)} />
+                        <TextField size="small" fullWidth multiline minRows={1} label="Payment Condition"
+                          value={d.payment_condition || ''}
+                          onChange={e => updField('payment_condition', e.target.value)} />
+                      </Box>
                     </Box>
                   </Box>
-                </Box>
-              );
-            })}
+                );
+              })}
+            </Box>
           </Grid>
 
           <Grid item xs={12} sm={4}>
