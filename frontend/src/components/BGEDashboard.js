@@ -213,6 +213,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [submissionUploading, setSubmissionUploading] = useState(false);
   const timesheetInputRef = useRef(null);
   const invoiceInputRef = useRef(null);
+  // inline replace state
+  const [replacingSubId, setReplacingSubId] = useState(null);
+  const [replaceTimesheetFile, setReplaceTimesheetFile] = useState(null);
+  const [replaceInvoiceFile, setReplaceInvoiceFile] = useState(null);
+  const [replaceUploading, setReplaceUploading] = useState(false);
+  const replaceTimesheetRef = useRef(null);
+  const replaceInvoiceRef = useRef(null);
 
   // Payments against work orders
   const [payments, setPayments] = useState([]);
@@ -1146,6 +1153,35 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const replaceSubmission = async (sub) => {
+    if (!replaceTimesheetFile && !replaceInvoiceFile) {
+      notify('Choose a new timesheet and/or invoice file first', 'error');
+      return;
+    }
+    setReplaceUploading(true);
+    try {
+      const form = new FormData();
+      if (replaceTimesheetFile) form.append('timesheet', replaceTimesheetFile);
+      if (replaceInvoiceFile) form.append('invoice', replaceInvoiceFile);
+      const res = await axios.patch(
+        `${API_ENDPOINTS.WORK_ORDER_SUBMISSIONS}${sub.id}/`,
+        form,
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } },
+      );
+      setSubmissions(prev => prev.map(s => s.id === sub.id ? res.data : s));
+      setReplacingSubId(null);
+      setReplaceTimesheetFile(null);
+      setReplaceInvoiceFile(null);
+      if (replaceTimesheetRef.current) replaceTimesheetRef.current.value = '';
+      if (replaceInvoiceRef.current) replaceInvoiceRef.current.value = '';
+      notify('Submission updated');
+    } catch (e) {
+      notify(e.response?.data?.detail || 'Failed to update submission', 'error');
+    } finally {
+      setReplaceUploading(false);
+    }
+  };
+
   const downloadSubmissionFile = async (sub, kind) => {
     const url = kind === 'timesheet' ? WORK_ORDER_SUBMISSION_TIMESHEET_URL(sub.id) : WORK_ORDER_SUBMISSION_INVOICE_URL(sub.id);
     const filename = kind === 'timesheet' ? sub.timesheet_filename : sub.invoice_filename;
@@ -1966,35 +2002,72 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       </TableHead>
                       <TableBody>
                         {submissions.map(sub => (
-                          <TableRow key={sub.id}>
-                            <TableCell>{sub.work_order_number}</TableCell>
-                            <TableCell>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
-                            <TableCell>
-                              {sub.has_timesheet ? (
-                                <Tooltip title={sub.timesheet_filename}>
-                                  <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'timesheet')}>
-                                    <Download fontSize="small" />
+                          <React.Fragment key={sub.id}>
+                            <TableRow>
+                              <TableCell>{sub.work_order_number}</TableCell>
+                              <TableCell>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                {sub.has_timesheet ? (
+                                  <Tooltip title={sub.timesheet_filename}>
+                                    <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'timesheet')}>
+                                      <Download fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                              </TableCell>
+                              <TableCell>
+                                {sub.has_invoice ? (
+                                  <Tooltip title={sub.invoice_filename}>
+                                    <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'invoice')}>
+                                      <Download fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                              </TableCell>
+                              <TableCell align="right">
+                                <Tooltip title="Replace files">
+                                  <IconButton size="small" color="primary" onClick={() => {
+                                    setReplacingSubId(prev => prev === sub.id ? null : sub.id);
+                                    setReplaceTimesheetFile(null);
+                                    setReplaceInvoiceFile(null);
+                                  }}>
+                                    <Edit fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
-                              ) : <Typography variant="caption" color="text.disabled">—</Typography>}
-                            </TableCell>
-                            <TableCell>
-                              {sub.has_invoice ? (
-                                <Tooltip title={sub.invoice_filename}>
-                                  <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'invoice')}>
-                                    <Download fontSize="small" />
+                                <Tooltip title="Delete submission">
+                                  <IconButton size="small" color="error" onClick={() => deleteSubmission(sub)}>
+                                    <Delete fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
-                              ) : <Typography variant="caption" color="text.disabled">—</Typography>}
-                            </TableCell>
-                            <TableCell align="right">
-                              <Tooltip title="Delete submission">
-                                <IconButton size="small" color="error" onClick={() => deleteSubmission(sub)}>
-                                  <Delete fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
+                              </TableCell>
+                            </TableRow>
+                            {replacingSubId === sub.id && (
+                              <TableRow>
+                                <TableCell colSpan={5} sx={{ bgcolor: 'action.hover', py: 1.5 }}>
+                                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <Typography variant="caption" fontWeight={700}>Replace files:</Typography>
+                                    <input type="file" accept=".xlsx,.xls" ref={replaceTimesheetRef} style={{ display: 'none' }}
+                                      onChange={e => setReplaceTimesheetFile(e.target.files[0] || null)} />
+                                    <Button size="small" variant="outlined" startIcon={<CloudUpload />}
+                                      onClick={() => replaceTimesheetRef.current?.click()}>
+                                      {replaceTimesheetFile ? replaceTimesheetFile.name : 'New Timesheet'}
+                                    </Button>
+                                    <input type="file" accept=".xlsx,.xls" ref={replaceInvoiceRef} style={{ display: 'none' }}
+                                      onChange={e => setReplaceInvoiceFile(e.target.files[0] || null)} />
+                                    <Button size="small" variant="outlined" startIcon={<CloudUpload />}
+                                      onClick={() => replaceInvoiceRef.current?.click()}>
+                                      {replaceInvoiceFile ? replaceInvoiceFile.name : 'New Invoice'}
+                                    </Button>
+                                    <Button size="small" variant="contained" disabled={replaceUploading}
+                                      onClick={() => replaceSubmission(sub)}>
+                                      {replaceUploading ? <CircularProgress size={14} color="inherit" /> : 'Update'}
+                                    </Button>
+                                    <Button size="small" onClick={() => setReplacingSubId(null)}>Cancel</Button>
+                                  </Box>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
                         ))}
                       </TableBody>
                     </Table>
