@@ -5032,9 +5032,23 @@ class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return qs.filter(work_order__bge=bge)
 
     def perform_create(self, serializer):
-        if not self._is_admin():
-            raise PermissionDenied("Only admins can record payments.")
-        serializer.save(recorded_by=self.request.user)
+        user = self.request.user
+        if self._is_admin():
+            serializer.save(recorded_by=user)
+        else:
+            # BGEs record payments they received against their own work orders
+            try:
+                bge = user.bge_profile
+            except Exception:
+                raise PermissionDenied("You must be a registered BGE to record payments.")
+            work_order = serializer.validated_data.get('work_order')
+            if not work_order or work_order.bge_id != bge.id:
+                raise PermissionDenied("You can only record payments for your own work orders.")
+            serializer.save(
+                recorded_by=user,
+                confirmed_by_bge=True,
+                confirmed_at=timezone.now(),
+            )
 
     def perform_update(self, serializer):
         if not self._is_admin():

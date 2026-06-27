@@ -6186,11 +6186,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         work_order: wo.id,
         amount: form.amount,
         payment_date: form.payment_date,
+        balance: form.balance || null,
         reference: form.reference || '',
         notes: form.notes || '',
       }, { headers });
       notify('Payment recorded');
-      setWoPaymentForms(prev => ({ ...prev, [wo.id]: { amount: '', payment_date: '', reference: '', notes: '' } }));
+      setWoPaymentForms(prev => ({ ...prev, [wo.id]: { amount: '', payment_date: '', balance: '', reference: '', notes: '' } }));
       fetchWoPayments();
     } catch (err) {
       const errData = err.response?.data;
@@ -6455,6 +6456,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                 <TableRow>
                                   <TableCell>Date</TableCell>
                                   <TableCell align="right">Amount (UGX)</TableCell>
+                                  <TableCell align="right">Balance (UGX)</TableCell>
                                   <TableCell>Reference</TableCell>
                                   <TableCell>Notes</TableCell>
                                   <TableCell>Recorded by</TableCell>
@@ -6467,6 +6469,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                   <TableRow key={p.id}>
                                     <TableCell>{p.payment_date}</TableCell>
                                     <TableCell align="right">{Number(p.amount).toLocaleString()}</TableCell>
+                                    <TableCell align="right">
+                                      {p.balance != null
+                                        ? <strong style={{ color: Number(p.balance) > 0 ? '#d32f2f' : 'inherit' }}>{Number(p.balance).toLocaleString()}</strong>
+                                        : '—'}
+                                    </TableCell>
                                     <TableCell>{p.reference || '—'}</TableCell>
                                     <TableCell>{p.notes || '—'}</TableCell>
                                     <TableCell>{p.recorded_by_name || '—'}</TableCell>
@@ -6524,6 +6531,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             size="small" type="number" label="Amount (UGX)"
                             value={pf.amount || ''}
                             onChange={e => setWoPaymentField(wo.id, 'amount', e.target.value)}
+                            sx={{ width: 150 }}
+                          />
+                          <TextField
+                            size="small" type="number" label="Balance (UGX)"
+                            value={pf.balance || ''}
+                            onChange={e => setWoPaymentField(wo.id, 'balance', e.target.value)}
                             sx={{ width: 150 }}
                           />
                           <TextField

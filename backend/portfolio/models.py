@@ -1371,6 +1371,8 @@ class WorkOrderPayment(models.Model):
     )
     amount       = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateField()
+    balance      = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text='Remaining balance on the invoice after this payment.')
     reference    = models.CharField(max_length=200, blank=True,
         help_text='Bank/mobile money transaction reference, cheque number, etc.')
     notes        = models.TextField(blank=True)

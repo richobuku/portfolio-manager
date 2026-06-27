@@ -225,6 +225,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // Payments against work orders
   const [payments, setPayments] = useState([]);
   const [paymentConfirming, setPaymentConfirming] = useState(null);
+  const [activePaymentWoId, setActivePaymentWoId] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({ payment_date: '', amount: '', balance: '' });
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   // Signature upload
   const [sigFile, setSigFile] = useState(null);
@@ -1214,6 +1217,35 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const recordPayment = async (woId) => {
+    if (!paymentForm.payment_date || !paymentForm.amount) {
+      notify('Date received and amount are required', 'error');
+      return;
+    }
+    setPaymentSaving(true);
+    try {
+      const body = {
+        work_order: woId,
+        payment_date: paymentForm.payment_date,
+        amount: paymentForm.amount,
+      };
+      if (paymentForm.balance !== '') body.balance = paymentForm.balance;
+      const res = await axios.post(API_ENDPOINTS.WORK_ORDER_PAYMENTS, body, { headers });
+      setPayments(prev => [...prev, res.data]);
+      setActivePaymentWoId(null);
+      setPaymentForm({ payment_date: '', amount: '', balance: '' });
+      notify('Payment recorded');
+    } catch (err) {
+      const errData = err.response?.data;
+      const msg = errData?.error || errData?.detail ||
+        (typeof errData === 'object' ? Object.values(errData).flat()[0] : null) ||
+        'Failed to record payment';
+      notify(String(msg), 'error');
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
   // ── sidebar ─────────────────────────────────────────────────────────────────
   const navItems = [
     { key: 'msmes',       label: 'My MSMEs',      icon: <Business /> },
@@ -2166,39 +2198,82 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           )}
                         </Box>
 
-                        {/* ── Payments — show once a submission exists ── */}
-                        {woSubs.length > 0 && (
-                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-                            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                              PAYMENTS
-                            </Typography>
-                            {woPays.length === 0 ? (
-                              <Typography variant="caption" color="text.disabled">
-                                No payment recorded yet. You will be notified when a payment is logged.
-                              </Typography>
-                            ) : (
-                              woPays.map(p => (
-                                <Box key={p.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 0.5 }}>
-                                  <Box>
-                                    <Typography variant="caption">
-                                      {p.payment_date} · <strong>UGX {Number(p.amount).toLocaleString()}</strong>
-                                      {p.reference && ` · Ref: ${p.reference}`}
-                                    </Typography>
-                                  </Box>
-                                  {p.confirmed_by_bge ? (
-                                    <Chip size="small" color="success" icon={<CheckCircle />}
-                                      label={`Confirmed ${new Date(p.confirmed_at).toLocaleDateString()}`} />
-                                  ) : (
-                                    <Button variant="outlined" size="small" color="success" disabled={paymentConfirming === p.id}
-                                      onClick={() => confirmPayment(p)}>
-                                      {paymentConfirming === p.id ? <CircularProgress size={14} /> : 'Confirm Received'}
-                                    </Button>
-                                  )}
-                                </Box>
-                              ))
-                            )}
+                        {/* ── Payments ── */}
+                        <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="caption" fontWeight={700} color="text.secondary">PAYMENTS</Typography>
+                            <Button size="small" onClick={() => {
+                              setActivePaymentWoId(prev => prev === wo.id ? null : wo.id);
+                              setPaymentForm({ payment_date: '', amount: '', balance: '' });
+                            }}>
+                              {activePaymentWoId === wo.id ? 'Cancel' : woPays.length > 0 ? 'Record another' : 'Record payment'}
+                            </Button>
                           </Box>
-                        )}
+
+                          {/* Existing payment records */}
+                          {woPays.length > 0 && (
+                            <TableContainer sx={{ mb: 1 }}>
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell sx={{ py: 0.5 }}>Date received</TableCell>
+                                    <TableCell sx={{ py: 0.5 }} align="right">Amount (UGX)</TableCell>
+                                    <TableCell sx={{ py: 0.5 }} align="right">Balance (UGX)</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {woPays.map(p => (
+                                    <TableRow key={p.id}>
+                                      <TableCell sx={{ py: 0.5 }}>{p.payment_date}</TableCell>
+                                      <TableCell sx={{ py: 0.5 }} align="right">
+                                        <strong>{Number(p.amount).toLocaleString()}</strong>
+                                      </TableCell>
+                                      <TableCell sx={{ py: 0.5 }} align="right">
+                                        {p.balance != null
+                                          ? Number(p.balance).toLocaleString()
+                                          : <Typography variant="caption" color="text.disabled">—</Typography>}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          )}
+
+                          {woPays.length === 0 && activePaymentWoId !== wo.id && (
+                            <Typography variant="caption" color="text.disabled">No payments recorded yet.</Typography>
+                          )}
+
+                          {/* Record payment form */}
+                          {activePaymentWoId === wo.id && (
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end', flexWrap: 'wrap', mt: 0.5, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                              <TextField
+                                size="small" type="date" label="Date received"
+                                InputLabelProps={{ shrink: true }}
+                                value={paymentForm.payment_date}
+                                onChange={e => setPaymentForm(f => ({ ...f, payment_date: e.target.value }))}
+                                sx={{ width: 160 }}
+                              />
+                              <TextField
+                                size="small" type="number" label="Amount received (UGX)"
+                                value={paymentForm.amount}
+                                onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                                sx={{ width: 180 }}
+                              />
+                              <TextField
+                                size="small" type="number" label="Balance on invoice (UGX)"
+                                value={paymentForm.balance}
+                                onChange={e => setPaymentForm(f => ({ ...f, balance: e.target.value }))}
+                                sx={{ width: 180 }}
+                              />
+                              <Button variant="contained" size="small" color="success"
+                                disabled={paymentSaving}
+                                onClick={() => recordPayment(wo.id)}>
+                                {paymentSaving ? <CircularProgress size={14} color="inherit" /> : 'Save'}
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
                       </CardContent>
                     </Card>
                   );

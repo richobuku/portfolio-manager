@@ -651,7 +651,7 @@ class WorkOrderPaymentSerializer(serializers.ModelSerializer):
         model = WorkOrderPayment
         fields = [
             'id', 'work_order', 'work_order_number', 'bge_name',
-            'amount', 'payment_date', 'reference', 'notes',
+            'amount', 'payment_date', 'balance', 'reference', 'notes',
             'recorded_by', 'recorded_by_name', 'created_at',
             'notified_at', 'confirmed_by_bge', 'confirmed_at',
         ]
