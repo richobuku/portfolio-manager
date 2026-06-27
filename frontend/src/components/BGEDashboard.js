@@ -1132,6 +1132,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       if (timesheetInputRef.current) timesheetInputRef.current.value = '';
       if (invoiceInputRef.current) invoiceInputRef.current.value = '';
       fetchSubmissions();
+      fetchPayments();
     } catch (err) {
       const errData = err.response?.data;
       const msg = errData?.error || errData?.detail ||
@@ -2061,7 +2062,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
                           {/* Existing submissions */}
                           {woSubs.length > 0 && (
-                            <Table size="small" sx={{ mb: 1 }}>
+                            <TableContainer sx={{ mb: 1 }}>
+                            <Table size="small">
                               <TableHead>
                                 <TableRow>
                                   <TableCell sx={{ py: 0.5 }}>Submitted</TableCell>
@@ -2099,6 +2101,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                             setReplacingSubId(prev => prev === sub.id ? null : sub.id);
                                             setReplaceTimesheetFile(null);
                                             setReplaceInvoiceFile(null);
+                                            if (replaceTimesheetRef.current) replaceTimesheetRef.current.value = '';
+                                            if (replaceInvoiceRef.current) replaceInvoiceRef.current.value = '';
                                           }}>
                                             <Edit fontSize="small" />
                                           </IconButton>
@@ -2136,6 +2140,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                 ))}
                               </TableBody>
                             </Table>
+                            </TableContainer>
                           )}
 
                           {woSubs.length === 0 && activeUploadWoId !== wo.id && (
@@ -2161,31 +2166,37 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           )}
                         </Box>
 
-                        {/* ── Payments ── */}
-                        {woPays.length > 0 && (
+                        {/* ── Payments — show once a submission exists ── */}
+                        {woSubs.length > 0 && (
                           <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
                             <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                               PAYMENTS
                             </Typography>
-                            {woPays.map(p => (
-                              <Box key={p.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 0.5 }}>
-                                <Box>
-                                  <Typography variant="caption">
-                                    {p.payment_date} · <strong>UGX {Number(p.amount).toLocaleString()}</strong>
-                                    {p.reference && ` · Ref: ${p.reference}`}
-                                  </Typography>
+                            {woPays.length === 0 ? (
+                              <Typography variant="caption" color="text.disabled">
+                                No payment recorded yet. You will be notified when a payment is logged.
+                              </Typography>
+                            ) : (
+                              woPays.map(p => (
+                                <Box key={p.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 0.5 }}>
+                                  <Box>
+                                    <Typography variant="caption">
+                                      {p.payment_date} · <strong>UGX {Number(p.amount).toLocaleString()}</strong>
+                                      {p.reference && ` · Ref: ${p.reference}`}
+                                    </Typography>
+                                  </Box>
+                                  {p.confirmed_by_bge ? (
+                                    <Chip size="small" color="success" icon={<CheckCircle />}
+                                      label={`Confirmed ${new Date(p.confirmed_at).toLocaleDateString()}`} />
+                                  ) : (
+                                    <Button variant="outlined" size="small" color="success" disabled={paymentConfirming === p.id}
+                                      onClick={() => confirmPayment(p)}>
+                                      {paymentConfirming === p.id ? <CircularProgress size={14} /> : 'Confirm Received'}
+                                    </Button>
+                                  )}
                                 </Box>
-                                {p.confirmed_by_bge ? (
-                                  <Chip size="small" color="success" icon={<CheckCircle />}
-                                    label={`Confirmed ${new Date(p.confirmed_at).toLocaleDateString()}`} />
-                                ) : (
-                                  <Button variant="outlined" size="small" disabled={paymentConfirming === p.id}
-                                    onClick={() => confirmPayment(p)}>
-                                    {paymentConfirming === p.id ? <CircularProgress size={14} /> : 'Confirm Received'}
-                                  </Button>
-                                )}
-                              </Box>
-                            ))}
+                              ))
+                            )}
                           </Box>
                         )}
                       </CardContent>
