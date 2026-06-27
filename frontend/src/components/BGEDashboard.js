@@ -207,12 +207,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   // Timesheet & invoice submissions
   const [submissions, setSubmissions] = useState([]);
-  const [submissionWoId, setSubmissionWoId] = useState('');
   const [timesheetFile, setTimesheetFile] = useState(null);
   const [invoiceFile, setInvoiceFile] = useState(null);
   const [submissionUploading, setSubmissionUploading] = useState(false);
   const timesheetInputRef = useRef(null);
   const invoiceInputRef = useRef(null);
+  // inline upload per work order
+  const [activeUploadWoId, setActiveUploadWoId] = useState(null);
   // inline replace state
   const [replacingSubId, setReplacingSubId] = useState(null);
   const [replaceTimesheetFile, setReplaceTimesheetFile] = useState(null);
@@ -1113,13 +1114,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   // ── timesheet & invoice submissions ─────────────────────────────────────────
-  const uploadSubmission = async () => {
-    if (!submissionWoId) { notify('Select a work order first', 'error'); return; }
+  const uploadSubmission = async (woId) => {
     if (!timesheetFile && !invoiceFile) { notify('Choose a timesheet and/or invoice file (.xlsx or .xls)', 'error'); return; }
     setSubmissionUploading(true);
     try {
       const form = new FormData();
-      form.append('work_order', submissionWoId);
+      form.append('work_order', woId);
       if (timesheetFile) form.append('timesheet', timesheetFile);
       if (invoiceFile) form.append('invoice', invoiceFile);
       await axios.post(API_ENDPOINTS.WORK_ORDER_SUBMISSIONS, form, {
@@ -1128,6 +1128,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       notify('Timesheet/invoice uploaded successfully');
       setTimesheetFile(null);
       setInvoiceFile(null);
+      setActiveUploadWoId(null);
       if (timesheetInputRef.current) timesheetInputRef.current.value = '';
       if (invoiceInputRef.current) invoiceInputRef.current.value = '';
       fetchSubmissions();
@@ -1894,7 +1895,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         {/* ── Work Orders (read-only — admin issues) ── */}
         {section === 'workorders' && (
           <Box>
-            {/* Signature card — compact when a signature is already stored */}
+            {/* Signature card */}
             <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                 <Box>
@@ -1913,13 +1914,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   )}
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    ref={sigInputRef}
-                    style={{ display: 'none' }}
-                    onChange={e => setSigFile(e.target.files[0] || null)}
-                  />
+                  <input type="file" accept="image/jpeg,image/png" ref={sigInputRef} style={{ display: 'none' }}
+                    onChange={e => setSigFile(e.target.files[0] || null)} />
                   {sigFile ? (
                     <>
                       <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sigFile.name}</Typography>
@@ -1937,191 +1933,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Box>
             </Card>
 
-            {/* Timesheet & invoice upload */}
-            <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>Submit Timesheet & Invoice</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Upload your timesheet and/or invoice (Excel format only) against one of your work orders.
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-                <FormControl size="small" sx={{ minWidth: 240 }}>
-                  <InputLabel>Work Order</InputLabel>
-                  <Select
-                    label="Work Order"
-                    value={submissionWoId}
-                    onChange={e => setSubmissionWoId(e.target.value)}
-                  >
-                    {workOrders.map(wo => (
-                      <MenuItem key={wo.id} value={wo.id}>{wo.work_order_number}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  ref={timesheetInputRef}
-                  style={{ display: 'none' }}
-                  onChange={e => setTimesheetFile(e.target.files[0] || null)}
-                />
-                <Button variant="outlined" size="small" startIcon={<CloudUpload />} onClick={() => timesheetInputRef.current?.click()}>
-                  {timesheetFile ? timesheetFile.name : 'Choose Timesheet'}
-                </Button>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  ref={invoiceInputRef}
-                  style={{ display: 'none' }}
-                  onChange={e => setInvoiceFile(e.target.files[0] || null)}
-                />
-                <Button variant="outlined" size="small" startIcon={<CloudUpload />} onClick={() => invoiceInputRef.current?.click()}>
-                  {invoiceFile ? invoiceFile.name : 'Choose Invoice'}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={submissionUploading}
-                  onClick={uploadSubmission}
-                >
-                  {submissionUploading ? <CircularProgress size={14} color="inherit" /> : 'Upload'}
-                </Button>
-              </Box>
-
-              {submissions.length > 0 && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>My Submissions</Typography>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Work Order</TableCell>
-                          <TableCell>Submitted</TableCell>
-                          <TableCell>Timesheet</TableCell>
-                          <TableCell>Invoice</TableCell>
-                          <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {submissions.map(sub => (
-                          <React.Fragment key={sub.id}>
-                            <TableRow>
-                              <TableCell>{sub.work_order_number}</TableCell>
-                              <TableCell>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
-                              <TableCell>
-                                {sub.has_timesheet ? (
-                                  <Tooltip title={sub.timesheet_filename}>
-                                    <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'timesheet')}>
-                                      <Download fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                ) : <Typography variant="caption" color="text.disabled">—</Typography>}
-                              </TableCell>
-                              <TableCell>
-                                {sub.has_invoice ? (
-                                  <Tooltip title={sub.invoice_filename}>
-                                    <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'invoice')}>
-                                      <Download fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                ) : <Typography variant="caption" color="text.disabled">—</Typography>}
-                              </TableCell>
-                              <TableCell align="right">
-                                <Tooltip title="Replace files">
-                                  <IconButton size="small" color="primary" onClick={() => {
-                                    setReplacingSubId(prev => prev === sub.id ? null : sub.id);
-                                    setReplaceTimesheetFile(null);
-                                    setReplaceInvoiceFile(null);
-                                  }}>
-                                    <Edit fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Delete submission">
-                                  <IconButton size="small" color="error" onClick={() => deleteSubmission(sub)}>
-                                    <Delete fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </TableCell>
-                            </TableRow>
-                            {replacingSubId === sub.id && (
-                              <TableRow>
-                                <TableCell colSpan={5} sx={{ bgcolor: 'action.hover', py: 1.5 }}>
-                                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <Typography variant="caption" fontWeight={700}>Replace files:</Typography>
-                                    <input type="file" accept=".xlsx,.xls" ref={replaceTimesheetRef} style={{ display: 'none' }}
-                                      onChange={e => setReplaceTimesheetFile(e.target.files[0] || null)} />
-                                    <Button size="small" variant="outlined" startIcon={<CloudUpload />}
-                                      onClick={() => replaceTimesheetRef.current?.click()}>
-                                      {replaceTimesheetFile ? replaceTimesheetFile.name : 'New Timesheet'}
-                                    </Button>
-                                    <input type="file" accept=".xlsx,.xls" ref={replaceInvoiceRef} style={{ display: 'none' }}
-                                      onChange={e => setReplaceInvoiceFile(e.target.files[0] || null)} />
-                                    <Button size="small" variant="outlined" startIcon={<CloudUpload />}
-                                      onClick={() => replaceInvoiceRef.current?.click()}>
-                                      {replaceInvoiceFile ? replaceInvoiceFile.name : 'New Invoice'}
-                                    </Button>
-                                    <Button size="small" variant="contained" disabled={replaceUploading}
-                                      onClick={() => replaceSubmission(sub)}>
-                                      {replaceUploading ? <CircularProgress size={14} color="inherit" /> : 'Update'}
-                                    </Button>
-                                    <Button size="small" onClick={() => setReplacingSubId(null)}>Cancel</Button>
-                                  </Box>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Box>
-              )}
-            </Card>
-
-            {/* Payments */}
-            {payments.length > 0 && (
-              <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>Payments</Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Work Order</TableCell>
-                        <TableCell>Date</TableCell>
-                        <TableCell align="right">Amount (UGX)</TableCell>
-                        <TableCell>Reference</TableCell>
-                        <TableCell align="right">Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {payments.map(p => (
-                        <TableRow key={p.id}>
-                          <TableCell>{p.work_order_number}</TableCell>
-                          <TableCell>{p.payment_date}</TableCell>
-                          <TableCell align="right">{Number(p.amount).toLocaleString()}</TableCell>
-                          <TableCell>{p.reference || '—'}</TableCell>
-                          <TableCell align="right">
-                            {p.confirmed_by_bge ? (
-                              <Chip
-                                size="small" color="success" icon={<CheckCircle />}
-                                label={`Confirmed ${new Date(p.confirmed_at).toLocaleDateString()}`}
-                              />
-                            ) : (
-                              <Button
-                                variant="outlined" size="small"
-                                disabled={paymentConfirming === p.id}
-                                onClick={() => confirmPayment(p)}
-                              >
-                                {paymentConfirming === p.id ? <CircularProgress size={14} /> : 'Confirm Received'}
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Card>
-            )}
-
+            {/* Work orders list — submissions and payments embedded per card */}
             <Box sx={{ mb: 2 }}>
               <Typography variant="h6" fontWeight={700}>Issued Work Orders</Typography>
               <Typography variant="body2" color="text.secondary">
@@ -2141,88 +1953,245 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Paper>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {workOrders.map(wo => (
-                  <Card variant="outlined" key={wo.id}>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
-                        <Box>
-                          <Typography fontWeight={700}>{wo.work_order_number}</Typography>
+                {/* Hidden file inputs shared across all work order cards */}
+                <input type="file" accept=".xlsx,.xls" ref={timesheetInputRef} style={{ display: 'none' }}
+                  onChange={e => setTimesheetFile(e.target.files[0] || null)} />
+                <input type="file" accept=".xlsx,.xls" ref={invoiceInputRef} style={{ display: 'none' }}
+                  onChange={e => setInvoiceFile(e.target.files[0] || null)} />
+                <input type="file" accept=".xlsx,.xls" ref={replaceTimesheetRef} style={{ display: 'none' }}
+                  onChange={e => setReplaceTimesheetFile(e.target.files[0] || null)} />
+                <input type="file" accept=".xlsx,.xls" ref={replaceInvoiceRef} style={{ display: 'none' }}
+                  onChange={e => setReplaceInvoiceFile(e.target.files[0] || null)} />
+
+                {workOrders.map(wo => {
+                  const woSubs = submissions.filter(s => s.work_order === wo.id);
+                  const woPays = payments.filter(p => p.work_order === wo.id);
+                  return (
+                    <Card variant="outlined" key={wo.id}>
+                      <CardContent>
+                        {/* Header row */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+                          <Box>
+                            <Typography fontWeight={700}>{wo.work_order_number}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {wo.work_order_type_display} · Issued: {wo.issue_date}
+                              {wo.start_date && ` · ${wo.start_date}`}
+                              {wo.end_date && ` – ${wo.end_date}`}
+                            </Typography>
+                            {wo.status === 'signed' && wo.bge_signed_date && (
+                              <Typography variant="caption" color="success.main" display="block" fontWeight={600}>
+                                Signed: {wo.bge_signed_date}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="text.secondary" display="block">{wo.location}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <Chip label={wo.status_display || wo.status} size="small"
+                              color={wo.status === 'signed' ? 'success' : 'primary'} />
+                            {wo.status === 'issued' && (
+                              <Tooltip title={sigUrl ? 'Sign this work order' : 'Upload your signature first'}>
+                                <span>
+                                  <Button variant="contained" size="small" color="success"
+                                    disabled={woSigning === wo.id || !sigUrl}
+                                    startIcon={woSigning === wo.id ? <CircularProgress size={14} color="inherit" /> : <CheckCircle />}
+                                    onClick={() => signWo(wo)}>
+                                    Sign
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            )}
+                            <Tooltip title="Review work order PDF">
+                              <IconButton size="small" color="info" onClick={() => reviewWo(wo)}>
+                                <Visibility fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Download PDF">
+                              <IconButton size="small" color={wo.status === 'signed' ? 'success' : 'default'} onClick={() => downloadWoPdf(wo)}>
+                                <Download fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Print / Save as PDF">
+                              <IconButton size="small" onClick={() => setWorkOrderPreview(wo)}>
+                                <Print fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </Box>
+
+                        {wo.objective && (
+                          <Alert severity="info" sx={{ mt: 1.5, py: 0.5 }} icon={false}>
+                            <Typography variant="caption" fontWeight={600}>Objective</Typography>
+                            <Typography variant="caption" display="block" sx={{ whiteSpace: 'pre-wrap' }}>
+                              {wo.objective.length > 200 ? wo.objective.slice(0, 200) + '…' : wo.objective}
+                            </Typography>
+                          </Alert>
+                        )}
+
+                        <Box sx={{ display: 'flex', gap: 2, mt: 1.5, flexWrap: 'wrap' }}>
                           <Typography variant="caption" color="text.secondary">
-                            {wo.work_order_type_display} · Issued: {wo.issue_date}
-                            {wo.start_date && ` · ${wo.start_date}`}
-                            {wo.end_date && ` – ${wo.end_date}`}
+                            Rate: <strong>UGX {Number(wo.rate_per_day).toLocaleString()}/day</strong>
                           </Typography>
-                          {wo.status === 'signed' && wo.bge_signed_date && (
-                            <Typography variant="caption" color="success.main" display="block" fontWeight={600}>
-                              Signed: {wo.bge_signed_date}
+                          <Typography variant="caption" color="text.secondary">
+                            Max: <strong>{wo.max_days} days</strong>
+                          </Typography>
+                          {wo.team_leader_name && (
+                            <Typography variant="caption" color="text.secondary">
+                              Team Leader: <strong>{wo.team_leader_name}</strong>
                             </Typography>
                           )}
-                          <Typography variant="caption" color="text.secondary" display="block">{wo.location}</Typography>
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                          <Chip
-                            label={wo.status_display || wo.status}
-                            size="small"
-                            color={wo.status === 'signed' ? 'success' : 'primary'}
-                          />
-                          {wo.status === 'issued' && (
-                            <Tooltip title={sigUrl ? 'Sign this work order — uses your uploaded signature' : 'Upload your signature first, then sign'}>
-                              <span>
-                                <Button
-                                  variant="contained"
-                                  size="small"
-                                  color="success"
-                                  disabled={woSigning === wo.id || !sigUrl}
-                                  startIcon={woSigning === wo.id ? <CircularProgress size={14} color="inherit" /> : <CheckCircle />}
-                                  onClick={() => signWo(wo)}
-                                >
-                                  Sign
-                                </Button>
-                              </span>
-                            </Tooltip>
-                          )}
-                          <Tooltip title="Review work order PDF">
-                            <IconButton size="small" color="info" onClick={() => reviewWo(wo)}>
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download PDF">
-                            <IconButton size="small" color={wo.status === 'signed' ? 'success' : 'default'} onClick={() => downloadWoPdf(wo)}>
-                              <Download fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Print / Save as PDF">
-                            <IconButton size="small" onClick={() => setWorkOrderPreview(wo)}>
-                              <Print fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </Box>
-                      {wo.objective && (
-                        <Alert severity="info" sx={{ mt: 1.5, py: 0.5 }} icon={false}>
-                          <Typography variant="caption" fontWeight={600}>Objective</Typography>
-                          <Typography variant="caption" display="block" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {wo.objective.length > 200 ? wo.objective.slice(0, 200) + '…' : wo.objective}
-                          </Typography>
-                        </Alert>
-                      )}
-                      <Box sx={{ display: 'flex', gap: 2, mt: 1.5, flexWrap: 'wrap' }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Rate: <strong>UGX {Number(wo.rate_per_day).toLocaleString()}/day</strong>
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Max: <strong>{wo.max_days} days</strong>
-                        </Typography>
-                        {wo.team_leader_name && (
-                          <Typography variant="caption" color="text.secondary">
-                            Team Leader: <strong>{wo.team_leader_name}</strong>
-                          </Typography>
-                        )}
-                      </Box>
 
-                    </CardContent>
-                  </Card>
-                ))}
+                        {/* ── Timesheet & Invoice submissions ── */}
+                        <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="caption" fontWeight={700} color="text.secondary">
+                              TIMESHEET &amp; INVOICE
+                            </Typography>
+                            <Button size="small" startIcon={<CloudUpload />}
+                              onClick={() => {
+                                setActiveUploadWoId(prev => prev === wo.id ? null : wo.id);
+                                setTimesheetFile(null);
+                                setInvoiceFile(null);
+                                if (timesheetInputRef.current) timesheetInputRef.current.value = '';
+                                if (invoiceInputRef.current) invoiceInputRef.current.value = '';
+                              }}>
+                              {activeUploadWoId === wo.id ? 'Cancel' : 'Upload files'}
+                            </Button>
+                          </Box>
+
+                          {/* Existing submissions */}
+                          {woSubs.length > 0 && (
+                            <Table size="small" sx={{ mb: 1 }}>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ py: 0.5 }}>Submitted</TableCell>
+                                  <TableCell sx={{ py: 0.5 }}>Timesheet</TableCell>
+                                  <TableCell sx={{ py: 0.5 }}>Invoice</TableCell>
+                                  <TableCell sx={{ py: 0.5 }} align="right">Actions</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {woSubs.map(sub => (
+                                  <React.Fragment key={sub.id}>
+                                    <TableRow>
+                                      <TableCell sx={{ py: 0.5 }}>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
+                                      <TableCell sx={{ py: 0.5 }}>
+                                        {sub.has_timesheet ? (
+                                          <Tooltip title={sub.timesheet_filename}>
+                                            <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'timesheet')}>
+                                              <Download fontSize="small" />
+                                            </IconButton>
+                                          </Tooltip>
+                                        ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                                      </TableCell>
+                                      <TableCell sx={{ py: 0.5 }}>
+                                        {sub.has_invoice ? (
+                                          <Tooltip title={sub.invoice_filename}>
+                                            <IconButton size="small" color="primary" onClick={() => downloadSubmissionFile(sub, 'invoice')}>
+                                              <Download fontSize="small" />
+                                            </IconButton>
+                                          </Tooltip>
+                                        ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                                      </TableCell>
+                                      <TableCell sx={{ py: 0.5 }} align="right">
+                                        <Tooltip title="Replace files">
+                                          <IconButton size="small" color="default" onClick={() => {
+                                            setReplacingSubId(prev => prev === sub.id ? null : sub.id);
+                                            setReplaceTimesheetFile(null);
+                                            setReplaceInvoiceFile(null);
+                                          }}>
+                                            <Edit fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Delete">
+                                          <IconButton size="small" color="error" onClick={() => deleteSubmission(sub)}>
+                                            <Delete fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      </TableCell>
+                                    </TableRow>
+                                    {replacingSubId === sub.id && (
+                                      <TableRow>
+                                        <TableCell colSpan={4} sx={{ bgcolor: 'action.hover', py: 1 }}>
+                                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <Typography variant="caption" fontWeight={700}>Replace:</Typography>
+                                            <Button size="small" variant="outlined" startIcon={<CloudUpload />}
+                                              onClick={() => replaceTimesheetRef.current?.click()}>
+                                              {replaceTimesheetFile ? replaceTimesheetFile.name : 'New Timesheet'}
+                                            </Button>
+                                            <Button size="small" variant="outlined" startIcon={<CloudUpload />}
+                                              onClick={() => replaceInvoiceRef.current?.click()}>
+                                              {replaceInvoiceFile ? replaceInvoiceFile.name : 'New Invoice'}
+                                            </Button>
+                                            <Button size="small" variant="contained" disabled={replaceUploading}
+                                              onClick={() => replaceSubmission(sub)}>
+                                              {replaceUploading ? <CircularProgress size={14} color="inherit" /> : 'Update'}
+                                            </Button>
+                                            <Button size="small" onClick={() => setReplacingSubId(null)}>Cancel</Button>
+                                          </Box>
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </React.Fragment>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+
+                          {woSubs.length === 0 && activeUploadWoId !== wo.id && (
+                            <Typography variant="caption" color="text.disabled">No files submitted yet.</Typography>
+                          )}
+
+                          {/* Inline upload form */}
+                          {activeUploadWoId === wo.id && (
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', mt: 0.5, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                              <Button size="small" variant="outlined" startIcon={<CloudUpload />}
+                                onClick={() => timesheetInputRef.current?.click()}>
+                                {timesheetFile ? timesheetFile.name : 'Choose Timesheet'}
+                              </Button>
+                              <Button size="small" variant="outlined" startIcon={<CloudUpload />}
+                                onClick={() => invoiceInputRef.current?.click()}>
+                                {invoiceFile ? invoiceFile.name : 'Choose Invoice'}
+                              </Button>
+                              <Button size="small" variant="contained" disabled={submissionUploading}
+                                onClick={() => uploadSubmission(wo.id)}>
+                                {submissionUploading ? <CircularProgress size={14} color="inherit" /> : 'Upload'}
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
+
+                        {/* ── Payments ── */}
+                        {woPays.length > 0 && (
+                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                              PAYMENTS
+                            </Typography>
+                            {woPays.map(p => (
+                              <Box key={p.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 0.5 }}>
+                                <Box>
+                                  <Typography variant="caption">
+                                    {p.payment_date} · <strong>UGX {Number(p.amount).toLocaleString()}</strong>
+                                    {p.reference && ` · Ref: ${p.reference}`}
+                                  </Typography>
+                                </Box>
+                                {p.confirmed_by_bge ? (
+                                  <Chip size="small" color="success" icon={<CheckCircle />}
+                                    label={`Confirmed ${new Date(p.confirmed_at).toLocaleDateString()}`} />
+                                ) : (
+                                  <Button variant="outlined" size="small" disabled={paymentConfirming === p.id}
+                                    onClick={() => confirmPayment(p)}>
+                                    {paymentConfirming === p.id ? <CircularProgress size={14} /> : 'Confirm Received'}
+                                  </Button>
+                                )}
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </Box>
             )}
           </Box>
