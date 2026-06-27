@@ -21,7 +21,6 @@ import {
   API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS,
   TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL,
   WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
-  WORK_ORDER_PAYMENT_CONFIRM_URL,
 } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -224,7 +223,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   // Payments against work orders
   const [payments, setPayments] = useState([]);
-  const [paymentConfirming, setPaymentConfirming] = useState(null);
   const [activePaymentWoId, setActivePaymentWoId] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ payment_date: '', amount: '', balance: '' });
   const [paymentSaving, setPaymentSaving] = useState(false);
@@ -1204,19 +1202,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   };
 
   // ── payments ─────────────────────────────────────────────────────────────────
-  const confirmPayment = async (payment) => {
-    setPaymentConfirming(payment.id);
-    try {
-      const res = await axios.post(WORK_ORDER_PAYMENT_CONFIRM_URL(payment.id), {}, { headers });
-      setPayments(prev => prev.map(p => p.id === payment.id ? res.data : p));
-      notify('Payment receipt confirmed');
-    } catch {
-      notify('Failed to confirm receipt', 'error');
-    } finally {
-      setPaymentConfirming(null);
-    }
-  };
-
   const recordPayment = async (woId) => {
     if (!paymentForm.payment_date || !paymentForm.amount) {
       notify('Date received and amount are required', 'error');
