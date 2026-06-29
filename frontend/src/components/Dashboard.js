@@ -387,58 +387,99 @@ const WO_DEFAULTS = {
     ],
   },
   biz_continuity: {
-    objective: `To develop a business continuity strategy and business operational plan for 05 agro-processors attached to you. These two documents are meant to help agro-processors to protect their businesses from disruptions.`,
-    key_tasks: `The BGE will visit the assigned agro-processors to specifically carry out the following:
+    objective: `To develop a Business Continuity Strategy (BCS) and Business Operational Plan (BOP) for each of the 5 assigned agro-processors. These documents will enable each MSME to identify its critical business functions, assess key risks and threats, develop realistic and actionable recovery strategies, and build internal capacity to respond effectively to any disruption — safeguarding livelihoods, assets, and operations.`,
+    key_tasks: `The BGE will carry out structured, in-person visits to each of the 5 assigned agro-processors to complete the following:
 
-• Conduct a Business Impact Analysis (BIA): Identify time-sensitive operations, estimate the financial and operational impacts of disruptions, and determine their Maximum Tolerable Downtime (MTD) for critical processes.
+1. Conduct a Business Impact Analysis (BIA)
+Identify and prioritise the MSME's time-sensitive business functions (e.g. raw material procurement, production, sales, payments). Estimate the financial and operational impact of disruptions to each function and determine the Maximum Tolerable Downtime (MTD) — the longest period the business can survive without that function. Document findings using the PRUDEV II BIA template and have the business owner review and sign off.
 
-• Perform a Risk Assessment: Identify potential threats (e.g., inflation, raw material seasonality, cyberattacks, supply chain failures, natural disasters) and evaluate the probability and impact of each to prioritize mitigation efforts.
+2. Perform a Risk and Threat Assessment
+Identify potential threats relevant to each MSME's context — including inflation, raw material seasonality, flooding, supply chain failures, equipment breakdown, power outages, key-person dependency, and market shocks. Assess the probability and impact of each threat and prioritise the top risks. Produce a Risk Register that directly informs the recovery strategies in the BCS.
 
-• Develop Recovery Strategies: Outline specific, actionable steps to resume critical functions for the business.
+3. Develop Recovery Strategies
+For each critical business function, develop specific, actionable recovery steps the MSME can realistically implement with its own resources. Define the responsible person(s), the trigger conditions for activation, and the expected recovery timeline for each strategy. Ensure recovery strategies directly address the top risks identified in the Risk Register.
 
-• Document the Plan: Create a clear, easily accessible written document detailing response procedures, team member roles and contact lists, communication protocols, among others.
+4. Document the Business Continuity Strategy (BCS) and Business Operational Plan (BOP)
+Using the approved PRUDEV II templates, compile a complete, clearly written BCS and BOP for each MSME. Each document must cover: roles and responsibilities during a disruption, communication protocols, step-by-step recovery procedures for each critical function, resource and supplier lists, escalation pathways, and a review schedule. Each completed document must be reviewed, accepted, and signed by the business owner before submission.
 
-• Train and Test: Educate employees on their specific responsibilities during a crisis as per the strategy. Conduct a simulation exercise (tabletop or full-scale) to identify weaknesses and refine the strategy.`,
+5. Train Key Staff
+Conduct a structured training session with the business owner and key staff at each MSME on their specific roles and responsibilities during a disruption. Use plain-language explanations and practical scenarios relevant to the business. Ensure each participant understands the plan and can act independently without external guidance.
+
+6. Conduct a Simulation Exercise (Tabletop or Desk-Based)
+Facilitate a scenario-based simulation exercise with the MSME team to test the plan under a realistic disruption scenario. Identify gaps, ambiguities, or resource shortfalls. Update the BCS/BOP to address any weaknesses identified and document all changes made following the exercise.
+
+7. Maintain a Non-Engagement Register
+Document all contact attempts with MSMEs that are unavailable or unwilling to engage. Record the date, method of contact, outcome, and reason for non-engagement. Update the register within 2 days of each attempted contact and recommend follow-up actions.`,
     deliverables_json: [
       {
         task_num: 1,
-        description: 'Business Continuity Strategy and Business Operational Plan',
-        due_date: '1 week after deployment',
-        quantitative_result: '5 Business Continuity and Operational Plans developed (1 per MSME) with all required sections completed',
-        qualitative_result: 'Each plan demonstrates deep understanding of the MSME\'s specific risks; recovery strategies are realistic, actionable, and validated by the business owner',
-        means_of_verification: 'Completed and signed Business Continuity Strategy document per MSME',
+        description: 'Business Impact Analysis (BIA) — completed for all 5 assigned MSMEs using the PRUDEV II BIA template, identifying critical business functions, Maximum Tolerable Downtime (MTD), and the financial/operational impact of disruption to each function',
+        due_date: 'Within 1 week of deployment',
+        quantitative_result: '5 BIAs completed and submitted (1 per assigned MSME) — each covering all critical business functions with MTD and impact estimates documented',
+        qualitative_result: 'Each BIA accurately reflects the MSME\'s actual operations and priorities; MTD estimates are justified and validated with the business owner; impact ratings are realistic and specific to the business context — not generic',
+        means_of_verification: 'Completed BIA form per MSME (PRUDEV II template), signed by the business owner and the BGE',
         unit_rate: '',
-        payment_condition: 'Pay only if both quantitative and qualitative targets are achieved',
+        payment_condition: 'Prerequisite for Task 3 — no separate payment; withheld if missing or not signed by business owner',
       },
       {
         task_num: 2,
-        description: 'Non-engagement register — documented record of any MSME that was unavailable or declined to participate, including reason and date of contact attempt',
-        due_date: 'Rolling — updated within 2 days of each attempted contact',
-        quantitative_result: '100% of assigned MSMEs contacted at least 3 times with all contact attempts documented',
-        qualitative_result: 'Register is complete, accurate, and includes documented reasons for non-engagement with recommended follow-up actions',
-        means_of_verification: 'Completed non-engagement register with dates, contact details, and outcomes',
+        description: 'Risk and Threat Assessment (Risk Register) — completed for all 5 assigned MSMEs, identifying a minimum of 5 context-specific threats per MSME with probability and impact ratings, and prioritising the top risks for recovery planning',
+        due_date: 'Within 1 week of deployment (alongside BIA)',
+        quantitative_result: '5 Risk Registers submitted (1 per MSME) — each identifying at least 5 context-specific threats with probability ratings, impact ratings, and a prioritised top-risk list',
+        qualitative_result: 'Threats are specific and relevant to each MSME\'s operating context (not generic); probability and impact ratings are justified with brief explanations; top-risk priorities directly shape the recovery strategies in Task 3',
+        means_of_verification: 'Completed Risk Register per MSME (PRUDEV II template), signed by the BGE and reviewed with the business owner',
         unit_rate: '',
-        payment_condition: 'Included in overall assignment deliverable — no separate payment',
+        payment_condition: 'Prerequisite for Task 3 — no separate payment; withheld if threats are generic or not grounded in the MSME\'s context',
       },
       {
         task_num: 3,
-        description: 'Close-out report',
-        due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan',
-        quantitative_result: '1 close-out report submitted covering all 5 MSMEs with key findings and lessons learned',
-        qualitative_result: 'Report provides a clear, reflective account of challenges encountered, BGE performance, and actionable recommendations for future assignments',
-        means_of_verification: 'Submitted and approved close-out report',
+        description: 'Business Continuity Strategy (BCS) and Business Operational Plan (BOP) — complete, owner-signed documents for all 5 assigned MSMEs, covering roles and responsibilities, communication protocols, recovery procedures for each critical function, resource and supplier lists, escalation pathways, and a review schedule',
+        due_date: 'Within 3 weeks of deployment',
+        quantitative_result: '5 complete BCS and BOP documents submitted and approved (1 set per MSME) — all required sections completed using PRUDEV II templates',
+        qualitative_result: 'Each BCS/BOP demonstrates genuine contextual understanding of the MSME\'s risks and operations; recovery strategies are specific, realistic, and directly linked to the BIA and Risk Register; roles and communication protocols are clearly defined and understood by the business owner; each document is reviewed, accepted, and signed by the business owner before submission',
+        means_of_verification: 'Completed and owner-signed BCS and BOP per MSME; cross-referenced BIA and Risk Register showing traceability from risk to recovery strategy',
         unit_rate: '',
-        payment_condition: 'Pay only if submitted on time and approved by Programme Manager',
+        payment_condition: '50% of total payment released upon Programme Manager approval of all 5 BCS/BOP documents — withheld if any document lacks owner signature, is incomplete, or recovery strategies are not grounded in the BIA and Risk Register',
       },
       {
         task_num: 4,
+        description: 'Staff Training and Simulation Exercise — structured training session with the business owner and key staff at each MSME on their roles during a disruption, followed by a tabletop or desk-based simulation exercise to test the plan and document any updates made',
+        due_date: 'Within 1 week after finalisation and approval of BCS/BOP',
+        quantitative_result: 'Training conducted at all 5 MSMEs with signed attendance registers; 5 simulation exercises completed and documented; any gaps identified in the simulation addressed and recorded in an updated BCS/BOP',
+        qualitative_result: 'Key staff demonstrate understanding of their individual roles and can describe their actions during a disruption without prompting; simulation exercise tests a realistic scenario relevant to the business; gaps identified are genuinely addressed in an updated plan — not cosmetic revisions',
+        means_of_verification: 'Signed training attendance register per MSME; written simulation report per MSME documenting the scenario used, gaps identified, and plan updates made following the exercise',
+        unit_rate: '',
+        payment_condition: '30% of total payment released upon submission and approval of all 5 training registers and simulation reports — withheld if attendance registers are unsigned, simulation reports are absent, or no plan updates are documented where gaps were identified',
+      },
+      {
+        task_num: 5,
+        description: 'Non-engagement register — documented record of any assigned MSME that was unavailable or declined to participate, including date and method of each contact attempt, reason for non-engagement, and recommended follow-up action',
+        due_date: 'Rolling — updated within 2 days of each attempted contact',
+        quantitative_result: '100% of assigned MSMEs contacted at least 3 times — all contact attempts documented in the register with dates, contact method, outcome, and reason where applicable',
+        qualitative_result: 'Register is complete, legible, and accurate; non-engagement reasons are specific and documented in the business owner\'s own words where possible; recommended follow-up actions are concrete and actionable',
+        means_of_verification: 'Completed non-engagement register submitted alongside close-out report',
+        unit_rate: '',
+        payment_condition: 'Required for payment — no separate payment; final payment withheld if register is missing or incomplete',
+      },
+      {
+        task_num: 6,
+        description: 'Close-out report — reflective summary covering all 5 MSMEs, documenting the quality of plans developed, key challenges encountered, BGE self-assessment, and actionable recommendations for future Business Continuity assignments',
+        due_date: 'Within 2 days of submission of final training records and simulation reports',
+        quantitative_result: '1 close-out report submitted covering all 5 assigned MSMEs — including a summary table of deliverable completion status and key findings per MSME',
+        qualitative_result: 'Report provides an honest, reflective account of the assignment; challenges are described with root causes identified; BGE self-assessment is candid and constructive; recommendations are specific and grounded in actual field experience — not boilerplate',
+        means_of_verification: 'Submitted and Programme-Manager-approved close-out report with deliverable completion table and per-MSME findings',
+        unit_rate: '',
+        payment_condition: 'Final 20% of payment released upon Programme Manager approval of close-out report — withheld if report is superficial, missing the completion table, or submitted after the deadline without prior approval',
+      },
+      {
+        task_num: 7,
         description: 'Approved invoice and signed timesheet',
-        due_date: 'Within 2 days after submission of Business Continuity Strategy and Business Operational Plan',
-        quantitative_result: '1 invoice and 1 signed timesheet submitted',
-        qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms',
+        due_date: 'Within 2 days of close-out report submission',
+        quantitative_result: '1 invoice and 1 signed timesheet submitted — accurately reflecting all days worked under this work order',
+        qualitative_result: 'Invoice and timesheet are consistent with each other and with the work order terms; days claimed correspond to documented deliverable activity',
         means_of_verification: 'Approved invoice and countersigned timesheet',
         unit_rate: '',
-        payment_condition: 'Payment processed upon approval of all deliverables',
+        payment_condition: 'Full payment processed only upon approval of all deliverables (Tasks 1–6) and submission of a compliant invoice and timesheet',
       },
     ],
   },
