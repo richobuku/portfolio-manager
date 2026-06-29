@@ -483,6 +483,123 @@ Document all contact attempts with MSMEs that are unavailable or unwilling to en
       },
     ],
   },
+  biz_continuity_workshop: {
+    objective: `To design and facilitate a 3-day hands-on Business Continuity Planning Workshop for assigned agro-processors; develop a comprehensive Business Continuity Planning Toolkit for BGE deployment; pre-train assigned BGEs on the toolkit and facilitation methodology; and collaborate directly with agro-processors to map their risks, critical processes, business functions, and dependencies — and to initiate their individual MSME Business Continuity Plans. Following the workshop, assigned BGEs will be deployed to complete the remaining on-site assessments and finalise each MSME's Business Continuity Strategy and Operational Plan.`,
+    key_tasks: `The Senior BGE will carry out the following over 5 working days (2 preparation + 3 facilitation):
+
+PREPARATION — Days 1 & 2
+
+1. Develop the Business Continuity Planning Toolkit
+Design all materials required for the 3-day workshop and subsequent BGE field deployments, including:
+• 3-day workshop session plans with timing, objectives, exercises, and facilitation notes for each session
+• Participant workbooks — plain-language, fill-in guides that agro-processors complete during each workshop session
+• MSME-ready templates: Business Impact Analysis (BIA) form, Risk Register, Process and Dependency Map, Business Continuity Plan (BCP) skeleton
+• BGE Field Guide — a step-by-step on-site reference guiding each BGE through the post-workshop follow-up visits and what they must complete per MSME
+• Visual aids and group exercise materials suitable for agro-processors with varying literacy levels
+Toolkit must be reviewed and approved by the Programme Manager before the workshop commences.
+
+2. Pre-train Assigned BGEs
+Conduct a structured pre-training session with all BGEs who will attend the workshop and carry out post-workshop follow-up visits:
+• Walk BGEs through the toolkit, templates, and facilitation tools
+• Clarify each BGE's facilitation role and assigned MSMEs during the workshop
+• Review post-workshop follow-up requirements: what assessments and plan sections each BGE must complete on-site and within what timeline
+• Address BGE questions and ensure every BGE can use the templates independently
+Collect signed attendance register and session notes.
+
+WORKSHOP FACILITATION — Days 3, 4 & 5
+
+3. Workshop Day 1 — Risk Mapping & Business Function Identification
+• Welcome agro-processors and establish objectives, ground rules, and expectations
+• Lead structured exercises to help each MSME identify and map its critical business functions and processes (production, procurement, sales, logistics, finance, staff)
+• Facilitate risk mapping: identify key threats relevant to each MSME's context, rate probability and impact for each, and build an initial Risk Register
+• Ensure each agro-processor actively participates and produces substantive MSME-specific outputs — not generic responses
+
+4. Workshop Day 2 — Business Impact Analysis & Dependency Mapping
+• Guide each agro-processor through a structured BIA exercise for their key business functions
+• Map business dependencies: critical inputs, raw material suppliers, key staff roles, equipment, utilities, customers, and distribution channels
+• Determine Maximum Tolerable Downtime (MTD) for each critical function
+• Identify recovery priorities based on combined BIA and dependency mapping outputs
+• Capture all outputs in the BIA form and Process/Dependency Map templates
+
+5. Workshop Day 3 — Starting Individual Business Continuity Plans
+• Guide each agro-processor through the BCP skeleton template using their Day 1 and Day 2 outputs
+• Facilitate development of draft recovery strategies for the top 3 risks per MSME — strategies must be specific, realistic, and achievable with the MSME's existing resources
+• Define roles, responsibilities, and communication protocols for each MSME team during a disruption
+• Set a clear post-workshop action plan for each MSME and their assigned BGE: what will be completed on-site, by whom, and by when
+• Ensure each agro-processor leaves with a draft BCP and a clear understanding of next steps`,
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Business Continuity Planning Toolkit — complete package including: 3-day workshop session plans with facilitator notes, participant workbooks (fill-in format for agro-processors), MSME-ready templates (BIA form, Risk Register, Process & Dependency Map, BCP skeleton), and a BGE Field Guide for post-workshop on-site follow-up visits',
+        due_date: 'End of Preparation Day 1 — submitted for Programme Manager review before workshop commences',
+        quantitative_result: 'Complete toolkit submitted on time — all 5 components present: session plans, participant workbooks, MSME templates, BGE Field Guide, and visual aids/exercise materials',
+        qualitative_result: 'Toolkit is contextually appropriate for Northern Uganda agro-processors; language is plain, accessible, and free of technical jargon; MSME templates are practical and can be completed by BGEs without expert support; session plans are realistic within the allocated workshop time and sequence logically across Days 1-3; BGE Field Guide clearly specifies what each BGE must do on-site and in what order',
+        means_of_verification: 'Submitted toolkit package (all components) reviewed and approved by Programme Manager before workshop Day 1',
+        unit_rate: '',
+        payment_condition: 'Prerequisite for workshop — no separate payment; workshop payment withheld if toolkit is not submitted and approved before the workshop commences',
+      },
+      {
+        task_num: 2,
+        description: 'BGE Pre-Training Session — structured pre-training with all assigned BGEs covering the toolkit, templates, workshop facilitation roles, and post-workshop follow-up requirements; signed attendance register and session notes submitted',
+        due_date: 'Completed during Preparation Day 2 — before workshop commences',
+        quantitative_result: '100% of assigned BGEs attend and complete the pre-training session; signed attendance register submitted; session notes covering all key topics submitted alongside the register',
+        qualitative_result: 'Each BGE can explain the BIA template, Risk Register, and BCP skeleton without prompting; BGEs are clear on their facilitation roles during the workshop and their post-workshop follow-up responsibilities per assigned MSME; any BGE questions or gaps in understanding are addressed and documented',
+        means_of_verification: 'Signed BGE pre-training attendance register; session notes confirming all topics covered and clarifications made',
+        unit_rate: '',
+        payment_condition: 'Prerequisite for workshop — no separate payment; withheld if fewer than 100% of assigned BGEs attend without documented justification',
+      },
+      {
+        task_num: 3,
+        description: 'Workshop Day 1 Facilitation — Risk Mapping & Business Function Identification: signed attendance register, facilitated Risk Register (draft) and business function map per participating MSME',
+        due_date: 'End of Workshop Day 1',
+        quantitative_result: 'Signed attendance register collected; draft Risk Register and business function map initiated for each participating MSME by end of Day 1',
+        qualitative_result: 'All participating agro-processors actively engage in exercises; outputs are MSME-specific and reflect each business\'s actual operations — not generic responses copied from examples; Risk Register identifies at least 5 context-specific threats per MSME with initial probability and impact ratings',
+        means_of_verification: 'Signed Day 1 attendance register; draft Risk Register and business function map per MSME (submitted as part of the Workshop Report)',
+        unit_rate: '',
+        payment_condition: 'Included in 60% milestone — released upon Workshop Report approval',
+      },
+      {
+        task_num: 4,
+        description: 'Workshop Day 2 Facilitation — Business Impact Analysis & Dependency Mapping: signed attendance register, completed BIA form and Process/Dependency Map per participating MSME',
+        due_date: 'End of Workshop Day 2',
+        quantitative_result: 'Signed attendance register collected; completed BIA form and Process/Dependency Map submitted for each participating MSME by end of Day 2 — including MTD determination for each critical function',
+        qualitative_result: 'BIA outputs reflect genuine engagement with each MSME\'s specific context; MTD estimates are realistic and validated with the business owner; dependency maps capture all critical inputs, suppliers, staff roles, equipment, and customers relevant to that MSME\'s operations',
+        means_of_verification: 'Signed Day 2 attendance register; completed BIA form and Dependency Map per MSME (submitted as part of the Workshop Report)',
+        unit_rate: '',
+        payment_condition: 'Included in 60% milestone — released upon Workshop Report approval',
+      },
+      {
+        task_num: 5,
+        description: 'Workshop Day 3 Facilitation — Starting Individual Business Continuity Plans: signed attendance register, draft BCP skeleton with initial recovery strategies, roles, and post-workshop action plan per participating MSME',
+        due_date: 'End of Workshop Day 3',
+        quantitative_result: 'Signed attendance register collected; draft BCP skeleton completed for each participating MSME — including draft recovery strategies for the top 3 risks, defined roles and communication protocols, and a specific post-workshop BGE action plan per MSME',
+        qualitative_result: 'Draft BCPs are substantive — not blank skeletons; recovery strategies are specific to each MSME\'s resources and top risks identified in Days 1-2; each agro-processor leaves understanding their next steps; BGE action plans are specific and actionable, naming what must be completed on-site, by whom, and by when',
+        means_of_verification: 'Signed Day 3 attendance register; draft BCP skeleton per MSME with recovery strategies and post-workshop action plan (submitted as part of the Workshop Report)',
+        unit_rate: '',
+        payment_condition: '60% of total payment released upon Programme Manager approval of the Workshop Report — withheld if draft BCP outputs are missing or superficial, or if BGE action plans lack specificity',
+      },
+      {
+        task_num: 6,
+        description: 'Workshop Report and BGE Follow-up Action Plan — comprehensive 3-day workshop report covering: MSME attendance and engagement summary, quality assessment of draft outputs per MSME, key challenges and lessons learned, and a BGE-specific follow-up action plan per assigned MSME specifying remaining assessments and plan sections to complete on-site',
+        due_date: 'Within 3 days of workshop conclusion',
+        quantitative_result: '1 workshop report submitted within 3 days of workshop conclusion — covering all 3 days, all participating MSMEs, all draft MSME outputs (BIA, Risk Register, Dependency Map, BCP skeleton), and a specific BGE follow-up action plan for each assigned BGE and MSME',
+        qualitative_result: 'Report provides an honest, detailed assessment of each MSME\'s engagement level and the quality of their draft outputs; lessons learned are specific and grounded in actual workshop experience; BGE follow-up action plans are actionable and specific — each plan names the remaining deliverables, the timeline for completion, and what support each BGE may need',
+        means_of_verification: 'Submitted and Programme-Manager-approved workshop report with all draft MSME outputs attached',
+        unit_rate: '',
+        payment_condition: '40% of total payment released upon Programme Manager approval of the Workshop Report — withheld if report is superficial, draft MSME outputs are missing or incomplete, or BGE action plans lack specificity',
+      },
+      {
+        task_num: 7,
+        description: 'Approved invoice and signed timesheet — reflecting 5 days worked (2 preparation + 3 facilitation), itemised by day',
+        due_date: 'Within 2 days of workshop report submission',
+        quantitative_result: '1 invoice and 1 signed timesheet submitted — reflecting all 5 days worked under this work order, itemised as 2 preparation days and 3 facilitation days',
+        qualitative_result: 'Invoice and timesheet are consistent with each other and with the work order terms; days are clearly itemised and consistent with documented deliverable activity',
+        means_of_verification: 'Approved invoice and countersigned timesheet',
+        unit_rate: '',
+        payment_condition: 'Full payment processed only upon approval of all deliverables (Tasks 1–6) and submission of a compliant invoice and timesheet',
+      },
+    ],
+  },
   mobilisation: {
     objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
     key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
@@ -633,6 +750,14 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.location   = 'Northern Uganda (Gulu & Lira)';
       extra.project_name = 'PRUDEV II Project – Financial Institution Mobilisation (Access to Finance Events)';
     }
+    if (type === 'biz_continuity_workshop') {
+      extra.duration     = '5 days (2 preparation + 3 facilitation)';
+      extra.max_days     = 5;
+      extra.location     = 'Gulu / Lira, Northern Uganda';
+      extra.project_name = 'PRUDEV II — Business Continuity Planning Workshop';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
@@ -739,6 +864,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
                 <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
                 <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
+                <MenuItem value="biz_continuity_workshop">Business Continuity — Workshop Design &amp; Facilitation</MenuItem>
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
@@ -6317,6 +6443,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
             <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
             <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
+            <MenuItem value="biz_continuity_workshop">Business Continuity — Workshop Design &amp; Facilitation</MenuItem>
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>

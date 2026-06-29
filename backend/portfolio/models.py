@@ -987,8 +987,9 @@ class WorkOrder(models.Model):
         ('msme_data_update',      'MSME Data Update & Verification'),
         ('msme_finance_survey',   'MSME Finance Survey (Google Forms)'),
         ('msme_access_finance',   'Access to Finance & Digital Onboarding'),
-        ('biz_continuity',        'Business Continuity & Operational Planning'),
-        ('mobilisation',          'Mobilisation / Outreach'),
+        ('biz_continuity',          'Business Continuity & Operational Planning'),
+        ('biz_continuity_workshop', 'Business Continuity — Workshop Design & Facilitation'),
+        ('mobilisation',            'Mobilisation / Outreach'),
         ('group_session',         'Peer-to-Peer Group Session'),
         ('training_facilitation', 'Training Facilitation — Senior BGE'),
         ('other',                 'Other'),
@@ -1076,7 +1077,7 @@ class WorkOrder(models.Model):
             code = self.bge.bge_code or ''
             m = re.search(r'BGE-([A-Z0-9]+)-', code)
             short = m.group(1) if m else str(self.bge_id)
-            prefix = 'TF' if self.work_order_type == 'training_facilitation' else 'BGE'
+            prefix = 'TF' if self.work_order_type in ('training_facilitation', 'biz_continuity_workshop') else 'BGE'
             # Start from count+1 but skip any numbers already taken (handles
             # gaps left by deleted work orders so we never hit a uniqueness clash).
             seq = WorkOrder.objects.filter(bge=self.bge).count() + 1
