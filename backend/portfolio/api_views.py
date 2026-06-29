@@ -3580,11 +3580,12 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
     def perform_create(self, serializer):
         self._require_admin()
         data = serializer.validated_data
-        self._check_date_overlap(
-            bge_id=data.get('bge').pk if data.get('bge') else None,
-            start_date=data.get('start_date'),
-            end_date=data.get('end_date'),
-        )
+        if not self.request.data.get('allow_overlap'):
+            self._check_date_overlap(
+                bge_id=data.get('bge').pk if data.get('bge') else None,
+                start_date=data.get('start_date'),
+                end_date=data.get('end_date'),
+            )
         serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
@@ -3592,12 +3593,13 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
         data = serializer.validated_data
         instance = self.get_object()
         bge = data.get('bge', instance.bge)
-        self._check_date_overlap(
-            bge_id=bge.pk if bge else None,
-            start_date=data.get('start_date', instance.start_date),
-            end_date=data.get('end_date', instance.end_date),
-            exclude_id=instance.pk,
-        )
+        if not self.request.data.get('allow_overlap'):
+            self._check_date_overlap(
+                bge_id=bge.pk if bge else None,
+                start_date=data.get('start_date', instance.start_date),
+                end_date=data.get('end_date', instance.end_date),
+                exclude_id=instance.pk,
+            )
         serializer.save()
 
     def destroy(self, request, *args, **kwargs):

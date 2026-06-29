@@ -5,7 +5,7 @@ import {
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, FormControl, InputLabel, Select, MenuItem, Alert,
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
-  Tooltip, Checkbox, Card, CardContent, Grid, Drawer, List,
+  Tooltip, Checkbox, FormControlLabel, Card, CardContent, Grid, Drawer, List,
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
   Badge, Accordion, AccordionSummary, AccordionDetails,
   Tab, Tabs, ListSubheader,
@@ -561,9 +561,10 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   const [woErrors, setWoErrors] = React.useState('');
   const [woSaving, setWoSaving] = React.useState(false);
   const [woConflict, setWoConflict] = React.useState(null);
+  const [woAllowOverlap, setWoAllowOverlap] = React.useState(false);
 
   // Reset conflict when dialog closes
-  React.useEffect(() => { if (!open) setWoConflict(null); }, [open]);
+  React.useEffect(() => { if (!open) { setWoConflict(null); setWoAllowOverlap(false); } }, [open]);
 
   // Live overlap check whenever BGE or dates change
   React.useEffect(() => {
@@ -582,6 +583,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         return wo.start_date <= end_date && wo.end_date >= start_date;
       });
       setWoConflict(conflict || null);
+      if (!conflict) setWoAllowOverlap(false);
     }).catch(() => setWoConflict(null));
     return () => { cancelled = true; };
   }, [woForm.bge, woForm.start_date, woForm.end_date, woEditing, headers]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -639,7 +641,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
     if (!woForm.issue_date) { setWoErrors('Issue date is required.'); return; }
     setWoSaving(true); setWoErrors('');
     try {
-      const payload = { ...woForm, group: woForm.group || null };
+      const payload = { ...woForm, group: woForm.group || null, allow_overlap: woAllowOverlap || false };
       if (woEditing) {
         await axios.put(`${API_ENDPOINTS.WORK_ORDERS}${woEditing.id}/`, payload, { headers });
       } else {
@@ -653,7 +655,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
     } finally {
       setWoSaving(false);
     }
-  }, [woForm, woEditing, headers, fetchWorkOrders, onSaved]);
+  }, [woForm, woEditing, woAllowOverlap, headers, fetchWorkOrders, onSaved]);
 
   return (
     <Dialog
@@ -692,7 +694,18 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
             <strong>Date overlap detected.</strong> This BGE is already assigned work order{' '}
             <strong>{woConflict.work_order_number}</strong> from{' '}
             <strong>{woConflict.start_date}</strong> to <strong>{woConflict.end_date}</strong>.
-            BGEs cannot be double-assigned during overlapping periods.
+            <Box sx={{ mt: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={woAllowOverlap}
+                    onChange={e => setWoAllowOverlap(e.target.checked)}
+                  />
+                }
+                label={<Typography variant="caption" fontWeight={600}>Allow overlap — I confirm this BGE can handle both assignments simultaneously</Typography>}
+              />
+            </Box>
           </Alert>
         )}
         <Grid container spacing={2}>
