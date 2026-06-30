@@ -20,6 +20,8 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 import re
 
+from django.views.decorators.http import require_http_methods
+
 # Create your views here.
 
 def home(request):
@@ -541,6 +543,95 @@ def upload_bge_data(request):
             messages.error(request, f'Error processing Excel file: {str(e)}')
         return redirect('bge_list')
     return render(request, 'portfolio/upload_bge.html')
+
+
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+def paste_bge_data(request):
+    """Admin page: paste a plain-text or CSV list of BGEs and import them."""
+    if request.method == 'POST':
+        text = request.POST.get('bge_list', '')
+        if not text.strip():
+            messages.error(request, 'Please paste BGE rows into the input box.')
+            return redirect('paste_bge_data')
+
+        import csv
+        from io import StringIO
+
+        reader = csv.reader(StringIO(text))
+        header = None
+        rows = []
+        for row in reader:
+            # skip empty lines
+            if not any(cell.strip() for cell in row):
+                continue
+            if header is None and len(row) > 1 and any(h.lower() in ('full name','name','email','phone') for h in row):
+                header = [c.strip() for c in row]
+                continue
+            rows.append([c.strip() for c in row])
+
+        success = 0
+        errors = 0
+        for r in rows:
+            try:
+                # If header mapped, create dict
+                if header:
+                    data = dict(zip(header, r))
+                    name = data.get('Full name') or data.get('Name') or data.get('name') or ''
+                    email = data.get('Email') or data.get('Email address') or data.get('email') or ''
+                    phone = data.get('Phone number') or data.get('Phone') or data.get('phone') or ''
+                    location = data.get('Location') or data.get('location') or ''
+                    bge_code = data.get('BGE code') or data.get('BGE Code') or data.get('bge_code') or ''
+                    skills = data.get('Specialisation') or data.get('Area of Expertise') or data.get('Skills') or ''
+                else:
+                    # best-effort positional parsing: name, phone, email, location, bge_code, skills
+                    name = r[0] if len(r) > 0 else ''
+                    phone = r[1] if len(r) > 1 else ''
+                    email = r[2] if len(r) > 2 else ''
+                    location = r[3] if len(r) > 3 else ''
+                    bge_code = r[4] if len(r) > 4 else ''
+                    skills = r[5] if len(r) > 5 else ''
+
+                if not name:
+                    errors += 1
+                    continue
+
+                # Normalize phone if numeric-like
+                if email and isinstance(email, float):
+                    email = str(email)
+
+                # Create BGE if not exists by email or exact name
+                existing = None
+                if email:
+                    existing = BusinessGrowthExpert.objects.filter(email__iexact=email).first()
+                if not existing:
+                    existing = BusinessGrowthExpert.objects.filter(name__iexact=name).first()
+
+                if existing:
+                    # update some fields
+                    existing.phone = existing.phone or phone
+                    existing.location = existing.location or location
+                    existing.bge_code = existing.bge_code or bge_code
+                    existing.top_skills = existing.top_skills or skills
+                    existing.save()
+                else:
+                    BusinessGrowthExpert.objects.create(
+                        name=name,
+                        email=email,
+                        phone=phone,
+                        location=location,
+                        bge_code=bge_code,
+                        top_skills=skills,
+                        status='approved',
+                    )
+                success += 1
+            except Exception:
+                errors += 1
+
+        messages.success(request, f'Imported {success} BGEs. {errors} errors.')
+        return redirect('bge_list')
+
+    return render(request, 'portfolio/paste_bge.html')
 
 def export_bge_excel(request):
     bges = BusinessGrowthExpert.objects.all()

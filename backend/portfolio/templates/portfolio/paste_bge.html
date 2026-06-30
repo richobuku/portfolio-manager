@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Paste BGE List</title>
+    <link rel="stylesheet" href="{% static 'portfolio/style.css' %}">
+}</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Paste BGE List</h1>
+            <nav class="nav">
+                <a href="{% url 'home' %}" class="nav-link">Dashboard</a>
+                <a href="{% url 'bge_list' %}" class="nav-link">BGE List</a>
+                <a href="{% url 'upload_bge_data' %}" class="nav-link">Upload Excel</a>
+            </nav>
+        </header>
+        <main class="main">
+            <section class="paste-section">
+                {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                            <div class="message {% if message.tags %}{{ message.tags }}{% endif %}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <p>Paste rows copied from Excel (CSV or tab-separated). If your pasted content includes a header row, it will be detected.</p>
+                    <div class="form-group">
+                        <label for="bge_list">BGE rows:</label>
+                        <textarea id="bge_list" name="bge_list" rows="12" style="width:100%;font-family:monospace"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Import BGEs</button>
+                </form>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

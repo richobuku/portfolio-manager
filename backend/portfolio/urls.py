@@ -11,6 +11,7 @@ urlpatterns = [
     path('msme/<int:msme_id>/delete/', views.msme_delete, name='msme_delete'),
     path('bge/', views.bge_list, name='bge_list'),
     path('bge/upload/', views.upload_bge_data, name='upload_bge_data'),
+    path('bge/paste/', views.paste_bge_data, name='paste_bge_data'),
     path('bge/export/', views.export_bge_excel, name='export_bge_excel'),
     path('bge/<int:bge_id>/', views.bge_detail, name='bge_detail'),
     path('bge/<int:bge_id>/edit/', views.bge_edit, name='bge_edit'),
