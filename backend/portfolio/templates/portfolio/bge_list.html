@@ -29,6 +29,12 @@
   </form>
   <div class="bge-actions" style="margin-bottom: 1.5rem;">
     <a href="{% url 'upload_bge_data' %}" class="btn btn-primary">Upload BGE Data (Excel)</a>
+    <a href="{% url 'paste_bge_data' %}" class="btn btn-primary">Paste BGE Rows</a>
+    {% if request.user.is_staff %}
+      <a href="/admin/portfolio/businessgrowthexpert/add/" class="btn btn-success">Add BGE (Admin)</a>
+    {% else %}
+      <a href="{% url 'bge_signup' %}" class="btn btn-success">Apply as BGE</a>
+    {% endif %}
     <a href="{% url 'export_bge_excel' %}" class="btn btn-secondary">Export as Excel</a>
   </div>
   <table class="bge-table">
