@@ -41,33 +41,36 @@
                     </form>
                 </div>
                 <div class="instructions-card">
-                    <h3>Excel File Format Requirements</h3>
-                    <p>Your Excel file should contain the following columns:</p>
+                    <h3>Excel File Format & Accepted Column Names</h3>
+                    <p>The importer accepts several common header names. Provide at least a name column.</p>
                     <div class="column-list">
                         <div class="column-item">
-                            <strong>Name</strong> - Name of the expert (required)
+                            <strong>Name</strong> — accepted: <em>Full name</em>, <em>Name</em>, <em>name</em> (required)
                         </div>
                         <div class="column-item">
-                            <strong>Email</strong> - Email address
+                            <strong>Email</strong> — accepted: <em>Email address</em>, <em>Email</em>, <em>email</em>
                         </div>
                         <div class="column-item">
-                            <strong>Phone</strong> - Phone number
+                            <strong>Phone</strong> — accepted: <em>Phone number</em>, <em>Phone</em>, <em>phone</em>
                         </div>
                         <div class="column-item">
-                            <strong>Area of Expertise</strong> - Area(s) of expertise
+                            <strong>Skills / Areas</strong> — accepted: <em>Skill area 1</em>, <em>Skill area 2</em>, <em>Skill area 3</em>, or a combined column like <em>Area of Expertise</em> (comma/semicolon/newline separated)
                         </div>
                         <div class="column-item">
-                            <strong>Location</strong> - City or region
+                            <strong>Location</strong> — accepted: <em>Location</em>, <em>location</em>
                         </div>
                         <div class="column-item">
-                            <strong>Years of Experience</strong> - Number of years
+                            <strong>BGE Code</strong> — accepted: <em>BGE code</em>, <em>BGE Code</em>, <em>bge_code</em>
                         </div>
                         <div class="column-item">
-                            <strong>MSMEs Supported</strong> - Number of MSMEs supported
+                            <strong>Years of Experience</strong> — accepted header like <em>Years of Experience</em>
+                        </div>
+                        <div class="column-item">
+                            <strong>MSMEs Supported</strong> — optional count (header examples: <em>MSMEs Supported</em>)
                         </div>
                     </div>
                     <div class="note">
-                        <strong>Note:</strong> Only the Name field is required. Other fields are optional.
+                        <strong>Note:</strong> Only a name column is required. Phone numbers stored as numbers in Excel will be converted to strings; if phone is missing the field will be left blank.
                     </div>
                 </div>
             </section>

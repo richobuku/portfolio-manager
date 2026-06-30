@@ -18,6 +18,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+import re
 
 # Create your views here.
 
@@ -458,26 +459,46 @@ def upload_bge_data(request):
             df = pd.read_excel(excel_file)
             success_count = 0
             error_count = 0
-            
+
             # Batch processing for better performance
             batch_size = 100
             bge_batch = []
-            
+
+            def get_field(r, *names):
+                for n in names:
+                    if n is None or n == '':
+                        continue
+                    val = r.get(n, None)
+                    if pd.notna(val):
+                        s = str(val).strip()
+                        if s and s.lower() not in ('nan', 'none'):
+                            return s
+                return ''
+
             for index, row in df.iterrows():
                 try:
-                    # Skip empty rows
-                    if pd.isna(row.get('Full name', '')) or str(row.get('Full name', '')).strip() == '':
+                    # Accept several common column names for the name field
+                    name = get_field(row, 'Full name', 'Name', 'name')
+                    if not name:
                         continue
-                    
-                    area1 = str(row.get('Skill area 1', '')).strip()
-                    area2 = str(row.get('Skill area 2', '')).strip()
-                    area3 = str(row.get('Skill area 3', '')).strip()
-                    areas = [a for a in [area1, area2, area3] if a and a != 'nan' and a != 'None']
+
+                    # Skills: either separate columns or a combined "Area of Expertise" column
+                    area1 = get_field(row, 'Skill area 1', 'Skill Area 1')
+                    area2 = get_field(row, 'Skill area 2', 'Skill Area 2')
+                    area3 = get_field(row, 'Skill area 3', 'Skill Area 3')
+                    combined = get_field(row, 'Area of Expertise', 'Area of Expertise', 'Areas of Expertise')
+
+                    areas = [a for a in [area1, area2, area3] if a]
+                    if not areas and combined:
+                        # split on common separators
+                        parts = [p.strip() for p in re.split('[,;\\n]', combined) if p.strip()]
+                        areas = parts
+
                     top_skills = ', '.join(areas) if areas else ''
 
-                    # Phone: stored as float in Excel (e.g. 2.567810e+11) — convert cleanly
-                    raw_phone = row.get('Phone number', '')
-                    if pd.notna(raw_phone):
+                    # Phone handling
+                    raw_phone = get_field(row, 'Phone number', 'Phone', 'phone')
+                    if raw_phone:
                         try:
                             phone = str(int(float(raw_phone)))
                         except (ValueError, TypeError):
@@ -486,37 +507,35 @@ def upload_bge_data(request):
                         phone = ''
 
                     # BGE code
-                    raw_code = row.get('BGE code', row.get('BGE Code', ''))
-                    bge_code = str(raw_code).strip() if pd.notna(raw_code) else ''
-                    if bge_code == 'nan':
-                        bge_code = ''
+                    raw_code = get_field(row, 'BGE code', 'BGE Code', 'bge_code')
+                    bge_code = raw_code
 
                     bge_data = {
-                        'name': str(row.get('Full name', '')).strip(),
-                        'email': str(row.get('Email address', '')).strip() if pd.notna(row.get('Email address', '')) else '',
+                        'name': name,
+                        'email': get_field(row, 'Email address', 'Email', 'email'),
                         'phone': phone,
-                        'location': str(row.get('Location', '')).strip() if pd.notna(row.get('Location', '')) else '',
+                        'location': get_field(row, 'Location', 'location'),
                         'bge_code': bge_code,
                         'top_skills': top_skills,
                         'status': 'approved',
                     }
-                    
+
                     bge_batch.append(BusinessGrowthExpert(**bge_data))
-                    
+
                     # Process batch when it reaches the batch size
                     if len(bge_batch) >= batch_size:
                         BusinessGrowthExpert.objects.bulk_create(bge_batch, ignore_conflicts=True)
                         success_count += len(bge_batch)
                         bge_batch = []
-                        
-                except Exception as e:
+
+                except Exception:
                     error_count += 1
-            
+
             # Process remaining items in the batch
             if bge_batch:
                 BusinessGrowthExpert.objects.bulk_create(bge_batch, ignore_conflicts=True)
                 success_count += len(bge_batch)
-            
+
             messages.success(request, f'Successfully imported {success_count} BGEs. {error_count} errors occurred.')
         except Exception as e:
             messages.error(request, f'Error processing Excel file: {str(e)}')
