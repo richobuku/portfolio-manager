@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
+from django.contrib import messages
+from .account_setup import ensure_bge_account
 from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate, TrainingFacilitationAssignment, TrainingReport
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
@@ -113,6 +115,18 @@ class BusinessGrowthExpertAdmin(admin.ModelAdmin):
     list_filter = ('status', 'is_senior', 'location')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('user',)
+
+    def save_model(self, request, obj, form, change):
+        # First save the object normally
+        super().save_model(request, obj, form, change)
+
+        # If this is a newly created BGE (admin 'Add'), ensure an account
+        if not change:
+            try:
+                ensure_bge_account(obj, send_email=True)
+                messages.success(request, f'Provisioned account and sent welcome email to {obj.email or obj.name}.')
+            except Exception as exc:
+                messages.warning(request, f'Provisioning succeeded but sending welcome email failed: {exc}')
 
 @admin.register(SupportRequest)
 class SupportRequestAdmin(admin.ModelAdmin):

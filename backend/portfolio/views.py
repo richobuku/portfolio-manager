@@ -19,6 +19,8 @@ from django.db.models import Count
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 import re
+from django.utils import timezone as _tz
+from .account_setup import ensure_bge_account
 
 from django.views.decorators.http import require_http_methods
 
@@ -537,6 +539,28 @@ def upload_bge_data(request):
             if bge_batch:
                 BusinessGrowthExpert.objects.bulk_create(bge_batch, ignore_conflicts=True)
                 success_count += len(bge_batch)
+
+            # Provision accounts and send welcome emails for imported (or matched) BGEs.
+            upload_time = _tz.now()
+            # Iterate rows and ensure account exists for each row (idempotent)
+            for index, row in df.iterrows():
+                try:
+                    name = get_field(row, 'Full name', 'Name', 'name')
+                    email = get_field(row, 'Email address', 'Email', 'email')
+                    # Find matching BGE by email first, then by name
+                    bge = None
+                    if email:
+                        bge = BusinessGrowthExpert.objects.filter(email__iexact=email).first()
+                    if not bge and name:
+                        bge = BusinessGrowthExpert.objects.filter(name__iexact=name).first()
+                    if bge:
+                        try:
+                            ensure_bge_account(bge, send_email=True)
+                        except Exception:
+                            # best-effort
+                            pass
+                except Exception:
+                    continue
 
             messages.success(request, f'Successfully imported {success_count} BGEs. {error_count} errors occurred.')
         except Exception as e:
