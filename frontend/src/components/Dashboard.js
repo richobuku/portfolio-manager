@@ -386,100 +386,105 @@ const WO_DEFAULTS = {
       { task_num: 8, description: 'Approved Invoice and Signed Timesheet', due_date: '16 June 2026', quantitative_result: '1 invoice and 1 signed timesheet submitted by 16 June 2026', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of all deliverables' },
     ],
   },
+  access_to_finance_bge: {
+    objective: `To support Access to Finance BGEs in onboarding MSMEs to digital finance platforms, building bankability, and mapping credit needs for follow-up engagement with financial institutions. This template focuses on 15 MSMEs over 7 working days, with an emphasis on practical digital onboarding and credit readiness documentation.`,
+    key_tasks: `1. Attend orientation on the Access to Finance assignment, digital finance platforms, and credit mapping requirements.
+2. Receive the assigned list of 15 MSMEs and develop a field visit and onboarding plan.
+3. Visit each MSME and support onboarding onto at least two digital finance platforms such as MOMO Pays, Flexy Pay, Wendi, or a business banking solution.
+4. Document each MSME’s digital finance onboarding progress, including registration evidence and platform access details.
+5. Assess each MSME’s interest in appropriate credit products and capture the preferred creditor and product type.
+6. Prepare a Credit Interest Mapping Report that summarises MSME readiness, product interest, and follow-up recommendations.
+7. Identify and document barriers to digital onboarding, including smartphone access, ID, or connectivity challenges.
+8. Submit daily progress updates and complete the final Access to Finance field report, invoice, and timesheet.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Orientation on digital finance onboarding and credit mapping completed', due_date: 'Day 1', quantitative_result: 'Orientation completed and documented for the assigned BGE', qualitative_result: 'BGE understands the digital finance onboarding and credit mapping process', means_of_verification: 'Signed orientation confirmation', unit_rate: '', payment_condition: 'Required prerequisite — no separate payment' },
+      { task_num: 2, description: 'Detailed field visit and onboarding plan for 15 assigned MSMEs', due_date: 'Day 1', quantitative_result: 'Onboarding plan submitted covering all 15 MSMEs and the planned schedule', qualitative_result: 'Plan is clear, logistically sound, and ready for execution', means_of_verification: 'Submitted onboarding plan', unit_rate: '', payment_condition: 'Required before field visits begin' },
+      { task_num: 3, description: 'Digital finance onboarding evidence for each MSME — minimum 2 platforms per MSME', due_date: 'Rolling across assignment', quantitative_result: 'At least 2 digital platforms onboarded for each MSME', qualitative_result: 'Onboarding evidence is complete, verified, and usable by the MSME', means_of_verification: 'Screenshots, confirmation messages, or account details per MSME', unit_rate: '', payment_condition: 'Pay only if onboarding evidence is complete and verified for at least 80% of MSMEs' },
+      { task_num: 4, description: 'Credit Interest Mapping Report with MSME product preferences and readiness assessment', due_date: 'Day 6', quantitative_result: 'Credit Interest Mapping Report submitted covering all 15 MSMEs', qualitative_result: 'Report accurately reflects MSME product interest and readiness level', means_of_verification: 'Submitted and approved report', unit_rate: '', payment_condition: 'Pay only if report is submitted on time and approved' },
+      { task_num: 5, description: 'Barrier Register capturing digital onboarding challenges per MSME', due_date: 'Day 6', quantitative_result: 'Barrier register submitted for MSMEs with onboarding challenges', qualitative_result: 'Register clearly documents issues and recommended follow-up actions', means_of_verification: 'Submitted barrier register', unit_rate: '', payment_condition: 'Required for payment — shows thorough field follow-up' },
+      { task_num: 6, description: 'Final Access to Finance field report with recommendations and next steps', due_date: 'Day 7', quantitative_result: 'Field report submitted by Day 7', qualitative_result: 'Report provides clear recommendations, next steps, and evidence of the assignment outcome', means_of_verification: 'Submitted final report', unit_rate: '', payment_condition: 'Payment processed upon approval of final report' },
+      { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Day 7', quantitative_result: 'Invoice and signed timesheet submitted by Day 7', qualitative_result: 'Invoice and timesheet accurately reflect the 7-day assignment', means_of_verification: 'Approved invoice and signed timesheet', unit_rate: '', payment_condition: 'Pay processed upon approval of all deliverables' },
+    ],
+  },
   biz_continuity: {
-    objective: `To develop a Business Continuity Strategy (BCS) and Business Operational Plan (BOP) for each of the 5 assigned agro-processors. These documents will enable each MSME to identify its critical business functions, assess key risks and threats, develop realistic and actionable recovery strategies, and build internal capacity to respond effectively to any disruption — safeguarding livelihoods, assets, and operations.`,
-    key_tasks: `The BGE will carry out structured, in-person visits to each of the 5 assigned agro-processors to complete the following:
+    objective: `To support Jacob, the Senior BGE, in preparing and delivering a Business Continuity Planning process for assigned agro-processors. This includes 3 days to build the necessary tools and materials, followed by 4 days to deliver the process through a group preparation session, direct MSME engagement, and final plan delivery. The assignment will help MSMEs build practical, business-specific Business Continuity Plans that can be used immediately in times of disruption.`,
+    key_tasks: `The Senior BGE will carry out the following over 7 working days:
 
-1. Conduct a Business Impact Analysis (BIA)
-Identify and prioritise the MSME's time-sensitive business functions (e.g. raw material procurement, production, sales, payments). Estimate the financial and operational impact of disruptions to each function and determine the Maximum Tolerable Downtime (MTD) — the longest period the business can survive without that function. Document findings using the PRUDEV II BIA template and have the business owner review and sign off.
+1. Days 1–3 — Tool Development and Preparation
+• Develop the Business Continuity Planning tools and materials needed for delivery.
+• Prepare the templates, session outlines, and supporting documents required for the process.
+• Ensure the tools are practical, context-appropriate, and ready for use with MSMEs.
 
-2. Perform a Risk and Threat Assessment
-Identify potential threats relevant to each MSME's context — including inflation, raw material seasonality, flooding, supply chain failures, equipment breakdown, power outages, key-person dependency, and market shocks. Assess the probability and impact of each threat and prioritise the top risks. Produce a Risk Register that directly informs the recovery strategies in the BCS.
+2. Day 4 — Group Preparation Session
+• Facilitate a preparatory session with a group of MSMEs to introduce the Business Continuity Planning process and prepare participants for the assignment.
+• Explain the purpose of the exercise, expected outputs, roles, and the flow of the next engagement days.
+• Agree on the schedule and approach for the MSME engagement activities.
 
-3. Develop Recovery Strategies
-For each critical business function, develop specific, actionable recovery steps the MSME can realistically implement with its own resources. Define the responsible person(s), the trigger conditions for activation, and the expected recovery timeline for each strategy. Ensure recovery strategies directly address the top risks identified in the Risk Register.
+3. Days 5 & 6 — MSME Engagement and Input Collection
+• Engage directly with MSMEs to gather business-specific inputs on operations, risks, critical functions, dependencies, and recovery needs.
+• Guide the MSMEs through the key planning steps and document their responses using the PRUDEV II templates.
+• Capture practical information needed to develop a realistic Business Continuity Plan.
 
-4. Document the Business Continuity Strategy (BCS) and Business Operational Plan (BOP)
-Using the approved PRUDEV II templates, compile a complete, clearly written BCS and BOP for each MSME. Each document must cover: roles and responsibilities during a disruption, communication protocols, step-by-step recovery procedures for each critical function, resource and supplier lists, escalation pathways, and a review schedule. Each completed document must be reviewed, accepted, and signed by the business owner before submission.
+4. Day 7 — Finalisation and Delivery
+• Review all collected information, finalise the Business Continuity Plan, and deliver it to the MSMEs.
+• Conduct a short training session to explain the plan, assigned roles, and next steps.
+• Present the final document and close the assignment.
 
-5. Train Key Staff
-Conduct a structured training session with the business owner and key staff at each MSME on their specific roles and responsibilities during a disruption. Use plain-language explanations and practical scenarios relevant to the business. Ensure each participant understands the plan and can act independently without external guidance.
-
-6. Conduct a Simulation Exercise (Tabletop or Desk-Based)
-Facilitate a scenario-based simulation exercise with the MSME team to test the plan under a realistic disruption scenario. Identify gaps, ambiguities, or resource shortfalls. Update the BCS/BOP to address any weaknesses identified and document all changes made following the exercise.
-
-7. Maintain a Non-Engagement Register
-Document all contact attempts with MSMEs that are unavailable or unwilling to engage. Record the date, method of contact, outcome, and reason for non-engagement. Update the register within 2 days of each attempted contact and recommend follow-up actions.`,
+Budget estimate:
+• UGX 60,000 for the tool development and preparation days on Days 1–3
+• UGX 60,000 for the group preparation session on Day 4
+• UGX 60,000 x 2 for the two days of direct MSME engagement on Days 5 and 6
+• UGX 60,000 for the final training and delivery day on Day 7`,
     deliverables_json: [
       {
         task_num: 1,
-        description: 'Business Impact Analysis (BIA) — completed for all 5 assigned MSMEs using the PRUDEV II BIA template, identifying critical business functions, Maximum Tolerable Downtime (MTD), and the financial/operational impact of disruption to each function',
-        due_date: 'Within 1 week of deployment',
-        quantitative_result: '5 BIAs completed and submitted (1 per assigned MSME) — each covering all critical business functions with MTD and impact estimates documented',
-        qualitative_result: 'Each BIA accurately reflects the MSME\'s actual operations and priorities; MTD estimates are justified and validated with the business owner; impact ratings are realistic and specific to the business context — not generic',
-        means_of_verification: 'Completed BIA form per MSME (PRUDEV II template), signed by the business owner and the BGE',
+        description: 'Business Continuity Planning tools and materials developed for delivery, including the required templates and session support documents',
+        due_date: 'Days 1–3',
+        quantitative_result: 'Tools and materials completed for delivery across the 3 preparation days; budget estimate UGX 60,000',
+        qualitative_result: 'The tools are practical, clear, and suitable for use with MSMEs during the delivery process',
+        means_of_verification: 'Completed tool package and preparation records',
         unit_rate: '',
-        payment_condition: 'Prerequisite for Task 3 — no separate payment; withheld if missing or not signed by business owner',
+        payment_condition: 'Required before delivery activities commence',
       },
       {
         task_num: 2,
-        description: 'Risk and Threat Assessment (Risk Register) — completed for all 5 assigned MSMEs, identifying a minimum of 5 context-specific threats per MSME with probability and impact ratings, and prioritising the top risks for recovery planning',
-        due_date: 'Within 1 week of deployment (alongside BIA)',
-        quantitative_result: '5 Risk Registers submitted (1 per MSME) — each identifying at least 5 context-specific threats with probability ratings, impact ratings, and a prioritised top-risk list',
-        qualitative_result: 'Threats are specific and relevant to each MSME\'s operating context (not generic); probability and impact ratings are justified with brief explanations; top-risk priorities directly shape the recovery strategies in Task 3',
-        means_of_verification: 'Completed Risk Register per MSME (PRUDEV II template), signed by the BGE and reviewed with the business owner',
+        description: 'Group preparation session completed with a group of MSMEs to introduce the Business Continuity Planning process and prepare participants for the assignment',
+        due_date: 'Day 4',
+        quantitative_result: '1 preparatory group session completed; budget estimate UGX 60,000',
+        qualitative_result: 'The session is well organised, MSMEs understand the process, and participants are ready for the engagement days that follow',
+        means_of_verification: 'Signed attendance register and session notes',
         unit_rate: '',
-        payment_condition: 'Prerequisite for Task 3 — no separate payment; withheld if threats are generic or not grounded in the MSME\'s context',
+        payment_condition: 'Required for the assignment to proceed',
       },
       {
         task_num: 3,
-        description: 'Business Continuity Strategy (BCS) and Business Operational Plan (BOP) — complete, owner-signed documents for all 5 assigned MSMEs, covering roles and responsibilities, communication protocols, recovery procedures for each critical function, resource and supplier lists, escalation pathways, and a review schedule',
-        due_date: 'Within 3 weeks of deployment',
-        quantitative_result: '5 complete BCS and BOP documents submitted and approved (1 set per MSME) — all required sections completed using PRUDEV II templates',
-        qualitative_result: 'Each BCS/BOP demonstrates genuine contextual understanding of the MSME\'s risks and operations; recovery strategies are specific, realistic, and directly linked to the BIA and Risk Register; roles and communication protocols are clearly defined and understood by the business owner; each document is reviewed, accepted, and signed by the business owner before submission',
-        means_of_verification: 'Completed and owner-signed BCS and BOP per MSME; cross-referenced BIA and Risk Register showing traceability from risk to recovery strategy',
+        description: 'MSME engagement day 1 completed with business-specific input collection for the Business Continuity Plan',
+        due_date: 'Day 5',
+        quantitative_result: '1 day of direct MSME engagement completed; budget estimate UGX 60,000',
+        qualitative_result: 'The engagement yields practical business inputs and clear information on critical functions, risks, and dependencies',
+        means_of_verification: 'Signed attendance sheet and completed engagement notes',
         unit_rate: '',
-        payment_condition: '50% of total payment released upon Programme Manager approval of all 5 BCS/BOP documents — withheld if any document lacks owner signature, is incomplete, or recovery strategies are not grounded in the BIA and Risk Register',
+        payment_condition: 'Required to support the next engagement day and final plan development',
       },
       {
         task_num: 4,
-        description: 'Staff Training and Simulation Exercise — structured training session with the business owner and key staff at each MSME on their roles during a disruption, followed by a tabletop or desk-based simulation exercise to test the plan and document any updates made',
-        due_date: 'Within 1 week after finalisation and approval of BCS/BOP',
-        quantitative_result: 'Training conducted at all 5 MSMEs with signed attendance registers; 5 simulation exercises completed and documented; any gaps identified in the simulation addressed and recorded in an updated BCS/BOP',
-        qualitative_result: 'Key staff demonstrate understanding of their individual roles and can describe their actions during a disruption without prompting; simulation exercise tests a realistic scenario relevant to the business; gaps identified are genuinely addressed in an updated plan — not cosmetic revisions',
-        means_of_verification: 'Signed training attendance register per MSME; written simulation report per MSME documenting the scenario used, gaps identified, and plan updates made following the exercise',
+        description: 'MSME engagement day 2 completed with further input collection and refinement of the Business Continuity Plan content',
+        due_date: 'Day 6',
+        quantitative_result: '1 additional day of direct MSME engagement completed; budget estimate UGX 60,000',
+        qualitative_result: 'The second engagement day adds clarity, confirms priorities, and strengthens the draft plan content',
+        means_of_verification: 'Signed attendance sheet and updated engagement notes',
         unit_rate: '',
-        payment_condition: '30% of total payment released upon submission and approval of all 5 training registers and simulation reports — withheld if attendance registers are unsigned, simulation reports are absent, or no plan updates are documented where gaps were identified',
+        payment_condition: 'Required to support finalisation of the full Business Continuity Plan',
       },
       {
         task_num: 5,
-        description: 'Non-engagement register — documented record of any assigned MSME that was unavailable or declined to participate, including date and method of each contact attempt, reason for non-engagement, and recommended follow-up action',
-        due_date: 'Rolling — updated within 2 days of each attempted contact',
-        quantitative_result: '100% of assigned MSMEs contacted at least 3 times — all contact attempts documented in the register with dates, contact method, outcome, and reason where applicable',
-        qualitative_result: 'Register is complete, legible, and accurate; non-engagement reasons are specific and documented in the business owner\'s own words where possible; recommended follow-up actions are concrete and actionable',
-        means_of_verification: 'Completed non-engagement register submitted alongside close-out report',
+        description: 'Final Business Continuity Plan delivered and trained to the MSMEs, including the completed document and a short delivery session',
+        due_date: 'Day 7',
+        quantitative_result: '1 full Business Continuity Plan delivered; training and delivery session completed; budget estimate UGX 60,000',
+        qualitative_result: 'The final plan is practical, clearly explained, and understood by the MSMEs and their key staff',
+        means_of_verification: 'Submitted final plan, signed delivery record, and training attendance sheet',
         unit_rate: '',
-        payment_condition: 'Required for payment — no separate payment; final payment withheld if register is missing or incomplete',
-      },
-      {
-        task_num: 6,
-        description: 'Close-out report — reflective summary covering all 5 MSMEs, documenting the quality of plans developed, key challenges encountered, BGE self-assessment, and actionable recommendations for future Business Continuity assignments',
-        due_date: 'Within 2 days of submission of final training records and simulation reports',
-        quantitative_result: '1 close-out report submitted covering all 5 assigned MSMEs — including a summary table of deliverable completion status and key findings per MSME',
-        qualitative_result: 'Report provides an honest, reflective account of the assignment; challenges are described with root causes identified; BGE self-assessment is candid and constructive; recommendations are specific and grounded in actual field experience — not boilerplate',
-        means_of_verification: 'Submitted and Programme-Manager-approved close-out report with deliverable completion table and per-MSME findings',
-        unit_rate: '',
-        payment_condition: 'Final 20% of payment released upon Programme Manager approval of close-out report — withheld if report is superficial, missing the completion table, or submitted after the deadline without prior approval',
-      },
-      {
-        task_num: 7,
-        description: 'Approved invoice and signed timesheet',
-        due_date: 'Within 2 days of close-out report submission',
-        quantitative_result: '1 invoice and 1 signed timesheet submitted — accurately reflecting all days worked under this work order',
-        qualitative_result: 'Invoice and timesheet are consistent with each other and with the work order terms; days claimed correspond to documented deliverable activity',
-        means_of_verification: 'Approved invoice and countersigned timesheet',
-        unit_rate: '',
-        payment_condition: 'Full payment processed only upon approval of all deliverables (Tasks 1–6) and submission of a compliant invoice and timesheet',
+        payment_condition: 'Full payment processed upon completion of the final plan and delivery session',
       },
     ],
   },
@@ -702,7 +707,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   const applyWoDefaults = React.useCallback((type) => {
     const d = WO_DEFAULTS[type] || WO_DEFAULTS.other;
     const extra = {};
-    if (type === 'msme_access_finance') {
+    if (type === 'msme_access_finance' || type === 'access_to_finance_bge') {
       extra.start_date = '2026-06-03';
       extra.end_date   = '2026-06-16';
       extra.duration   = '7 working days';
@@ -710,10 +715,12 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.location   = 'Acholi Sub-region, Northern Uganda';
     }
     if (type === 'biz_continuity') {
-      extra.duration   = 'Maximum of 4 days';
-      extra.max_days   = 4;
-      extra.location   = 'Northern Uganda (Gulu & Lira)';
-      extra.project_name = 'PRUDEV II Project – Financial Institution Mobilisation (Access to Finance Events)';
+      extra.duration     = '5 days (2 preparation + 3 facilitation)';
+      extra.max_days     = 5;
+      extra.location     = 'Gulu / Lira, Northern Uganda';
+      extra.project_name = 'PRUDEV II — Business Continuity Planning Workshop';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
     }
     if (type === 'biz_continuity_workshop') {
       extra.duration     = '5 days (2 preparation + 3 facilitation)';
@@ -828,6 +835,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
                 <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
                 <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
+                <MenuItem value="access_to_finance_bge">Access to Finance — BGE Template</MenuItem>
                 <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
                 <MenuItem value="biz_continuity_workshop">Business Continuity — Workshop Design &amp; Facilitation</MenuItem>
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
@@ -2249,7 +2257,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
         <TextField
           size="small" placeholder="Search name, owner, sector…" value={msmeSearch}
-          onChange={e => setMsmeSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchAll()}
+          onChange={e => startTransition(() => setMsmeSearch(e.target.value))}
+          onKeyDown={e => e.key === 'Enter' && fetchAll()}
           InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
           sx={{ flex: '1 1 160px', minWidth: 0 }}
         />
@@ -6170,7 +6179,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Alert>
                   <TextField
                     size="small" fullWidth placeholder="Search MSMEs…"
-                    value={addMsmeSearch} onChange={e => setAddMsmeSearch(e.target.value)}
+                    value={addMsmeSearch} onChange={e => startTransition(() => setAddMsmeSearch(e.target.value))}
                     sx={{ mb: 1.5 }}
                     InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: 'text.secondary', fontSize: 18 }} /> }}
                   />
@@ -6407,6 +6416,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
             <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
             <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
+            <MenuItem value="access_to_finance_bge">Access to Finance — BGE Template</MenuItem>
             <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
             <MenuItem value="biz_continuity_workshop">Business Continuity — Workshop Design &amp; Facilitation</MenuItem>
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
