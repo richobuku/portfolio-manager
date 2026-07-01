@@ -7119,6 +7119,30 @@ Thank you for being such a valued part of the PRUDEV II community. We look forwa
 Warm regards,
 PRUDEV II BDS Team`,
     },
+    {
+      key: 'msme_upcoming_visit',
+      label: 'MSME — Upcoming visit from our Business Growth Experts',
+      subject: 'PRUDEV II: Upcoming visit from our Business Growth Experts to support your enterprise',
+      body: `Dear {{name}},
+
+We hope you and your business are doing well.
+
+As you may recall, we recently provided technical training and mentorship/coaching support focused on improving your agro-processing operations, energy efficiency, and quality certifications. You have been working closely on this with Gloria, our Agroprocessing Expert, in conjunction with UNBS and our energy audit teams. We are truly grateful for your continued partnership and active engagement with the PRUDEV II programme.
+
+At this stage, we want to learn and improve how we support you. To do that, we want to understand the real impact our combined technical support, audits, and mentorship have made on your daily operations, and to hear directly from you about what is working well and what we can do better going forward.
+
+To that end, we are sending one of our Business Growth Experts (BGEs) to visit you at your enterprise. They will be administering our Outcome Assessment Tool to document your progress, system adoptions, and milestone achievements—such as changes in energy costs, employment, or certification tracks.
+
+Our BGE will be in touch with you shortly to arrange a convenient time to come by. The visit will be practical and straightforward—they simply want to sit with you, listen to your experiences, and learn how we can continue to strengthen your business.
+
+We kindly ask that you make yourself available this week or next week to receive them. Your honest insights mean a great deal to us and will directly shape the future of our support for you and other agro-processors.
+
+Thank you for being such a valued part of the PRUDEV II community. We look forward to celebrating your business's growth and learning how to serve you even better.
+
+Warm regards,
+
+PRUDEV II BDS Team`,
+    },
   ];
 
   const [commChannel, setCommChannel] = React.useState('email'); // 'email' | 'sms'
@@ -7335,6 +7359,11 @@ PRUDEV II BDS Team`
       key: 'visit_notify',
       label: 'MSME — BGE visit notification',
       body: 'Dear {{name}}, a PRUDEV II Business Growth Expert will visit your business this week to check on your progress. Kindly be available. — PRUDEV II BDS Team',
+    },
+    {
+      key: 'msme_upcoming_visit',
+      label: 'MSME — Upcoming BGE visit',
+      body: "Dear {{name}}, to help us learn & improve how we support you, a PRUDEV II Business Growth Expert will visit your enterprise this or next week. They will briefly review your progress following the agro-processing and UNBS work you've been doing with Gloria. They will call you shortly to schedule a convenient time. We appreciate your continued partnership! — PRUDEV II BDS Team",
     },
     {
       key: 'training_reminder',
