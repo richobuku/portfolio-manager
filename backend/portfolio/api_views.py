@@ -27,7 +27,7 @@ from .models import (
     MentorTrainingReport, TshirtReceipt, TshirtReceiptEntry,
     WorkOrderSubmission, WorkOrderPayment,
 )
-from .account_setup import ensure_bge_account, send_welcome_email
+from .account_setup import ensure_bge_account, send_welcome_email, send_welcome_sms
 
 
 def _managed_groups(user):
@@ -1691,6 +1691,41 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             return Response({'message': f"Email sent to {bge.email} with {email_data['msme_count']} assigned MSMEs."})
         except Exception as e:
             return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='provision-account')
+    def provision_account(self, request, pk=None):
+        """Admin: provision or resend a BGE login account and welcome messages."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can provision BGE accounts.")
+        bge = self.get_object()
+        if bge.user_id:
+            sent_email = send_welcome_email(bge, bge.user.username, None)
+            sent_sms = send_welcome_sms(bge, bge.user.username)
+            return Response({
+                'result': 'resent',
+                'message': f'Welcome email and SMS resent to {bge.name or "BGE"}.',
+                'sent_email': sent_email,
+                'sent_sms': sent_sms,
+                'username': bge.user.username,
+            })
+
+        outcome = ensure_bge_account(bge, send_email=True)
+        if outcome == 'created':
+            return Response({
+                'result': outcome,
+                'message': f'Account created for {bge.name or "BGE"}.',
+                'username': bge.user.username if bge.user else None,
+            })
+        if outcome == 'already_linked':
+            return Response({
+                'result': outcome,
+                'message': 'This BGE already has a linked login account.',
+                'username': bge.user.username if bge.user else None,
+            })
+        return Response({
+            'result': outcome,
+            'message': 'Account could not be created. Missing usable name/email/code.',
+        })
 
     @action(detail=True, methods=['post'], url_path='upload-signature')
     def upload_signature(self, request, pk=None):

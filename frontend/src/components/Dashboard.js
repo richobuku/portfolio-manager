@@ -1159,6 +1159,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [emailEditBody, setEmailEditBody] = useState('');   // editable copy of body
   const [emailEditSubject, setEmailEditSubject] = useState(''); // editable subject
   const [emailSending, setEmailSending] = useState(false);
+  const [provisioningBgeId, setProvisioningBgeId] = useState(null);
 
   // ── training / mentor reports (admin) ─────────────────────────────────────
   const [adminTrainingReports, setAdminTrainingReports] = useState([]);
@@ -1438,6 +1439,21 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify(msg, 'error');
     } finally {
       setEmailingBgeId(null);
+    }
+  };
+
+  const provisionBgeAccount = async (bge) => {
+    if (!bge) return;
+    setProvisioningBgeId(bge.id);
+    try {
+      const res = await axios.post(`${API_ENDPOINTS.EXPERTS}${bge.id}/provision-account/`, {}, { headers });
+      notify(res.data.message || `Provisioned account for ${bge.name || 'BGE'}`);
+      fetchAll();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to provision login account';
+      notify(msg, 'error');
+    } finally {
+      setProvisioningBgeId(null);
     }
   };
 
@@ -1754,7 +1770,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       }
       fetchAll();
     } catch (err) {
-      notify(err.response?.data?.error || err.response?.data?.detail || 'Failed to create BGE expert', 'error');
+      const message = err.response?.data?.error || err.response?.data?.detail || 'Failed to create BGE expert';
+      notify(message, 'error');
     } finally {
       setBgeSaving(false);
     }
@@ -2779,6 +2796,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         </IconButton>
                       </span>
                     </Tooltip>
+                    {isStaff && (
+                      <Tooltip title={e.user_id ? 'Resend welcome email/SMS' : 'Provision login account and send welcome email/SMS'}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="secondary"
+                            disabled={provisioningBgeId === e.id}
+                            onClick={() => provisionBgeAccount(e)}
+                          >
+                            {provisioningBgeId === e.id
+                              ? <CircularProgress size={16} />
+                              : <LockOpen fontSize="small" />}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
                     <ActionCell item={e} type="expert" />
                   </Box>
                 </TableCell>
