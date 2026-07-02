@@ -993,6 +993,7 @@ class WorkOrder(models.Model):
         ('mobilisation',            'Mobilisation / Outreach'),
         ('group_session',         'Peer-to-Peer Group Session'),
         ('training_facilitation', 'Training Facilitation — Senior BGE'),
+        ('outcome_assessment_tool', 'Outcome Assessment Tool Delivery'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [

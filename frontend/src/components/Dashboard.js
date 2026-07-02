@@ -621,6 +621,39 @@ Budget estimate:
       { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Monthly, with report submission', quantitative_result: '1 invoice and 1 signed timesheet submitted monthly with the report', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of monthly deliverables' },
     ],
   },
+  outcome_assessment_tool: {
+    objective: `Deliver the Outcome Assessment Tool to assigned MSMEs and document their progress through the official assessment process. The BGE will explain the purpose of the visit, coordinate the assessment, and capture milestone achievements such as changes in energy costs, employment, or certification progress. The official response form is: https://forms.gle/UBXtrRgjGCmGsZnE8
+
+Dear {{name}},
+
+We hope you and your business are doing well.
+
+As you may recall, we recently provided technical training and mentorship/coaching support focused on improving your agro-processing operations, energy efficiency, and quality certifications. You have been working closely on this with Gloria, our Agroprocessing Expert, in conjunction with UNBS and our energy audit teams. We are truly grateful for your continued partnership and active engagement with the PRUDEV II programme.
+
+At this stage, we want to learn and improve how we support you. To do that, we want to understand the real impact our combined technical support, audits, and mentorship have made on your daily operations, and to hear directly from you about what is working well and what we can do better going forward.
+
+To that end, we are sending one of our Business Growth Experts (BGEs) to visit you at your enterprise. They will be administering our Outcome Assessment Tool to document your progress, system adoptions, and milestone achievements—such as changes in energy costs, employment, or certification tracks.
+
+Our BGE will be in touch with you shortly to arrange a convenient time to come by. The visit will be practical and straightforward—they simply want to sit with you, listen to your experiences, and learn how we can continue to strengthen your business.
+
+We kindly ask that you make yourself available this week or next week to receive them. Your honest insights mean a great deal to us and will directly shape the future of our support for you and other agro-processors.
+
+Thank you for being such a valued part of the PRUDEV II community. We look forward to celebrating your business's growth and learning how to serve you even better.
+
+Warm regards,
+
+PRUDEV II BDS Team`,
+    key_tasks: `1. Contact the assigned MSME and arrange a convenient time for the visit.
+2. Explain the purpose of the Outcome Assessment Tool and confirm the MSME's availability.
+3. Administer the assessment using the official form: https://forms.gle/UBXtrRgjGCmGsZnE8
+4. Capture progress, system adoptions, and milestone achievements from the MSME.
+5. Submit the assessment summary and any supporting notes within the reporting timeline.`,
+    deliverables_json: [
+      { task_num: 1, description: 'Visit scheduling confirmation with the MSME', due_date: 'Within 2 working days', quantitative_result: '1 confirmed visit schedule recorded for the MSME', qualitative_result: 'Schedule is practical, documented, and agreed with the MSME', means_of_verification: 'Scheduled visit note or call log', unit_rate: '', payment_condition: 'Required for payment — must be documented' },
+      { task_num: 2, description: 'Completed Outcome Assessment Tool submission', due_date: 'Within 3 working days of visit', quantitative_result: '1 completed assessment submission recorded for each assigned MSME', qualitative_result: 'Assessment clearly documents progress, challenges, and achievements', means_of_verification: 'Submitted form response and supporting notes', unit_rate: '', payment_condition: 'Required for payment — must be submitted on time' },
+      { task_num: 3, description: 'Assessment summary report', due_date: 'Within 5 working days of visit', quantitative_result: '1 summary report submitted per MSME visit', qualitative_result: 'Summary captures key findings and follow-up actions for improved support', means_of_verification: 'Submitted assessment summary report', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -841,6 +874,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
+                <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
