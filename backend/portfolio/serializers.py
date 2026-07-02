@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from .models import (
     Portfolio, Investment, Transaction,
@@ -172,11 +173,12 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
     def _all_msmes(self, obj):
-        """Return combined queryset: primary assigned + co-assigned, deduped."""
-        from django.db.models import Q
+        """Return combined queryset: primary assigned + co-assigned + group-assigned, deduped."""
         from portfolio.models import MSME
         return MSME.objects.filter(
-            Q(assigned_bge=obj) | Q(co_assigned_bges=obj),
+            Q(assigned_bge=obj) |
+            Q(co_assigned_bges=obj) |
+            Q(assigned_group__members=obj),
             is_active=True,
         ).distinct().order_by('business_name')
 

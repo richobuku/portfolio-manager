@@ -1377,9 +1377,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, mt: { xs: 7, md: 0 }, minWidth: 0, overflowX: 'hidden', pb: { xs: 10, md: 4 } }}>
         {loading && <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 4 }} />}
 
-        {/* ── My MSMEs (direct assignments only) ── */}
+        {/* ── My MSMEs (direct + co-assigned) ── */}
         {section === 'msmes' && !loading && (() => {
           const directMsmes = msmes.filter(m => m.assigned_bge === myBgeId);
+          const coAssignedMsmes = msmes.filter(m =>
+            m.assigned_bge !== myBgeId &&
+            (m.co_assigned_bge_names || []).some(b => b.id === myBgeId)
+          );
           return (
             <Box>
               {/* Responsive header: stacks vertically on phones so the
@@ -1391,7 +1395,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   <Box component="span" sx={{ color: BRAND.primaryMain, fontWeight: 600 }}>
                     {directMsmes.length}
                   </Box>
-                  {' '}directly assigned to you · group MSMEs are in{' '}
+                  {' '}directly assigned to you
+                  {coAssignedMsmes.length > 0 && (
+                    <><Box component="span" sx={{ mx: 0.5 }}>&middot;</Box>
+                    <Box component="span" sx={{ color: BRAND.primaryMain, fontWeight: 600 }}>
+                      {coAssignedMsmes.length}
+                    </Box>{' '}co-assigned to you</>
+                  )}
+                  {' '}· group MSMEs are in{' '}
                   <Box component="span"
                     sx={{ color: '#F9A825', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
                     onClick={() => startTransition(() => setSection('groups'))}>
@@ -1443,117 +1454,235 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 );
               })()}
 
-              {directMsmes.length === 0 ? (
+              {directMsmes.length === 0 && coAssignedMsmes.length === 0 ? (
                 <Paper sx={{ p: { xs: 3, sm: 6 }, textAlign: 'center' }}>
                   <Business sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-                  <Typography color="text.secondary">No MSMEs directly assigned yet. Contact your programme administrator.</Typography>
+                  <Typography color="text.secondary">No MSMEs assigned to you yet. Contact your programme administrator.</Typography>
                 </Paper>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
-                  {directMsmes.map((m) => {
-                    const msmeReportCount = reports.filter(r => r.msme === m.id).length;
-                    const lastIndividual = reports.filter(r => r.msme === m.id).sort((a, b) => b.visit_date > a.visit_date ? 1 : -1)[0];
-                    // last_support_date from the API already merges individual + group reports
-                    const lastSupportDate = m.last_support_date || lastIndividual?.visit_date;
-                    const totalSupports = m.total_reports || msmeReportCount;
-                    return (
-                      <Card key={m.id}
-                        sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, borderLeft: `4px solid ${BRAND.primaryMain}` }}
-                        onClick={() => openMsmeDetail(m)}
-                      >
-                        <CardContent>
-                          {/* Row 1: name + type + action buttons */}
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, gap: 1 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography fontWeight={700} fontSize={15}>{m.business_name}</Typography>
-                              <Typography variant="caption" color="text.secondary">{m.msme_code}</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
-                              <Chip label={m.business_type || 'MSME'} size="small" variant="outlined" />
-                              <Tooltip title="View details & reports">
-                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMsmeDetail(m); }}>
-                                  <Visibility fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="New visit report">
-                                <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
-                                  <Add fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Update MSME data">
-                                <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
-                                  <TrendingUp fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          </Box>
+                  {directMsmes.length > 0 && (
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                        Directly assigned MSMEs
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {directMsmes.map((m) => {
+                          const msmeReportCount = reports.filter(r => r.msme === m.id).length;
+                          const lastIndividual = reports.filter(r => r.msme === m.id).sort((a, b) => b.visit_date > a.visit_date ? 1 : -1)[0];
+                          const lastSupportDate = m.last_support_date || lastIndividual?.visit_date;
+                          const totalSupports = m.total_reports || msmeReportCount;
+                          return (
+                            <Card key={`direct-${m.id}`}
+                              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, borderLeft: `4px solid ${BRAND.primaryMain}` }}
+                              onClick={() => openMsmeDetail(m)}
+                            >
+                              <CardContent>
+                                {/* Row 1: name + type + action buttons */}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, gap: 1 }}>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography fontWeight={700} fontSize={15}>{m.business_name}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{m.msme_code}</Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                                    <Chip label={m.business_type || 'MSME'} size="small" variant="outlined" />
+                                    <Tooltip title="View details & reports">
+                                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMsmeDetail(m); }}>
+                                        <Visibility fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="New visit report">
+                                      <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
+                                        <Add fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Update MSME data">
+                                      <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
+                                        <TrendingUp fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                </Box>
 
-                          {/* Row 2: key fields grid */}
-                          <Grid container spacing={1} sx={{ mb: 1 }}>
-                            {m.owner_name && (
-                              <Grid item xs={6} sm={3}>
-                                <Typography variant="caption" color="text.secondary" display="block">Owner</Typography>
-                                <Typography variant="body2" fontWeight={500}>{m.owner_name}</Typography>
-                              </Grid>
-                            )}
-                            {m.phone && (
-                              <Grid item xs={6} sm={3}>
-                                <Typography variant="caption" color="text.secondary" display="block">Phone</Typography>
-                                <Typography variant="body2">{m.phone}</Typography>
-                              </Grid>
-                            )}
-                            {(m.city || m.state) && (
-                              <Grid item xs={6} sm={3}>
-                                <Typography variant="caption" color="text.secondary" display="block">Location</Typography>
-                                <Typography variant="body2">{[m.city, m.state].filter(Boolean).join(', ')}</Typography>
-                              </Grid>
-                            )}
-                            {m.sector && (
-                              <Grid item xs={6} sm={3}>
-                                <Typography variant="caption" color="text.secondary" display="block">Sector</Typography>
-                                <Typography variant="body2">{m.sector}</Typography>
-                              </Grid>
-                            )}
-                            {m.assignment_date && (
-                              <Grid item xs={6} sm={3}>
-                                <Typography variant="caption" color="text.secondary" display="block">Assigned</Typography>
-                                <Typography variant="body2">{m.assignment_date}</Typography>
-                              </Grid>
-                            )}
-                            <Grid item xs={6} sm={3}>
-                              <Typography variant="caption" color="text.secondary" display="block">Supports</Typography>
-                              <Typography variant="body2" fontWeight={600} color={totalSupports > 0 ? 'primary.main' : 'text.secondary'}>
-                                {totalSupports} total{lastSupportDate ? ` · last ${lastSupportDate}` : ''}
-                              </Typography>
-                            </Grid>
-                          </Grid>
+                                {/* Row 2: key fields grid */}
+                                <Grid container spacing={1} sx={{ mb: 1 }}>
+                                  {m.owner_name && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Owner</Typography>
+                                      <Typography variant="body2" fontWeight={500}>{m.owner_name}</Typography>
+                                    </Grid>
+                                  )}
+                                  {m.phone && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Phone</Typography>
+                                      <Typography variant="body2">{m.phone}</Typography>
+                                    </Grid>
+                                  )}
+                                  {(m.city || m.state) && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Location</Typography>
+                                      <Typography variant="body2">{[m.city, m.state].filter(Boolean).join(', ')}</Typography>
+                                    </Grid>
+                                  )}
+                                  {m.sector && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Sector</Typography>
+                                      <Typography variant="body2">{m.sector}</Typography>
+                                    </Grid>
+                                  )}
+                                  {m.assignment_date && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Assigned</Typography>
+                                      <Typography variant="body2">{m.assignment_date}</Typography>
+                                    </Grid>
+                                  )}
+                                  <Grid item xs={6} sm={3}>
+                                    <Typography variant="caption" color="text.secondary" display="block">Supports</Typography>
+                                    <Typography variant="body2" fontWeight={600} color={totalSupports > 0 ? 'primary.main' : 'text.secondary'}>
+                                      {totalSupports} total{lastSupportDate ? ` · last ${lastSupportDate}` : ''}
+                                    </Typography>
+                                  </Grid>
+                                </Grid>
 
-                          {/* Assignment objectives (truncated) */}
-                          {m.assignment_objectives && (
-                            <Alert severity="info" icon={false} sx={{ py: 0.5, mt: 0.5 }}>
-                              <Typography variant="caption" fontWeight={600} display="block">Assignment objective</Typography>
-                              <Typography variant="caption" sx={{ whiteSpace: 'pre-wrap' }}>
-                                {m.assignment_objectives.length > 180
-                                  ? m.assignment_objectives.slice(0, 180) + '…'
-                                  : m.assignment_objectives}
-                              </Typography>
-                            </Alert>
-                          )}
+                                {/* Assignment objectives (truncated) */}
+                                {m.assignment_objectives && (
+                                  <Alert severity="info" icon={false} sx={{ py: 0.5, mt: 0.5 }}>
+                                    <Typography variant="caption" fontWeight={600} display="block">Assignment objective</Typography>
+                                    <Typography variant="caption" sx={{ whiteSpace: 'pre-wrap' }}>
+                                      {m.assignment_objectives.length > 180
+                                        ? m.assignment_objectives.slice(0, 180) + '…'
+                                        : m.assignment_objectives}
+                                    </Typography>
+                                  </Alert>
+                                )}
 
-                          {/* Chips row */}
-                          <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
-                            {m.cohort_name && (
-                              <Chip label={`Cohort ${m.cohort_name}`} size="small"
-                                sx={{ bgcolor: BRAND.programmeGreen + '20', color: BRAND.programmeGreen, fontWeight: 600 }} />
-                            )}
-                            {m.session_number && (
-                              <Chip label={`Session ${m.session_number}`} size="small" variant="outlined" />
-                            )}
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                                {/* Chips row */}
+                                <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
+                                  {m.cohort_name && (
+                                    <Chip label={`Cohort ${m.cohort_name}`} size="small"
+                                      sx={{ bgcolor: BRAND.programmeGreen + '20', color: BRAND.programmeGreen, fontWeight: 600 }} />
+                                  )}
+                                  {m.session_number && (
+                                    <Chip label={`Session ${m.session_number}`} size="small" variant="outlined" />
+                                  )}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {coAssignedMsmes.length > 0 && (
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                        Co-assigned MSMEs
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {coAssignedMsmes.map((m) => {
+                          const msmeReportCount = reports.filter(r => r.msme === m.id).length;
+                          const lastIndividual = reports.filter(r => r.msme === m.id).sort((a, b) => b.visit_date > a.visit_date ? 1 : -1)[0];
+                          const lastSupportDate = m.last_support_date || lastIndividual?.visit_date;
+                          const totalSupports = m.total_reports || msmeReportCount;
+                          return (
+                            <Card key={`coassigned-${m.id}`}
+                              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 }, borderLeft: `4px solid ${BRAND.warningMain}` }}
+                              onClick={() => openMsmeDetail(m)}
+                            >
+                              <CardContent>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, gap: 1 }}>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography fontWeight={700} fontSize={15}>{m.business_name}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{m.msme_code}</Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                                    <Chip label={m.business_type || 'MSME'} size="small" variant="outlined" />
+                                    <Chip label="Co-assigned" size="small" color="warning" />
+                                    <Tooltip title="View details & reports">
+                                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMsmeDetail(m); }}>
+                                        <Visibility fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="New visit report">
+                                      <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
+                                        <Add fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Update MSME data">
+                                      <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
+                                        <TrendingUp fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                </Box>
+
+                                <Grid container spacing={1} sx={{ mb: 1 }}>
+                                  {m.owner_name && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Owner</Typography>
+                                      <Typography variant="body2" fontWeight={500}>{m.owner_name}</Typography>
+                                    </Grid>
+                                  )}
+                                  {m.phone && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Phone</Typography>
+                                      <Typography variant="body2">{m.phone}</Typography>
+                                    </Grid>
+                                  )}
+                                  {(m.city || m.state) && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Location</Typography>
+                                      <Typography variant="body2">{[m.city, m.state].filter(Boolean).join(', ')}</Typography>
+                                    </Grid>
+                                  )}
+                                  {m.sector && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Sector</Typography>
+                                      <Typography variant="body2">{m.sector}</Typography>
+                                    </Grid>
+                                  )}
+                                  {m.assignment_date && (
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary" display="block">Assigned</Typography>
+                                      <Typography variant="body2">{m.assignment_date}</Typography>
+                                    </Grid>
+                                  )}
+                                  <Grid item xs={6} sm={3}>
+                                    <Typography variant="caption" color="text.secondary" display="block">Supports</Typography>
+                                    <Typography variant="body2" fontWeight={600} color={totalSupports > 0 ? 'primary.main' : 'text.secondary'}>
+                                      {totalSupports} total{lastSupportDate ? ` · last ${lastSupportDate}` : ''}
+                                    </Typography>
+                                  </Grid>
+                                </Grid>
+
+                                {m.assignment_objectives && (
+                                  <Alert severity="info" icon={false} sx={{ py: 0.5, mt: 0.5 }}>
+                                    <Typography variant="caption" fontWeight={600} display="block">Assignment objective</Typography>
+                                    <Typography variant="caption" sx={{ whiteSpace: 'pre-wrap' }}>
+                                      {m.assignment_objectives.length > 180
+                                        ? m.assignment_objectives.slice(0, 180) + '…'
+                                        : m.assignment_objectives}
+                                    </Typography>
+                                  </Alert>
+                                )}
+
+                                <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
+                                  {m.cohort_name && (
+                                    <Chip label={`Cohort ${m.cohort_name}`} size="small"
+                                      sx={{ bgcolor: BRAND.programmeGreen + '20', color: BRAND.programmeGreen, fontWeight: 600 }} />
+                                  )}
+                                  {m.session_number && (
+                                    <Chip label={`Session ${m.session_number}`} size="small" variant="outlined" />
+                                  )}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
               )}
             </Box>

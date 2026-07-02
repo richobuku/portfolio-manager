@@ -1373,12 +1373,14 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
     @staticmethod
     def _bge_all_msme_ids(bge):
-        """Return all MSME IDs visible to a BGE: direct assignments + group assignments."""
+        """Return all MSME IDs visible to a BGE: direct, co-assigned, and group MSME assignments."""
+        from django.db.models import Q
         direct = set(bge.assigned_msmes.values_list('id', flat=True))
+        co_assigned = set(MSME.objects.filter(co_assigned_bges=bge).values_list('id', flat=True))
         via_group = set(MSME.objects.filter(
             assigned_group__in=bge.bge_groups.all()
         ).values_list('id', flat=True))
-        return direct | via_group
+        return direct | co_assigned | via_group
 
     @staticmethod
     def _already_assigned_bges(bge):
