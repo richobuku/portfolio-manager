@@ -1692,6 +1692,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [bgeUploadFile, setBgeUploadFile] = useState(null);
   const [bgeUploading, setBgeUploading] = useState(false);
   const [bgeUploadSkipDups, setBgeUploadSkipDups] = useState(false);
+  const [bgeDialog, setBgeDialog] = useState(false);
+  const [bgeForm, setBgeForm] = useState({ name: '', email: '', phone: '', location: '', bge_code: '', status: 'approved' });
+  const [bgeSaving, setBgeSaving] = useState(false);
   const bgeFileRef = React.useRef();
 
   const openBgeUpload = () => {
@@ -1716,6 +1719,44 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } finally {
       setBgeUploading(false);
       if (bgeFileRef.current) bgeFileRef.current.value = '';
+    }
+  };
+
+  const openBgeDialog = () => {
+    setBgeDialog(true);
+    setBgeForm({ name: '', email: '', phone: '', location: '', bge_code: '', status: 'approved' });
+  };
+
+  const openUserDialogForBge = (bge) => {
+    const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/(^\.+|\.+$)/g, '').replace(/\.+/g, '.');
+    const suggestedUsername = bge.email ? bge.email.split('@')[0].toLowerCase() : slug(bge.name || '');
+    setUserForm({
+      username: suggestedUsername,
+      password: '',
+      email: bge.email || '',
+      bge_id: bge.id,
+      role: 'bge',
+      group_ids: [],
+    });
+    setUserDialog(true);
+  };
+
+  const createBge = async () => {
+    if (!bgeForm.name.trim()) { notify('Please enter a name', 'error'); return; }
+    setBgeSaving(true);
+    try {
+      const res = await axios.post(API_ENDPOINTS.EXPERTS, bgeForm, { headers });
+      notify(res.data?.name ? `${res.data.name} created` : 'BGE expert created', 'success');
+      setBgeDialog(false);
+      setBgeForm({ name: '', email: '', phone: '', location: '', bge_code: '', status: 'approved' });
+      if (res.data?.id) {
+        openUserDialogForBge(res.data);
+      }
+      fetchAll();
+    } catch (err) {
+      notify(err.response?.data?.error || err.response?.data?.detail || 'Failed to create BGE expert', 'error');
+    } finally {
+      setBgeSaving(false);
     }
   };
 
@@ -2667,9 +2708,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     <Box>
       <SectionHeader title="BGE Experts" subtitle={`${experts.length} experts`}>
         {isStaff && (
-          <Button variant="outlined" startIcon={<Upload />} size="small" onClick={openBgeUpload}>
-            Import BGE Excel
-          </Button>
+          <>
+            <Button variant="contained" startIcon={<Add />} size="small" onClick={openBgeDialog}>
+              Add BGE
+            </Button>
+            <Button variant="outlined" startIcon={<Upload />} size="small" onClick={openBgeUpload} sx={{ ml: 1 }}>
+              Import BGE Excel
+            </Button>
+          </>
         )}
       </SectionHeader>
 
@@ -8802,6 +8848,68 @@ PRUDEV II BDS Team`
             startIcon={bgeUploading ? <CircularProgress size={16} /> : <Upload />}
           >
             {bgeUploading ? 'Uploading…' : 'Upload'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bgeDialog} onClose={() => setBgeDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add BGE Expert</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Create a single BGE expert profile for the programme.
+          </Typography>
+          <TextField
+            fullWidth size="small" label="Full name"
+            value={bgeForm.name}
+            onChange={e => setBgeForm(f => ({ ...f, name: e.target.value }))}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth size="small" label="Email address"
+            value={bgeForm.email}
+            onChange={e => setBgeForm(f => ({ ...f, email: e.target.value }))}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth size="small" label="Phone number"
+            value={bgeForm.phone}
+            onChange={e => setBgeForm(f => ({ ...f, phone: e.target.value }))}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth size="small" label="Location"
+            value={bgeForm.location}
+            onChange={e => setBgeForm(f => ({ ...f, location: e.target.value }))}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth size="small" label="BGE code"
+            value={bgeForm.bge_code}
+            onChange={e => setBgeForm(f => ({ ...f, bge_code: e.target.value }))}
+            sx={{ mb: 2 }}
+          />
+          <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={bgeForm.status}
+              label="Status"
+              onChange={e => setBgeForm(f => ({ ...f, status: e.target.value }))}
+            >
+              <MenuItem value="approved">Approved</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBgeDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={createBge}
+            disabled={bgeSaving}
+            startIcon={bgeSaving ? <CircularProgress size={16} /> : <Add />}
+          >
+            {bgeSaving ? 'Saving…' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
