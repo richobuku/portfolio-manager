@@ -587,7 +587,7 @@ def render_work_order(work_order):
 
     story.append(Spacer(1, 8))
 
-    if work_order.work_order_type == 'training_facilitation':
+    if work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [
             'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA AFC and GIZ quality standards.',
             'All training content and session plans must be reviewed and approved by the BDS Expert before delivery.',

@@ -753,10 +753,9 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.location   = 'Acholi Sub-region, Northern Uganda';
     }
     if (type === 'biz_continuity') {
-      extra.duration     = '5 days (2 preparation + 3 facilitation)';
-      extra.max_days     = 5;
+      extra.duration     = '7 days';
+      extra.max_days     = 7;
       extra.location     = 'Gulu / Lira, Northern Uganda';
-      extra.project_name = 'PRUDEV II — Business Continuity Planning Workshop';
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
       extra.team_leader_position = 'Team Leader';
     }
