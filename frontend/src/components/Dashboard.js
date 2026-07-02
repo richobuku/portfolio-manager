@@ -489,84 +489,109 @@ Budget estimate:
     ],
   },
   biz_continuity_workshop: {
-    objective: `To support Jacob, the Senior BGE, in preparing and delivering a Business Continuity Planning process for assigned agro-processors. This includes 3 days to build the necessary tools and materials, followed by 4 days to deliver the process through a group preparation session, direct MSME engagement, and final plan delivery. The assignment will help MSMEs build practical, business-specific Business Continuity Plans that can be used immediately in times of disruption.`,
-    key_tasks: `The Senior BGE will carry out the following over 7 working days:
+    objective: `To design and facilitate a 3-day hands-on Business Continuity Planning Workshop for agro-processors under the PRUDEV II programme. The assignment involves 2 preparation days — developing a fit-for-purpose BCP Toolkit and pre-training assigned BGEs — followed by 3 days of structured workshop facilitation with agro-processors. During the workshop, participants will collaboratively map business risks, critical functions, dependencies, and recovery strategies, and will begin developing their individual MSME Business Continuity Plans. Assigned BGEs will subsequently follow up on-site to complete the remaining assessments and finalise the plans.`,
+    key_tasks: `PREPARATION — Days 1 & 2
 
-1. Days 1–3 — Tool Development and Preparation
-• Develop the Business Continuity Planning tools and materials needed for delivery.
-• Prepare the templates, session outlines, and supporting documents required for the process.
-• Ensure the tools are practical, context-appropriate, and ready for use with MSMEs.
+1. Develop the Business Continuity Planning Toolkit
+• Design and produce all materials required for the workshop: session guides, risk mapping matrices, business function templates, dependency mapping tools, BCP framework document, and facilitator notes.
+• Ensure all materials are practical, MSME-appropriate, and ready for use before the workshop begins.
 
-2. Day 4 — Group Preparation Session
-• Facilitate a preparatory session with a group of MSMEs to introduce the Business Continuity Planning process and prepare participants for the assignment.
-• Explain the purpose of the exercise, expected outputs, roles, and the flow of the next engagement days.
-• Agree on the schedule and approach for the MSME engagement activities.
+2. Pre-train Assigned BGEs
+• Facilitate a pre-training session with all BGEs assigned to the workshop.
+• Walk BGEs through the BCP Toolkit, their facilitation roles during the 3-day workshop, and the on-site follow-up assignment that follows.
+• Confirm BGE readiness before the workshop commences.
 
-3. Days 5 & 6 — MSME Engagement and Input Collection
-• Engage directly with MSMEs to gather business-specific inputs on operations, risks, critical functions, dependencies, and recovery needs.
-• Guide the MSMEs through the key planning steps and document their responses using the PRUDEV II templates.
-• Capture practical information needed to develop a realistic Business Continuity Plan.
+WORKSHOP FACILITATION — Days 3, 4 & 5
 
-4. Day 7 — Finalisation and Delivery
-• Review all collected information, finalise the Business Continuity Plan, and deliver it to the MSMEs.
-• Conduct a short training session to explain the plan, assigned roles, and next steps.
-• Present the final document and close the assignment.
+3. Workshop Day 1 — Risk Mapping and Business Process Documentation
+• Introduce the Business Continuity Planning process and expected outputs to all agro-processor participants.
+• Facilitate structured risk identification and business process mapping for each MSME using the toolkit templates.
+• Capture outputs and ensure all participants complete their risk and process documentation before end of day.
 
-Budget estimate:
-• UGX 60,000 for the tool development and preparation days on Days 1–3
-• UGX 60,000 for the group preparation session on Day 4
-• UGX 60,000 x 2 for the two days of direct MSME engagement on Days 5 and 6
-• UGX 60,000 for the final training and delivery day on Day 7`,
+4. Workshop Day 2 — Business Dependencies and Recovery Strategies
+• Guide participants through identification of critical business dependencies (suppliers, buyers, services, utilities).
+• Facilitate development of initial recovery strategies for each MSME's critical risks and functions.
+• Capture outputs and ensure each participant has a clear draft recovery framework before end of day.
+
+5. Workshop Day 3 — Individual BCP Drafting and Next Steps
+• Support each MSME in drafting their individual Business Continuity Plan using all inputs gathered across Days 1 and 2.
+• Review and refine each draft plan with the participant.
+• Agree on next steps, assign BGEs for on-site follow-up, and confirm the follow-up schedule before close of workshop.
+
+POST-WORKSHOP
+
+6. Compile and submit the Workshop Report covering all 3 facilitation days.
+7. Submit approved invoice and signed timesheet.`,
     deliverables_json: [
       {
         task_num: 1,
-        description: 'Business Continuity Planning tools and materials developed for delivery, including the required templates and session support documents',
-        due_date: 'Days 1–3',
-        quantitative_result: 'Tools and materials completed for delivery across the 3 preparation days; budget estimate UGX 60,000',
-        qualitative_result: 'The tools are practical, clear, and suitable for use with MSMEs during the delivery process',
-        means_of_verification: 'Completed tool package and preparation records',
+        description: 'Business Continuity Planning Toolkit developed — including session guides, risk mapping matrices, business function templates, dependency mapping tools, BCP framework document, and facilitator notes',
+        due_date: 'End of Preparation Day 1',
+        quantitative_result: '1 complete BCP Toolkit package delivered, covering all materials required to run the 3-day workshop',
+        qualitative_result: 'The toolkit is practical, contextually appropriate for Ugandan agro-processors, and ready for use without further revision; reviewed and confirmed before the workshop begins',
+        means_of_verification: 'Submitted BCP Toolkit package (soft copy and printed copies for facilitation)',
         unit_rate: '',
-        payment_condition: 'Required before delivery activities commence',
+        payment_condition: 'Prerequisite for the workshop — no separate payment (included in preparation day fees)',
       },
       {
         task_num: 2,
-        description: 'Group preparation session completed with a group of MSMEs to introduce the Business Continuity Planning process and prepare participants for the assignment',
-        due_date: 'Day 4',
-        quantitative_result: '1 preparatory group session completed; budget estimate UGX 60,000',
-        qualitative_result: 'The session is well organised, MSMEs understand the process, and participants are ready for the engagement days that follow',
-        means_of_verification: 'Signed attendance register and session notes',
+        description: 'BGE pre-training completed — all assigned BGEs trained on the BCP Toolkit, their facilitation roles, and on-site follow-up responsibilities',
+        due_date: 'End of Preparation Day 2',
+        quantitative_result: '1 BGE pre-training session completed; all assigned BGEs attended and signed the attendance register',
+        qualitative_result: 'BGEs understand the toolkit, can explain each step to MSMEs, and are confident in their assigned facilitation roles for the 3-day workshop',
+        means_of_verification: 'Signed BGE pre-training attendance register and session notes',
         unit_rate: '',
-        payment_condition: 'Required for the assignment to proceed',
+        payment_condition: 'Required before workshop commences; payment included in preparation day fees',
       },
       {
         task_num: 3,
-        description: 'MSME engagement day 1 completed with business-specific input collection for the Business Continuity Plan',
-        due_date: 'Day 5',
-        quantitative_result: '1 day of direct MSME engagement completed; budget estimate UGX 60,000',
-        qualitative_result: 'The engagement yields practical business inputs and clear information on critical functions, risks, and dependencies',
-        means_of_verification: 'Signed attendance sheet and completed engagement notes',
+        description: 'Workshop Day 1 facilitated — risk identification and business process mapping completed with all agro-processor participants',
+        due_date: 'Workshop Day 1',
+        quantitative_result: '1 full workshop day facilitated; all enrolled agro-processors attended and completed their risk mapping and process documentation outputs',
+        qualitative_result: 'Participants are engaged and have documented their key business risks and critical processes using the BCP Toolkit templates; outputs are sufficient to support Day 2 activities',
+        means_of_verification: 'Signed Day 1 attendance register and completed risk mapping outputs per participant',
         unit_rate: '',
-        payment_condition: 'Required to support the next engagement day and final plan development',
+        payment_condition: 'Payment upon submission of Day 1 attendance register and participant risk mapping outputs',
       },
       {
         task_num: 4,
-        description: 'MSME engagement day 2 completed with further input collection and refinement of the Business Continuity Plan content',
-        due_date: 'Day 6',
-        quantitative_result: '1 additional day of direct MSME engagement completed; budget estimate UGX 60,000',
-        qualitative_result: 'The second engagement day adds clarity, confirms priorities, and strengthens the draft plan content',
-        means_of_verification: 'Signed attendance sheet and updated engagement notes',
+        description: 'Workshop Day 2 facilitated — business dependencies and recovery strategies developed with all agro-processor participants',
+        due_date: 'Workshop Day 2',
+        quantitative_result: '1 full workshop day facilitated; all enrolled agro-processors attended and completed their dependency mapping and initial recovery strategy outputs',
+        qualitative_result: 'Participants have clearly identified their critical business dependencies and developed actionable recovery strategies; outputs build directly on Day 1 work and are ready for BCP drafting on Day 3',
+        means_of_verification: 'Signed Day 2 attendance register and completed dependency mapping and recovery strategy outputs per participant',
         unit_rate: '',
-        payment_condition: 'Required to support finalisation of the full Business Continuity Plan',
+        payment_condition: 'Payment upon submission of Day 2 attendance register and participant dependency and recovery outputs',
       },
       {
         task_num: 5,
-        description: 'Final Business Continuity Plan delivered and trained to the MSMEs, including the completed document and a short delivery session',
-        due_date: 'Day 7',
-        quantitative_result: '1 full Business Continuity Plan delivered; training and delivery session completed; budget estimate UGX 60,000',
-        qualitative_result: 'The final plan is practical, clearly explained, and understood by the MSMEs and their key staff',
-        means_of_verification: 'Submitted final plan, signed delivery record, and training attendance sheet',
+        description: 'Workshop Day 3 facilitated — individual MSME Business Continuity Plan drafts completed and BGE follow-up schedule agreed',
+        due_date: 'Workshop Day 3',
+        quantitative_result: '1 full workshop day facilitated; all enrolled agro-processors have a written draft Business Continuity Plan and an agreed BGE follow-up schedule',
+        qualitative_result: 'Each MSME BCP draft is realistic, specific to their business, and captures risks, critical functions, dependencies, and recovery strategies developed across all 3 workshop days; each participant understands their plan and next steps',
+        means_of_verification: 'Signed Day 3 attendance register and individual MSME BCP draft per participant',
         unit_rate: '',
-        payment_condition: 'Full payment processed upon completion of the final plan and delivery session',
+        payment_condition: 'Payment upon submission of Day 3 attendance register and all MSME BCP drafts',
+      },
+      {
+        task_num: 6,
+        description: 'Workshop Report submitted — covering all 3 facilitation days, participant engagement, key outputs per day, BGE follow-up assignments, and recommendations',
+        due_date: 'Within 3 days of final workshop day',
+        quantitative_result: '1 workshop report submitted within 3 days of the final workshop day',
+        qualitative_result: 'Report clearly documents what was achieved across all 3 days, the quality of participant outputs, which BGEs are assigned to which MSMEs for follow-up, and specific recommendations to support plan finalisation',
+        means_of_verification: 'Submitted and approved workshop report',
+        unit_rate: '',
+        payment_condition: 'Final payment processed upon approval of the workshop report',
+      },
+      {
+        task_num: 7,
+        description: 'Approved invoice and signed timesheet submitted',
+        due_date: 'With workshop report',
+        quantitative_result: '1 approved invoice and 1 signed timesheet reflecting 5 days worked (2 preparation + 3 facilitation)',
+        qualitative_result: 'Invoice and timesheet are accurate, consistent with the work order terms, and submitted alongside the workshop report',
+        means_of_verification: 'Approved invoice and countersigned timesheet',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of invoice, timesheet, and workshop report',
       },
     ],
   },
