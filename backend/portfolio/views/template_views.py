@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic
+from ..models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic
 import pandas as pd
 import os
 from django.conf import settings
@@ -13,14 +13,14 @@ from django import forms
 from django.utils.decorators import method_decorator
 import io
 from collections import Counter
-from .forms import SupportRequestForm, BGEPublicSignupForm, TrainingSessionForm, AttendanceForm, MSMEForm, BGEForm
+from ..forms import SupportRequestForm, BGEPublicSignupForm, TrainingSessionForm, AttendanceForm, MSMEForm, BGEForm
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 import re
 from django.utils import timezone as _tz
-from .account_setup import ensure_bge_account
+from ..account_setup import ensure_bge_account
 
 from django.views.decorators.http import require_http_methods
 
