@@ -14,6 +14,7 @@ from .views import (
     push_subscribe, push_unsubscribe, push_vapid_key,
     bulk_email_view, bulk_email_log_view,
     bulk_sms_view, bulk_sms_log_view, bulk_sms_balance_view,
+    scheduled_messages_view, scheduled_message_cancel_view, scheduled_messages_process_view,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
 from .blockchain.api_views import (
@@ -73,4 +74,7 @@ urlpatterns = [
     path('api/bulk-sms/', bulk_sms_view, name='bulk_sms'),
     path('api/bulk-sms/balance/', bulk_sms_balance_view, name='bulk_sms_balance'),
     path('api/bulk-sms/log/', bulk_sms_log_view, name='bulk_sms_log'),
+    path('api/scheduled-messages/', scheduled_messages_view, name='scheduled_messages'),
+    path('api/scheduled-messages/<int:pk>/cancel/', scheduled_message_cancel_view, name='scheduled_message_cancel'),
+    path('api/scheduled-messages/process/', scheduled_messages_process_view, name='scheduled_messages_process'),
 ]

@@ -17,6 +17,7 @@ from .training_reports import TrainingReportViewSet, AnnualReviewReportViewSet, 
 from .communications import (
     bulk_email_view, bulk_email_log_view,
     bulk_sms_balance_view, bulk_sms_view, bulk_sms_log_view,
+    scheduled_messages_view, scheduled_message_cancel_view, scheduled_messages_process_view,
 )
 from .tshirt import TshirtReceiptViewSet, TshirtReceiptEntryViewSet
 from .push import push_subscribe, push_unsubscribe, push_vapid_key

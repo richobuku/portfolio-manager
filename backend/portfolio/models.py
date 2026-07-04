@@ -1252,6 +1252,34 @@ class SmsSendLog(models.Model):
         return f"{self.recipient_type}:{self.recipient_id} → {self.recipient_phone} ({self.sent_at:%Y-%m-%d})"
 
 
+
+# ── Scheduled Messages ────────────────────────────────────────────────────
+class ScheduledMessage(models.Model):
+    """Stores a bulk email or SMS to be sent at a future date/time."""
+    CHANNEL_CHOICES = [('email', 'Email'), ('sms', 'SMS')]
+    STATUS_CHOICES  = [('pending', 'Pending'), ('sent', 'Sent'), ('cancelled', 'Cancelled'), ('failed', 'Failed')]
+
+    channel          = models.CharField(max_length=10, choices=CHANNEL_CHOICES)
+    recipient_type   = models.CharField(max_length=10)          # 'bge' | 'msme'
+    recipient_ids    = models.JSONField(default=list)
+    subject          = models.CharField(max_length=300, blank=True)  # email only
+    body             = models.TextField()
+    skip_already_sent = models.BooleanField(default=False)
+    scheduled_at     = models.DateTimeField()
+    status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    recipient_count  = models.PositiveIntegerField(default=0)
+    created_by       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='scheduled_messages')
+    created_at       = models.DateTimeField(auto_now_add=True)
+    sent_at          = models.DateTimeField(null=True, blank=True)
+    error            = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['scheduled_at']
+
+    def __str__(self):
+        return f"[{self.channel}] {self.subject or self.body[:40]} → {self.scheduled_at:%Y-%m-%d %H:%M} ({self.status})"
+
+
 # ── User Security Profile ─────────────────────────────────────────────────
 class UserSecurityProfile(models.Model):
     """Tracks password change requirements and last-changed date for every user."""

@@ -71,6 +71,9 @@ export const BULK_EMAIL_LOG = `${API_BASE_URL}/api/bulk-email/log/`;
 export const BULK_SMS = `${API_BASE_URL}/api/bulk-sms/`;
 export const BULK_SMS_LOG = `${API_BASE_URL}/api/bulk-sms/log/`;
 export const BULK_SMS_BALANCE = `${API_BASE_URL}/api/bulk-sms/balance/`;
+export const SCHEDULED_MESSAGES = `${API_BASE_URL}/api/scheduled-messages/`;
+export const SCHEDULED_MESSAGES_PROCESS = `${API_BASE_URL}/api/scheduled-messages/process/`;
+export const SCHEDULED_MESSAGE_CANCEL = (id) => `${API_BASE_URL}/api/scheduled-messages/${id}/cancel/`;
 export const MENTOR_REPORTS = API_ENDPOINTS.MENTOR_REPORTS;
 
 export default API_BASE_URL;

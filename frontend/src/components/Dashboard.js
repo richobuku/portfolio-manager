@@ -18,7 +18,7 @@ import {
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
   Lock, LockOpen, Star, StarBorder, Download, Undo,
-  Campaign, Send as SendIcon, Checkroom, DrawOutlined,
+  Campaign, Send as SendIcon, Schedule as ScheduleIcon, Checkroom, DrawOutlined,
   RotateLeft, RotateRight, Dashboard as DashboardIcon,
   ArrowForward, TaskAlt, Payments, Description,
 } from '@mui/icons-material';
@@ -27,7 +27,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -6286,6 +6286,13 @@ PRUDEV II BDS Team`,
   const [smsBalanceError, setSmsBalanceError] = React.useState(null);
   const [smsBalanceBefore, setSmsBalanceBefore] = React.useState(null); // snapshot before send
 
+  // ── Schedule Send state ──────────────────────────────────────────────────
+  const [scheduleDialogOpen, setScheduleDialogOpen] = React.useState(false);
+  const [scheduleDateTime, setScheduleDateTime] = React.useState('');
+  const [scheduleFor, setScheduleFor] = React.useState(null); // { channel, recipients, subject, body, recipientType, skipSent }
+  const [scheduledMessages, setScheduledMessages] = React.useState([]);
+  const [scheduledLoading, setScheduledLoading] = React.useState(false);
+
   // ── Session MSME notification dialog ────────────────────────────────────
   const [sessionNotifyDialog, setSessionNotifyDialog] = React.useState(false);
   const [sessionNotifySession, setSessionNotifySession] = React.useState(null);
@@ -6533,6 +6540,64 @@ PRUDEV II BDS Team`
     }
   };
 
+  // ── Scheduled messages helpers ─────────────────────────────────────────────
+  const loadScheduledMessages = React.useCallback(async () => {
+    setScheduledLoading(true);
+    try {
+      const res = await axios.get(SCHEDULED_MESSAGES, { headers });
+      setScheduledMessages(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // silent — non-critical
+    } finally {
+      setScheduledLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  React.useEffect(() => {
+    if (section !== 'communications') return;
+    loadScheduledMessages();
+    const id = setInterval(async () => {
+      try { await axios.post(SCHEDULED_MESSAGES_PROCESS, {}, { headers }); } catch {}
+      loadScheduledMessages();
+    }, 60000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, token]);
+
+  const handleScheduleSubmit = async () => {
+    if (!scheduleFor || !scheduleDateTime) return;
+    try {
+      await axios.post(SCHEDULED_MESSAGES, {
+        channel: scheduleFor.channel,
+        recipient_type: scheduleFor.recipientType,
+        recipient_ids: scheduleFor.recipients,
+        subject: scheduleFor.subject,
+        body: scheduleFor.body,
+        skip_already_sent: scheduleFor.skipSent,
+        scheduled_at: scheduleDateTime,
+      }, { headers });
+      notify(`${scheduleFor.channel === 'email' ? 'Email' : 'SMS'} scheduled for ${new Date(scheduleDateTime).toLocaleString()}`, 'success');
+      setScheduleDialogOpen(false);
+      setScheduleDateTime('');
+      setScheduleFor(null);
+      loadScheduledMessages();
+    } catch (err) {
+      const d = err.response?.data;
+      notify(d?.detail || d?.error || 'Failed to schedule message', 'error');
+    }
+  };
+
+  const handleScheduleCancel = async (id) => {
+    try {
+      await axios.delete(SCHEDULED_MESSAGE_CANCEL(id), { headers });
+      notify('Scheduled message cancelled', 'info');
+      loadScheduledMessages();
+    } catch {
+      notify('Failed to cancel scheduled message', 'error');
+    }
+  };
+
   const renderCommunications = () => (
     <Box>
       <SectionHeader title="Communications" subtitle="Send bulk emails or SMS to BGEs or MSMEs" />
@@ -6657,7 +6722,26 @@ PRUDEV II BDS Team`
               })}
             </Box>
 
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+              <Button
+                variant="outlined"
+                color="success"
+                startIcon={<ScheduleIcon />}
+                disabled={smsSelected.size === 0 || !smsBody.trim() || smsSending}
+                onClick={() => {
+                  setScheduleFor({
+                    channel: 'sms',
+                    recipients: Array.from(smsSelected),
+                    subject: '',
+                    body: smsBody,
+                    recipientType: smsTab === 0 ? 'bge' : 'msme',
+                    skipSent: false,
+                  });
+                  setScheduleDialogOpen(true);
+                }}
+              >
+                Schedule
+              </Button>
               <Button
                 variant="contained"
                 color="success"
@@ -6796,7 +6880,25 @@ PRUDEV II BDS Team`
           </Alert>
         )}
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<ScheduleIcon />}
+            disabled={commSelected.size === 0 || !commSubject.trim() || !commBody.trim() || commSending}
+            onClick={() => {
+              setScheduleFor({
+                channel: 'email',
+                recipients: Array.from(commSelected),
+                subject: commSubject,
+                body: commBody,
+                recipientType: commTab === 0 ? 'bge' : 'msme',
+                skipSent: commSkipSent,
+              });
+              setScheduleDialogOpen(true);
+            }}
+          >
+            Schedule
+          </Button>
           <Button
             variant="contained"
             startIcon={commSending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
@@ -6827,6 +6929,84 @@ PRUDEV II BDS Team`
       </Dialog>
     </Box>
       )} {/* end email/sms ternary */}
+
+      {/* ── Scheduled Messages Queue ──────────────────────────────────────── */}
+      {scheduledMessages.length > 0 && (
+        <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <ScheduleIcon fontSize="small" /> Scheduled Messages{scheduledLoading && <CircularProgress size={14} sx={{ ml: 1 }} />}
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {scheduledMessages.map(msg => (
+              <Box key={msg.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, borderRadius: 1, bgcolor: 'grey.50', border: '1px solid', borderColor: msg.status === 'pending' ? 'warning.200' : msg.status === 'sent' ? 'success.200' : 'error.200' }}>
+                <Chip
+                  label={msg.channel.toUpperCase()}
+                  size="small"
+                  color={msg.channel === 'email' ? 'primary' : 'success'}
+                  variant="outlined"
+                />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  {msg.subject && <Typography variant="body2" noWrap fontWeight={500}>{msg.subject}</Typography>}
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {msg.body.substring(0, 80)}{msg.body.length > 80 ? '…' : ''}
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    {new Date(msg.scheduled_at).toLocaleString()} · {msg.recipient_count} recipient{msg.recipient_count !== 1 ? 's' : ''} · <strong>{msg.status}</strong>
+                    {msg.error && <span style={{ color: 'red' }}> · {msg.error}</span>}
+                  </Typography>
+                </Box>
+                {msg.status === 'pending' && (
+                  <Button size="small" color="error" onClick={() => handleScheduleCancel(msg.id)}>Cancel</Button>
+                )}
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      )}
+
+      {/* ── Schedule Send Dialog ──────────────────────────────────────────── */}
+      <Dialog open={scheduleDialogOpen} onClose={() => { setScheduleDialogOpen(false); setScheduleDateTime(''); }} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ScheduleIcon fontSize="small" /> Schedule Send
+        </DialogTitle>
+        <DialogContent>
+          {scheduleFor && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>{scheduleFor.channel === 'email' ? 'Email' : 'SMS'}</strong> to{' '}
+                <strong>{scheduleFor.recipients.length} recipient{scheduleFor.recipients.length !== 1 ? 's' : ''}</strong>
+                {scheduleFor.subject && <> · <em>{scheduleFor.subject}</em></>}
+              </Typography>
+              <Paper variant="outlined" sx={{ p: 1, bgcolor: 'grey.50', mb: 2 }}>
+                <Typography variant="caption" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                  {scheduleFor.body.substring(0, 120)}{scheduleFor.body.length > 120 ? '…' : ''}
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+          <TextField
+            label="Send at"
+            type="datetime-local"
+            fullWidth
+            size="small"
+            value={scheduleDateTime}
+            onChange={e => setScheduleDateTime(e.target.value)}
+            inputProps={{ min: new Date(Date.now() + 60000).toISOString().slice(0, 16) }}
+            InputLabelProps={{ shrink: true }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setScheduleDialogOpen(false); setScheduleDateTime(''); }}>Cancel</Button>
+          <Button
+            variant="contained"
+            startIcon={<ScheduleIcon />}
+            disabled={!scheduleDateTime}
+            onClick={handleScheduleSubmit}
+          >
+            Schedule
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 

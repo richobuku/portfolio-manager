@@ -7,8 +7,10 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.utils import timezone
 
-from ..models import BusinessGrowthExpert, MSME
+from ..models import BusinessGrowthExpert, MSME, ScheduledMessage
+from ..serializers import ScheduledMessageSerializer
 from .mixins import _managed_groups
 
 logger = logging.getLogger(__name__)
@@ -415,3 +417,164 @@ def bulk_sms_log_view(request):
         }
         for l in logs
     ]})
+
+
+# ── Scheduled Messages ────────────────────────────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([_IsAuth])
+def scheduled_messages_view(request):
+    """List pending scheduled messages or create a new one."""
+    user = request.user
+    if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+        raise PermissionDenied("Only administrators can manage scheduled messages.")
+
+    if request.method == 'GET':
+        msgs = ScheduledMessage.objects.filter(
+            created_by=user,
+            status='pending',
+        ).order_by('scheduled_at')
+        return Response(ScheduledMessageSerializer(msgs, many=True).data)
+
+    # POST — create a new scheduled message
+    channel        = request.data.get('channel', 'email')
+    recipient_type = request.data.get('recipient_type', 'bge')
+    recipient_ids  = request.data.get('recipient_ids', [])
+    subject        = (request.data.get('subject') or '').strip()
+    body           = (request.data.get('body') or '').strip()
+    skip_sent      = bool(request.data.get('skip_already_sent', False))
+    scheduled_at   = request.data.get('scheduled_at')
+    recipient_count = int(request.data.get('recipient_count', len(recipient_ids)))
+
+    if not body:
+        return Response({'detail': 'Body / message is required.'}, status=400)
+    if channel == 'email' and not subject:
+        return Response({'detail': 'Subject is required for email.'}, status=400)
+    if not scheduled_at:
+        return Response({'detail': 'scheduled_at is required.'}, status=400)
+    if not recipient_ids:
+        return Response({'detail': 'No recipients selected.'}, status=400)
+
+    try:
+        from django.utils.dateparse import parse_datetime
+        dt = parse_datetime(scheduled_at)
+        if dt is None:
+            raise ValueError
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt)
+    except (ValueError, TypeError):
+        return Response({'detail': 'Invalid scheduled_at datetime.'}, status=400)
+
+    if dt <= timezone.now():
+        return Response({'detail': 'Scheduled time must be in the future.'}, status=400)
+
+    msg = ScheduledMessage.objects.create(
+        channel=channel,
+        recipient_type=recipient_type,
+        recipient_ids=list(recipient_ids),
+        subject=subject,
+        body=body,
+        skip_already_sent=skip_sent,
+        scheduled_at=dt,
+        recipient_count=recipient_count,
+        created_by=user,
+    )
+    return Response(ScheduledMessageSerializer(msg).data, status=201)
+
+
+@api_view(['DELETE'])
+@permission_classes([_IsAuth])
+def scheduled_message_cancel_view(request, pk):
+    """Cancel (soft-delete) a pending scheduled message."""
+    try:
+        msg = ScheduledMessage.objects.get(pk=pk, created_by=request.user)
+    except ScheduledMessage.DoesNotExist:
+        return Response({'detail': 'Not found.'}, status=404)
+    if msg.status != 'pending':
+        return Response({'detail': f'Cannot cancel a message with status "{msg.status}".'}, status=400)
+    msg.status = 'cancelled'
+    msg.save(update_fields=['status'])
+    return Response({'detail': 'Cancelled.'})
+
+
+@api_view(['POST'])
+@permission_classes([_IsAuth])
+def scheduled_messages_process_view(request):
+    """Process all due pending messages. Called periodically by the frontend."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied("Only admins can trigger message processing.")
+
+    now = timezone.now()
+    due = ScheduledMessage.objects.filter(status='pending', scheduled_at__lte=now)
+    processed = sent = failed = 0
+
+    for msg in due:
+        processed += 1
+        try:
+            if msg.channel == 'email':
+                _dispatch_scheduled_email(msg)
+            else:
+                _dispatch_scheduled_sms(msg)
+            msg.status = 'sent'
+            msg.sent_at = timezone.now()
+            msg.save(update_fields=['status', 'sent_at'])
+            sent += 1
+        except Exception as e:
+            logger.error('Scheduled message %d failed: %s', msg.pk, e, exc_info=True)
+            msg.status = 'failed'
+            msg.error = str(e)
+            msg.save(update_fields=['status', 'error'])
+            failed += 1
+
+    return Response({'processed': processed, 'sent': sent, 'failed': failed})
+
+
+def _dispatch_scheduled_email(msg):
+    """Fire email send for a ScheduledMessage (runs in the request thread — acceptable for small lists)."""
+    import threading
+    from .mixins import _managed_groups as _mg
+
+    if msg.recipient_type == 'bge':
+        qs = BusinessGrowthExpert.objects.filter(email__isnull=False).exclude(email='')
+        if msg.recipient_ids:
+            qs = qs.filter(id__in=msg.recipient_ids)
+        records = [{'id': b.id, 'name': b.name or 'BGE', 'email': b.email} for b in qs]
+    else:
+        qs = MSME.objects.filter(email__isnull=False).exclude(email='')
+        if msg.recipient_ids:
+            qs = qs.filter(id__in=msg.recipient_ids)
+        records = [{'id': m.id, 'name': m.owner_name or m.business_name or 'Business Owner', 'email': m.email} for m in qs]
+
+    already_sent_ids = set()
+    from_email = settings.DEFAULT_FROM_EMAIL
+    reply_to   = getattr(settings, 'EMAIL_REPLY_TO', from_email)
+
+    t = threading.Thread(
+        target=_do_send_emails,
+        args=(records, msg.subject, msg.body, '', msg.skip_already_sent,
+              already_sent_ids, msg.recipient_type, from_email, reply_to, msg.created_by_id),
+        daemon=True,
+    )
+    t.start()
+
+
+def _dispatch_scheduled_sms(msg):
+    """Fire SMS send for a ScheduledMessage."""
+    import threading
+
+    if msg.recipient_type == 'bge':
+        qs = BusinessGrowthExpert.objects.filter(phone__isnull=False).exclude(phone='')
+        if msg.recipient_ids:
+            qs = qs.filter(id__in=msg.recipient_ids)
+        records = [{'id': b.id, 'name': b.name or 'BGE', 'phone': b.phone, 'rtype': 'bge'} for b in qs]
+    else:
+        qs = MSME.objects.filter(phone__isnull=False).exclude(phone='')
+        if msg.recipient_ids:
+            qs = qs.filter(id__in=msg.recipient_ids)
+        records = [{'id': m.id, 'name': m.owner_name or m.business_name or 'Business', 'phone': m.phone, 'rtype': 'msme'} for m in qs]
+
+    threading.Thread(
+        target=_do_send_sms,
+        args=(records, msg.body, msg.created_by_id),
+        daemon=True,
+    ).start()
