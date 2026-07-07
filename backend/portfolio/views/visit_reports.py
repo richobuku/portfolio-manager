@@ -168,6 +168,21 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
             notes               = '\n'.join(notes_parts),
         )
 
+    def destroy(self, request, *args, **kwargs):
+        report = self.get_object()
+        user = request.user
+        if user.is_staff or user.is_superuser:
+            pass  # admins can delete any report
+        else:
+            if report.status != 'draft':
+                raise PermissionDenied("You can only delete reports that are still in draft.")
+            try:
+                if report.bge != user.bge_profile:
+                    raise PermissionDenied("You can only delete your own reports.")
+            except Exception:
+                raise PermissionDenied("No BGE profile associated with this account.")
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'], url_path='revert')
     def revert(self, request, pk=None):
         """Admin-only: revert a submitted/reviewed report back to draft

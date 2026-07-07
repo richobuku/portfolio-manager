@@ -866,6 +866,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const deleteReport = async (report) => {
+    if (!window.confirm(`Delete this draft report for "${report.msme_name || 'this MSME'}"? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.REPORTS}${report.id}/`, { headers });
+      notify('Draft report deleted', 'success');
+      setReports(prev => prev.filter(r => r.id !== report.id));
+    } catch (e) {
+      notify(e.response?.data?.detail || 'Failed to delete report', 'error');
+    }
+  };
+
   // ── PDF helpers (MSME + Group reports) ─────────────────────────────────────
   const openReportPdf = async (kind, reportId, mode = 'view') => {
     const base = kind === 'group' ? API_ENDPOINTS.GROUP_REPORTS : API_ENDPOINTS.REPORTS;
@@ -4435,6 +4446,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         <Tooltip title="Revert to draft">
                           <IconButton size="small" color="warning" onClick={() => revertReport('msme', r.id)}>
                             <Undo fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {r.status === 'draft' && (
+                        <Tooltip title="Delete draft">
+                          <IconButton size="small" color="error" onClick={() => deleteReport(r)}>
+                            <Delete fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       )}
