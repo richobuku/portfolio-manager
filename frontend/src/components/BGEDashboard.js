@@ -763,6 +763,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setVisitReportOpen(true);
   };
 
+  const deleteReport = async (report) => {
+    if (!window.confirm(`Delete this draft report for "${report.msme_name || 'this MSME'}"? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.REPORTS}${report.id}/`, { headers: { Authorization: `Bearer ${token}` } });
+      notify('Draft report deleted', 'success');
+      setReports(prev => prev.filter(r => r.id !== report.id));
+    } catch (e) {
+      notify(e.response?.data?.detail || 'Failed to delete report', 'error');
+    }
+  };
+
   // ── group reports ─────────────────────────────────────────────────────────
 
   /* Draft-save helpers (debounced 800 ms) */
@@ -2022,6 +2033,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                 </IconButton>
                               </span>
                             </Tooltip>
+                            {r.status === 'draft' && (
+                              <Tooltip title="Delete draft">
+                                <IconButton size="small" color="error" onClick={() => deleteReport(r)}>
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Box>
                         </TableCell>
                       </TableRow>
