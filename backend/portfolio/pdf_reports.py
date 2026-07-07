@@ -17,8 +17,9 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    HRFlowable, KeepTogether,
 )
-from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY
+from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY, TA_CENTER
 
 
 NAVY = HexColor('#1A2F4B')
@@ -804,6 +805,303 @@ def render_mentor_report(report):
 
     story.append(Spacer(1, 12))
     story.append(_sig_block(s, bge, signed_date=report.updated_at))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Quarterly / Programme-period summary report
+# ─────────────────────────────────────────────────────────────────────────────
+
+VISIT_LABELS_Q = {
+    'data_update':      'Data Collection',
+    'one_on_one':       'One-on-One Visit',
+    'training':         'Training Visit',
+    'coaching':         'Business Coaching',
+    'annual_review':    'Annual Review',
+    'initial':          'Initial Assessment',
+    'followup':         'Follow-up Visit',
+    'final':            'Final Assessment',
+    'mentoring':        'Mentoring Session',
+    'quarterly_review': 'Quarterly Review',
+}
+
+
+def _qr_styles():
+    base = getSampleStyleSheet()
+    NAVY2 = HexColor('#162A3A')
+    MID   = HexColor('#2B5278')
+    GREY2 = HexColor('#555555')
+    return {
+        'title':   ParagraphStyle('qrt',  fontName='Helvetica-Bold', fontSize=17,
+                                  textColor=NAVY2, alignment=TA_CENTER, spaceAfter=2, leading=22),
+        'sub':     ParagraphStyle('qrs',  fontName='Helvetica', fontSize=10,
+                                  textColor=GREY2, alignment=TA_CENTER, spaceAfter=2),
+        'h1':      ParagraphStyle('qrh1', fontName='Helvetica-Bold', fontSize=12,
+                                  textColor=NAVY2, spaceBefore=12, spaceAfter=4, leading=16),
+        'body':    ParagraphStyle('qrb',  fontName='Helvetica', fontSize=9.5,
+                                  leading=14, spaceAfter=4, alignment=TA_JUSTIFY),
+        'th':      ParagraphStyle('qrth', fontName='Helvetica-Bold', fontSize=8.5,
+                                  textColor=HexColor('#FFFFFF'), alignment=TA_CENTER, leading=11),
+        'td':      ParagraphStyle('qrtd',  fontName='Helvetica', fontSize=8.5, leading=11),
+        'tdc':     ParagraphStyle('qrtdc', fontName='Helvetica', fontSize=8.5, leading=11,
+                                  alignment=TA_CENTER),
+        'tdb':     ParagraphStyle('qrtdb', fontName='Helvetica-Bold', fontSize=8.5, leading=11),
+        'bge_hdr': ParagraphStyle('qrbh', fontName='Helvetica-Bold', fontSize=9.5,
+                                  textColor=HexColor('#FFFFFF'), backColor=MID, leading=14,
+                                  spaceBefore=6, spaceAfter=2),
+    }
+
+
+def _qr_table(data, cws, hrows=1, extra_cmds=()):
+    """Build a styled quarterly-report table.  Pass ``extra_cmds`` for per-table
+    style overrides instead of reaching into ReportLab private state afterwards."""
+    NAVY2 = HexColor('#162A3A')
+    t = Table(data, colWidths=cws, repeatRows=hrows)
+    cmds = [
+        ('BACKGROUND',    (0, 0), (-1, hrows-1), NAVY2),
+        ('TEXTCOLOR',     (0, 0), (-1, hrows-1), HexColor('#FFFFFF')),
+        ('FONTNAME',      (0, 0), (-1, hrows-1), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, -1), 8.5),
+        ('LEADING',       (0, 0), (-1, -1), 11),
+        ('TOPPADDING',    (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 5),
+        ('GRID',          (0, 0), (-1, -1), 0.3, HexColor('#CCCCCC')),
+        ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',         (0, 0), (-1, hrows-1), 'CENTER'),
+    ]
+    for i in range(hrows, len(data)):
+        if i % 2 == 0:
+            cmds.append(('BACKGROUND', (0, i), (-1, i), HexColor('#F5F5F5')))
+    cmds.extend(extra_cmds)
+    t.setStyle(TableStyle(cmds))
+    return t
+
+
+def render_quarterly_report(qs, start_date=None, end_date=None, label=''):
+    """Generate a programme-period summary PDF from a queryset of MSMEReports.
+
+    Args:
+        qs:          Iterable / QuerySet of MSMEReport instances.
+        start_date:  datetime.date or None (display only).
+        end_date:    datetime.date or None (display only).
+        label:       Optional period label, e.g. 'Q2 2026'.
+
+    Returns:
+        io.BytesIO with the PDF bytes, seeked to 0.
+    """
+    from collections import defaultdict, Counter
+
+    NAVY2   = HexColor('#162A3A')
+    ACCENT2 = HexColor('#C0392B')
+    GREEN   = HexColor('#2E7D32')
+    AMBER   = HexColor('#E67E22')
+    MID     = HexColor('#2B5278')
+
+    s = _qr_styles()
+    reports = list(
+        qs.select_related('bge', 'msme')
+          .order_by('bge__name', 'msme__business_name', 'visit_date')
+    )
+
+    total_reports = len(reports)
+    bge_ids  = {r.bge_id  for r in reports}
+    msme_ids = {r.msme_id for r in reports}
+    dates    = [r.visit_date for r in reports if r.visit_date]
+
+    period_str = label or (f'{min(dates)} to {max(dates)}' if dates else 'All dates')
+    start_str  = str(start_date) if start_date else (str(min(dates))  if dates else 'start')
+    end_str    = str(end_date)   if end_date   else (str(max(dates))   if dates else 'end')
+
+    by_bge = defaultdict(list)
+    for r in reports:
+        by_bge[r.bge].append(r)
+
+    buf, doc = _build_doc()
+    PAGE_W = A4[0]
+    LM = RM = 20 * mm
+    CW = PAGE_W - LM - RM
+    story = []
+
+    # ── Cover / KPI strip ────────────────────────────────────────────────────
+    story.append(Spacer(1, 8))
+    story.append(Paragraph('BGE One-on-One Support Summary', s['title']))
+    story.append(Paragraph(f'PRUDEV II Programme  ·  Period: {period_str}', s['sub']))
+    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width='100%', thickness=1.5, color=ACCENT2, spaceAfter=6))
+
+    def _kpi_cell(num_txt, lbl_txt, idx):
+        num_s = ParagraphStyle(f'kn{idx}', fontName='Helvetica-Bold', fontSize=20,
+                               textColor=HexColor('#FFFFFF'), alignment=TA_CENTER, leading=24)
+        lbl_s = ParagraphStyle(f'kl{idx}', fontName='Helvetica', fontSize=8,
+                               textColor=HexColor('#FFFFFF'), alignment=TA_CENTER)
+        return [Paragraph(num_txt, num_s), Paragraph(lbl_txt, lbl_s)]
+
+    kpi_t = Table([[
+        _kpi_cell(str(total_reports),  'Reports Filed',  0),
+        _kpi_cell(str(len(bge_ids)),   'BGEs Reporting', 1),
+        _kpi_cell(str(len(msme_ids)),  'MSMEs Visited',  2),
+        _kpi_cell(f'{start_str[:10]}', f'to {end_str[:10]}', 3),
+    ]], colWidths=[CW / 4] * 4)
+    kpi_t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), ACCENT2),
+        ('BACKGROUND', (1, 0), (1, 0), MID),
+        ('BACKGROUND', (2, 0), (2, 0), GREEN),
+        ('BACKGROUND', (3, 0), (3, 0), AMBER),
+        ('TOPPADDING',    (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',  (0, 0), (-1, -1), 'CENTER'),
+        ('GRID',   (0, 0), (-1, -1), 0, HexColor('#FFFFFF')),
+    ]))
+    story.append(kpi_t)
+    story.append(Spacer(1, 12))
+
+    # ── Visit-type breakdown table ────────────────────────────────────────────
+    story.append(Paragraph('Overview — Reports by Visit Type', s['h1']))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=4))
+    vt_counts = Counter(r.visit_type for r in reports)
+    vt_rows = [[
+        Paragraph('<b>Visit Type</b>', s['th']),
+        Paragraph('<b>Count</b>', s['th']),
+        Paragraph('<b>% of Total</b>', s['th']),
+    ]]
+    for vt, cnt in sorted(vt_counts.items(), key=lambda x: -x[1]):
+        pct = f'{100 * cnt / total_reports:.0f}%' if total_reports else '—'
+        vt_rows.append([
+            Paragraph(VISIT_LABELS_Q.get(vt, vt), s['td']),
+            Paragraph(str(cnt), s['tdc']),
+            Paragraph(pct, s['tdc']),
+        ])
+    vt_rows.append([
+        Paragraph('<b>TOTAL</b>', s['tdb']),
+        Paragraph(f'<b>{total_reports}</b>',
+                  ParagraphStyle('vtot', fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+        Paragraph('<b>100%</b>',
+                  ParagraphStyle('vp',   fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+    ])
+    vt_t = _qr_table(vt_rows, [CW * 0.55, CW * 0.22, CW * 0.23], extra_cmds=[
+        ('BACKGROUND', (0, len(vt_rows)-1), (-1, len(vt_rows)-1), NAVY2),
+        ('TEXTCOLOR',  (0, len(vt_rows)-1), (-1, len(vt_rows)-1), HexColor('#FFFFFF')),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+    ])
+    story.append(vt_t)
+    story.append(Spacer(1, 12))
+
+    # ── Per-BGE summary table ─────────────────────────────────────────────────
+    story.append(Paragraph('Per-BGE Summary', s['h1']))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=4))
+    bge_rows = [[
+        Paragraph('<b>BGE Name</b>', s['th']),
+        Paragraph('<b>Reports</b>', s['th']),
+        Paragraph('<b>MSMEs</b>', s['th']),
+        Paragraph('<b>Visit Types</b>', s['th']),
+    ]]
+    for bge, rpts in sorted(by_bge.items(), key=lambda x: x[0].name):
+        mc = len({r.msme_id for r in rpts})
+        vt_str = ', '.join(
+            f'{VISIT_LABELS_Q.get(vt, vt)} ({cnt})'
+            for vt, cnt in sorted(Counter(r.visit_type for r in rpts).items(), key=lambda x: -x[1])
+        )
+        bge_rows.append([
+            Paragraph(bge.name, s['td']),
+            Paragraph(str(len(rpts)), s['tdc']),
+            Paragraph(str(mc), s['tdc']),
+            Paragraph(vt_str, s['td']),
+        ])
+    bge_rows.append([
+        Paragraph(f'<b>TOTAL — {len(by_bge)} BGEs</b>', s['tdb']),
+        Paragraph(f'<b>{total_reports}</b>',
+                  ParagraphStyle('btot', fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+        Paragraph(f'<b>{len(msme_ids)}</b>',
+                  ParagraphStyle('bmsme', fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+        '',
+    ])
+    bge_t = _qr_table(bge_rows, [CW * 0.31, CW * 0.12, CW * 0.11, CW * 0.46], extra_cmds=[
+        ('BACKGROUND', (0, len(bge_rows)-1), (-1, len(bge_rows)-1), NAVY2),
+        ('TEXTCOLOR',  (0, len(bge_rows)-1), (-1, len(bge_rows)-1), HexColor('#FFFFFF')),
+        ('ALIGN', (1, 0), (2, -1), 'CENTER'),
+    ])
+    story.append(bge_t)
+
+    # ── Detailed narratives per BGE ───────────────────────────────────────────
+    story.append(Spacer(1, 8))
+    story.append(Paragraph('Detailed BGE Activity Narratives', s['h1']))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=6))
+
+    # Hoist repeated ParagraphStyles out of the inner loops — one object per style is enough
+    _s_msmeh = ParagraphStyle('qr_msmeh', fontName='Helvetica-Bold', fontSize=9,
+                               textColor=MID, spaceBefore=4, spaceAfter=2)
+    _s_vrh   = ParagraphStyle('qr_vrh', fontName='Helvetica-Oblique', fontSize=8.5,
+                               textColor=HexColor('#666666'), spaceBefore=2, spaceAfter=1)
+    _s_vrb   = ParagraphStyle('qr_vrb', fontName='Helvetica', fontSize=8.5,
+                               leading=12, spaceAfter=2, leftIndent=8, alignment=TA_JUSTIFY)
+    _s_vrn   = ParagraphStyle('qr_vrn', fontName='Helvetica-Oblique', fontSize=8.5,
+                               textColor=HexColor('#999999'), leftIndent=8, spaceAfter=2)
+
+    for bge, rpts in sorted(by_bge.items(), key=lambda x: x[0].name):
+        mc = len({r.msme_id for r in rpts})
+        vt_str = ', '.join(
+            f'{VISIT_LABELS_Q.get(vt, vt)} ({cnt})'
+            for vt, cnt in sorted(Counter(r.visit_type for r in rpts).items(), key=lambda x: -x[1])
+        )
+        hdr = (
+            f'<b>{_safe_html(bge.name)}</b>'
+            f'  —  {len(rpts)} report{"s" if len(rpts)!=1 else ""}  |  '
+            f'{mc} MSME{"s" if mc!=1 else ""}  |  {_safe_html(vt_str)}'
+        )
+        bge_block = [Spacer(1, 6), Paragraph(hdr, s['bge_hdr'])]
+
+        by_msme = defaultdict(list)
+        for r in rpts:
+            by_msme[r.msme].append(r)
+
+        for msme, mrpts in sorted(by_msme.items(), key=lambda x: x[0].business_name):
+            mrpts_s = sorted(mrpts, key=lambda r: r.visit_date or '')
+            bge_block.append(Spacer(1, 4))
+            bge_block.append(Paragraph(
+                f'<b>{_safe_html(msme.business_name)}</b>'
+                f'  ({len(mrpts_s)} visit{"s" if len(mrpts_s)!=1 else ""})',
+                _s_msmeh,
+            ))
+            for r in mrpts_s:
+                vt_lbl   = VISIT_LABELS_Q.get(r.visit_type, r.visit_type)
+                date_str = str(r.visit_date) if r.visit_date else '—'
+                parts = [
+                    ('Support',     r.support_provided),
+                    ('Achievement', r.key_achievement),
+                    ('Challenges',  r.challenges_identified),
+                    ('Action Plan', r.action_plan),
+                ]
+                bge_block.append(Paragraph(f'[{date_str} | {_safe_html(vt_lbl)}]', _s_vrh))
+                has_text = False
+                for fl, fv in parts:
+                    if fv and fv.strip():
+                        snippet = fv.strip()[:400] + ('…' if len(fv.strip()) > 400 else '')
+                        bge_block.append(Paragraph(
+                            f'<b>{_safe_html(fl)}:</b> {_safe_html(snippet)}',
+                            _s_vrb,
+                        ))
+                        has_text = True
+                if not has_text:
+                    bge_block.append(Paragraph('(No narrative recorded)', _s_vrn))
+
+        story.append(KeepTogether(bge_block[:4]))
+        story.extend(bge_block[4:])
+
+    story.append(Spacer(1, 12))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=NAVY2, spaceAfter=4))
+    story.append(Paragraph(
+        f'Generated from PRUDEV II Portfolio Management System  ·  Period: {period_str}',
+        ParagraphStyle('foot2', fontName='Helvetica', fontSize=7.5,
+                       textColor=HexColor('#888888'), alignment=TA_CENTER),
+    ))
 
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)

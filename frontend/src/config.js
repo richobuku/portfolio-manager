@@ -61,6 +61,8 @@ export const WORK_ORDER_PAYMENT_CONFIRM_URL = (id) => `${API_BASE_URL}/api/work-
 // legacy alias kept for any existing references
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const REPORT_REVERT_URL              = (id) => `${API_BASE_URL}/api/reports/${id}/revert/`;
+export const REPORTS_BGE_SUMMARY_URL = (params) => `${API_BASE_URL}/api/reports/bge-summary/?${params}`;
+export const REPORTS_QUARTERLY_PDF_URL = (params) => `${API_BASE_URL}/api/reports/quarterly-pdf/?${params}`;
 export const GROUP_REPORT_REVERT_URL        = (id) => `${API_BASE_URL}/api/group-reports/${id}/revert/`;
 export const TRAINING_REPORT_REVERT_URL     = (id) => `${API_BASE_URL}/api/training-reports/${id}/revert/`;
 export const MENTOR_REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/mentor-reports/${id}/revert/`;

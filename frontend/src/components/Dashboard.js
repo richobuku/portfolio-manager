@@ -27,7 +27,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -179,6 +179,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [reportFilterStatus, setReportFilterStatus] = useState('');
   const [viewReport, setViewReport] = useState(null);
   const [reportPage, setReportPage] = useState(0);
+
+  // ── Quarterly Report generator ────────────────────────────────────────────
+  const [qrStart, setQrStart]         = useState('');
+  const [qrEnd, setQrEnd]             = useState('');
+  const [qrLabel, setQrLabel]         = useState('');
+  const [qrGenerating, setQrGenerating] = useState(false);
+
+  // ── BGE Assignment Summary ────────────────────────────────────────────────
+  const [bsStart, setBsStart]         = useState('');
+  const [bsEnd, setBsEnd]             = useState('');
+  const [bsLoading, setBsLoading]     = useState(false);
+  const [bsData, setBsData]           = useState(null);
+  const [bsExpandedBge, setBsExpandedBge] = useState(null);
+  const [bsExpandedMsme, setBsExpandedMsme] = useState({});
   const [emailingBgeId, setEmailingBgeId] = useState(null);
   const [emailPreview, setEmailPreview] = useState(null);   // { subject, body, to, bge }
   const [emailEditBody, setEmailEditBody] = useState('');   // editable copy of body
@@ -897,6 +911,44 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
     } catch {
       notify('Failed to render PDF', 'error');
+    }
+  };
+
+  const downloadQuarterlyPdf = async () => {
+    if (!qrStart || !qrEnd) { notify('Please select a start and end date', 'warning'); return; }
+    setQrGenerating(true);
+    try {
+      const params = new URLSearchParams({ start: qrStart, end: qrEnd, dl: '1' });
+      if (qrLabel) params.append('label', qrLabel);
+      const res = await axios.get(REPORTS_QUARTERLY_PDF_URL(params.toString()), {
+        headers, responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `PRUDEV2_BGE_Summary_${qrLabel || qrStart + '_' + qrEnd}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch {
+      notify('Failed to generate quarterly report PDF', 'error');
+    } finally {
+      setQrGenerating(false);
+    }
+  };
+
+  const loadBgeSummary = async () => {
+    setBsLoading(true);
+    setBsData(null);
+    try {
+      const params = new URLSearchParams();
+      if (bsStart) params.append('start', bsStart);
+      if (bsEnd)   params.append('end',   bsEnd);
+      const res = await axios.get(REPORTS_BGE_SUMMARY_URL(params.toString()), { headers });
+      setBsData(res.data);
+    } catch {
+      notify('Failed to load BGE summary', 'error');
+    } finally {
+      setBsLoading(false);
     }
   };
 
@@ -4363,8 +4415,213 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const REPORT_STATUS_COLORS = { draft: 'default', submitted: 'primary', reviewed: 'success' };
   const VISIT_LABELS = { initial: 'Initial', followup: 'Follow-up', final: 'Final', training: 'Training', mentoring: 'Mentoring' };
 
+  const VISIT_TYPE_COLORS = {
+    annual_review:    '#2B5278', one_on_one: '#2E7D32', data_update: '#E67E22',
+    coaching: '#8E44AD', training: '#16A085', followup: '#C0392B',
+    quarterly_review: '#2980B9', mentoring: '#F39C12', initial: '#7F8C8D',
+  };
+
   const renderReports = () => (
     <Box>
+
+      {/* ── Quarterly Report Generator ──────────────────────────────────── */}
+      <Box sx={{ mb: 3 }}>
+        <SectionHeader
+          title="Generate Quarterly Report"
+          subtitle="Download a full BGE support summary PDF for any date range"
+        />
+        <Paper variant="outlined" sx={{ p: 2.5 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <TextField
+              label="Start Date" type="date" size="small"
+              value={qrStart} onChange={e => setQrStart(e.target.value)}
+              InputLabelProps={{ shrink: true }} sx={{ minWidth: 150 }}
+            />
+            <TextField
+              label="End Date" type="date" size="small"
+              value={qrEnd} onChange={e => setQrEnd(e.target.value)}
+              InputLabelProps={{ shrink: true }} sx={{ minWidth: 150 }}
+            />
+            <TextField
+              label="Period Label (optional)" size="small" placeholder="e.g. Q2 2026"
+              value={qrLabel} onChange={e => setQrLabel(e.target.value)}
+              sx={{ minWidth: 170 }}
+            />
+            <Button
+              variant="contained" startIcon={qrGenerating ? <CircularProgress size={16} color="inherit" /> : <Download />}
+              onClick={downloadQuarterlyPdf} disabled={qrGenerating || !qrStart || !qrEnd}
+              sx={{ bgcolor: '#162A3A', '&:hover': { bgcolor: '#2B5278' }, whiteSpace: 'nowrap' }}
+            >
+              {qrGenerating ? 'Generating…' : 'Download PDF'}
+            </Button>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Generates a consolidated PDF with KPI summary, per-BGE table, and full visit narratives for the selected date range.
+          </Typography>
+        </Paper>
+      </Box>
+
+      {/* ── BGE Assignment Summary ──────────────────────────────────────── */}
+      <Box sx={{ mb: 3 }}>
+        <SectionHeader
+          title="BGE Assignment Summaries"
+          subtitle="Consolidated view of all visits per BGE — grouped by MSME"
+        >
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <TextField
+              label="From" type="date" size="small"
+              value={bsStart} onChange={e => setBsStart(e.target.value)}
+              InputLabelProps={{ shrink: true }} sx={{ minWidth: 140 }}
+            />
+            <TextField
+              label="To" type="date" size="small"
+              value={bsEnd} onChange={e => setBsEnd(e.target.value)}
+              InputLabelProps={{ shrink: true }} sx={{ minWidth: 140 }}
+            />
+            <Button
+              variant="outlined" size="small"
+              startIcon={bsLoading ? <CircularProgress size={14} /> : <Assessment />}
+              onClick={loadBgeSummary} disabled={bsLoading}
+            >
+              {bsLoading ? 'Loading…' : 'Load Summary'}
+            </Button>
+          </Box>
+        </SectionHeader>
+
+        {bsData && (
+          <Box>
+            {/* Totals strip */}
+            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+              {[
+                { val: bsData.total_bges,    label: 'BGEs',          color: '#2B5278' },
+                { val: bsData.total_reports, label: 'Reports Filed', color: '#2E7D32' },
+                { val: bsData.total_msmes,   label: 'MSMEs Reached', color: '#E67E22' },
+              ].map(({ val, label, color }) => (
+                <Paper key={label} variant="outlined" sx={{ px: 2.5, py: 1.5, borderLeft: `4px solid ${color}`, minWidth: 100 }}>
+                  <Typography variant="h5" fontWeight={700} color={color}>{val}</Typography>
+                  <Typography variant="caption" color="text.secondary">{label}</Typography>
+                </Paper>
+              ))}
+              {bsData.period_start && (
+                <Paper variant="outlined" sx={{ px: 2.5, py: 1.5, borderLeft: '4px solid #8E44AD', minWidth: 160 }}>
+                  <Typography variant="body2" fontWeight={600} color="#8E44AD">
+                    {bsData.period_start} → {bsData.period_end}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">Date Range</Typography>
+                </Paper>
+              )}
+            </Box>
+
+            {/* Per-BGE accordions */}
+            {bsData.bges.map(bge => (
+              <Accordion
+                key={bge.bge_id}
+                expanded={bsExpandedBge === bge.bge_id}
+                onChange={(_, open) => setBsExpandedBge(open ? bge.bge_id : null)}
+                variant="outlined"
+                sx={{ mb: 1, '&:before': { display: 'none' } }}
+              >
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', flexWrap: 'wrap' }}>
+                    <Typography fontWeight={600} sx={{ minWidth: 180 }}>{bge.bge_name}</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip label={`${bge.total_reports} reports`} size="small" color="primary" variant="outlined" />
+                      <Chip label={`${bge.total_msmes} MSMEs`} size="small" color="success" variant="outlined" />
+                      {bge.date_range?.start && (
+                        <Chip label={`${bge.date_range.start} – ${bge.date_range.end}`} size="small" variant="outlined" />
+                      )}
+                    </Box>
+                    <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {bge.visit_type_breakdown.map(vt => (
+                        <Chip
+                          key={vt.visit_type}
+                          label={`${vt.label} (${vt.count})`}
+                          size="small"
+                          sx={{ bgcolor: VISIT_TYPE_COLORS[vt.visit_type] || '#888', color: '#fff', fontSize: 10 }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails sx={{ p: 0 }}>
+                  {bge.msmes.map(msme => (
+                    <Accordion
+                      key={msme.msme_id}
+                      expanded={!!bsExpandedMsme[`${bge.bge_id}-${msme.msme_id}`]}
+                      onChange={(_, open) => setBsExpandedMsme(prev => ({
+                        ...prev,
+                        [`${bge.bge_id}-${msme.msme_id}`]: open,
+                      }))}
+                      disableGutters
+                      elevation={0}
+                      sx={{ borderBottom: '1px solid', borderColor: 'divider', '&:before': { display: 'none' } }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMore />} sx={{ bgcolor: '#fafafa', pl: 3 }}>
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+                          <Typography variant="body2" fontWeight={600}>{msme.msme_name}</Typography>
+                          {msme.msme_code && (
+                            <Typography variant="caption" color="text.secondary">{msme.msme_code}</Typography>
+                          )}
+                          <Chip label={`${msme.visits.length} visit${msme.visits.length !== 1 ? 's' : ''}`} size="small" variant="outlined" />
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ pl: 4, pr: 2, pt: 1, pb: 1 }}>
+                        {msme.visits.map((v, vi) => (
+                          <Box key={v.id} sx={{ mb: 2, pb: 2, borderBottom: vi < msme.visits.length - 1 ? '1px dashed' : 'none', borderColor: 'divider' }}>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
+                              <Chip
+                                label={v.visit_type_label}
+                                size="small"
+                                sx={{ bgcolor: VISIT_TYPE_COLORS[v.visit_type] || '#888', color: '#fff', fontSize: 10 }}
+                              />
+                              <Typography variant="caption" color="text.secondary">{v.visit_date}</Typography>
+                              <Chip label={v.status} size="small" color={{ submitted: 'success', reviewed: 'primary', draft: 'default' }[v.status] || 'default'} />
+                              {v.growth_rating && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  {[1,2,3,4,5].map(n => (
+                                    <Star key={n} sx={{ fontSize: 14, color: n <= v.growth_rating ? '#F39C12' : '#ddd' }} />
+                                  ))}
+                                </Box>
+                              )}
+                              {v.revenue_ugx && (
+                                <Chip label={`UGX ${Number(v.revenue_ugx).toLocaleString()}`} size="small" variant="outlined" color="success" />
+                              )}
+                            </Box>
+                            {[
+                              ['Support Provided',    v.support_provided],
+                              ['Key Achievement',     v.key_achievement],
+                              ['Challenges',          v.challenges_identified],
+                              ['Action Plan',         v.action_plan],
+                              ['Recommendations',     v.recommendations],
+                            ].filter(([, val]) => val).map(([lbl, val]) => (
+                              <Box key={lbl} sx={{ mb: 0.75 }}>
+                                <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">{lbl}</Typography>
+                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{val}</Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        ))}
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </AccordionDetails>
+              </Accordion>
+            ))}
+          </Box>
+        )}
+
+        {!bsData && !bsLoading && (
+          <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+            <Assessment sx={{ fontSize: 40, mb: 1, opacity: 0.3 }} />
+            <Typography variant="body2">
+              Select a date range and click "Load Summary" to see consolidated BGE activity.
+            </Typography>
+          </Paper>
+        )}
+      </Box>
+
+      <Divider sx={{ my: 3 }} />
+
       <SectionHeader title="Visit Reports" subtitle={`${reports.length} reports`}>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>

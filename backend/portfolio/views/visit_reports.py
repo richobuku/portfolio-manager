@@ -183,6 +183,155 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
                 raise PermissionDenied("No BGE profile associated with this account.")
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=False, methods=['get'], url_path='bge-summary')
+    def bge_summary(self, request):
+        """Consolidated per-BGE summary of all reports in a date range.
+
+        Query params:
+          bge    — BGE id (optional; omit for all BGEs)
+          start  — YYYY-MM-DD (optional)
+          end    — YYYY-MM-DD (optional)
+          status — filter by status (optional)
+        """
+        import datetime
+        from collections import defaultdict, Counter
+        from ..pdf_reports import VISIT_LABELS_Q
+
+        start = request.query_params.get('start')
+        end   = request.query_params.get('end')
+
+        # Validate date params before touching the ORM — bad strings cause ORM ValidationError
+        for param_name, param_val in [('start', start), ('end', end)]:
+            if param_val:
+                try:
+                    datetime.date.fromisoformat(param_val)
+                except ValueError:
+                    return Response(
+                        {'detail': f"Invalid '{param_name}' date — expected YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        qs = self.get_queryset().exclude(status='draft')
+        if start:
+            qs = qs.filter(visit_date__gte=start)
+        if end:
+            qs = qs.filter(visit_date__lte=end)
+
+        # Group reports by BGE then by MSME
+        by_bge = defaultdict(lambda: {'reports': [], 'msmes': {}})
+        for r in qs.select_related('bge', 'msme').order_by('bge__name', 'msme__business_name', 'visit_date'):
+            bge_key  = r.bge_id
+            msme_key = r.msme_id
+            by_bge[bge_key]['bge_id']   = r.bge_id
+            by_bge[bge_key]['bge_name'] = r.bge.name
+            by_bge[bge_key]['reports'].append(r)
+            if msme_key not in by_bge[bge_key]['msmes']:
+                by_bge[bge_key]['msmes'][msme_key] = {
+                    'msme_id':   r.msme_id,
+                    'msme_name': r.msme.business_name,
+                    'msme_code': r.msme.msme_code if hasattr(r.msme, 'msme_code') else '',
+                    'visits':    [],
+                }
+            by_bge[bge_key]['msmes'][msme_key]['visits'].append({
+                'id':                    r.id,
+                'visit_date':            str(r.visit_date) if r.visit_date else None,
+                'visit_type':            r.visit_type,
+                'visit_type_label':      VISIT_LABELS_Q.get(r.visit_type, r.visit_type),
+                'status':                r.status,
+                'support_provided':      r.support_provided or '',
+                'key_achievement':       r.key_achievement or '',
+                'challenges_identified': r.challenges_identified or '',
+                'action_plan':           r.action_plan or '',
+                'recommendations':       r.recommendations or '',
+                'growth_rating':         r.growth_rating,
+                # Use explicit None check so Decimal('0') is not coerced to null
+                'revenue_ugx': str(r.revenue_ugx) if r.revenue_ugx is not None else None,
+            })
+
+        result = []
+        for bge_data in sorted(by_bge.values(), key=lambda x: x['bge_name']):
+            rpts = bge_data['reports']
+            vt_counts = Counter(r.visit_type for r in rpts)
+            result.append({
+                'bge_id':        bge_data['bge_id'],
+                'bge_name':      bge_data['bge_name'],
+                'total_reports': len(rpts),
+                'total_msmes':   len(bge_data['msmes']),
+                'visit_type_breakdown': [
+                    {'visit_type': vt, 'label': VISIT_LABELS_Q.get(vt, vt), 'count': cnt}
+                    for vt, cnt in sorted(vt_counts.items(), key=lambda x: -x[1])
+                ],
+                'date_range': {
+                    'start': str(min((r.visit_date for r in rpts if r.visit_date), default='')),
+                    'end':   str(max((r.visit_date for r in rpts if r.visit_date), default='')),
+                },
+                'msmes': list(bge_data['msmes'].values()),
+            })
+
+        # Derive total_msmes from already-loaded data — avoids a second DB round-trip
+        all_msme_ids = {mid for bd in by_bge.values() for mid in bd['msmes']}
+        return Response({
+            'total_bges':    len(result),
+            'total_reports': sum(b['total_reports'] for b in result),
+            'total_msmes':   len(all_msme_ids),
+            'period_start':  start or '',
+            'period_end':    end   or '',
+            'bges':          result,
+        })
+
+    @action(detail=False, methods=['get'], url_path='quarterly-pdf')
+    def quarterly_pdf(self, request):
+        """Stream a quarterly summary PDF for a date range.
+
+        Query params:
+          start  — YYYY-MM-DD (required)
+          end    — YYYY-MM-DD (required)
+          label  — display label, e.g. 'Q2 2026' (optional)
+          dl     — any value → Content-Disposition: attachment (optional)
+        """
+        import datetime
+        import re
+        from ..pdf_reports import render_quarterly_report
+
+        start_str = request.query_params.get('start', '').strip()
+        end_str   = request.query_params.get('end',   '').strip()
+        label     = request.query_params.get('label', '').strip()
+
+        # Validate dates before filtering — invalid strings would cause an ORM ValidationError 500
+        start_date = end_date = None
+        for param_name, param_val in [('start', start_str), ('end', end_str)]:
+            if param_val:
+                try:
+                    parsed = datetime.date.fromisoformat(param_val)
+                    if param_name == 'start':
+                        start_date = parsed
+                    else:
+                        end_date = parsed
+                except ValueError:
+                    return Response(
+                        {'detail': f"Invalid '{param_name}' date — expected YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        qs = self.get_queryset().exclude(status='draft')
+        if start_date:
+            qs = qs.filter(visit_date__gte=start_date)
+        if end_date:
+            qs = qs.filter(visit_date__lte=end_date)
+
+        if not label and start_date and end_date:
+            label = f'{start_date.strftime("%d %b %Y")} – {end_date.strftime("%d %b %Y")}'
+
+        buf = render_quarterly_report(qs, start_date=start_date, end_date=end_date, label=label)
+
+        # Strip any characters that could break the Content-Disposition header
+        safe_label = re.sub(r'[^\w\-]', '_', label or 'period')
+        fname = f'PRUDEV2_BGE_Summary_{safe_label}.pdf'
+        disposition = 'attachment' if request.query_params.get('dl') else 'inline'
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
+
     @action(detail=True, methods=['post'], url_path='revert')
     def revert(self, request, pk=None):
         """Admin-only: revert a submitted/reviewed report back to draft
