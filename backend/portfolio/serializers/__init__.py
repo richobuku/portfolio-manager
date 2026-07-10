@@ -17,7 +17,7 @@ from .visit_reports import (
     GroupReportContributionSerializer,
     GroupReportAttendanceSerializer,
 )
-from .work_orders import WorkOrderSerializer, WorkOrderSubmissionSerializer, WorkOrderPaymentSerializer
+from .work_orders import WorkOrderSerializer, WorkOrderSubmissionSerializer, WorkOrderPaymentSerializer, WorkOrderAttachmentSerializer
 from .tshirt import TshirtReceiptEntrySerializer, TshirtReceiptSerializer
 from .communications import ScheduledMessageSerializer
 

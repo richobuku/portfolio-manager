@@ -38,6 +38,7 @@ export const API_ENDPOINTS = {
   TSHIRT_ENTRIES:            `${API_BASE_URL}/api/tshirt-entries/`,
   WORK_ORDER_SUBMISSIONS:    `${API_BASE_URL}/api/work-order-submissions/`,
   WORK_ORDER_PAYMENTS:       `${API_BASE_URL}/api/work-order-payments/`,
+  WORK_ORDER_ATTACHMENTS:    `${API_BASE_URL}/api/work-order-attachments/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
@@ -61,6 +62,7 @@ export const WORK_ORDER_PAYMENT_CONFIRM_URL = (id) => `${API_BASE_URL}/api/work-
 // legacy alias kept for any existing references
 export const MSME_SET_GROUPS_URL = (id) => `${API_BASE_URL}/api/msmes/${id}/set-groups/`;
 export const REPORT_REVERT_URL              = (id) => `${API_BASE_URL}/api/reports/${id}/revert/`;
+export const WORK_ORDER_ATTACHMENT_DOWNLOAD_URL = (id) => `${API_BASE_URL}/api/work-order-attachments/${id}/download/`;
 export const REPORTS_BGE_SUMMARY_URL = (params) => `${API_BASE_URL}/api/reports/bge-summary/?${params}`;
 export const REPORTS_QUARTERLY_PDF_URL = (params) => `${API_BASE_URL}/api/reports/quarterly-pdf/?${params}`;
 export const GROUP_REPORT_REVERT_URL        = (id) => `${API_BASE_URL}/api/group-reports/${id}/revert/`;

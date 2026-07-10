@@ -12,7 +12,7 @@ from .visit_reports import (
     MSMEReportViewSet, GroupReportViewSet, GroupReportContributionViewSet,
     GroupReportAttendanceViewSet,
 )
-from .work_orders import WorkOrderViewSet, WorkOrderSubmissionViewSet, WorkOrderPaymentViewSet
+from .work_orders import WorkOrderViewSet, WorkOrderSubmissionViewSet, WorkOrderPaymentViewSet, WorkOrderAttachmentViewSet
 from .training_reports import TrainingReportViewSet, AnnualReviewReportViewSet, MentorTrainingReportViewSet
 from .communications import (
     bulk_email_view, bulk_email_log_view,

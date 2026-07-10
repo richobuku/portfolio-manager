@@ -9,9 +9,10 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
 
-from ..models import WorkOrder, WorkOrderSubmission, WorkOrderPayment
+from ..models import WorkOrder, WorkOrderSubmission, WorkOrderPayment, WorkOrderAttachment
 from ..serializers import (
     WorkOrderSerializer, WorkOrderSubmissionSerializer, WorkOrderPaymentSerializer,
+    WorkOrderAttachmentSerializer,
 )
 from .mixins import (
     ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin,
@@ -609,3 +610,102 @@ class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 pass
 
         return Response(self.get_serializer(payment).data)
+
+
+class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
+    """Supporting documents (photos, PDFs) uploaded by BGEs against a work order."""
+    serializer_class = WorkOrderAttachmentSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    ALLOWED_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf')
+    MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
+
+    def _is_admin(self):
+        u = self.request.user
+        return u.is_staff or u.is_superuser or _managed_groups(u) is not None
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = WorkOrderAttachment.objects.select_related(
+            'work_order', 'work_order__bge', 'uploaded_by'
+        )
+        wo_id = self.request.query_params.get('work_order')
+        if self._is_admin() or _is_viewer(user):
+            if wo_id:
+                qs = qs.filter(work_order_id=wo_id)
+            return qs
+        try:
+            bge = user.bge_profile
+        except Exception:
+            return qs.none()
+        qs = qs.filter(work_order__bge=bge)
+        if wo_id:
+            qs = qs.filter(work_order_id=wo_id)
+        return qs
+
+    def _validate_file(self, f):
+        name = (f.name or '').lower()
+        if not any(name.endswith(ext) for ext in self.ALLOWED_EXTENSIONS):
+            raise ValidationError('Attachments must be images (JPG, PNG, GIF, WebP) or PDF files.')
+        if f.size > self.MAX_FILE_SIZE:
+            raise ValidationError('File must be under 20 MB.')
+
+    def _check_access(self, work_order):
+        if self._is_admin():
+            return
+        try:
+            bge = self.request.user.bge_profile
+        except Exception:
+            raise PermissionDenied("Only BGEs or admins can upload attachments.")
+        if bge.id != work_order.bge_id and not work_order.co_bges.filter(id=bge.id).exists():
+            raise PermissionDenied("You can only upload attachments for your own work orders.")
+
+    def perform_create(self, serializer):
+        from django.core.files.base import ContentFile
+        work_order = serializer.validated_data.get('work_order')
+        self._check_access(work_order)
+        f = serializer.validated_data.pop('file_upload')
+        self._validate_file(f)
+        data = f.read()
+        instance = serializer.save(
+            uploaded_by=self.request.user,
+            filename=f.name,
+            file_data=data,
+        )
+        instance.file.save(f.name, ContentFile(data), save=True)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._is_admin():
+            try:
+                bge = request.user.bge_profile
+            except Exception:
+                raise PermissionDenied("Only BGEs or admins can delete attachments.")
+            if bge.id != instance.work_order.bge_id:
+                raise PermissionDenied("You can only delete your own attachments.")
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], url_path='download')
+    def download(self, request, pk=None):
+        instance = self.get_object()
+        if not instance.file_data:
+            return Response({'error': 'File not found.'}, status=status.HTTP_404_NOT_FOUND)
+        name = (instance.filename or '').lower()
+        if name.endswith(('.jpg', '.jpeg')):
+            ct = 'image/jpeg'
+        elif name.endswith('.png'):
+            ct = 'image/png'
+        elif name.endswith('.gif'):
+            ct = 'image/gif'
+        elif name.endswith('.webp'):
+            ct = 'image/webp'
+        elif name.endswith('.pdf'):
+            ct = 'application/pdf'
+        else:
+            ct = 'application/octet-stream'
+        fname = _safe_filename(instance.filename or 'attachment')
+        resp = HttpResponse(bytes(instance.file_data), content_type=ct)
+        disp = 'attachment' if request.query_params.get('dl') else 'inline'
+        resp['Content-Disposition'] = f'{disp}; filename="{fname}"'
+        return resp

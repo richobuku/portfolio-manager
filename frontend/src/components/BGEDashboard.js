@@ -21,6 +21,7 @@ import {
   API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS,
   TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL,
   WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
+  WORK_ORDER_ATTACHMENT_DOWNLOAD_URL,
 } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -220,6 +221,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [replaceUploading, setReplaceUploading] = useState(false);
   const replaceTimesheetRef = useRef(null);
   const replaceInvoiceRef = useRef(null);
+
+  // Supporting document attachments
+  const [attachments, setAttachments] = useState([]);
+  const [activeAttachWoId, setActiveAttachWoId] = useState(null);
+  const [attachFile, setAttachFile] = useState(null);
+  const [attachCaption, setAttachCaption] = useState('');
+  const [attachUploading, setAttachUploading] = useState(false);
+  const attachInputRef = useRef(null);
 
   // Payments against work orders
   const [payments, setPayments] = useState([]);
@@ -509,6 +518,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchAttachments = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDER_ATTACHMENTS, { headers: h });
+      setAttachments(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // silent
+    }
+  }, [token]);
+
 
   const fetchSessions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -735,13 +754,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchWorkOrders();
     fetchSubmissions();
     fetchPayments();
+    fetchAttachments();
     fetchSessions();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchSessions, token]);
+  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -1209,6 +1229,56 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       URL.revokeObjectURL(blobUrl);
     } catch {
       notify(`Failed to download ${kind}`, 'error');
+    }
+  };
+
+  // ── work order attachments ────────────────────────────────────────────────────
+  const uploadAttachment = async (woId) => {
+    if (!attachFile) { notify('Choose a file to attach', 'error'); return; }
+    setAttachUploading(true);
+    try {
+      const form = new FormData();
+      form.append('work_order', woId);
+      form.append('file_upload', attachFile);
+      if (attachCaption.trim()) form.append('caption', attachCaption.trim());
+      await axios.post(API_ENDPOINTS.WORK_ORDER_ATTACHMENTS, form, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      notify('Document attached successfully');
+      setAttachFile(null);
+      setAttachCaption('');
+      setActiveAttachWoId(null);
+      if (attachInputRef.current) attachInputRef.current.value = '';
+      fetchAttachments();
+    } catch (err) {
+      const errData = err.response?.data;
+      const msg = errData?.detail || (typeof errData === 'object' ? Object.values(errData).flat()[0] : null) || 'Failed to upload attachment';
+      notify(String(msg), 'error');
+    } finally {
+      setAttachUploading(false);
+    }
+  };
+
+  const deleteAttachment = async (att) => {
+    if (!window.confirm(`Delete "${att.filename}"? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.WORK_ORDER_ATTACHMENTS}${att.id}/`, { headers });
+      setAttachments(prev => prev.filter(a => a.id !== att.id));
+      notify('Attachment deleted');
+    } catch {
+      notify('Failed to delete attachment', 'error');
+    }
+  };
+
+  const openAttachment = async (att) => {
+    try {
+      const res = await axios.get(WORK_ORDER_ATTACHMENT_DOWNLOAD_URL(att.id), {
+        headers, responseType: 'blob',
+      });
+      const blobUrl = URL.createObjectURL(res.data);
+      window.open(blobUrl, '_blank');
+    } catch {
+      notify('Failed to open attachment', 'error');
     }
   };
 
@@ -2127,10 +2197,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   onChange={e => setReplaceTimesheetFile(e.target.files[0] || null)} />
                 <input type="file" accept=".xlsx,.xls" ref={replaceInvoiceRef} style={{ display: 'none' }}
                   onChange={e => setReplaceInvoiceFile(e.target.files[0] || null)} />
+                <input type="file" accept="image/*,.pdf" ref={attachInputRef} style={{ display: 'none' }}
+                  onChange={e => setAttachFile(e.target.files[0] || null)} />
 
                 {workOrders.map(wo => {
                   const woSubs = submissions.filter(s => s.work_order === wo.id);
                   const woPays = payments.filter(p => p.work_order === wo.id);
+                  const woAttachments = attachments.filter(a => a.work_order === wo.id);
                   return (
                     <Card variant="outlined" key={wo.id}>
                       <CardContent>
@@ -2330,6 +2403,91 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           )}
                         </Box>
 
+                        {/* ── Supporting Documents ── */}
+                        <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="caption" fontWeight={700} color="text.secondary">
+                              SUPPORTING DOCUMENTS &amp; PHOTOS
+                            </Typography>
+                            <Button size="small" startIcon={<CloudUpload />}
+                              onClick={() => {
+                                setActiveAttachWoId(prev => prev === wo.id ? null : wo.id);
+                                setAttachFile(null);
+                                setAttachCaption('');
+                                if (attachInputRef.current) attachInputRef.current.value = '';
+                              }}>
+                              {activeAttachWoId === wo.id ? 'Cancel' : 'Attach file'}
+                            </Button>
+                          </Box>
+
+                          {woAttachments.length > 0 && (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
+                              {woAttachments.map(att => {
+                                const isImage = att.content_type && att.content_type.startsWith('image/');
+                                const isPdf   = att.content_type === 'application/pdf';
+                                return (
+                                  <Box key={att.id} sx={{ display: 'flex', alignItems: 'center', gap: 1,
+                                    p: 0.75, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    {isImage
+                                      ? <img src={WORK_ORDER_ATTACHMENT_DOWNLOAD_URL(att.id)}
+                                          alt={att.filename}
+                                          style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
+                                          onError={e => { e.target.style.display = 'none'; }} />
+                                      : <PictureAsPdf fontSize="small" color={isPdf ? 'error' : 'action'} sx={{ flexShrink: 0 }} />
+                                    }
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <Typography variant="caption" noWrap display="block" fontWeight={600}>
+                                        {att.filename}
+                                      </Typography>
+                                      {att.caption && (
+                                        <Typography variant="caption" color="text.secondary" noWrap display="block">
+                                          {att.caption}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                    <Tooltip title="View / Download">
+                                      <IconButton size="small" color="primary" onClick={() => openAttachment(att)}>
+                                        <Visibility fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete">
+                                      <IconButton size="small" color="error" onClick={() => deleteAttachment(att)}>
+                                        <Delete fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          )}
+
+                          {woAttachments.length === 0 && activeAttachWoId !== wo.id && (
+                            <Typography variant="caption" color="text.disabled">
+                              No supporting documents yet.
+                            </Typography>
+                          )}
+
+                          {activeAttachWoId === wo.id && (
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap',
+                              mt: 0.5, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                              <Button size="small" variant="outlined" startIcon={<CloudUpload />}
+                                onClick={() => attachInputRef.current?.click()}>
+                                {attachFile ? attachFile.name : 'Choose file (photo or PDF)'}
+                              </Button>
+                              <TextField
+                                size="small" placeholder="Caption (optional)"
+                                value={attachCaption}
+                                onChange={e => setAttachCaption(e.target.value)}
+                                sx={{ flex: 1, minWidth: 140 }}
+                              />
+                              <Button size="small" variant="contained" disabled={attachUploading}
+                                onClick={() => uploadAttachment(wo.id)}>
+                                {attachUploading ? <CircularProgress size={14} color="inherit" /> : 'Attach'}
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
+
                         {/* ── Payments ── */}
                         <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -2342,7 +2500,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             </Button>
                           </Box>
 
-                          {/* Existing payment records */}
                           {woPays.length > 0 && (
                             <TableContainer sx={{ mb: 1 }}>
                               <Table size="small">
@@ -2376,7 +2533,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             <Typography variant="caption" color="text.disabled">No payments recorded yet.</Typography>
                           )}
 
-                          {/* Record payment form */}
                           {activePaymentWoId === wo.id && (
                             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end', flexWrap: 'wrap', mt: 0.5, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
                               <TextField

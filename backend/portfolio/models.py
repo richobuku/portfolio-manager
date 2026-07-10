@@ -1392,6 +1392,28 @@ class WorkOrderSubmission(models.Model):
         return f"{self.bge.name} — {self.work_order.work_order_number} ({self.created_at:%Y-%m-%d})"
 
 
+class WorkOrderAttachment(models.Model):
+    """Additional supporting documents (photos, PDFs) attached to a work order by a BGE."""
+    work_order = models.ForeignKey(
+        'WorkOrder', on_delete=models.CASCADE, related_name='attachments'
+    )
+    file      = models.FileField(upload_to='work_orders/attachments/', null=True, blank=True)
+    file_data = models.BinaryField(null=True, blank=True)
+    filename  = models.CharField(max_length=255, blank=True)
+    caption   = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='work_order_attachments',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.filename} — {self.work_order}"
+
+
 # ── Work Order Payment Tracking ────────────────────────────────────────────
 
 class WorkOrderPayment(models.Model):

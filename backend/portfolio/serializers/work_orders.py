@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import WorkOrder, WorkOrderSubmission, WorkOrderPayment
+from ..models import WorkOrder, WorkOrderSubmission, WorkOrderPayment, WorkOrderAttachment
 
 
 class WorkOrderSerializer(serializers.ModelSerializer):
@@ -71,6 +71,39 @@ class WorkOrderSubmissionSerializer(serializers.ModelSerializer):
 
     def get_has_invoice(self, obj):
         return bool(obj.invoice_data)
+
+
+class WorkOrderAttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.SerializerMethodField()
+    file_upload      = serializers.FileField(write_only=True, required=True)
+    content_type     = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkOrderAttachment
+        fields = [
+            'id', 'work_order', 'filename', 'caption', 'content_type',
+            'uploaded_by', 'uploaded_by_name', 'created_at', 'file_upload',
+        ]
+        read_only_fields = ['filename', 'uploaded_by', 'created_at']
+
+    def get_uploaded_by_name(self, obj):
+        if not obj.uploaded_by:
+            return None
+        return obj.uploaded_by.get_full_name().strip() or obj.uploaded_by.username
+
+    def get_content_type(self, obj):
+        name = (obj.filename or '').lower()
+        if name.endswith(('.jpg', '.jpeg')):
+            return 'image/jpeg'
+        if name.endswith('.png'):
+            return 'image/png'
+        if name.endswith('.gif'):
+            return 'image/gif'
+        if name.endswith('.webp'):
+            return 'image/webp'
+        if name.endswith('.pdf'):
+            return 'application/pdf'
+        return 'application/octet-stream'
 
 
 class WorkOrderPaymentSerializer(serializers.ModelSerializer):
