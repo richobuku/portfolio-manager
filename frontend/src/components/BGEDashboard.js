@@ -2475,7 +2475,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                 {attachFile ? attachFile.name : 'Choose file (photo or PDF)'}
                               </Button>
                               <TextField
-                                size="small" placeholder="Caption (optional)"
+                                size="small" placeholder="Title (e.g. Attendance sheet)"
                                 value={attachCaption}
                                 onChange={e => setAttachCaption(e.target.value)}
                                 sx={{ flex: 1, minWidth: 140 }}
