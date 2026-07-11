@@ -6580,6 +6580,21 @@ PRUDEV II BDS Team`,
     setTimeout(() => { el.focus(); el.setSelectionRange(start, start + toggled.length); }, 0);
   };
 
+  const bodyToHtml = (text) => {
+    const blocks = text.split(/\n\n+/);
+    const htmlBlocks = blocks.map(block => {
+      const lines = block.split('\n').filter(l => l.trim() !== '');
+      if (!lines.length) return '';
+      const allBullets = lines.every(l => l.trimStart().startsWith('• '));
+      if (allBullets) {
+        const items = lines.map(l => `<li>${l.replace(/^•\s*/, '').trim()}</li>`).join('');
+        return `<ul style="margin:8px 0;padding-left:20px;">${items}</ul>`;
+      }
+      return `<p style="margin:0 0 12px 0;">${lines.join('<br />')}</p>`;
+    });
+    return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;">${htmlBlocks.filter(Boolean).join('')}</body></html>`;
+  };
+
   const insertEmailDate = (dateStr) => {
     const el = commBodyRef.current;
     if (!el) return;
@@ -6740,7 +6755,8 @@ PRUDEV II BDS Team`
         recipient_type: commTab === 0 ? 'bge' : 'msme',
         recipient_ids: selectedList.map(r => r.id),
         subject: commSubject,
-        body: commBody,
+        body: commBody.replace(/<\/?b>/gi, ''),
+        body_html: bodyToHtml(commBody),
         skip_already_sent: commSkipSent,
       };
       const res = await axios.post(BULK_EMAIL, payload, { headers });
@@ -6888,6 +6904,7 @@ PRUDEV II BDS Team`
         recipient_ids: scheduleFor.recipients,
         subject: scheduleFor.subject,
         body: scheduleFor.body,
+        body_html: scheduleFor.body_html || '',
         skip_already_sent: scheduleFor.skipSent,
         scheduled_at: scheduleDateTime,
       }, { headers });
@@ -7250,7 +7267,8 @@ PRUDEV II BDS Team`
                 channel: 'email',
                 recipients: Array.from(commSelected),
                 subject: commSubject,
-                body: commBody,
+                body: commBody.replace(/<\/?b>/gi, ''),
+                body_html: bodyToHtml(commBody),
                 recipientType: commTab === 0 ? 'bge' : 'msme',
                 skipSent: commSkipSent,
               });

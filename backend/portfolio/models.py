@@ -1264,6 +1264,7 @@ class ScheduledMessage(models.Model):
     recipient_ids    = models.JSONField(default=list)
     subject          = models.CharField(max_length=300, blank=True)  # email only
     body             = models.TextField()
+    body_html        = models.TextField(blank=True, default='')
     skip_already_sent = models.BooleanField(default=False)
     scheduled_at     = models.DateTimeField()
     status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

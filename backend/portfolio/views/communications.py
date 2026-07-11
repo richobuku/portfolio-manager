@@ -442,6 +442,7 @@ def scheduled_messages_view(request):
     recipient_ids  = request.data.get('recipient_ids', [])
     subject        = (request.data.get('subject') or '').strip()
     body           = (request.data.get('body') or '').strip()
+    body_html      = (request.data.get('body_html') or '').strip()
     skip_sent      = bool(request.data.get('skip_already_sent', False))
     scheduled_at   = request.data.get('scheduled_at')
     recipient_count = int(request.data.get('recipient_count', len(recipient_ids)))
@@ -474,6 +475,7 @@ def scheduled_messages_view(request):
         recipient_ids=list(recipient_ids),
         subject=subject,
         body=body,
+        body_html=body_html,
         skip_already_sent=skip_sent,
         scheduled_at=dt,
         recipient_count=recipient_count,
@@ -551,7 +553,7 @@ def _dispatch_scheduled_email(msg):
 
     t = threading.Thread(
         target=_do_send_emails,
-        args=(records, msg.subject, msg.body, '', msg.skip_already_sent,
+        args=(records, msg.subject, msg.body, msg.body_html or '', msg.skip_already_sent,
               already_sent_ids, msg.recipient_type, from_email, reply_to, msg.created_by_id),
         daemon=True,
     )
