@@ -473,11 +473,11 @@ def render_work_order(work_order):
 
     if work_order.key_tasks:
         story.append(Paragraph('Key Tasks', s['sectiontitle']))
-        for i, line in enumerate(work_order.key_tasks.splitlines(), start=1):
+        for line in work_order.key_tasks.splitlines():
             line = line.strip()
             if line:
                 story.append(Paragraph(
-                    f'{i}. {_safe_html(line)}',
+                    _safe_html(line),
                     ParagraphStyle('task', parent=s['body'], leftIndent=10),
                 ))
 
