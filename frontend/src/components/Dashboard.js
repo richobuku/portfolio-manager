@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, startTransition, useRef } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress,
@@ -8,7 +8,7 @@ import {
   Tooltip, Checkbox, Card, CardContent, Grid, Drawer, List,
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
   Badge, Accordion, AccordionSummary, AccordionDetails,
-  Tab, Tabs, ListSubheader,
+  Tab, Tabs, ListSubheader, Popover,
 } from '@mui/material';
 import {
   Business, People, School, Assessment, ChevronRight,
@@ -21,6 +21,7 @@ import {
   Campaign, Send as SendIcon, Schedule as ScheduleIcon, Checkroom, DrawOutlined,
   RotateLeft, RotateRight, Dashboard as DashboardIcon,
   ArrowForward, TaskAlt, Payments, Description,
+  FormatBold, FormatListBulleted, CalendarToday,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -6549,6 +6550,44 @@ PRUDEV II BDS Team`,
   const [commConfirm, setCommConfirm] = React.useState(false);
   const [commSkipSent, setCommSkipSent] = React.useState(false);
   const [commAlreadySent, setCommAlreadySent] = React.useState([]);  // ids already sent this subject
+  const commBodyRef = useRef(null);
+  const [datePickerAnchor, setDatePickerAnchor] = React.useState(null);
+  const [datePickerValue, setDatePickerValue] = React.useState('');
+
+  const _insertIntoBody = (before, after = '') => {
+    const el = commBodyRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end   = el.selectionEnd;
+    const sel   = commBody.substring(start, end);
+    const next  = commBody.substring(0, start) + before + sel + after + commBody.substring(end);
+    setCommBody(next);
+    setTimeout(() => { el.focus(); el.setSelectionRange(start + before.length, start + before.length + sel.length); }, 0);
+  };
+
+  const applyEmailBold = () => _insertIntoBody('<b>', '</b>');
+
+  const applyEmailBullets = () => {
+    const el = commBodyRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end   = el.selectionEnd;
+    const sel   = commBody.substring(start, end) || '';
+    const lines = sel ? sel.split('\n') : [''];
+    const toggled = lines.map(l => l.startsWith('• ') ? l.slice(2) : '• ' + l).join('\n');
+    const next = commBody.substring(0, start) + toggled + commBody.substring(end);
+    setCommBody(next);
+    setTimeout(() => { el.focus(); el.setSelectionRange(start, start + toggled.length); }, 0);
+  };
+
+  const insertEmailDate = (dateStr) => {
+    const el = commBodyRef.current;
+    if (!el) return;
+    const pos  = el.selectionStart;
+    const next = commBody.substring(0, pos) + dateStr + commBody.substring(pos);
+    setCommBody(next);
+    setTimeout(() => { el.focus(); el.setSelectionRange(pos + dateStr.length, pos + dateStr.length); }, 0);
+  };
   // ── SMS state ──────────────────────────────────────────────────────────────
   const [smsTab, setSmsTab] = React.useState(0); // 0=BGEs 1=MSMEs
   const [smsSearch, setSmsSearch] = React.useState('');
@@ -7080,13 +7119,59 @@ PRUDEV II BDS Team`
           onChange={e => setCommSubject(e.target.value)}
           fullWidth size="small" sx={{ mb: 1.5 }}
         />
+
+        {/* Formatting toolbar */}
+        <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5, p: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'grey.50' }}>
+          <Tooltip title="Bold selected text">
+            <IconButton size="small" onClick={applyEmailBold}><FormatBold fontSize="small" /></IconButton>
+          </Tooltip>
+          <Tooltip title="Toggle bullets on selected lines">
+            <IconButton size="small" onClick={applyEmailBullets}><FormatListBulleted fontSize="small" /></IconButton>
+          </Tooltip>
+          <Tooltip title="Insert date">
+            <IconButton size="small" onClick={e => { setDatePickerValue(''); setDatePickerAnchor(e.currentTarget); }}>
+              <CalendarToday fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
         <TextField
           label="Body"
           value={commBody}
           onChange={e => setCommBody(e.target.value)}
           fullWidth multiline minRows={8}
-          helperText="Use {{name}} to personalise with the recipient's first name."
+          inputRef={commBodyRef}
+          helperText="Use {{name}} to personalise. Select text then click B to bold, or • to add bullets."
         />
+
+        {/* Date picker popover */}
+        <Popover
+          open={Boolean(datePickerAnchor)}
+          anchorEl={datePickerAnchor}
+          onClose={() => setDatePickerAnchor(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        >
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 220 }}>
+            <Typography variant="caption" fontWeight={700}>Insert date</Typography>
+            <TextField
+              type="date"
+              size="small"
+              value={datePickerValue}
+              onChange={e => setDatePickerValue(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <Button
+              size="small" variant="contained"
+              disabled={!datePickerValue}
+              onClick={() => {
+                const [y, m, d] = datePickerValue.split('-');
+                const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                insertEmailDate(`${d} ${months[parseInt(m,10)-1]} ${y}`);
+                setDatePickerAnchor(null);
+              }}
+            >Insert</Button>
+          </Box>
+        </Popover>
       </Paper>
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
