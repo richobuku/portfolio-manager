@@ -188,6 +188,10 @@ class MSME(models.Model):
         help_text='Objectives and scope of this BGE deployment for the MSME'
     )
     assignment_date = models.DateField(null=True, blank=True, help_text='Date this MSME was assigned to the BGE')
+    co_assignment_objectives = models.JSONField(
+        default=dict, blank=True,
+        help_text='Per-co-assignee objectives keyed by BGE id string, e.g. {"5": "Sales support"}'
+    )
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)

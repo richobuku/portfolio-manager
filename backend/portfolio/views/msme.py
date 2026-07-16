@@ -273,6 +273,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 raise PermissionDenied("You can only assign BGEs to MSMEs in your managed programme groups.")
         bge_id = request.data.get('bge_id')
         objectives = (request.data.get('objectives') or '').strip()
+        co_objectives = (request.data.get('co_objectives') or '').strip()
         assignment_date = request.data.get('assignment_date') or None
         bge = None  # initialise so the notification block below is always safe
         if bge_id:
@@ -289,6 +290,10 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                     # so BOTH BGEs keep the MSME in their list (joint deployment).
                     existing_primary = msme.assigned_bge  # capture before save
                     msme.co_assigned_bges.add(bge)
+                    # Store per-co-assignee objectives
+                    co_obj = msme.co_assignment_objectives or {}
+                    co_obj[str(bge.id)] = co_objectives
+                    msme.co_assignment_objectives = co_obj
                     msme.save()
                     # Notify the new (co-assigned) BGE via push
                     from .bge import _notify_bge, _send_co_assignment_alert
@@ -315,6 +320,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             # Unassign: clear primary and all co-assignees
             msme.assigned_bge = None
             msme.co_assigned_bges.clear()
+            msme.co_assignment_objectives = {}
         msme.assignment_objectives = objectives
         msme.assignment_date = assignment_date
         msme.save()
@@ -330,6 +336,21 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return Response(MSMESerializer(msme).data)
 
     @action(detail=True, methods=['patch'])
+    def update_co_objectives(self, request, pk=None):
+        if not self._is_admin_or_cohort_admin(request):
+            raise PermissionDenied("Only admins can modify BGE assignments.")
+        msme = self.get_object()
+        bge_id = request.data.get('bge_id')
+        objectives = (request.data.get('objectives') or '').strip()
+        if not bge_id:
+            return Response({'error': 'bge_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        co_obj = msme.co_assignment_objectives or {}
+        co_obj[str(bge_id)] = objectives
+        msme.co_assignment_objectives = co_obj
+        msme.save()
+        return Response(MSMESerializer(msme).data)
+
+    @action(detail=True, methods=['patch'])
     def remove_co_assigned(self, request, pk=None):
         if not self._is_admin_or_cohort_admin(request):
             raise PermissionDenied("Only admins can modify BGE assignments.")
@@ -340,6 +361,10 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         try:
             bge = BusinessGrowthExpert.objects.get(pk=bge_id)
             msme.co_assigned_bges.remove(bge)
+            co_obj = msme.co_assignment_objectives or {}
+            co_obj.pop(str(bge.id), None)
+            msme.co_assignment_objectives = co_obj
+            msme.save()
         except BusinessGrowthExpert.DoesNotExist:
             return Response({'error': 'BGE not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(MSMESerializer(msme).data)

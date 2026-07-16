@@ -213,7 +213,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── assignment dialog ──────────────────────────────────────────────────────
   const [assignDialog, setAssignDialog] = useState(false);
   const [coAssignAdd, setCoAssignAdd] = useState('');
+  const [coAssignAddObjectives, setCoAssignAddObjectives] = useState('');
   const [coAssignSaving, setCoAssignSaving] = useState(false);
+  const [coAssignEditObjectives, setCoAssignEditObjectives] = useState({});
   const [inactiveMsmes, setInactiveMsmes]   = useState(null);  // null=unchecked, [] or array when loaded
   const [reactivating, setReactivating]     = useState(false);
 
@@ -624,6 +626,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       assignment_date: msme.assignment_date || new Date().toISOString().slice(0, 10),
     });
     setCoAssignAdd('');
+    setCoAssignAddObjectives('');
+    setCoAssignEditObjectives(msme.co_assignment_objectives || {});
     setAssignDialog(true);
   };
 
@@ -652,11 +656,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     try {
       const res = await axios.patch(
         `${API_ENDPOINTS.MSMES}${assignTarget.id}/assign_bge/`,
-        { bge_id: bgeId },
+        { bge_id: bgeId, co_objectives: coAssignAddObjectives },
         { headers }
       );
       setAssignTarget(res.data);
+      setCoAssignEditObjectives(res.data.co_assignment_objectives || {});
       setCoAssignAdd('');
+      setCoAssignAddObjectives('');
       notify('Co-assignee added');
     } catch (err) {
       notify(err.response?.data?.error || 'Failed to add co-assignee', 'error');
@@ -673,6 +679,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         { headers }
       );
       setAssignTarget(res.data);
+      setCoAssignEditObjectives(res.data.co_assignment_objectives || {});
       notify('Co-assignee removed');
     } catch (err) {
       notify(err.response?.data?.error || 'Failed to remove co-assignee', 'error');
@@ -9238,26 +9245,49 @@ PRUDEV II BDS Team`
               <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 1 }}>
                 CO-ASSIGNED BGEs
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
-                {(assignTarget.co_assigned_bge_names || []).length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', fontSize: 12 }}>
-                    None — add BGEs below to jointly assign them
-                  </Typography>
-                ) : (
-                  (assignTarget.co_assigned_bge_names || []).map(b => (
-                    <Chip
-                      key={b.id}
-                      label={`${b.name}${b.bge_code ? ` · ${b.bge_code}` : ''}`}
-                      size="small"
-                      onDelete={() => removeCoAssignee(b.id)}
-                      variant="outlined"
-                      sx={{ borderColor: '#7B1FA2', color: '#7B1FA2', '& .MuiChip-deleteIcon': { color: '#7B1FA2' } }}
-                    />
-                  ))
-                )}
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <FormControl size="small" sx={{ flex: 1 }}>
+
+              {(assignTarget.co_assigned_bge_names || []).length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', fontSize: 12, mb: 1.5 }}>
+                  None — add BGEs below to jointly assign them
+                </Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 1.5 }}>
+                  {(assignTarget.co_assigned_bge_names || []).map(b => (
+                    <Box key={b.id} sx={{ border: '1px solid', borderColor: '#E1BEE7', borderRadius: 1, p: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="body2" fontWeight={600} sx={{ color: '#7B1FA2' }}>
+                          {b.name}{b.bge_code ? ` · ${b.bge_code}` : ''}
+                        </Typography>
+                        <Button size="small" color="error" onClick={() => removeCoAssignee(b.id)}
+                          sx={{ minWidth: 0, px: 1, fontSize: 11 }}>Remove</Button>
+                      </Box>
+                      <TextField
+                        fullWidth size="small" multiline rows={2}
+                        label="Deployment Objectives"
+                        placeholder="Objectives for this co-assigned BGE…"
+                        value={coAssignEditObjectives[String(b.id)] ?? ''}
+                        onChange={e => setCoAssignEditObjectives(prev => ({ ...prev, [String(b.id)]: e.target.value }))}
+                        onBlur={async () => {
+                          try {
+                            const res = await axios.patch(
+                              `${API_ENDPOINTS.MSMES}${assignTarget.id}/update_co_objectives/`,
+                              { bge_id: b.id, objectives: coAssignEditObjectives[String(b.id)] ?? '' },
+                              { headers }
+                            );
+                            setAssignTarget(res.data);
+                          } catch { notify('Failed to save objectives', 'error'); }
+                        }}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ '& .MuiInputBase-input': { fontSize: 13 } }}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              {/* Add co-assignee row */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <FormControl size="small" fullWidth>
                   <InputLabel>Add co-assignee</InputLabel>
                   <Select
                     value={coAssignAdd}
@@ -9275,15 +9305,26 @@ PRUDEV II BDS Team`
                       ))}
                   </Select>
                 </FormControl>
+                {coAssignAdd && (
+                  <TextField
+                    fullWidth size="small" multiline rows={2}
+                    label="Objectives for this co-assignee"
+                    placeholder="What will this BGE focus on?…"
+                    value={coAssignAddObjectives}
+                    onChange={e => setCoAssignAddObjectives(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ '& .MuiInputBase-input': { fontSize: 13 } }}
+                  />
+                )}
                 <Button
                   variant="outlined"
                   size="small"
                   disabled={!coAssignAdd || coAssignSaving}
                   onClick={() => addCoAssignee(coAssignAdd)}
                   startIcon={coAssignSaving ? <CircularProgress size={14} color="inherit" /> : null}
-                  sx={{ whiteSpace: 'nowrap', minWidth: 60 }}
+                  sx={{ alignSelf: 'flex-end' }}
                 >
-                  {coAssignSaving ? '' : 'Add'}
+                  {coAssignSaving ? 'Adding…' : 'Add Co-Assignee'}
                 </Button>
               </Box>
             </Box>
