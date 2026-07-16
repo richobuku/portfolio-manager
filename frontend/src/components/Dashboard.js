@@ -98,6 +98,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── work orders ───────────────────────────────────────────────────────────
   const [workOrders, setWorkOrders] = useState([]);
+  const deferredWorkOrders = React.useDeferredValue(workOrders);
   const [woFilterBge, setWoFilterBge] = useState('');
   const [woFilterStatus, setWoFilterStatus] = useState('');
   const [woFilterType, setWoFilterType] = useState('');
@@ -5644,8 +5645,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     );
   };
 
-  const openWoCreate = () => { setWoEditing(null); setWoDialog(true); };
-  const openWoEdit = (wo) => { setWoEditing(wo); setWoDialog(true); };
+  const openWoCreate = () => startTransition(() => { setWoEditing(null); setWoDialog(true); });
+  const openWoEdit = (wo) => startTransition(() => { setWoEditing(wo); setWoDialog(true); });
 
   const issueWo = async (wo) => {
     setWoIssuing(wo.id);
@@ -5788,14 +5789,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
         <FormControl size="small" sx={{ flex: '1 1 160px', minWidth: 0 }}>
           <InputLabel>Filter by BGE</InputLabel>
-          <Select value={woFilterBge} label="Filter by BGE" onChange={e => setWoFilterBge(e.target.value)}>
+          <Select value={woFilterBge} label="Filter by BGE" onChange={e => { const v = e.target.value; startTransition(() => setWoFilterBge(v)); }}>
             <MenuItem value="">All BGEs</MenuItem>
             {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)}
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ flex: '1 1 110px', minWidth: 0 }}>
           <InputLabel>Status</InputLabel>
-          <Select value={woFilterStatus} label="Status" onChange={e => setWoFilterStatus(e.target.value)}>
+          <Select value={woFilterStatus} label="Status" onChange={e => { const v = e.target.value; startTransition(() => setWoFilterStatus(v)); }}>
             <MenuItem value="">All</MenuItem>
             <MenuItem value="draft">Draft</MenuItem>
             <MenuItem value="issued">Issued</MenuItem>
@@ -5804,7 +5805,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </FormControl>
         <FormControl size="small" sx={{ flex: '1 1 160px', minWidth: 0 }}>
           <InputLabel>Type</InputLabel>
-          <Select value={woFilterType || ''} label="Type" onChange={e => setWoFilterType(e.target.value)}>
+          <Select value={woFilterType || ''} label="Type" onChange={e => { const v = e.target.value; startTransition(() => setWoFilterType(v)); }}>
             <MenuItem value="">All Types</MenuItem>
             <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
             <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
@@ -5821,14 +5822,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </FormControl>
       </Paper>
 
-      {workOrders.length === 0 ? (
+      {deferredWorkOrders.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Assignment sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
           <Typography color="text.secondary">No work orders yet.</Typography>
         </Paper>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {workOrders.map(wo => (
+          {deferredWorkOrders.map(wo => (
             <Card variant="outlined" key={wo.id}
               sx={wo.work_order_type === 'training_facilitation' ? { borderLeft: '4px solid #7B1FA2' } : {}}>
               <CardContent>
@@ -5937,7 +5938,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   const outstanding = Number(wo.outstanding ?? (amountDue - totalPaid));
                   const pf = woPaymentForms[wo.id] || {};
                   return (
-                    <Accordion variant="outlined" sx={{ mt: 1.5 }} disableGutters>
+                    <Accordion variant="outlined" sx={{ mt: 1.5 }} disableGutters TransitionProps={{ unmountOnExit: true }}>
                       <AccordionSummary expandIcon={<ExpandMore />}>
                         <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
                           <Typography variant="caption" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
