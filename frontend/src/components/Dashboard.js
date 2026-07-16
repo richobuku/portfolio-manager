@@ -1528,16 +1528,27 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Box>
                 </TableCell>
                 <TableCell>
-                  {m.assigned_bge_name ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Chip
-                        label={m.assigned_bge_name}
-                        size="small"
-                        color="success"
-                        variant="outlined"
-                        onClick={() => openAssignDialog(m)}
-                        sx={{ cursor: 'pointer', fontSize: 11 }}
-                      />
+                  {m.assigned_bge_name || (m.co_assigned_bge_names || []).length > 0 ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                      {m.assigned_bge_name && (
+                        <Chip
+                          label={m.assigned_bge_name}
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                          onClick={() => openAssignDialog(m)}
+                          sx={{ cursor: 'pointer', fontSize: 11 }}
+                        />
+                      )}
+                      {(m.co_assigned_bge_names || []).map(b => (
+                        <Chip
+                          key={b.id}
+                          label={b.name}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: 11, borderColor: '#7B1FA2', color: '#7B1FA2' }}
+                        />
+                      ))}
                     </Box>
                   ) : (
                     <Button
