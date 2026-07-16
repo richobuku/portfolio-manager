@@ -278,12 +278,12 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if bge_id:
             try:
                 bge = BusinessGrowthExpert.objects.get(pk=bge_id)
-                # Prevent assigning the same BGE twice as primary
+                # Same primary BGE re-submitted — just update objectives/date
                 if msme.assigned_bge_id and msme.assigned_bge_id == bge.id:
-                    return Response(
-                        {'error': f'{msme.business_name} is already assigned to {bge.name}.'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    msme.assignment_objectives = objectives
+                    msme.assignment_date = assignment_date
+                    msme.save()
+                    return Response(MSMESerializer(msme).data)
                 if msme.assigned_bge_id and msme.assigned_bge_id != bge.id:
                     # MSME already has a primary BGE — add the new BGE as co-assigned
                     # so BOTH BGEs keep the MSME in their list (joint deployment).
@@ -327,6 +327,21 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 body=f'You have been assigned to {msme.business_name}. Check your dashboard for details.',
                 url='/bge'
             )
+        return Response(MSMESerializer(msme).data)
+
+    @action(detail=True, methods=['patch'])
+    def remove_co_assigned(self, request, pk=None):
+        if not self._is_admin_or_cohort_admin(request):
+            raise PermissionDenied("Only admins can modify BGE assignments.")
+        msme = self.get_object()
+        bge_id = request.data.get('bge_id')
+        if not bge_id:
+            return Response({'error': 'bge_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            bge = BusinessGrowthExpert.objects.get(pk=bge_id)
+            msme.co_assigned_bges.remove(bge)
+        except BusinessGrowthExpert.DoesNotExist:
+            return Response({'error': 'BGE not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(MSMESerializer(msme).data)
 
     @action(detail=True, methods=['patch'])

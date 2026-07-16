@@ -212,6 +212,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── assignment dialog ──────────────────────────────────────────────────────
   const [assignDialog, setAssignDialog] = useState(false);
+  const [coAssignAdd, setCoAssignAdd] = useState('');
+  const [coAssignSaving, setCoAssignSaving] = useState(false);
   const [inactiveMsmes, setInactiveMsmes]   = useState(null);  // null=unchecked, [] or array when loaded
   const [reactivating, setReactivating]     = useState(false);
 
@@ -621,15 +623,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       objectives: msme.assignment_objectives || '',
       assignment_date: msme.assignment_date || new Date().toISOString().slice(0, 10),
     });
+    setCoAssignAdd('');
     setAssignDialog(true);
   };
 
   const saveAssignment = async () => {
     if (!assignForm.bge_id) { notify('Please select a BGE Expert', 'error'); return; }
-    if (assignTarget && assignTarget.assigned_bge === parseInt(assignForm.bge_id)) {
-      notify('This MSME is already assigned to the selected BGE Expert', 'error');
-      return;
-    }
     setAssignSaving(true);
     try {
       await axios.patch(
@@ -644,6 +643,39 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify(err.response?.data?.error || 'Failed to save assignment', 'error');
     } finally {
       setAssignSaving(false);
+    }
+  };
+
+  const addCoAssignee = async (bgeId) => {
+    if (!bgeId) return;
+    setCoAssignSaving(true);
+    try {
+      const res = await axios.patch(
+        `${API_ENDPOINTS.MSMES}${assignTarget.id}/assign_bge/`,
+        { bge_id: bgeId },
+        { headers }
+      );
+      setAssignTarget(res.data);
+      setCoAssignAdd('');
+      notify('Co-assignee added');
+    } catch (err) {
+      notify(err.response?.data?.error || 'Failed to add co-assignee', 'error');
+    } finally {
+      setCoAssignSaving(false);
+    }
+  };
+
+  const removeCoAssignee = async (bgeId) => {
+    try {
+      const res = await axios.patch(
+        `${API_ENDPOINTS.MSMES}${assignTarget.id}/remove_co_assigned/`,
+        { bge_id: bgeId },
+        { headers }
+      );
+      setAssignTarget(res.data);
+      notify('Co-assignee removed');
+    } catch (err) {
+      notify(err.response?.data?.error || 'Failed to remove co-assignee', 'error');
     }
   };
 
@@ -9187,18 +9219,76 @@ PRUDEV II BDS Team`
             </Accordion>
           )}
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel>BGE Expert</InputLabel>
+            <InputLabel>Primary BGE Expert</InputLabel>
             <Select
               value={assignForm.bge_id}
-              label="BGE Expert"
+              label="Primary BGE Expert"
               onChange={e => setAssignForm({ ...assignForm, bge_id: e.target.value })}
             >
-              <MenuItem value=""><em>None (unassign)</em></MenuItem>
+              <MenuItem value=""><em>None (unassign all)</em></MenuItem>
               {experts.map(e => (
                 <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` · ${e.bge_code}` : ''}</MenuItem>
               ))}
             </Select>
           </FormControl>
+
+          {/* Co-assigned BGEs — shown once a primary is assigned */}
+          {assignTarget?.assigned_bge && (
+            <Box sx={{ mb: 2, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 1 }}>
+                CO-ASSIGNED BGEs
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
+                {(assignTarget.co_assigned_bge_names || []).length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', fontSize: 12 }}>
+                    None — add BGEs below to jointly assign them
+                  </Typography>
+                ) : (
+                  (assignTarget.co_assigned_bge_names || []).map(b => (
+                    <Chip
+                      key={b.id}
+                      label={`${b.name}${b.bge_code ? ` · ${b.bge_code}` : ''}`}
+                      size="small"
+                      onDelete={() => removeCoAssignee(b.id)}
+                      variant="outlined"
+                      sx={{ borderColor: '#7B1FA2', color: '#7B1FA2', '& .MuiChip-deleteIcon': { color: '#7B1FA2' } }}
+                    />
+                  ))
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <FormControl size="small" sx={{ flex: 1 }}>
+                  <InputLabel>Add co-assignee</InputLabel>
+                  <Select
+                    value={coAssignAdd}
+                    label="Add co-assignee"
+                    onChange={e => setCoAssignAdd(e.target.value)}
+                  >
+                    <MenuItem value=""><em>Select BGE...</em></MenuItem>
+                    {experts
+                      .filter(e =>
+                        e.id !== parseInt(assignForm.bge_id) &&
+                        !(assignTarget.co_assigned_bge_names || []).some(b => b.id === e.id)
+                      )
+                      .map(e => (
+                        <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` · ${e.bge_code}` : ''}</MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!coAssignAdd || coAssignSaving}
+                  onClick={() => addCoAssignee(coAssignAdd)}
+                  startIcon={coAssignSaving ? <CircularProgress size={14} color="inherit" /> : null}
+                  sx={{ whiteSpace: 'nowrap', minWidth: 60 }}
+                >
+                  {coAssignSaving ? '' : 'Add'}
+                </Button>
+              </Box>
+            </Box>
+          )}
+
           <TextField
             fullWidth size="small" label="Assignment Date" type="date"
             value={assignForm.assignment_date}
@@ -9219,9 +9309,9 @@ PRUDEV II BDS Team`
           {assignForm.bge_id && (
             <Button color="error" sx={{ mr: 'auto' }} onClick={async () => {
               await axios.patch(`${API_ENDPOINTS.MSMES}${assignTarget.id}/assign_bge/`, { bge_id: null }, { headers });
-              notify('BGE unassigned'); setAssignDialog(false); fetchAll();
+              notify('All BGE assignments removed'); setAssignDialog(false); fetchAll();
             }}>
-              Remove Assignment
+              Remove All
             </Button>
           )}
           <Button onClick={() => setAssignDialog(false)}>Cancel</Button>
