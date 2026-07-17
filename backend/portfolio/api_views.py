@@ -42,14 +42,11 @@ def _managed_groups(user):
 
 
 def _is_viewer(user):
-    """True for accounts that have no BGE profile and no programme-manager role — read-only."""
+    """True only for accounts explicitly in the 'Viewer' Django group.
+    Unlinked accounts see NOTHING — they must be linked or added to Viewer."""
     if user.is_staff or user.is_superuser:
         return False
-    if hasattr(user, 'cohort_admin_profile'):
-        return False
-    if hasattr(user, 'bge_profile'):
-        return False
-    return True
+    return user.groups.filter(name='Viewer').exists()
 
 
 def _is_programme_manager(user):

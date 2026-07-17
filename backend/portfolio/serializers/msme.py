@@ -51,7 +51,6 @@ class MSMESerializer(serializers.ModelSerializer):
     ADMIN_ONLY_FIELDS = (
         'assigned_bge', 'co_assigned_bges', 'cohort', 'programme_groups',
         'assigned_group', 'is_active', 'assignment_objectives', 'assignment_date',
-        'co_assignment_objectives',
     )
 
     def update(self, instance, validated_data):
