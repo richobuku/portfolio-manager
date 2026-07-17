@@ -2450,11 +2450,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                         <Visibility fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
-                                    <Tooltip title="Delete">
-                                      <IconButton size="small" color="error" onClick={() => deleteAttachment(att)}>
-                                        <Delete fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
                                   </Box>
                                 );
                               })}

@@ -676,14 +676,8 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         instance.file.save(f.name, ContentFile(data), save=True)
 
     def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
         if not self._is_admin():
-            try:
-                bge = request.user.bge_profile
-            except Exception:
-                raise PermissionDenied("Only BGEs or admins can delete attachments.")
-            if bge.id != instance.work_order.bge_id:
-                raise PermissionDenied("You can only delete your own attachments.")
+            raise PermissionDenied("Only admins can delete attachments.")
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['get'], url_path='download')
