@@ -17,7 +17,7 @@ import {
   AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
-  Lock, LockOpen, Star, StarBorder, Download, Undo,
+  Lock, LockOpen, Star, StarBorder, Download, Undo, AttachFile,
   Campaign, Send as SendIcon, Schedule as ScheduleIcon, Checkroom, DrawOutlined,
   RotateLeft, RotateRight, Dashboard as DashboardIcon,
   ArrowForward, TaskAlt, Payments, Description,
@@ -28,7 +28,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -111,6 +111,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [woWithdrawReason, setWoWithdrawReason] = useState('');
   const [woSubmissions, setWoSubmissions] = useState([]);
   const [woPayments, setWoPayments] = useState([]);
+  const [woAttachments, setWoAttachments] = useState([]);
   const [woPaymentForms, setWoPaymentForms] = useState({});   // { [workOrderId]: { amount, payment_date, reference, notes } }
   const [woPaymentSaving, setWoPaymentSaving] = useState(null);
 
@@ -376,12 +377,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchWoAttachments = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDER_ATTACHMENTS, { headers: h });
+      setWoAttachments(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      setWoAttachments([]);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (section === 'workorders') {
       fetchWoSubmissions();
       fetchWoPayments();
+      fetchWoAttachments();
     }
-  }, [section, fetchWoSubmissions, fetchWoPayments]);
+  }, [section, fetchWoSubmissions, fetchWoPayments, fetchWoAttachments]);
 
   const fetchTshirtReceipts = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -5736,6 +5748,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const deleteWoAttachment = async (att) => {
+    if (!window.confirm(`Delete "${att.caption || att.filename}"? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.WORK_ORDER_ATTACHMENTS}${att.id}/`, { headers });
+      notify('Attachment deleted');
+      fetchWoAttachments();
+    } catch (e) {
+      notify(e.response?.data?.error || 'Failed to delete attachment', 'error');
+    }
+  };
+
   const withdrawWo = async () => {
     if (!woWithdrawTarget) return;
     setWoWithdrawing(woWithdrawTarget.id);
@@ -5997,6 +6020,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 {(() => {
                   const subs = woSubmissions.filter(s => s.work_order === wo.id);
                   const payments = woPayments.filter(p => p.work_order === wo.id);
+                  const atts = woAttachments.filter(a => a.work_order === wo.id);
                   const amountDue = Number(wo.amount_due || 0);
                   const totalPaid = Number(wo.total_paid || 0);
                   const outstanding = Number(wo.outstanding ?? (amountDue - totalPaid));
@@ -6014,9 +6038,60 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             Paid UGX {totalPaid.toLocaleString()} of {amountDue.toLocaleString()}
                             {outstanding > 0 ? ` · UGX ${outstanding.toLocaleString()} outstanding` : ' · fully paid'}
                           </Typography>
+                          {atts.length > 0 && (
+                            <Typography variant="caption" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AttachFile fontSize="inherit" /> {atts.length} doc{atts.length !== 1 ? 's' : ''}
+                            </Typography>
+                          )}
                         </Box>
                       </AccordionSummary>
                       <AccordionDetails>
+                        {/* Supporting documents uploaded by BGE */}
+                        {atts.length > 0 && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Supporting Documents</Typography>
+                            <TableContainer>
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Title / Caption</TableCell>
+                                    <TableCell>File</TableCell>
+                                    <TableCell>Uploaded by</TableCell>
+                                    <TableCell>Date</TableCell>
+                                    <TableCell align="right">Action</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {atts.map(att => (
+                                    <TableRow key={att.id}>
+                                      <TableCell>{att.caption || <em style={{ color: '#999' }}>No title</em>}</TableCell>
+                                      <TableCell>
+                                        <Tooltip title={att.filename}>
+                                          <IconButton size="small" color="primary"
+                                            component="a" href={WORK_ORDER_ATTACHMENT_DOWNLOAD_URL(att.id)}
+                                            target="_blank" rel="noopener noreferrer">
+                                            <Download fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                        <Typography variant="caption" color="text.secondary">{att.filename}</Typography>
+                                      </TableCell>
+                                      <TableCell>{att.uploaded_by_name || '—'}</TableCell>
+                                      <TableCell>{att.created_at ? new Date(att.created_at).toLocaleDateString() : '—'}</TableCell>
+                                      <TableCell align="right">
+                                        <Tooltip title="Delete attachment">
+                                          <IconButton size="small" color="error" onClick={() => deleteWoAttachment(att)}>
+                                            <DeleteForever fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          </Box>
+                        )}
+
                         {/* Timesheet & invoice submissions */}
                         <Typography variant="subtitle2" fontWeight={700} gutterBottom>Timesheets & Invoices</Typography>
                         {subs.length === 0 ? (
