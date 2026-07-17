@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import {
   Business, People, School, Assessment, ChevronRight,
-  Add, Upload, Visibility, Edit, Delete, Search, CheckCircle,
+  Add, Upload, Visibility, Edit, Delete, DeleteForever, Search, CheckCircle,
   TrendingUp, LocationOn, EventNote, Group,
   AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
@@ -1282,6 +1282,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify(`${user.username} ${user.is_active ? 'deactivated' : 'activated'}`);
       fetchAll();
     } catch { notify('Failed to update user', 'error'); }
+  };
+
+  const deleteUser = async (user) => {
+    if (!window.confirm(`Permanently delete ${user.username}? This cannot be undone. Their BGE profile (if any) will be unlinked but kept.`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.BGE_USERS}${user.id}/`, { headers });
+      notify(`${user.username} permanently deleted`);
+      fetchAll();
+    } catch (e) { notify(e.response?.data?.error || 'Failed to delete user', 'error'); }
   };
 
   const approveUser = async (user) => {
@@ -4449,8 +4458,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       </Tooltip>
                     )}
                     <Tooltip title={u.is_active ? 'Disable login' : 'Enable login'}>
-                      <IconButton size="small" color={u.is_active ? 'error' : 'success'} onClick={() => toggleUserActive(u)}>
+                      <IconButton size="small" color={u.is_active ? 'warning' : 'success'} onClick={() => toggleUserActive(u)}>
                         {u.is_active ? <Delete fontSize="small" /> : <CheckCircle fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Permanently delete account">
+                      <IconButton size="small" color="error" onClick={() => deleteUser(u)}>
+                        <DeleteForever fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   </TableCell>

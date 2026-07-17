@@ -3327,6 +3327,17 @@ class BGEUserViewSet(viewsets.ViewSet):
         user.save()
         return Response({'is_active': user.is_active})
 
+    def destroy(self, request, pk=None):
+        self._require_admin(request)
+        user, err = self._get_target_non_admin_user(pk, request)
+        if err is not None:
+            return err
+        # Unlink any BGE profile before deletion so the BGE record is preserved
+        BusinessGrowthExpert.objects.filter(user=user).update(user=None)
+        username = user.username
+        user.delete()
+        return Response({'message': f'User {username} permanently deleted.'})
+
 
 # ── Push notification helpers ──────────────────────────────────────────────────
 
