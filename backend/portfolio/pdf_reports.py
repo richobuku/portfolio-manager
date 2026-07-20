@@ -571,8 +571,13 @@ def render_work_order(work_order):
 
     # Expected Outcomes — rendered only for agro_biz_continuity work orders
     if work_order.work_order_type == 'agro_biz_continuity':
+        _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
         story.append(Spacer(1, 8))
         story.append(Paragraph('EXPECTED OUTCOMES', s['sectiontitle']))
+        story.append(Paragraph(
+            'The Business Growth Expert&#x2019;s technical support will contribute to the following outcomes:',
+            ParagraphStyle('outcome_intro', parent=s['body'], fontSize=9, spaceBefore=4, spaceAfter=4),
+        ))
         outcome_groups = [
             ('Immediate Outcomes', [
                 'Participants demonstrate an improved understanding of Business Continuity Management principles and enterprise resilience.',
@@ -598,8 +603,8 @@ def render_work_order(work_order):
         outcome_item_style = ParagraphStyle('outcome_item', parent=s['body'], fontSize=9, leftIndent=14, spaceBefore=2)
         for heading, items in outcome_groups:
             story.append(Paragraph(f'<b>{heading}</b>', ParagraphStyle('outcome_hd', parent=s['body'], fontSize=10, spaceBefore=6, spaceAfter=2)))
-            for i, item in enumerate(items, start=1):
-                story.append(Paragraph(f'{i}. {_safe_html(item)}', outcome_item_style))
+            for i, item in enumerate(items):
+                story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', outcome_item_style))
 
     story.append(Spacer(1, 8))
 
