@@ -990,6 +990,7 @@ class WorkOrder(models.Model):
         ('access_to_finance_bge', 'Access to Finance — BGE Template'),
         ('biz_continuity',          'Business Continuity & Operational Planning'),
         ('biz_continuity_workshop', 'Business Continuity — Workshop Design & Facilitation'),
+        ('agro_biz_continuity',     'Agro-processors — Business Continuity & Strategic Planning'),
         ('mobilisation',            'Mobilisation / Outreach'),
         ('group_session',         'Peer-to-Peer Group Session'),
         ('training_facilitation', 'Training Facilitation — Senior BGE'),

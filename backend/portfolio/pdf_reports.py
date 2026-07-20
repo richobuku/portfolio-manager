@@ -569,6 +569,38 @@ def render_work_order(work_order):
             ]))
             story.append(mt)
 
+    # Expected Outcomes — rendered only for agro_biz_continuity work orders
+    if work_order.work_order_type == 'agro_biz_continuity':
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('EXPECTED OUTCOMES', s['sectiontitle']))
+        outcome_groups = [
+            ('Immediate Outcomes', [
+                'Participants demonstrate an improved understanding of Business Continuity Management principles and enterprise resilience.',
+                'Agro-processing MSMEs gain practical skills in identifying, assessing, and managing business risks.',
+                'Participants acquire the knowledge and confidence to use the Business Continuity Planning (BCP) tool effectively.',
+                'Increased awareness of the importance of strategic planning, innovation, and market diversification for sustainable business growth.',
+            ]),
+            ('Intermediate Outcomes', [
+                'Each participating enterprise develops a practical Business Continuity Plan tailored to its operational context.',
+                'Participating enterprises develop strategic business growth plans with clear priorities and implementation actions.',
+                'Enterprises strengthen preparedness for operational disruptions, climate-related shocks, supply chain interruptions, and market uncertainties.',
+                'Improved integration of food safety, quality management, and regulatory compliance into enterprise business strategies.',
+                'Enhanced capacity of enterprise owners and managers to make informed strategic and operational decisions.',
+            ]),
+            ('Long-Term Outcomes', [
+                'Agro-processing enterprises demonstrate improved business resilience and continuity during disruptions.',
+                'Increased competitiveness and productivity of supported MSMEs.',
+                'Improved compliance with food safety and quality standards, enhancing access to domestic and regional markets.',
+                'Stronger business performance through innovation, diversification, and strategic investment.',
+                'Increased sustainability of agro-processing enterprises, contributing to employment creation, higher incomes, and resilient local economies in Northern Uganda.',
+            ]),
+        ]
+        outcome_item_style = ParagraphStyle('outcome_item', parent=s['body'], fontSize=9, leftIndent=14, spaceBefore=2)
+        for heading, items in outcome_groups:
+            story.append(Paragraph(f'<b>{heading}</b>', ParagraphStyle('outcome_hd', parent=s['body'], fontSize=10, spaceBefore=6, spaceAfter=2)))
+            for i, item in enumerate(items, start=1):
+                story.append(Paragraph(f'{i}. {_safe_html(item)}', outcome_item_style))
+
     story.append(Spacer(1, 8))
 
     story.append(Paragraph('SCHEDULE 2 — PAYMENT TERMS', s['sectiontitle']))
@@ -588,7 +620,17 @@ def render_work_order(work_order):
 
     story.append(Spacer(1, 8))
 
-    if work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
+    if work_order.work_order_type == 'agro_biz_continuity':
+        CONDITIONS = [
+            'BGE must use standardized PRUDEV II tools and report templates.',
+            'All MSME data and business-related information must be treated confidentially.',
+            'All outputs and tools remain the property of GOPA AFC.',
+            'In line with provisions of Ugandan Income Tax laws, professional fees paid to consultants would be subject to a 6% withholding tax, which would be deducted at the source of payment by GOPA AFC GmbH.',
+            'GOPA AFC reserves the right to terminate this Work Order in case of non-performance or breach of contract.',
+            'Transport and Accommodation: Distances above 7 km will be reimbursed as per the public transportation rates.',
+            'Payment Terms: Monthly, upon submission and approval of all deliverables listed, a duly filled and signed timesheet, an approved invoice, and validation by the Business Development Expert or agro-processing expert.',
+        ]
+    elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [
             'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA AFC and GIZ quality standards.',
             'All training content and session plans must be reviewed and approved by the BDS Expert before delivery.',

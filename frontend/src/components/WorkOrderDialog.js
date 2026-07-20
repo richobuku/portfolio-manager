@@ -383,6 +383,20 @@ POST-WORKSHOP
       { task_num: 3, description: 'Visit summary report submitted', due_date: 'Within 5 working days of visit', quantitative_result: '1 visit summary report submitted per MSME', qualitative_result: 'Summary captures observations, evidence, and recommended next steps', means_of_verification: 'Submitted visit summary report', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
     ],
   },
+  agro_biz_continuity: {
+    objective: `To provide technical support during the training of Agro-processors in Business Continuity and Strategic Planning.`,
+    key_tasks: `The BGE will:
+i. Orient Participants on the Business Continuity Planning
+ii. Facilitate Strategic Business Planning
+iii. Evaluate Participant Learning
+iv. Prepare the Workshop Report`,
+    deliverables_json: [
+      { task_num: 1, description: 'Two-day Business Continuity and Strategic Planning training successfully facilitated', due_date: '21st–24th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Signed attendance register and session notes', unit_rate: '', payment_condition: '' },
+      { task_num: 2, description: 'Participants trained on Business Continuity Management and Strategic Planning', due_date: '21st–24th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Training attendance sheet', unit_rate: '', payment_condition: '' },
+      { task_num: 3, description: 'Enterprise risk assessment exercises completed', due_date: '21st–24th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Completed risk assessment worksheets', unit_rate: '', payment_condition: '' },
+      { task_num: 4, description: 'Workshop report', due_date: '28th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Submitted workshop report', unit_rate: '', payment_condition: 'Payment processed upon approval of workshop report' },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -488,6 +502,17 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.max_days     = 5;
       extra.location     = 'Gulu / Lira, Northern Uganda';
       extra.project_name = 'PRUDEV II — Business Continuity Planning Workshop';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
+    if (type === 'agro_biz_continuity') {
+      extra.duration     = '02 days';
+      extra.max_days     = 3;
+      extra.start_date   = '2026-07-21';
+      extra.end_date     = '2026-07-22';
+      extra.location     = 'Northern Uganda';
+      extra.project_name = 'PRUDEV II- Climate Smart Agro-processing for Green Jobs';
+      extra.rate_per_day = 60000;
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
       extra.team_leader_position = 'Team Leader';
     }
@@ -599,6 +624,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="access_to_finance_bge">Access to Finance — BGE Template</MenuItem>
                 <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
                 <MenuItem value="biz_continuity_workshop">Business Continuity — Workshop Design &amp; Facilitation</MenuItem>
+                <MenuItem value="agro_biz_continuity">Agro-processors — Business Continuity &amp; Strategic Planning</MenuItem>
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
