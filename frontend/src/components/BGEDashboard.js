@@ -1259,16 +1259,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
-  const deleteAttachment = async (att) => {
-    if (!window.confirm(`Delete "${att.filename}"? This cannot be undone.`)) return;
-    try {
-      await axios.delete(`${API_ENDPOINTS.WORK_ORDER_ATTACHMENTS}${att.id}/`, { headers });
-      setAttachments(prev => prev.filter(a => a.id !== att.id));
-      notify('Attachment deleted');
-    } catch {
-      notify('Failed to delete attachment', 'error');
-    }
-  };
 
   const openAttachment = async (att) => {
     try {
