@@ -711,6 +711,19 @@ def render_work_order(work_order):
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
         ]
+    elif work_order.work_order_type == 'bge_bcp_participant_mentor':
+        CONDITIONS = [
+            'The BGE shall attend the two-day BCP Tool Training (16–17 July) punctually and participate actively throughout all sessions.',
+            'The BGE shall complete all hands-on exercises during the training and demonstrate competency in using the BCP tool.',
+            'The BGE shall provide facilitation support to MSMEs during the Business Continuity Plan workshop sessions in Gulu (21–22 July) and Lira (23–24 July).',
+            'During MSME workshop sessions, the BGE shall assist participants with exercises, provide guidance on the BCP tool, and support the lead facilitator as directed.',
+            'The BGE shall treat all MSME data, business information, and programme materials as strictly confidential.',
+            'Fees are conditional on full attendance at the training, active facilitation support at both workshop locations, and timely submission of all required reports.',
+            'Transport will be reimbursed upon submission of receipts / fuel log.',
+            'GOPA AFC reserves the right to withhold payment for non-attendance, inadequate support, or failure to submit required deliverables.',
+            'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+        ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [
             'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA AFC and GIZ quality standards.',

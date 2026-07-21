@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, FormControl, FormControlLabel, Grid,
+  DialogContent, DialogTitle, Divider, FormControl, FormControlLabel, Grid,
   IconButton, InputLabel, MenuItem, Select, TextField, Typography,
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
@@ -425,6 +425,21 @@ iv. Submit a post-training application note describing how the tool will be appl
       { task_num: 3, description: 'Post-training application note', due_date: 'Within 5 days of training', quantitative_result: '1 application note submitted describing planned BCP tool use with at least one MSME', qualitative_result: 'Note is specific, actionable, and grounded in the MSME context', means_of_verification: 'Submitted application note', unit_rate: '', payment_condition: 'Payment processed upon submission and approval' },
     ],
   },
+  bge_bcp_participant_mentor: {
+    objective: `To participate in the Business Continuity Plan (BCP) Tool Training (16–17 July 2026) and subsequently provide facilitation support to MSMEs during the Business Continuity Plan workshop sessions in Gulu (21–22 July 2026) and Lira (23–24 July 2026), assisting MSMEs in applying the BCP tool to their enterprises.`,
+    key_tasks: `The BGE will:
+i. Attend the two-day BCP Tool Training (16–17 July 2026) and demonstrate understanding of the BCP tool and its application to MSME support
+ii. Provide facilitation support at the Business Continuity Plan MSME workshop in Gulu (21–22 July 2026), assisting participants with exercises and guiding them through the BCP tool
+iii. Provide facilitation support at the Business Continuity Plan MSME workshop in Lira (23–24 July 2026), assisting participants with exercises and guiding them through the BCP tool
+iv. Support MSMEs in completing risk assessment exercises and developing their Business Continuity Plans under the guidance of the lead facilitator
+v. Submit a brief post-workshop summary report within 5 working days of the final session`,
+    deliverables_json: [
+      { task_num: 1, description: 'Full attendance at BCP Tool Training — Gulu', due_date: '16–17 July 2026', quantitative_result: 'BGE attends both days of the BCP Tool Training', qualitative_result: 'Active and engaged participation throughout', means_of_verification: 'Signed attendance register', unit_rate: '', payment_condition: 'Required for payment — non-attendance forfeits fee' },
+      { task_num: 2, description: 'Facilitation support at MSME BCP Workshop — Gulu', due_date: '21–22 July 2026', quantitative_result: 'BGE provides facilitation support for both days in Gulu', qualitative_result: 'MSMEs guided effectively through BCP tool exercises', means_of_verification: 'Signed attendance register and lead facilitator confirmation', unit_rate: '', payment_condition: 'Required for payment' },
+      { task_num: 3, description: 'Facilitation support at MSME BCP Workshop — Lira', due_date: '23–24 July 2026', quantitative_result: 'BGE provides facilitation support for both days in Lira', qualitative_result: 'MSMEs guided effectively through BCP tool exercises', means_of_verification: 'Signed attendance register and lead facilitator confirmation', unit_rate: '', payment_condition: 'Required for payment' },
+      { task_num: 4, description: 'Post-workshop summary report', due_date: 'Within 5 working days of 24 July 2026', quantitative_result: '1 summary report submitted covering observations from training and both workshop locations', qualitative_result: 'Report captures key observations, MSME challenges, and recommended follow-up actions', means_of_verification: 'Submitted summary report', unit_rate: '', payment_condition: 'Payment processed upon submission and approval of report' },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -548,6 +563,17 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.duration     = '2 days';
       extra.max_days     = 2;
       extra.location     = 'Northern Uganda';
+      extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
+      extra.rate_per_day = 60000;
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
+    if (type === 'bge_bcp_participant_mentor') {
+      extra.duration     = '6 days';
+      extra.max_days     = 6;
+      extra.start_date   = '2026-07-16';
+      extra.end_date     = '2026-07-24';
+      extra.location     = 'Gulu & Lira, Northern Uganda';
       extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
       extra.rate_per_day = 60000;
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
@@ -678,40 +704,12 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
                 <MenuItem value="bcp_tool_facilitation">BCP Tool Training — Senior BGE Facilitator</MenuItem>
                 <MenuItem value="bcp_tool_training">BCP Tool Training — BGE Participant</MenuItem>
+                <MenuItem value="bge_bcp_participant_mentor">BCP Training — BGE Participant &amp; MSME Support</MenuItem>
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
           </Grid>
-          {woForm.work_order_type === 'bcp_tool_facilitation' && (
-            <Grid item xs={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>BGE Participants (attending the training)</InputLabel>
-                <Select
-                  multiple
-                  value={woForm.participant_bges || []}
-                  label="BGE Participants (attending the training)"
-                  onChange={e => setWoForm(f => ({ ...f, participant_bges: e.target.value }))}
-                  renderValue={selected => selected.map(id => {
-                    const e = experts.find(x => x.id === id);
-                    return e ? e.name : id;
-                  }).join(', ')}
-                >
-                  {experts.map(e => (
-                    <MenuItem key={e.id} value={e.id}>
-                      <input type="checkbox" readOnly
-                        checked={(woForm.participant_bges || []).includes(e.id)}
-                        style={{ marginRight: 8 }} />
-                      {e.name} ({e.bge_code})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                Select all BGEs attending as participants. Their names will appear in the Training Programme section of the PDF.
-              </Typography>
-            </Grid>
-          )}
           <Grid item xs={12} sm={4}>
             <TextField fullWidth size="small" label="Issue Date" type="date" InputLabelProps={{ shrink: true }}
               value={woForm.issue_date} onChange={e => setWoForm(f => ({ ...f, issue_date: e.target.value }))} />
@@ -741,6 +739,43 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
               helperText="Each numbered task on its own line — pre-populated by type, fully editable."
               value={woForm.key_tasks} onChange={e => setWoForm(f => ({ ...f, key_tasks: e.target.value }))} />
           </Grid>
+
+          {/* ── SECTION: Training Programme (BCP Tool types only) ── */}
+          {woForm.work_order_type === 'bcp_tool_facilitation' && (
+            <>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>Training Programme</Typography>
+                <Divider />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>BGE Participants (attending the training)</InputLabel>
+                  <Select
+                    multiple
+                    value={woForm.participant_bges || []}
+                    label="BGE Participants (attending the training)"
+                    onChange={e => setWoForm(f => ({ ...f, participant_bges: e.target.value }))}
+                    renderValue={selected => selected.map(id => {
+                      const ex = experts.find(x => x.id === id);
+                      return ex ? ex.name : id;
+                    }).join(', ')}
+                  >
+                    {experts.map(ex => (
+                      <MenuItem key={ex.id} value={ex.id}>
+                        <input type="checkbox" readOnly
+                          checked={(woForm.participant_bges || []).includes(ex.id)}
+                          style={{ marginRight: 8 }} />
+                        {ex.name} ({ex.bge_code})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  Select all BGEs attending as participants — their names appear in the Training Programme section of the PDF.
+                </Typography>
+              </Grid>
+            </>
+          )}
 
           {/* ── SECTION: Deliverables ── */}
           <Grid item xs={12}>

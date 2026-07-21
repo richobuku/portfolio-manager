@@ -997,6 +997,7 @@ class WorkOrder(models.Model):
         ('training_facilitation',   'Training Facilitation — Senior BGE'),
         ('bcp_tool_facilitation',   'BCP Tool Training — Senior BGE Facilitator'),
         ('bcp_tool_training',       'BCP Tool Training — BGE Participant'),
+        ('bge_bcp_participant_mentor', 'BCP Training — BGE Participant & MSME Support'),
         ('outcome_assessment_tool', 'Outcome Assessment Tool Delivery'),
         ('other',                 'Other'),
     ]
