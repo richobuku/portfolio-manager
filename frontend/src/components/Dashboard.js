@@ -162,7 +162,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [sessionDialog, setSessionDialog] = useState(false);
   const [sessionEditing, setSessionEditing] = useState(null);
   // team = [{role:'lead'|'mentor', bge_id:'', work_order_id:'', _key: uniqueKey}]
-  const EMPTY_SESSION_FORM = { title: '', date: '', location: '', description: '', topic: '', businesses: [], team: [] };
+  const EMPTY_SESSION_FORM = { title: '', date: '', location: '', description: '', topic: '', businesses: [], bge_participants: [], team: [] };
   const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [attendanceDialog, setAttendanceDialog] = useState(false);
@@ -1051,6 +1051,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       description: s.description || '',
       topic: s.topic || '',
       businesses: (s.businesses || []),
+      bge_participants: (s.bge_participants_detail || []).map(b => b.id),
       team: (s.team || []).map(m => ({ ...m, _key: Math.random() })),
     });
     setSessionDialog(true);
@@ -2126,6 +2127,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Lead BGE</TableCell>
               <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Mentors</TableCell>
               <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>MSMEs</TableCell>
+              <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>BGE Participants</TableCell>
               <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Attendance</TableCell>
               <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 600 }}>Actions</TableCell>
             </TableRow>
@@ -2146,6 +2148,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <TableCell>
                   {(s.businesses_detail || []).length > 0
                     ? <Chip label={`${s.businesses_detail.length} MSME${s.businesses_detail.length !== 1 ? 's' : ''}`} size="small" color="info" />
+                    : <Typography variant="caption" color="text.secondary">—</Typography>}
+                </TableCell>
+                <TableCell>
+                  {(s.bge_participants_detail || []).length > 0
+                    ? <Chip label={`${s.bge_participants_detail.length} BGE${s.bge_participants_detail.length !== 1 ? 's' : ''}`} size="small" color="secondary" />
                     : <Typography variant="caption" color="text.secondary">—</Typography>}
                 </TableCell>
                 <TableCell><Chip icon={<EventNote />} label={`${s.attendance_count ?? 0} present`} size="small" /></TableCell>
@@ -8909,6 +8916,24 @@ PRUDEV II BDS Team`
                     <MenuItem key={m.id} value={m.id}>
                       <Checkbox checked={sessionForm.businesses.includes(m.id)} size="small" />
                       {m.business_name} {m.owner_name ? `· ${m.owner_name}` : ''}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>BGE Participants</InputLabel>
+                <Select
+                  multiple value={sessionForm.bge_participants}
+                  onChange={e => setSessionForm({...sessionForm, bge_participants: e.target.value})}
+                  label="BGE Participants"
+                  renderValue={sel => `${sel.length} BGE${sel.length !== 1 ? 's' : ''} selected`}
+                >
+                  {experts.map(ex => (
+                    <MenuItem key={ex.id} value={ex.id}>
+                      <Checkbox checked={sessionForm.bge_participants.includes(ex.id)} size="small" />
+                      {ex.name}{ex.bge_code ? ` (${ex.bge_code})` : ''}
                     </MenuItem>
                   ))}
                 </Select>

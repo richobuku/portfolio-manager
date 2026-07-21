@@ -501,7 +501,8 @@ class TrainingSession(models.Model):
     location    = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     topic       = models.ForeignKey(TrainingTopic, on_delete=models.SET_NULL, null=True, related_name='sessions')
-    businesses  = models.ManyToManyField('MSME', blank=True, related_name='sessions_attended')
+    businesses        = models.ManyToManyField('MSME', blank=True, related_name='sessions_attended')
+    bge_participants  = models.ManyToManyField('BusinessGrowthExpert', blank=True, related_name='sessions_attended_as_participant')
 
     def __str__(self):
         return f"{self.title} ({self.date})"

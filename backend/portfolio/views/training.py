@@ -29,6 +29,7 @@ class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         qs = TrainingSession.objects.select_related('topic').prefetch_related(
             'businesses',
+            'bge_participants',
             'facilitation_assignments__bge',
             'facilitation_assignments__work_order',
             'attendances__msme',

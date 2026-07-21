@@ -13,12 +13,13 @@ class TrainingTopicSerializer(serializers.ModelSerializer):
 
 
 class TrainingSessionSerializer(serializers.ModelSerializer):
-    topic_name           = serializers.CharField(source='topic.name', read_only=True)
-    topic_section_number = serializers.CharField(source='topic.section_number', read_only=True, allow_null=True)
-    attendance_count     = serializers.SerializerMethodField()
-    businesses_detail    = serializers.SerializerMethodField()
-    team                 = serializers.SerializerMethodField()
-    lead_bge_name        = serializers.SerializerMethodField()
+    topic_name            = serializers.CharField(source='topic.name', read_only=True)
+    topic_section_number  = serializers.CharField(source='topic.section_number', read_only=True, allow_null=True)
+    attendance_count      = serializers.SerializerMethodField()
+    businesses_detail     = serializers.SerializerMethodField()
+    bge_participants_detail = serializers.SerializerMethodField()
+    team                  = serializers.SerializerMethodField()
+    lead_bge_name         = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession
@@ -37,6 +38,12 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
                 'sector': m.sector or '',
             }
             for m in obj.businesses.all()
+        ]
+
+    def get_bge_participants_detail(self, obj):
+        return [
+            {'id': b.id, 'name': b.name, 'bge_code': b.bge_code or ''}
+            for b in obj.bge_participants.all()
         ]
 
     def get_team(self, obj):
