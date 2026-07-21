@@ -426,18 +426,18 @@ iv. Submit a post-training application note describing how the tool will be appl
     ],
   },
   bge_bcp_participant_mentor: {
-    objective: `To participate in the Business Continuity Plan (BCP) Tool Training (16–17 July 2026) and subsequently provide facilitation support to MSMEs during the Business Continuity Plan workshop sessions in Gulu (21–22 July 2026) and Lira (23–24 July 2026), assisting MSMEs in applying the BCP tool to their enterprises.`,
+    objective: `To participate in the Business Continuity Plan (BCP) Tool Training (16–17 July 2026) and subsequently provide facilitation support to Agro-processors during the Business Continuity & Strategic Planning workshop sessions in Gulu (21–22 July 2026) and Lira (23–24 July 2026), assisting Agro-processing MSMEs in developing their Business Continuity Plans and Strategic Growth Plans.`,
     key_tasks: `The BGE will:
-i. Attend the two-day BCP Tool Training (16–17 July 2026) and demonstrate understanding of the BCP tool and its application to MSME support
-ii. Provide facilitation support at the Business Continuity Plan MSME workshop in Gulu (21–22 July 2026), assisting participants with exercises and guiding them through the BCP tool
-iii. Provide facilitation support at the Business Continuity Plan MSME workshop in Lira (23–24 July 2026), assisting participants with exercises and guiding them through the BCP tool
-iv. Support MSMEs in completing risk assessment exercises and developing their Business Continuity Plans under the guidance of the lead facilitator
-v. Submit a brief post-workshop summary report within 5 working days of the final session`,
+i. Attend the two-day BCP Tool Training (16–17 July 2026) and demonstrate understanding of the Business Continuity Planning tool and its application to Agro-processing enterprises
+ii. Provide facilitation support at the Agro-processors Business Continuity & Strategic Planning workshop in Gulu (21–22 July 2026), guiding participants through BCP tool exercises and risk assessment activities
+iii. Provide facilitation support at the Agro-processors Business Continuity & Strategic Planning workshop in Lira (23–24 July 2026), guiding participants through BCP tool exercises and risk assessment activities
+iv. Support Agro-processing MSMEs in completing enterprise risk assessments and developing practical Business Continuity Plans under the guidance of the lead facilitator
+v. Submit a post-workshop summary report within 5 working days of the final session in Lira`,
     deliverables_json: [
-      { task_num: 1, description: 'Full attendance at BCP Tool Training — Gulu', due_date: '16–17 July 2026', quantitative_result: 'BGE attends both days of the BCP Tool Training', qualitative_result: 'Active and engaged participation throughout', means_of_verification: 'Signed attendance register', unit_rate: '', payment_condition: 'Required for payment — non-attendance forfeits fee' },
-      { task_num: 2, description: 'Facilitation support at MSME BCP Workshop — Gulu', due_date: '21–22 July 2026', quantitative_result: 'BGE provides facilitation support for both days in Gulu', qualitative_result: 'MSMEs guided effectively through BCP tool exercises', means_of_verification: 'Signed attendance register and lead facilitator confirmation', unit_rate: '', payment_condition: 'Required for payment' },
-      { task_num: 3, description: 'Facilitation support at MSME BCP Workshop — Lira', due_date: '23–24 July 2026', quantitative_result: 'BGE provides facilitation support for both days in Lira', qualitative_result: 'MSMEs guided effectively through BCP tool exercises', means_of_verification: 'Signed attendance register and lead facilitator confirmation', unit_rate: '', payment_condition: 'Required for payment' },
-      { task_num: 4, description: 'Post-workshop summary report', due_date: 'Within 5 working days of 24 July 2026', quantitative_result: '1 summary report submitted covering observations from training and both workshop locations', qualitative_result: 'Report captures key observations, MSME challenges, and recommended follow-up actions', means_of_verification: 'Submitted summary report', unit_rate: '', payment_condition: 'Payment processed upon submission and approval of report' },
+      { task_num: 1, description: 'Full attendance at BCP Tool Training', due_date: '16–17 July 2026', quantitative_result: 'BGE attends both days of the BCP Tool Training', qualitative_result: 'Active and engaged participation throughout; BGE demonstrates understanding of the BCP tool', means_of_verification: 'Signed attendance register', unit_rate: '', payment_condition: 'Required for payment — non-attendance forfeits fee' },
+      { task_num: 2, description: 'Facilitation support at Agro-processors Business Continuity & Strategic Planning Workshop — Gulu', due_date: '21–22 July 2026', quantitative_result: 'BGE provides facilitation support for both days of the Gulu workshop', qualitative_result: 'Agro-processing MSMEs guided effectively through BCP tool exercises and risk assessment activities', means_of_verification: 'Signed attendance register and lead facilitator confirmation', unit_rate: '', payment_condition: 'Required for payment' },
+      { task_num: 3, description: 'Facilitation support at Agro-processors Business Continuity & Strategic Planning Workshop — Lira', due_date: '23–24 July 2026', quantitative_result: 'BGE provides facilitation support for both days of the Lira workshop', qualitative_result: 'Agro-processing MSMEs guided effectively through BCP tool exercises and risk assessment activities', means_of_verification: 'Signed attendance register and lead facilitator confirmation', unit_rate: '', payment_condition: 'Required for payment' },
+      { task_num: 4, description: 'Post-workshop summary report', due_date: 'Within 5 working days of 24 July 2026', quantitative_result: '1 summary report submitted covering observations from the training and both workshop locations', qualitative_result: 'Report captures key observations, Agro-processor challenges encountered, and recommended follow-up actions', means_of_verification: 'Submitted summary report approved by Team Leader', unit_rate: '', payment_condition: 'Payment processed upon submission and approval of report' },
     ],
   },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
@@ -704,7 +704,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
                 <MenuItem value="bcp_tool_facilitation">BCP Tool Training — Senior BGE Facilitator</MenuItem>
                 <MenuItem value="bcp_tool_training">BCP Tool Training — BGE Participant</MenuItem>
-                <MenuItem value="bge_bcp_participant_mentor">BCP Training — BGE Participant &amp; MSME Support</MenuItem>
+                <MenuItem value="bge_bcp_participant_mentor">Agro-processors — Business Continuity &amp; Strategic Planning (BGE Support)</MenuItem>
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
