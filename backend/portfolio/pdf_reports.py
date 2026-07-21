@@ -635,6 +635,32 @@ def render_work_order(work_order):
             'Transport and Accommodation: Distances above 7 km will be reimbursed as per the public transportation rates.',
             'Payment Terms: Monthly, upon submission and approval of all deliverables listed, a duly filled and signed timesheet, an approved invoice, and validation by the Business Development Expert or agro-processing expert.',
         ]
+    elif work_order.work_order_type == 'bcp_tool_facilitation':
+        CONDITIONS = [
+            'The Senior BGE shall facilitate the BCP Tool training with professionalism and in accordance with GOPA AFC and GIZ quality standards.',
+            'All training content, session plans, and BCP tool exercises must be reviewed and approved by the BDS Expert before delivery.',
+            'The Senior BGE shall submit a Training Report within 5 working days of the training.',
+            'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of every session.',
+            'The Senior BGE is responsible for briefing BGE participants before the training and for monitoring their active engagement throughout.',
+            'Fees are conditional on satisfactory delivery of reports, approved training content, and completed feedback analysis.',
+            'Transport will be reimbursed upon submission of receipts / fuel log.',
+            'The Senior BGE shall maintain confidentiality of all BGE and programme information.',
+            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
+            'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+        ]
+    elif work_order.work_order_type == 'bcp_tool_training':
+        CONDITIONS = [
+            'The BGE shall attend all BCP Tool training sessions punctually and participate actively throughout.',
+            'The BGE shall complete all hands-on exercises and apply the BCP tool to the assigned MSME scenario during training.',
+            'A post-training application note must be submitted within 5 working days of the training.',
+            'The BGE shall treat all programme materials, MSME data, and training content as confidential.',
+            'Fees are conditional on full attendance, active participation, and timely submission of the application note.',
+            'Transport will be reimbursed upon submission of receipts / fuel log.',
+            'GOPA AFC reserves the right to withhold payment for non-attendance or unsatisfactory participation.',
+            'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+        ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [
             'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA AFC and GIZ quality standards.',

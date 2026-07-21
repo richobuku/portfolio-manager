@@ -397,6 +397,34 @@ iv. Prepare the Workshop Report`,
       { task_num: 4, description: 'Workshop report', due_date: '28th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Submitted workshop report', unit_rate: '', payment_condition: 'Payment processed upon approval of workshop report' },
     ],
   },
+  bcp_tool_facilitation: {
+    objective: `To facilitate a capacity building training for Business Growth Experts (BGEs) on the Business Continuity Planning (BCP) tool, equipping them with the practical skills to apply the tool effectively when supporting MSMEs.`,
+    key_tasks: `The Senior BGE will:
+i. Orient participating BGEs on the Business Continuity Planning tool, its purpose, and its application in MSME support
+ii. Facilitate hands-on practice sessions, guiding BGEs through each section of the BCP tool
+iii. Guide BGEs in applying the tool to real MSME scenarios during training exercises
+iv. Evaluate BGE understanding and competency in using the BCP tool through practical exercises
+v. Collect participant feedback using the approved PRUDEV II feedback instrument
+vi. Compile and submit a Training Report within 5 working days of the training`,
+    deliverables_json: [
+      { task_num: 1, description: 'BCP Tool training successfully facilitated for BGEs', due_date: 'Day of training', quantitative_result: 'Training delivered to all assigned BGEs', qualitative_result: 'Sessions are structured, practical, and meet PRUDEV II quality standards', means_of_verification: 'Signed attendance register and session notes', unit_rate: '', payment_condition: 'Required for payment' },
+      { task_num: 2, description: 'Participant feedback collected and summarised', due_date: 'Within 3 days of training', quantitative_result: 'Feedback collected from all participants and summary submitted', qualitative_result: 'Summary identifies key themes and areas for improvement', means_of_verification: 'Submitted feedback summary with original forms', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
+      { task_num: 3, description: 'Training Report submitted', due_date: 'Within 5 days of training', quantitative_result: '1 training report submitted covering objectives, activities, observations, and recommendations', qualitative_result: 'Report is comprehensive and meets PRUDEV II reporting standards', means_of_verification: 'Submitted training report approved by BDS Expert', unit_rate: '', payment_condition: 'Payment processed upon approval of training report' },
+    ],
+  },
+  bcp_tool_training: {
+    objective: `To participate in a capacity building training on the Business Continuity Planning (BCP) tool and develop the practical skills to apply it effectively when supporting assigned MSMEs in business continuity planning.`,
+    key_tasks: `The BGE will:
+i. Attend all BCP Tool training sessions punctually and participate actively throughout
+ii. Complete all hands-on exercises, applying the BCP tool to assigned MSME scenarios during training
+iii. Demonstrate understanding of the BCP tool through practical exercises facilitated by the Senior BGE
+iv. Submit a post-training application note describing how the tool will be applied to at least one assigned MSME`,
+    deliverables_json: [
+      { task_num: 1, description: 'Full attendance at BCP Tool training sessions', due_date: 'Day of training', quantitative_result: 'BGE attends all scheduled training sessions', qualitative_result: 'Active and engaged participation throughout the training', means_of_verification: 'Signed attendance register', unit_rate: '', payment_condition: 'Required for payment — non-attendance forfeits fee' },
+      { task_num: 2, description: 'Completed BCP Tool exercise submitted during training', due_date: 'Day of training', quantitative_result: '1 completed BCP tool exercise submitted', qualitative_result: 'Exercise demonstrates practical understanding of the tool', means_of_verification: 'Completed BCP tool exercise worksheet', unit_rate: '', payment_condition: 'Required for payment' },
+      { task_num: 3, description: 'Post-training application note', due_date: 'Within 5 days of training', quantitative_result: '1 application note submitted describing planned BCP tool use with at least one MSME', qualitative_result: 'Note is specific, actionable, and grounded in the MSME context', means_of_verification: 'Submitted application note', unit_rate: '', payment_condition: 'Payment processed upon submission and approval' },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -502,6 +530,24 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.max_days     = 5;
       extra.location     = 'Gulu / Lira, Northern Uganda';
       extra.project_name = 'PRUDEV II — Business Continuity Planning Workshop';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
+    if (type === 'bcp_tool_facilitation') {
+      extra.duration     = '2 days';
+      extra.max_days     = 2;
+      extra.location     = 'Northern Uganda';
+      extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
+      extra.rate_per_day = 60000;
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
+    if (type === 'bcp_tool_training') {
+      extra.duration     = '2 days';
+      extra.max_days     = 2;
+      extra.location     = 'Northern Uganda';
+      extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
+      extra.rate_per_day = 60000;
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
       extra.team_leader_position = 'Team Leader';
     }
@@ -628,6 +674,8 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                 <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
+                <MenuItem value="bcp_tool_facilitation">BCP Tool Training — Senior BGE Facilitator</MenuItem>
+                <MenuItem value="bcp_tool_training">BCP Tool Training — BGE Participant</MenuItem>
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
