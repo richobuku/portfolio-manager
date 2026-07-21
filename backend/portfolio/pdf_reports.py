@@ -569,6 +569,52 @@ def render_work_order(work_order):
             ]))
             story.append(mt)
 
+    # Training Programme — rendered for BCP tool training work orders
+    if work_order.work_order_type in ('bcp_tool_facilitation', 'bcp_tool_training'):
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('TRAINING PROGRAMME', s['sectiontitle']))
+        story.append(Paragraph(
+            'Business Continuity Planning (BCP) Tool &#x2014; BGE Capacity Building',
+            ParagraphStyle('tp_subtitle', parent=s['body'], fontSize=9, spaceBefore=2, spaceAfter=6),
+        ))
+        bge_name = work_order.bge.name if work_order.bge else '—'
+        if work_order.work_order_type == 'bcp_tool_facilitation':
+            role_rows = [
+                ['Lead Facilitator', 'Jacob Odur (Senior BGE)'],
+                ['Participants',     'All Participating BGEs'],
+                ['Role',             'Facilitator'],
+            ]
+        else:
+            role_rows = [
+                ['Lead Facilitator', 'Jacob Odur (Senior BGE)'],
+                ['Participant',      bge_name],
+                ['Role',             'Participant / Trainee'],
+            ]
+        story.append(_kv_table(role_rows))
+        story.append(Spacer(1, 6))
+        _tp_cell  = ParagraphStyle('tp_cell', parent=s['body'], fontSize=9)
+        _tp_hdr   = ParagraphStyle('tp_hdr',  parent=s['body'], fontSize=9,
+                                   fontName='Helvetica-Bold', textColor=HexColor('#FFFFFF'))
+        tp_rows = [
+            [Paragraph('Session', _tp_hdr), Paragraph('Topic', _tp_hdr), Paragraph('Day / Slot', _tp_hdr)],
+            [Paragraph('1', _tp_cell), Paragraph('Orientation on Business Continuity Planning', _tp_cell), Paragraph('Day 1 &#x2014; Morning', _tp_cell)],
+            [Paragraph('2', _tp_cell), Paragraph('Facilitate Strategic Business Planning', _tp_cell),      Paragraph('Day 1 &#x2014; Afternoon', _tp_cell)],
+            [Paragraph('3', _tp_cell), Paragraph('Enterprise Risk Assessment Exercises', _tp_cell),        Paragraph('Day 2 &#x2014; Morning', _tp_cell)],
+            [Paragraph('4', _tp_cell), Paragraph('Evaluate Participant Learning', _tp_cell),               Paragraph('Day 2 &#x2014; Afternoon', _tp_cell)],
+        ]
+        tp_table = Table(tp_rows, hAlign='LEFT', colWidths=[12 * mm, 108 * mm, 50 * mm], repeatRows=1)
+        tp_table.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, 0),  NAVY),
+            ('LINEBELOW',     (0, 0), (-1, -1), 0.25, LIGHT_GREY),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+            ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
+        ]))
+        story.append(tp_table)
+
     # Expected Outcomes — rendered only for agro_biz_continuity work orders
     if work_order.work_order_type == 'agro_biz_continuity':
         _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
