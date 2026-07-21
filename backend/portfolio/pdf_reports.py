@@ -619,8 +619,8 @@ def render_work_order(work_order):
         ]))
         story.append(tp_table)
 
-    # Expected Outcomes — rendered only for agro_biz_continuity work orders
-    if work_order.work_order_type == 'agro_biz_continuity':
+    # Expected Outcomes — rendered for all Agro-processors Business Continuity work orders
+    if work_order.work_order_type in ('agro_biz_continuity', 'bge_bcp_participant_mentor'):
         _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
         story.append(Spacer(1, 8))
         story.append(Paragraph('EXPECTED OUTCOMES', s['sectiontitle']))
