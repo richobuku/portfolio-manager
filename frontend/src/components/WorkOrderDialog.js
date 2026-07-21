@@ -440,6 +440,101 @@ v. Submit a post-workshop summary report within 5 working days of the final sess
       { task_num: 4, description: 'Post-workshop summary report', due_date: 'Within 5 working days of 24 July 2026', quantitative_result: '1 summary report submitted covering observations from the training and both workshop locations', qualitative_result: 'Report captures key observations, Agro-processor challenges encountered, and recommended follow-up actions', means_of_verification: 'Submitted summary report approved by Team Leader', unit_rate: '', payment_condition: 'Payment processed upon submission and approval of report' },
     ],
   },
+  bcp_senior_facilitator: {
+    objective: `To lead the end-to-end design, preparation, and facilitation of the Business Continuity & Strategic Planning programme for Agro-processing MSMEs under PRUDEV II. The Senior BGE will develop the Business Continuity Planning (BCP) toolkit and all workshop materials, facilitate a two-day BGE capacity building training (16–17 July 2026), and lead workshop facilitation with Agro-processing MSMEs in Gulu (21–22 July 2026) and Lira (23–24 July 2026).`,
+    key_tasks: `PHASE 1 — PREPARATION (Week of 8–14 July 2026)
+
+i. Develop the Business Continuity Planning Toolkit and all workshop materials, including session guides, risk mapping matrices, business function templates, dependency mapping tools, BCP framework document, and facilitator notes.
+ii. Prepare the BGE capacity building training content and session plans for the two-day BCP Tool Training.
+iii. Conduct a pre-training briefing with all assigned BGEs on the BCP tool, their facilitation roles, and the workshop schedule for Gulu and Lira.
+iv. Ensure all materials and logistics are confirmed and ready before the BGE training commences on 16 July 2026.
+
+PHASE 2 — BGE CAPACITY BUILDING TRAINING (16–17 July 2026)
+
+v. Facilitate the two-day BCP Tool Training for participating BGEs, equipping them with the practical skills to support MSME facilitation.
+vi. Guide BGEs through hands-on exercises using the BCP tool, applying it to real Agro-processing MSME scenarios.
+vii. Evaluate BGE understanding and readiness through practical exercises and observation.
+viii. Collect participant feedback using the approved PRUDEV II feedback instrument and prepare a brief training report.
+
+PHASE 3 — MSME WORKSHOP FACILITATION (21–24 July 2026)
+
+ix. Facilitate the Business Continuity & Strategic Planning workshop with Agro-processing MSMEs in Gulu (21–22 July 2026), guiding participants through risk identification, business process mapping, BCP drafting, and strategic planning exercises.
+x. Facilitate the Business Continuity & Strategic Planning workshop with Agro-processing MSMEs in Lira (23–24 July 2026), guiding participants through the same structured process.
+xi. Support individual MSMEs in completing enterprise risk assessments and developing practical Business Continuity Plans and Strategic Growth Plans.
+xii. Compile and submit a consolidated workshop report covering observations, participant outputs, and recommendations from all facilitation days.`,
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Business Continuity Planning Toolkit developed — including session guides, risk mapping matrices, business function templates, dependency mapping tools, BCP framework document, and facilitator notes',
+        due_date: '14 July 2026',
+        quantitative_result: '1 complete BCP Toolkit package delivered, covering all materials required for the BGE training and MSME workshops',
+        qualitative_result: 'Toolkit is practical, contextually appropriate for Ugandan agro-processors, and ready for use without further revision; reviewed and confirmed before the BGE training begins',
+        means_of_verification: 'Submitted BCP Toolkit package (soft copy)',
+        unit_rate: '',
+        payment_condition: 'Prerequisite for the programme — included in preparation week fees',
+      },
+      {
+        task_num: 2,
+        description: 'BGE capacity building training facilitated — all participating BGEs trained on the BCP tool and their facilitation roles',
+        due_date: '16–17 July 2026',
+        quantitative_result: 'Two-day BCP Tool Training delivered to all assigned BGEs; attendance register signed by all participants',
+        qualitative_result: 'BGEs understand and can apply the BCP tool; training sessions are structured, practical, and meet PRUDEV II quality standards',
+        means_of_verification: 'Signed attendance register and BGE training session notes',
+        unit_rate: '',
+        payment_condition: 'Required for payment — non-delivery forfeits preparation phase fees',
+      },
+      {
+        task_num: 3,
+        description: 'BGE training report submitted — covering objectives, activities, BGE competency observations, feedback summary, and readiness assessment',
+        due_date: 'Within 5 days of 17 July 2026',
+        quantitative_result: '1 training report submitted within 5 days of the final training day',
+        qualitative_result: 'Report documents training content, BGE performance observations, feedback analysis, and confirms BGE readiness for MSME workshop facilitation',
+        means_of_verification: 'Submitted training report approved by BDS Expert',
+        unit_rate: '',
+        payment_condition: 'Payment for Phase 2 processed upon approval of the training report',
+      },
+      {
+        task_num: 4,
+        description: 'MSME Business Continuity & Strategic Planning workshop facilitated in Gulu',
+        due_date: '21–22 July 2026',
+        quantitative_result: 'Two-day workshop facilitated with all enrolled Agro-processing MSMEs in Gulu; signed attendance register submitted',
+        qualitative_result: 'Participants guided effectively through risk identification, business process mapping, BCP drafting, and strategic planning; workshop outputs are sufficient to support plan finalisation',
+        means_of_verification: 'Signed Gulu attendance register and participant BCP and planning outputs',
+        unit_rate: '',
+        payment_condition: 'Required for payment — attendance register and participant outputs must be submitted',
+      },
+      {
+        task_num: 5,
+        description: 'MSME Business Continuity & Strategic Planning workshop facilitated in Lira',
+        due_date: '23–24 July 2026',
+        quantitative_result: 'Two-day workshop facilitated with all enrolled Agro-processing MSMEs in Lira; signed attendance register submitted',
+        qualitative_result: 'Participants guided effectively through risk identification, business process mapping, BCP drafting, and strategic planning; workshop outputs are sufficient to support plan finalisation',
+        means_of_verification: 'Signed Lira attendance register and participant BCP and planning outputs',
+        unit_rate: '',
+        payment_condition: 'Required for payment — attendance register and participant outputs must be submitted',
+      },
+      {
+        task_num: 6,
+        description: 'Consolidated workshop report submitted — covering the BGE training, Gulu workshop, and Lira workshop, with observations, participant outputs, and recommendations',
+        due_date: 'Within 5 days of 24 July 2026',
+        quantitative_result: '1 consolidated report submitted within 5 days of the final workshop day covering all three phases',
+        qualitative_result: 'Report clearly documents what was achieved across all phases, the quality of participant outputs, and provides specific recommendations to support MSME plan finalisation',
+        means_of_verification: 'Submitted and approved consolidated workshop report',
+        unit_rate: '',
+        payment_condition: 'Final payment processed upon approval of the consolidated report',
+      },
+      {
+        task_num: 7,
+        description: 'Approved invoice and signed timesheet submitted',
+        due_date: 'With consolidated report',
+        quantitative_result: '1 approved invoice and 1 signed timesheet reflecting 11 days worked (5 preparation + 2 BGE training + 4 MSME facilitation)',
+        qualitative_result: 'Invoice and timesheet are accurate, consistent with the work order terms, and submitted alongside the consolidated report',
+        means_of_verification: 'Approved invoice and countersigned timesheet',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of invoice, timesheet, and consolidated report',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -590,6 +685,17 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
       extra.team_leader_position = 'Team Leader';
     }
+    if (type === 'bcp_senior_facilitator') {
+      extra.duration     = '11 days (5 preparation + 2 BGE training + 4 MSME facilitation)';
+      extra.max_days     = 11;
+      extra.start_date   = '2026-07-08';
+      extra.end_date     = '2026-07-24';
+      extra.location     = 'Gulu & Lira, Northern Uganda';
+      extra.project_name = 'PRUDEV II — Business Continuity & Strategic Planning';
+      extra.rate_per_day = 80000;
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
@@ -705,6 +811,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="bcp_tool_facilitation">BCP Tool Training — Senior BGE Facilitator</MenuItem>
                 <MenuItem value="bcp_tool_training">BCP Tool Training — BGE Participant</MenuItem>
                 <MenuItem value="bge_bcp_participant_mentor">Agro-processors — Business Continuity &amp; Strategic Planning (BGE Support)</MenuItem>
+                <MenuItem value="bcp_senior_facilitator">Agro-processors BCP — Senior BGE Lead Facilitator</MenuItem>
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>

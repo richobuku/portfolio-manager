@@ -619,8 +619,46 @@ def render_work_order(work_order):
         ]))
         story.append(tp_table)
 
+    # Training Programme — 3-phase table for the Senior BGE Lead Facilitator
+    if work_order.work_order_type == 'bcp_senior_facilitator':
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('PROGRAMME OVERVIEW', s['sectiontitle']))
+        _tp_cell = ParagraphStyle('tp_cell2', parent=s['body'], fontSize=9)
+        _tp_hdr  = ParagraphStyle('tp_hdr2',  parent=s['body'], fontSize=9,
+                                  fontName='Helvetica-Bold', textColor=HexColor('#FFFFFF'))
+        phase_rows = [
+            [Paragraph('Phase', _tp_hdr), Paragraph('Activities', _tp_hdr), Paragraph('Dates', _tp_hdr), Paragraph('Days', _tp_hdr)],
+            [Paragraph('1 — Preparation', _tp_cell),
+             Paragraph('BCP Toolkit development, session plan design, BGE briefing', _tp_cell),
+             Paragraph('8–14 July 2026', _tp_cell),
+             Paragraph('5', _tp_cell)],
+            [Paragraph('2 — BGE Capacity Building Training', _tp_cell),
+             Paragraph('Facilitate two-day BCP Tool Training for participating BGEs', _tp_cell),
+             Paragraph('16–17 July 2026', _tp_cell),
+             Paragraph('2', _tp_cell)],
+            [Paragraph('3 — MSME Workshop Facilitation', _tp_cell),
+             Paragraph('Lead Business Continuity &amp; Strategic Planning workshops — Gulu (21–22 Jul) and Lira (23–24 Jul)', _tp_cell),
+             Paragraph('21–24 July 2026', _tp_cell),
+             Paragraph('4', _tp_cell)],
+            [Paragraph('<b>Total</b>', _tp_cell), Paragraph('', _tp_cell), Paragraph('', _tp_cell), Paragraph('<b>11</b>', _tp_cell)],
+        ]
+        phase_table = Table(phase_rows, hAlign='LEFT', colWidths=[44 * mm, 82 * mm, 30 * mm, 14 * mm], repeatRows=1)
+        phase_table.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, 0),  NAVY),
+            ('LINEBELOW',     (0, 0), (-1, -1), 0.25, LIGHT_GREY),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+            ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
+            ('FONTNAME',      (0, 4), (-1, 4),  'Helvetica-Bold'),
+            ('LINEABOVE',     (0, 4), (-1, 4),  0.5, NAVY),
+        ]))
+        story.append(phase_table)
+
     # Expected Outcomes — rendered for all Agro-processors Business Continuity work orders
-    if work_order.work_order_type in ('agro_biz_continuity', 'bge_bcp_participant_mentor'):
+    if work_order.work_order_type in ('agro_biz_continuity', 'bge_bcp_participant_mentor', 'bcp_senior_facilitator'):
         _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
         story.append(Spacer(1, 8))
         story.append(Paragraph('EXPECTED OUTCOMES', s['sectiontitle']))
@@ -723,6 +761,23 @@ def render_work_order(work_order):
             'Transport will be reimbursed upon submission of receipts / fuel log. Distances above 7 km will be reimbursed as per public transportation rates.',
             'GOPA AFC reserves the right to withhold payment for non-attendance, inadequate support, or failure to submit required deliverables.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+        ]
+    elif work_order.work_order_type == 'bcp_senior_facilitator':
+        CONDITIONS = [
+            'The Senior BGE shall develop all Business Continuity Planning Toolkit materials to the required PRUDEV II quality standard and submit them for review before the BGE training commences.',
+            'All training content, session plans, and BCP tool exercises must be reviewed and approved by the BDS Expert before delivery.',
+            'The Senior BGE shall facilitate the BGE capacity building training with professionalism and in accordance with GOPA AFC and GIZ quality standards, ensuring all participating BGEs are equipped to support MSME facilitation.',
+            'The Senior BGE shall facilitate MSME workshop sessions in both Gulu and Lira, ensuring structured delivery of risk identification, business process mapping, BCP drafting, and strategic planning activities.',
+            'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of every session.',
+            'A consolidated workshop report covering all three phases must be submitted within 5 working days of the final Lira session.',
+            'All MSME data, BGE information, and programme materials must be treated as strictly confidential.',
+            'All outputs, tools, and materials produced under this work order remain the property of GOPA AFC.',
+            'Fees are conditional on satisfactory completion of all three phases, submission of required reports, and approval by the BDS Expert and Team Leader.',
+            'Transport will be reimbursed upon submission of receipts / fuel log. Distances above 7 km will be reimbursed as per public transportation rates.',
+            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables or non-performance.',
+            'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            'Any changes to the scope or schedule require written approval from the Team Leader.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
         ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
