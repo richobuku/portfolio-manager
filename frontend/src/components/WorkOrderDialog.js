@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, Divider, FormControl, FormControlLabel, Grid,
+  DialogContent, DialogTitle, FormControl, FormControlLabel, Grid,
   IconButton, InputLabel, MenuItem, Select, TextField, Typography,
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
@@ -212,113 +212,6 @@ Budget estimate:
       },
     ],
   },
-  biz_continuity_workshop: {
-    objective: `To design and facilitate a 3-day hands-on Business Continuity Planning Workshop for agro-processors under the PRUDEV II programme. The assignment involves 2 preparation days — developing a fit-for-purpose BCP Toolkit and pre-training assigned BGEs — followed by 3 days of structured workshop facilitation with agro-processors. During the workshop, participants will collaboratively map business risks, critical functions, dependencies, and recovery strategies, and will begin developing their individual MSME Business Continuity Plans. Assigned BGEs will subsequently follow up on-site to complete the remaining assessments and finalise the plans.`,
-    key_tasks: `PREPARATION — Days 1 & 2
-
-1. Develop the Business Continuity Planning Toolkit
-• Design and produce all materials required for the workshop: session guides, risk mapping matrices, business function templates, dependency mapping tools, BCP framework document, and facilitator notes.
-• Ensure all materials are practical, MSME-appropriate, and ready for use before the workshop begins.
-
-2. Pre-train Assigned BGEs
-• Facilitate a pre-training session with all BGEs assigned to the workshop.
-• Walk BGEs through the BCP Toolkit, their facilitation roles during the 3-day workshop, and the on-site follow-up assignment that follows.
-• Confirm BGE readiness before the workshop commences.
-
-WORKSHOP FACILITATION — Days 3, 4 & 5
-
-3. Workshop Day 1 — Risk Mapping and Business Process Documentation
-• Introduce the Business Continuity Planning process and expected outputs to all agro-processor participants.
-• Facilitate structured risk identification and business process mapping for each MSME using the toolkit templates.
-• Capture outputs and ensure all participants complete their risk and process documentation before end of day.
-
-4. Workshop Day 2 — Business Dependencies and Recovery Strategies
-• Guide participants through identification of critical business dependencies (suppliers, buyers, services, utilities).
-• Facilitate development of initial recovery strategies for each MSME's critical risks and functions.
-• Capture outputs and ensure each participant has a clear draft recovery framework before end of day.
-
-5. Workshop Day 3 — Individual BCP Drafting and Next Steps
-• Support each MSME in drafting their individual Business Continuity Plan using all inputs gathered across Days 1 and 2.
-• Review and refine each draft plan with the participant.
-• Agree on next steps, assign BGEs for on-site follow-up, and confirm the follow-up schedule before close of workshop.
-
-POST-WORKSHOP
-
-6. Compile and submit the Workshop Report covering all 3 facilitation days.
-7. Submit approved invoice and signed timesheet.`,
-    deliverables_json: [
-      {
-        task_num: 1,
-        description: 'Business Continuity Planning Toolkit developed — including session guides, risk mapping matrices, business function templates, dependency mapping tools, BCP framework document, and facilitator notes',
-        due_date: 'End of Preparation Day 1',
-        quantitative_result: '1 complete BCP Toolkit package delivered, covering all materials required to run the 3-day workshop',
-        qualitative_result: 'The toolkit is practical, contextually appropriate for Ugandan agro-processors, and ready for use without further revision; reviewed and confirmed before the workshop begins',
-        means_of_verification: 'Submitted BCP Toolkit package (soft copy and printed copies for facilitation)',
-        unit_rate: '',
-        payment_condition: 'Prerequisite for the workshop — no separate payment (included in preparation day fees)',
-      },
-      {
-        task_num: 2,
-        description: 'BGE pre-training completed — all assigned BGEs trained on the BCP Toolkit, their facilitation roles, and on-site follow-up responsibilities',
-        due_date: 'End of Preparation Day 2',
-        quantitative_result: '1 BGE pre-training session completed; all assigned BGEs attended and signed the attendance register',
-        qualitative_result: 'BGEs understand the toolkit, can explain each step to MSMEs, and are confident in their assigned facilitation roles for the 3-day workshop',
-        means_of_verification: 'Signed BGE pre-training attendance register and session notes',
-        unit_rate: '',
-        payment_condition: 'Required before workshop commences; payment included in preparation day fees',
-      },
-      {
-        task_num: 3,
-        description: 'Workshop Day 1 facilitated — risk identification and business process mapping completed with all agro-processor participants',
-        due_date: 'Workshop Day 1',
-        quantitative_result: '1 full workshop day facilitated; all enrolled agro-processors attended and completed their risk mapping and process documentation outputs',
-        qualitative_result: 'Participants are engaged and have documented their key business risks and critical processes using the BCP Toolkit templates; outputs are sufficient to support Day 2 activities',
-        means_of_verification: 'Signed Day 1 attendance register and completed risk mapping outputs per participant',
-        unit_rate: '',
-        payment_condition: 'Payment upon submission of Day 1 attendance register and participant risk mapping outputs',
-      },
-      {
-        task_num: 4,
-        description: 'Workshop Day 2 facilitated — business dependencies and recovery strategies developed with all agro-processor participants',
-        due_date: 'Workshop Day 2',
-        quantitative_result: '1 full workshop day facilitated; all enrolled agro-processors attended and completed their dependency mapping and initial recovery strategy outputs',
-        qualitative_result: 'Participants have clearly identified their critical business dependencies and developed actionable recovery strategies; outputs build directly on Day 1 work and are ready for BCP drafting on Day 3',
-        means_of_verification: 'Signed Day 2 attendance register and completed dependency mapping and recovery strategy outputs per participant',
-        unit_rate: '',
-        payment_condition: 'Payment upon submission of Day 2 attendance register and participant dependency and recovery outputs',
-      },
-      {
-        task_num: 5,
-        description: 'Workshop Day 3 facilitated — individual MSME Business Continuity Plan drafts completed and BGE follow-up schedule agreed',
-        due_date: 'Workshop Day 3',
-        quantitative_result: '1 full workshop day facilitated; all enrolled agro-processors have a written draft Business Continuity Plan and an agreed BGE follow-up schedule',
-        qualitative_result: 'Each MSME BCP draft is realistic, specific to their business, and captures risks, critical functions, dependencies, and recovery strategies developed across all 3 workshop days; each participant understands their plan and next steps',
-        means_of_verification: 'Signed Day 3 attendance register and individual MSME BCP draft per participant',
-        unit_rate: '',
-        payment_condition: 'Payment upon submission of Day 3 attendance register and all MSME BCP drafts',
-      },
-      {
-        task_num: 6,
-        description: 'Workshop Report submitted — covering all 3 facilitation days, participant engagement, key outputs per day, BGE follow-up assignments, and recommendations',
-        due_date: 'Within 3 days of final workshop day',
-        quantitative_result: '1 workshop report submitted within 3 days of the final workshop day',
-        qualitative_result: 'Report clearly documents what was achieved across all 3 days, the quality of participant outputs, which BGEs are assigned to which MSMEs for follow-up, and specific recommendations to support plan finalisation',
-        means_of_verification: 'Submitted and approved workshop report',
-        unit_rate: '',
-        payment_condition: 'Final payment processed upon approval of the workshop report',
-      },
-      {
-        task_num: 7,
-        description: 'Approved invoice and signed timesheet submitted',
-        due_date: 'With workshop report',
-        quantitative_result: '1 approved invoice and 1 signed timesheet reflecting 5 days worked (2 preparation + 3 facilitation)',
-        qualitative_result: 'Invoice and timesheet are accurate, consistent with the work order terms, and submitted alongside the workshop report',
-        means_of_verification: 'Approved invoice and countersigned timesheet',
-        unit_rate: '',
-        payment_condition: 'Payment processed upon approval of invoice, timesheet, and workshop report',
-      },
-    ],
-  },
   mobilisation: {
     objective: `To mobilise and confirm participation of selected applicants for the scheduled programme. The BGE will conduct structured telephone outreach to confirm interest, clarify programme expectations, verify qualifications and readiness, gather required information, and address any concerns or logistical barriers.`,
     key_tasks: `1. Telephone outreach to confirm applicant participation using the list provided by the BDS Component Coordinator.
@@ -348,28 +241,6 @@ POST-WORKSHOP
       { task_num: 3, description: 'Individual MSME follow-up log – specific action points agreed with each MSME', due_date: 'Within 2 days of session', quantitative_result: 'Follow-up log submitted within 2 days of each session for all MSMEs who attended', qualitative_result: 'Log captures specific, actionable follow-up points agreed with each MSME', means_of_verification: 'Completed individual MSME follow-up log', unit_rate: '', payment_condition: 'Pay only if both quantitative and qualitative targets are achieved' },
     ],
   },
-  training_facilitation: {
-    objective: `To lead the design and facilitation of structured training for MSMEs and Business Growth Experts (BGEs) under the Prudev II programme. The Senior BGE will work alongside the BDS Expert to develop training content, deliver sessions, co-facilitate with the broader BGE team, monitor active participation, collect participant feedback, and share lessons learnt with the programme team.`,
-    key_tasks: `1. Collaborate with the BDS Expert to design and develop training content, materials, and session plans in line with PRUDEV II programme standards.
-2. Lead the delivery of assigned training modules for MSME cohorts and/or BGE capacity-building sessions.
-3. Co-facilitate training sessions alongside the Lead Facilitator and guest trainers, ensuring structured and effective delivery.
-4. Brief and prepare assigned BGEs before each session to ensure active, confident participation in facilitation.
-5. Monitor BGE engagement during sessions and provide real-time coaching and support where needed.
-6. Design and administer participant feedback forms at the end of each training session.
-7. Consolidate and analyse participant feedback, identifying trends, strengths, and areas for improvement.
-8. Conduct a structured post-training review with the delivery team within 3 days of each session.
-9. Compile and share a detailed Training Report and Lessons Learnt document with the programme team after each training.
-10. Maintain training records, attendance sheets, and all programme documentation in the required PRUDEV II formats.`,
-    deliverables_json: [
-      { task_num: 1, description: 'Training Content Package – session plans, facilitator guides, and participant materials approved by the BDS Expert', due_date: 'Before first training session', quantitative_result: 'Complete training content package approved by BDS Expert before the first training session', qualitative_result: 'Content is well-structured, contextually relevant, and meets PRUDEV II quality standards', means_of_verification: 'Approved training content package with sign-off from BDS Expert', unit_rate: '', payment_condition: 'Required before training commences — no separate payment' },
-      { task_num: 2, description: 'Signed attendance sheets – collected and submitted for every session', due_date: 'Day of each session', quantitative_result: 'Signed attendance sheet collected and submitted for every training session on the day of delivery', qualitative_result: 'Sheets are complete, legible, and accurately capture participant attendance', means_of_verification: 'Original signed attendance sheets per session', unit_rate: '', payment_condition: 'Required for payment — must be submitted on the day of each session' },
-      { task_num: 3, description: 'Participant Feedback Summary – consolidated analysis of feedback forms from each training', due_date: 'Within 3 days of each session', quantitative_result: 'Participant feedback summary submitted within 3 days of each training session', qualitative_result: 'Summary provides consolidated analysis of feedback, identifies key themes, and highlights areas for improvement', means_of_verification: 'Submitted feedback summary with original feedback forms attached', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
-      { task_num: 4, description: 'Post-Training Review Notes – documented debrief with the facilitation team', due_date: 'Within 3 days of each session', quantitative_result: 'Post-training review notes submitted within 3 days of each session', qualitative_result: 'Notes reflect a structured debrief, capture team observations, and include agreed improvement actions', means_of_verification: 'Submitted post-training review notes', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
-      { task_num: 5, description: 'Detailed Training Report – covering objectives, activities, key findings, observations, and recommendations', due_date: 'Within 5 days of each session', quantitative_result: 'Detailed training report submitted within 5 days of each training session', qualitative_result: 'Report covers objectives, activities, key findings, observations, and recommendations with sufficient depth', means_of_verification: 'Submitted detailed training report', unit_rate: '', payment_condition: 'Pay only if submitted within 5 days and approved by BDS Expert' },
-      { task_num: 6, description: 'Lessons Learnt Report – structured document capturing insights for future training design and delivery', due_date: 'End of assignment', quantitative_result: '1 lessons learnt report submitted at the end of the assignment', qualitative_result: 'Report provides structured, insightful reflections that can genuinely improve future training design and delivery', means_of_verification: 'Submitted lessons learnt report', unit_rate: '', payment_condition: 'Pay only if submitted on time and approved' },
-      { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Monthly, with report submission', quantitative_result: '1 invoice and 1 signed timesheet submitted monthly with the report', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of monthly deliverables' },
-    ],
-  },
   outcome_assessment_tool: {
     objective: `To conduct an Outcome Assessment Tool visit with assigned MSMEs, document progress across agro-processing, energy use, and certification milestones, and submit findings for the PRUDEV II BDS team. The BGE will ensure each visit is practical, evidence-based, and focused on understanding the real impact of recent technical training, audits, and mentorship.`,
     key_tasks: `1. Contact the assigned MSME and agree a convenient visit date.
@@ -395,21 +266,6 @@ iv. Prepare the Workshop Report`,
       { task_num: 2, description: 'Participants trained on Business Continuity Management and Strategic Planning', due_date: '21st–24th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Training attendance sheet', unit_rate: '', payment_condition: '' },
       { task_num: 3, description: 'Enterprise risk assessment exercises completed', due_date: '21st–24th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Completed risk assessment worksheets', unit_rate: '', payment_condition: '' },
       { task_num: 4, description: 'Workshop report', due_date: '28th July 2026', quantitative_result: '', qualitative_result: '', means_of_verification: 'Submitted workshop report', unit_rate: '', payment_condition: 'Payment processed upon approval of workshop report' },
-    ],
-  },
-  bcp_tool_facilitation: {
-    objective: `To facilitate a capacity building training for Business Growth Experts (BGEs) on the Business Continuity Planning (BCP) tool, equipping them with the practical skills to apply the tool effectively when supporting MSMEs.`,
-    key_tasks: `The Senior BGE will:
-i. Orient participating BGEs on the Business Continuity Planning tool, its purpose, and its application in MSME support
-ii. Facilitate hands-on practice sessions, guiding BGEs through each section of the BCP tool
-iii. Guide BGEs in applying the tool to real MSME scenarios during training exercises
-iv. Evaluate BGE understanding and competency in using the BCP tool through practical exercises
-v. Collect participant feedback using the approved PRUDEV II feedback instrument
-vi. Compile and submit a Training Report within 5 working days of the training`,
-    deliverables_json: [
-      { task_num: 1, description: 'BCP Tool training successfully facilitated for BGEs', due_date: 'Day of training', quantitative_result: 'Training delivered to all assigned BGEs', qualitative_result: 'Sessions are structured, practical, and meet PRUDEV II quality standards', means_of_verification: 'Signed attendance register and session notes', unit_rate: '', payment_condition: 'Required for payment' },
-      { task_num: 2, description: 'Participant feedback collected and summarised', due_date: 'Within 3 days of training', quantitative_result: 'Feedback collected from all participants and summary submitted', qualitative_result: 'Summary identifies key themes and areas for improvement', means_of_verification: 'Submitted feedback summary with original forms', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline' },
-      { task_num: 3, description: 'Training Report submitted', due_date: 'Within 5 days of training', quantitative_result: '1 training report submitted covering objectives, activities, observations, and recommendations', qualitative_result: 'Report is comprehensive and meets PRUDEV II reporting standards', means_of_verification: 'Submitted training report approved by BDS Expert', unit_rate: '', payment_condition: 'Payment processed upon approval of training report' },
     ],
   },
   bcp_tool_training: {
@@ -630,30 +486,6 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.max_days   = 7;
       extra.location   = 'Acholi Sub-region, Northern Uganda';
     }
-    if (type === 'biz_continuity') {
-      extra.duration     = '7 days';
-      extra.max_days     = 7;
-      extra.location     = 'Gulu / Lira, Northern Uganda';
-      extra.team_leader_name     = 'Stephen Maxi Opwonya';
-      extra.team_leader_position = 'Team Leader';
-    }
-    if (type === 'biz_continuity_workshop') {
-      extra.duration     = '5 days (2 preparation + 3 facilitation)';
-      extra.max_days     = 5;
-      extra.location     = 'Gulu / Lira, Northern Uganda';
-      extra.project_name = 'PRUDEV II — Business Continuity Planning Workshop';
-      extra.team_leader_name     = 'Stephen Maxi Opwonya';
-      extra.team_leader_position = 'Team Leader';
-    }
-    if (type === 'bcp_tool_facilitation') {
-      extra.duration     = '2 days';
-      extra.max_days     = 2;
-      extra.location     = 'Northern Uganda';
-      extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
-      extra.rate_per_day = 60000;
-      extra.team_leader_name     = 'Stephen Maxi Opwonya';
-      extra.team_leader_position = 'Team Leader';
-    }
     if (type === 'bcp_tool_training') {
       extra.duration     = '2 days';
       extra.max_days     = 2;
@@ -776,7 +608,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
             <FormControl fullWidth size="small" required>
               <InputLabel>BGE</InputLabel>
               <Select value={woForm.bge} label="BGE" onChange={e => setWoForm(f => ({ ...f, bge: e.target.value }))}>
-                {woForm.work_order_type === 'training_facilitation' ? (
+                {woForm.work_order_type === 'bcp_senior_facilitator' ? (
                   experts.filter(e => e.is_senior).length > 0
                     ? experts.filter(e => e.is_senior).map(e =>
                         <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
@@ -786,7 +618,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 )}
               </Select>
             </FormControl>
-            {woForm.work_order_type === 'training_facilitation' && (
+            {woForm.work_order_type === 'bcp_senior_facilitator' && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
                 Only Senior BGEs are listed for this work order type.
               </Typography>
@@ -802,13 +634,10 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
                 <MenuItem value="msme_access_finance">Access to Finance &amp; Digital Onboarding</MenuItem>
                 <MenuItem value="access_to_finance_bge">Access to Finance — BGE Template</MenuItem>
-                <MenuItem value="biz_continuity">Business Continuity &amp; Operational Planning</MenuItem>
-                <MenuItem value="biz_continuity_workshop">Business Continuity — Workshop Design &amp; Facilitation</MenuItem>
                 <MenuItem value="agro_biz_continuity">Agro-processors — Business Continuity &amp; Strategic Planning</MenuItem>
+                <MenuItem value="bcp_senior_facilitator">Agro-processors BCP — Senior BGE Lead Facilitator</MenuItem>
                 <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
-                <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
-                <MenuItem value="bcp_tool_facilitation">BCP Tool Training — Senior BGE Facilitator</MenuItem>
                 <MenuItem value="bcp_tool_training">BCP Tool Training — BGE Participant</MenuItem>
                 <MenuItem value="bge_bcp_participant_mentor">Agro-processors — Business Continuity &amp; Strategic Planning (BGE Support)</MenuItem>
                 <MenuItem value="bcp_senior_facilitator">Agro-processors BCP — Senior BGE Lead Facilitator</MenuItem>
@@ -847,42 +676,6 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
               value={woForm.key_tasks} onChange={e => setWoForm(f => ({ ...f, key_tasks: e.target.value }))} />
           </Grid>
 
-          {/* ── SECTION: Training Programme (BCP Tool types only) ── */}
-          {woForm.work_order_type === 'bcp_tool_facilitation' && (
-            <>
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>Training Programme</Typography>
-                <Divider />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>BGE Participants (attending the training)</InputLabel>
-                  <Select
-                    multiple
-                    value={woForm.participant_bges || []}
-                    label="BGE Participants (attending the training)"
-                    onChange={e => setWoForm(f => ({ ...f, participant_bges: e.target.value }))}
-                    renderValue={selected => selected.map(id => {
-                      const ex = experts.find(x => x.id === id);
-                      return ex ? ex.name : id;
-                    }).join(', ')}
-                  >
-                    {experts.map(ex => (
-                      <MenuItem key={ex.id} value={ex.id}>
-                        <input type="checkbox" readOnly
-                          checked={(woForm.participant_bges || []).includes(ex.id)}
-                          style={{ marginRight: 8 }} />
-                        {ex.name} ({ex.bge_code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                  Select all BGEs attending as participants — their names appear in the Training Programme section of the PDF.
-                </Typography>
-              </Grid>
-            </>
-          )}
 
           {/* ── SECTION: Deliverables ── */}
           <Grid item xs={12}>

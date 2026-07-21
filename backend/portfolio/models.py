@@ -989,13 +989,10 @@ class WorkOrder(models.Model):
         ('msme_finance_survey',   'MSME Finance Survey (Google Forms)'),
         ('msme_access_finance',   'Access to Finance & Digital Onboarding'),
         ('access_to_finance_bge', 'Access to Finance — BGE Template'),
-        ('biz_continuity',          'Business Continuity & Operational Planning'),
-        ('biz_continuity_workshop', 'Business Continuity — Workshop Design & Facilitation'),
         ('agro_biz_continuity',     'Agro-processors — Business Continuity & Strategic Planning'),
+        ('bcp_senior_facilitator',  'Agro-processors BCP — Senior BGE Lead Facilitator'),
         ('mobilisation',            'Mobilisation / Outreach'),
         ('group_session',         'Peer-to-Peer Group Session'),
-        ('training_facilitation',   'Training Facilitation — Senior BGE'),
-        ('bcp_tool_facilitation',   'BCP Tool Training — Senior BGE Facilitator'),
         ('bcp_tool_training',       'BCP Tool Training — BGE Participant'),
         ('bge_bcp_participant_mentor', 'Agro-processors — Business Continuity & Strategic Planning (BGE Support)'),
         ('bcp_senior_facilitator',  'Agro-processors BCP — Senior BGE Lead Facilitator'),
@@ -1092,7 +1089,7 @@ class WorkOrder(models.Model):
             code = self.bge.bge_code or ''
             m = re.search(r'BGE-([A-Z0-9]+)-', code)
             short = m.group(1) if m else str(self.bge_id)
-            prefix = 'TF' if self.work_order_type in ('training_facilitation', 'biz_continuity_workshop', 'bcp_tool_facilitation', 'bcp_senior_facilitator') else 'BGE'
+            prefix = 'TF' if self.work_order_type == 'bcp_senior_facilitator' else 'BGE'
             # Start from count+1 but skip any numbers already taken (handles
             # gaps left by deleted work orders so we never hit a uniqueness clash).
             seq = WorkOrder.objects.filter(bge=self.bge).count() + 1
