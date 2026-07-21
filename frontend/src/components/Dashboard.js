@@ -1131,17 +1131,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (records.length > 0) {
         setSessionAttendees(records.map(r => ({ ...r, _key: r.id })));
       } else {
-        // Pre-fill from session's MSMEs for convenience
-        const sessionMsmeList = msmes.filter(m => m.is_active);
-        setSessionAttendees(sessionMsmeList.length > 0
-          ? sessionMsmeList.slice(0, 20).map(m => ({
-              ...EMPTY_ATTENDEE(),
-              msme: m.id,
-              attendee_name: m.owner_name || '',
-              attendee_phone: m.phone || '',
-              gender: m.gender === 'MALE' ? 'M' : m.gender === 'FEMALE' ? 'F' : '',
-            }))
-          : [EMPTY_ATTENDEE()]);
+        // Pre-fill from the session's chosen MSMEs and BGE participants
+        const msmePrefill = (session.businesses_detail || []).map(m => ({
+          ...EMPTY_ATTENDEE(),
+          msme: m.id,
+          attendee_name: m.owner_name || '',
+          attendee_phone: m.phone || '',
+        }));
+        const bgePrefill = (session.bge_participants_detail || []).map(b => ({
+          ...EMPTY_ATTENDEE(),
+          msme: '',
+          attendee_name: b.name || '',
+        }));
+        const combined = [...msmePrefill, ...bgePrefill];
+        setSessionAttendees(combined.length > 0 ? combined : [EMPTY_ATTENDEE()]);
       }
     } catch { notify('Failed to load attendance', 'error'); }
     finally { setAttendanceLoading(false); }
