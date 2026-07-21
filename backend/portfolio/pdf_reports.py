@@ -574,18 +574,22 @@ def render_work_order(work_order):
         story.append(Spacer(1, 8))
         story.append(Paragraph('TRAINING PROGRAMME', s['sectiontitle']))
         story.append(Paragraph(
-            'Business Continuity Planning (BCP) Tool &#x2014; BGE Capacity Building',
+            '<b>Training Topic:</b> Business Continuity Plan Tool Training &#x2014; BGE Capacity Building',
             ParagraphStyle('tp_subtitle', parent=s['body'], fontSize=9, spaceBefore=2, spaceAfter=6),
         ))
         bge_name = work_order.bge.name if work_order.bge else '—'
         if work_order.work_order_type == 'bcp_tool_facilitation':
+            participants = work_order.participant_bges.all()
+            participant_label = ', '.join(b.name for b in participants) if participants else 'All Participating BGEs'
             role_rows = [
+                ['Training Topic',   'Business Continuity Plan Tool Training'],
                 ['Lead Facilitator', 'Jacob Odur (Senior BGE)'],
-                ['Participants',     'All Participating BGEs'],
-                ['Role',             'Facilitator'],
+                ['Participants',     participant_label],
+                ['Role',             'Lead Facilitator'],
             ]
         else:
             role_rows = [
+                ['Training Topic',   'Business Continuity Plan Tool Training'],
                 ['Lead Facilitator', 'Jacob Odur (Senior BGE)'],
                 ['Participant',      bge_name],
                 ['Role',             'Participant / Trainee'],

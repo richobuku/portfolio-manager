@@ -445,6 +445,7 @@ const WO_EMPTY = {
   payment_notes: '',
   team_leader_name: 'Stephen Maxi Opwonya',
   team_leader_position: 'Team Leader',
+  participant_bges: [],
 };
 
 const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woEditing, experts, headers, onSaved, fetchWorkOrders }) {
@@ -501,6 +502,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         payment_notes: woEditing.payment_notes || '',
         team_leader_name: woEditing.team_leader_name,
         team_leader_position: woEditing.team_leader_position,
+        participant_bges: woEditing.participant_bges || [],
       });
     } else {
       setWoForm({ ...WO_EMPTY });
@@ -681,6 +683,35 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
               </Select>
             </FormControl>
           </Grid>
+          {woForm.work_order_type === 'bcp_tool_facilitation' && (
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>BGE Participants (attending the training)</InputLabel>
+                <Select
+                  multiple
+                  value={woForm.participant_bges || []}
+                  label="BGE Participants (attending the training)"
+                  onChange={e => setWoForm(f => ({ ...f, participant_bges: e.target.value }))}
+                  renderValue={selected => selected.map(id => {
+                    const e = experts.find(x => x.id === id);
+                    return e ? e.name : id;
+                  }).join(', ')}
+                >
+                  {experts.map(e => (
+                    <MenuItem key={e.id} value={e.id}>
+                      <input type="checkbox" readOnly
+                        checked={(woForm.participant_bges || []).includes(e.id)}
+                        style={{ marginRight: 8 }} />
+                      {e.name} ({e.bge_code})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                Select all BGEs attending as participants. Their names will appear in the Training Programme section of the PDF.
+              </Typography>
+            </Grid>
+          )}
           <Grid item xs={12} sm={4}>
             <TextField fullWidth size="small" label="Issue Date" type="date" InputLabelProps={{ shrink: true }}
               value={woForm.issue_date} onChange={e => setWoForm(f => ({ ...f, issue_date: e.target.value }))} />

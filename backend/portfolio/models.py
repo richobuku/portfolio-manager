@@ -1046,6 +1046,13 @@ class WorkOrder(models.Model):
         help_text='Other BGEs jointly deployed with this work order (for collaboration emails).',
     )
 
+    # BCP Tool Training — BGEs attending as participants (facilitation WO only)
+    participant_bges = models.ManyToManyField(
+        'BusinessGrowthExpert', blank=True,
+        related_name='bcp_participant_work_orders',
+        help_text='BGEs attending as participants in a BCP Tool Training session.',
+    )
+
     # Signatures
     team_leader_name     = models.CharField(max_length=200, default='Stephen Maxi Opwonya')
     team_leader_position = models.CharField(max_length=200, default='Team Leader')
