@@ -54,6 +54,91 @@ const NAV_ITEMS = [
   { key: 'tshirts',        label: 'T-Shirt Receipts', icon: <Checkroom /> },
 ];
 
+const AttendeeRow = React.memo(function AttendeeRow({ att, idx, msmes, updateAttendee, removeAttendeeRow }) {
+  const [name, setName] = React.useState(att.attendee_name);
+  const [phone, setPhone] = React.useState(att.attendee_phone);
+  return (
+    <TableRow hover>
+      <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
+      <TableCell>
+        <TextField size="small" placeholder="Full name" variant="standard"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onBlur={() => updateAttendee(att._key, 'attendee_name', name)}
+          sx={{ minWidth: 140 }} />
+      </TableCell>
+      <TableCell>
+        <TextField size="small" placeholder="Phone" variant="standard"
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          onBlur={() => updateAttendee(att._key, 'attendee_phone', phone)}
+          sx={{ minWidth: 110 }} />
+      </TableCell>
+      <TableCell>
+        <Select size="small" variant="standard" displayEmpty
+          value={att.msme || ''}
+          onChange={e => {
+            const m = msmes.find(x => x.id === e.target.value);
+            updateAttendee(att._key, 'msme', e.target.value);
+            if (m && !name) {
+              const ownerName = m.owner_name || '';
+              setName(ownerName);
+              updateAttendee(att._key, 'attendee_name', ownerName);
+            }
+          }}
+          sx={{ minWidth: 160 }}>
+          <MenuItem value=""><em>— walk-in —</em></MenuItem>
+          {msmes.filter(m => m.is_active).map(m => (
+            <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
+          ))}
+        </Select>
+      </TableCell>
+      <TableCell>
+        <Select size="small" variant="standard" displayEmpty
+          value={att.gender}
+          onChange={e => updateAttendee(att._key, 'gender', e.target.value)}
+          sx={{ minWidth: 55 }}>
+          <MenuItem value=""><em>—</em></MenuItem>
+          <MenuItem value="M">M</MenuItem>
+          <MenuItem value="F">F</MenuItem>
+        </Select>
+      </TableCell>
+      <TableCell>
+        <Select size="small" variant="standard" displayEmpty
+          value={att.age_group}
+          onChange={e => updateAttendee(att._key, 'age_group', e.target.value)}
+          sx={{ minWidth: 80 }}>
+          <MenuItem value=""><em>—</em></MenuItem>
+          <MenuItem value="18-34">18–34</MenuItem>
+          <MenuItem value="35-45">35–45</MenuItem>
+          <MenuItem value="46-55">46–55</MenuItem>
+          <MenuItem value="56+">56+</MenuItem>
+        </Select>
+      </TableCell>
+      <TableCell>
+        <Select size="small" variant="standard"
+          value={att.refugee_status}
+          onChange={e => updateAttendee(att._key, 'refugee_status', e.target.value)}
+          sx={{ minWidth: 80 }}>
+          <MenuItem value="H">Host Comm.</MenuItem>
+          <MenuItem value="R">Refugee</MenuItem>
+        </Select>
+      </TableCell>
+      <TableCell align="center">
+        <Tooltip title="Photo consent">
+          <Checkbox size="small" checked={!!att.consent_photo}
+            onChange={e => updateAttendee(att._key, 'consent_photo', e.target.checked)} />
+        </Tooltip>
+      </TableCell>
+      <TableCell>
+        <IconButton size="small" color="error" onClick={() => removeAttendeeRow(att._key)}>
+          <Delete fontSize="small" />
+        </IconButton>
+      </TableCell>
+    </TableRow>
+  );
+});
+
 export default function Dashboard({ token, currentUser, onLogout }) {
   const isViewer          = currentUser?.role === 'viewer';
   const isStaff           = !!(currentUser?.is_staff || currentUser?.is_superuser || currentUser?.role === 'admin');
@@ -1176,17 +1261,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     finally { setAttendanceLoading(false); }
   };
 
-  const updateAttendee = (key, field, value) => {
+  const updateAttendee = React.useCallback((key, field, value) => {
     setSessionAttendees(prev => prev.map(a => a._key === key ? { ...a, [field]: value } : a));
-  };
+  }, []);
 
   const addAttendeeRow = () => {
     setSessionAttendees(prev => [...prev, EMPTY_ATTENDEE(attendanceDay)]);
   };
 
-  const removeAttendeeRow = (key) => {
+  const removeAttendeeRow = React.useCallback((key) => {
     setSessionAttendees(prev => prev.filter(a => a._key !== key));
-  };
+  }, []);
 
   const saveAttendance = async () => {
     setAttendanceLoading(true);
@@ -9034,78 +9119,8 @@ PRUDEV II BDS Team`
                 </TableHead>
                 <TableBody>
                   {dayAttendees.map((att, idx) => (
-                    <TableRow key={att._key} hover>
-                      <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
-                      <TableCell>
-                        <TextField size="small" placeholder="Full name" variant="standard"
-                          value={att.attendee_name}
-                          onChange={e => updateAttendee(att._key, 'attendee_name', e.target.value)}
-                          sx={{ minWidth: 140 }} />
-                      </TableCell>
-                      <TableCell>
-                        <TextField size="small" placeholder="Phone" variant="standard"
-                          value={att.attendee_phone}
-                          onChange={e => updateAttendee(att._key, 'attendee_phone', e.target.value)}
-                          sx={{ minWidth: 110 }} />
-                      </TableCell>
-                      <TableCell>
-                        <Select size="small" variant="standard" displayEmpty
-                          value={att.msme || ''}
-                          onChange={e => {
-                            const m = msmes.find(x => x.id === e.target.value);
-                            updateAttendee(att._key, 'msme', e.target.value);
-                            if (m && !att.attendee_name) updateAttendee(att._key, 'attendee_name', m.owner_name || '');
-                          }}
-                          sx={{ minWidth: 160 }}>
-                          <MenuItem value=""><em>— walk-in —</em></MenuItem>
-                          {msmes.filter(m => m.is_active).map(m => (
-                            <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
-                          ))}
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select size="small" variant="standard" displayEmpty
-                          value={att.gender}
-                          onChange={e => updateAttendee(att._key, 'gender', e.target.value)}
-                          sx={{ minWidth: 55 }}>
-                          <MenuItem value=""><em>—</em></MenuItem>
-                          <MenuItem value="M">M</MenuItem>
-                          <MenuItem value="F">F</MenuItem>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select size="small" variant="standard" displayEmpty
-                          value={att.age_group}
-                          onChange={e => updateAttendee(att._key, 'age_group', e.target.value)}
-                          sx={{ minWidth: 80 }}>
-                          <MenuItem value=""><em>—</em></MenuItem>
-                          <MenuItem value="18-34">18–34</MenuItem>
-                          <MenuItem value="35-45">35–45</MenuItem>
-                          <MenuItem value="46-55">46–55</MenuItem>
-                          <MenuItem value="56+">56+</MenuItem>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select size="small" variant="standard"
-                          value={att.refugee_status}
-                          onChange={e => updateAttendee(att._key, 'refugee_status', e.target.value)}
-                          sx={{ minWidth: 80 }}>
-                          <MenuItem value="H">Host Comm.</MenuItem>
-                          <MenuItem value="R">Refugee</MenuItem>
-                        </Select>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="Photo consent">
-                          <Checkbox size="small" checked={!!att.consent_photo}
-                            onChange={e => updateAttendee(att._key, 'consent_photo', e.target.checked)} />
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        <IconButton size="small" color="error" onClick={() => removeAttendeeRow(att._key)}>
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
+                    <AttendeeRow key={att._key} att={att} idx={idx} msmes={msmes}
+                      updateAttendee={updateAttendee} removeAttendeeRow={removeAttendeeRow} />
                   ))}
                 </TableBody>
               </Table>
