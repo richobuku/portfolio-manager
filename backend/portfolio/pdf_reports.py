@@ -948,6 +948,59 @@ def render_training_report(report):
     for title, body in narrative_sections:
         story.extend(_section(s, title, body))
 
+    # ── Attendance sheet ──────────────────────────────────────────────────────
+    attendances = list(
+        session.attendances.select_related('msme').order_by('attendance_date', 'attendee_name')
+    )
+    if attendances:
+        story.append(Paragraph('Attendance Sheet', s['sectiontitle']))
+
+        # Collect unique days; None means single-day session
+        days = sorted({a.attendance_date for a in attendances if a.attendance_date}) or [None]
+        is_multiday = bool(days[0])
+
+        for day in days:
+            day_rows = [a for a in attendances if a.attendance_date == day] if is_multiday else attendances
+
+            if is_multiday:
+                story.append(Paragraph(
+                    day.strftime('%A, %-d %B %Y') if hasattr(day, 'strftime') else str(day),
+                    s['sub'],
+                ))
+
+            att_header = ['#', 'Name', 'Phone', 'Sex', 'Age Group', 'Status', 'Signature']
+            att_data = [att_header]
+            for i, a in enumerate(day_rows, 1):
+                att_data.append([
+                    str(i),
+                    a.attendee_name or '—',
+                    a.attendee_phone or '—',
+                    a.gender or '—',
+                    a.age_group or '—',
+                    'Host' if a.refugee_status == 'H' else ('Refugee' if a.refugee_status == 'R' else '—'),
+                    '',
+                ])
+
+            col_widths = [20, 130, 80, 25, 55, 50, 80]
+            att_table = Table(att_data, colWidths=col_widths, hAlign='LEFT', repeatRows=1)
+            att_table.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
+                ('TEXTCOLOR',     (0, 0), (-1, 0), HexColor('#FFFFFF')),
+                ('FONT',          (0, 0), (-1, 0), 'Helvetica-Bold', 7),
+                ('FONT',          (0, 1), (-1, -1), 'Helvetica', 8),
+                ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN',         (1, 1), (1, -1), 'LEFT'),
+                ('ALIGN',         (2, 1), (2, -1), 'LEFT'),
+                ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING',    (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#F4F6F9')]),
+                ('GRID',          (0, 0), (-1, -1), 0.4, LIGHT_GREY),
+                ('LINEBELOW',     (6, 1), (6, -1), 0.4, LIGHT_GREY),
+            ]))
+            story.append(att_table)
+            story.append(Spacer(1, 8))
+
     story.append(Spacer(1, 12))
     story.append(_sig_block(s, bge, signed_date=report.updated_at))
 

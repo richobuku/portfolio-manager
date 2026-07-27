@@ -153,14 +153,32 @@ class TrainingFacilitationAssignmentSerializer(serializers.ModelSerializer):
 class TrainingReportSerializer(serializers.ModelSerializer):
     session_title    = serializers.CharField(source='session.title', read_only=True)
     session_date     = serializers.DateField(source='session.date', read_only=True)
+    session_end_date = serializers.DateField(source='session.end_date', read_only=True, allow_null=True)
     session_location = serializers.CharField(source='session.location', read_only=True)
     bge_name         = serializers.CharField(source='bge.name', read_only=True, allow_null=True)
     total_participants = serializers.IntegerField(read_only=True)
+    attendance_list  = serializers.SerializerMethodField()
 
     class Meta:
         model  = TrainingReport
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at', 'submitted_at']
+
+    def get_attendance_list(self, obj):
+        return [
+            {
+                'id': a.id,
+                'attendance_date': str(a.attendance_date) if a.attendance_date else None,
+                'attendee_name': a.attendee_name,
+                'attendee_phone': a.attendee_phone,
+                'gender': a.gender,
+                'age_group': a.age_group,
+                'refugee_status': a.refugee_status,
+                'present': a.present,
+                'msme_name': a.msme.business_name if a.msme_id else '',
+            }
+            for a in obj.session.attendances.select_related('msme').order_by('attendance_date', 'attendee_name')
+        ]
 
 
 class AnnualReviewReportSerializer(serializers.ModelSerializer):

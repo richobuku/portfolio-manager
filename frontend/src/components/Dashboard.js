@@ -9835,6 +9835,58 @@ PRUDEV II BDS Team`
                   </Box>
                 ))}
               </Box>
+
+              {/* Attendance sheet */}
+              {(tr.attendance_list || []).length > 0 && (() => {
+                const attList = tr.attendance_list;
+                const days = [...new Set(attList.map(a => a.attendance_date).filter(Boolean))].sort();
+                const isMultiday = days.length > 1 || (days.length === 1 && days[0]);
+                const groups = isMultiday
+                  ? days.map(d => ({ day: d, rows: attList.filter(a => a.attendance_date === d) }))
+                  : [{ day: null, rows: attList }];
+                return (
+                  <>
+                    <Divider />
+                    <Box sx={{ px: 3, py: 2 }}>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>Attendance Sheet</Typography>
+                      {groups.map(({ day, rows }) => (
+                        <Box key={day || 'all'} sx={{ mb: 2 }}>
+                          {day && (
+                            <Typography variant="caption" fontWeight={600} color="text.secondary"
+                              sx={{ display: 'block', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                              {new Date(day + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                            </Typography>
+                          )}
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow sx={{ bgcolor: '#f0f4f8' }}>
+                                <TableCell sx={{ fontSize: 11, fontWeight: 700, py: 0.5 }}>#</TableCell>
+                                <TableCell sx={{ fontSize: 11, fontWeight: 700, py: 0.5 }}>Name</TableCell>
+                                <TableCell sx={{ fontSize: 11, fontWeight: 700, py: 0.5 }}>MSME / Business</TableCell>
+                                <TableCell sx={{ fontSize: 11, fontWeight: 700, py: 0.5 }}>Sex</TableCell>
+                                <TableCell sx={{ fontSize: 11, fontWeight: 700, py: 0.5 }}>Age Group</TableCell>
+                                <TableCell sx={{ fontSize: 11, fontWeight: 700, py: 0.5 }}>Status</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {rows.map((a, i) => (
+                                <TableRow key={a.id} hover>
+                                  <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>{i + 1}</TableCell>
+                                  <TableCell sx={{ fontSize: 11 }}>{a.attendee_name || '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>{a.msme_name || '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 11 }}>{a.gender || '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 11 }}>{a.age_group || '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 11 }}>{a.refugee_status === 'R' ? 'Refugee' : a.refugee_status === 'H' ? 'Host' : '—'}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </Box>
+                      ))}
+                    </Box>
+                  </>
+                );
+              })()}
             </DialogContent>
             <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1 }}>
               <Button onClick={() => openTrainingReportPdf('lead', tr.id, 'view')} startIcon={<PictureAsPdf />}>
