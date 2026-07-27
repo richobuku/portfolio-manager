@@ -498,6 +498,7 @@ class TrainingTopic(models.Model):
 class TrainingSession(models.Model):
     title       = models.CharField(max_length=200)
     date        = models.DateField()
+    end_date    = models.DateField(null=True, blank=True)
     location    = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     topic       = models.ForeignKey(TrainingTopic, on_delete=models.SET_NULL, null=True, related_name='sessions')
@@ -668,11 +669,12 @@ class Attendance(models.Model):
         ('H', 'Host Community'),
     ]
 
-    session        = models.ForeignKey(TrainingSession, on_delete=models.CASCADE, related_name='attendances')
+    session         = models.ForeignKey(TrainingSession, on_delete=models.CASCADE, related_name='attendances')
+    attendance_date = models.DateField(null=True, blank=True)
     # msme is now optional — we can record walk-in / non-MSME participants too
-    msme           = models.ForeignKey('MSME', on_delete=models.SET_NULL, null=True, blank=True, related_name='attendances')
-    present        = models.BooleanField(default=True)
-    marked_at      = models.DateTimeField(auto_now=True)
+    msme            = models.ForeignKey('MSME', on_delete=models.SET_NULL, null=True, blank=True, related_name='attendances')
+    present         = models.BooleanField(default=True)
+    marked_at       = models.DateTimeField(auto_now=True)
 
     # Per-person demographic fields (matching the PRUDEV II attendance sheet)
     attendee_name  = models.CharField(max_length=200, blank=True)

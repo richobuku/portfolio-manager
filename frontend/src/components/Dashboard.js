@@ -162,10 +162,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [sessionDialog, setSessionDialog] = useState(false);
   const [sessionEditing, setSessionEditing] = useState(null);
   // team = [{role:'lead'|'mentor', bge_id:'', work_order_id:'', _key: uniqueKey}]
-  const EMPTY_SESSION_FORM = { title: '', date: '', location: '', description: '', topic: '', businesses: [], bge_participants: [], team: [] };
+  const EMPTY_SESSION_FORM = { title: '', date: '', end_date: '', location: '', description: '', topic: '', businesses: [], bge_participants: [], team: [] };
   const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [attendanceDialog, setAttendanceDialog] = useState(false);
+  const [attendanceDay, setAttendanceDay] = useState('');
   const [selectedSession, setSelectedSession] = useState(null);
   const [sessionAttendees, setSessionAttendees] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
@@ -1047,6 +1048,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setSessionForm({
       title: s.title,
       date: s.date,
+      end_date: s.end_date || '',
       location: s.location || '',
       description: s.description || '',
       topic: s.topic || '',
@@ -1098,9 +1100,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     finally { setSessionLoading(false); }
   };
 
-  const EMPTY_ATTENDEE = () => ({
+  const EMPTY_ATTENDEE = (date = '') => ({
     _key: Math.random(),
     id: null,
+    attendance_date: date,
     msme: '',
     attendee_name: '',
     attendee_phone: '',
@@ -1111,6 +1114,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     consent_contact: true,
     present: true,
   });
+
+  // Returns all calendar dates (YYYY-MM-DD strings) from start to end inclusive
+  const sessionDays = (session) => {
+    if (!session?.date) return [];
+    const start = new Date(session.date);
+    const end = session.end_date ? new Date(session.end_date) : start;
+    const days = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  };
 
   const deleteSession = async (session) => {
     if (!window.confirm(`Delete "${session.title}"? This will also remove all attendance records and reports for this session.`)) return;
@@ -1125,26 +1140,31 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setSelectedSession(session);
     setAttendanceLoading(true);
     setAttendanceDialog(true);
+    const days = sessionDays(session);
+    const firstDay = days[0] || session.date;
+    setAttendanceDay(firstDay);
     try {
       const res = await axios.get(`${API_ENDPOINTS.ATTENDANCE}?session=${session.id}`, { headers });
       const records = Array.isArray(res.data) ? res.data : (res.data.results || []);
       if (records.length > 0) {
-        setSessionAttendees(records.map(r => ({ ...r, _key: r.id })));
+        setSessionAttendees(records.map(r => ({ ...r, _key: r.id || Math.random() })));
       } else {
-        // Pre-fill from the session's chosen MSMEs and BGE participants
-        const msmePrefill = (session.businesses_detail || []).map(m => ({
-          ...EMPTY_ATTENDEE(),
-          msme: m.id,
-          attendee_name: m.owner_name || '',
-          attendee_phone: m.phone || '',
-        }));
-        const bgePrefill = (session.bge_participants_detail || []).map(b => ({
-          ...EMPTY_ATTENDEE(),
-          msme: '',
-          attendee_name: b.name || '',
-        }));
-        const combined = [...msmePrefill, ...bgePrefill];
-        setSessionAttendees(combined.length > 0 ? combined : [EMPTY_ATTENDEE()]);
+        // Pre-fill each day with the session's MSMEs and BGE participants
+        const allRows = days.flatMap(day => {
+          const msmePrefill = (session.businesses_detail || []).map(m => ({
+            ...EMPTY_ATTENDEE(day),
+            msme: m.id,
+            attendee_name: m.owner_name || '',
+            attendee_phone: m.phone || '',
+          }));
+          const bgePrefill = (session.bge_participants_detail || []).map(b => ({
+            ...EMPTY_ATTENDEE(day),
+            msme: '',
+            attendee_name: b.name || '',
+          }));
+          return [...msmePrefill, ...bgePrefill];
+        });
+        setSessionAttendees(allRows.length > 0 ? allRows : [EMPTY_ATTENDEE(firstDay)]);
       }
     } catch { notify('Failed to load attendance', 'error'); }
     finally { setAttendanceLoading(false); }
@@ -1155,7 +1175,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   const addAttendeeRow = () => {
-    setSessionAttendees(prev => [...prev, EMPTY_ATTENDEE()]);
+    setSessionAttendees(prev => [...prev, EMPTY_ATTENDEE(attendanceDay)]);
   };
 
   const removeAttendeeRow = (key) => {
@@ -1169,6 +1189,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       await Promise.all(present.map(a => {
         const payload = {
           session: selectedSession.id,
+          attendance_date: a.attendance_date || null,
           msme: a.msme || null,
           attendee_name: a.attendee_name,
           attendee_phone: a.attendee_phone,
@@ -8830,8 +8851,9 @@ PRUDEV II BDS Team`
         <DialogContent dividers>
           <Grid container spacing={2}>
             <Grid item xs={12}><TextField fullWidth size="small" required label="Title" value={sessionForm.title} onChange={e => setSessionForm({...sessionForm, title: e.target.value})} /></Grid>
-            <Grid item xs={6}><TextField fullWidth size="small" required label="Date" type="date" InputLabelProps={{shrink:true}} value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} /></Grid>
-            <Grid item xs={6}><TextField fullWidth size="small" label="Location" value={sessionForm.location} onChange={e => setSessionForm({...sessionForm, location: e.target.value})} /></Grid>
+            <Grid item xs={4}><TextField fullWidth size="small" required label="Start Date" type="date" InputLabelProps={{shrink:true}} value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} /></Grid>
+            <Grid item xs={4}><TextField fullWidth size="small" label="End Date" type="date" InputLabelProps={{shrink:true}} helperText="Leave blank for single-day" value={sessionForm.end_date} onChange={e => setSessionForm({...sessionForm, end_date: e.target.value})} /></Grid>
+            <Grid item xs={4}><TextField fullWidth size="small" label="Location" value={sessionForm.location} onChange={e => setSessionForm({...sessionForm, location: e.target.value})} /></Grid>
             <Grid item xs={12}>
               <FormControl fullWidth size="small"><InputLabel>Topic</InputLabel>
                 <Select value={sessionForm.topic} onChange={e => setSessionForm({...sessionForm, topic: e.target.value})} label="Topic">
@@ -8958,7 +8980,7 @@ PRUDEV II BDS Team`
         <DialogTitle sx={{ pb: 1 }}>
           Attendance Sheet — {selectedSession?.title}
           <Typography variant="caption" display="block" color="text.secondary">
-            {selectedSession?.date} · {selectedSession?.location}
+            {selectedSession?.date}{selectedSession?.end_date && selectedSession.end_date !== selectedSession.date ? ` – ${selectedSession.end_date}` : ''} · {selectedSession?.location}
           </Typography>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
@@ -8966,6 +8988,29 @@ PRUDEV II BDS Team`
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
           ) : (
             <Box>
+              {/* Day tabs for multi-day sessions */}
+              {sessionDays(selectedSession).length > 1 && (
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {sessionDays(selectedSession).map((day, i) => (
+                    <Box
+                      key={day}
+                      onClick={() => setAttendanceDay(day)}
+                      sx={{
+                        px: 2, py: 0.75, borderRadius: '4px 4px 0 0', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                        borderBottom: attendanceDay === day ? '3px solid #1565C0' : '3px solid transparent',
+                        color: attendanceDay === day ? '#1565C0' : 'text.secondary',
+                        bgcolor: attendanceDay === day ? '#E3F2FD' : 'transparent',
+                        '&:hover': { bgcolor: '#F3F6FB' },
+                      }}
+                    >
+                      Day {i + 1} — {new Date(day + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                        ({sessionAttendees.filter(a => a.attendance_date === day).length})
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
               {/* Per-person rows */}
               <Table size="small" stickyHeader>
                 <TableHead sx={{ bgcolor: '#f5f5f5' }}>
@@ -8982,7 +9027,7 @@ PRUDEV II BDS Team`
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {sessionAttendees.map((att, idx) => (
+                  {sessionAttendees.filter(a => sessionDays(selectedSession).length <= 1 || a.attendance_date === attendanceDay).map((att, idx) => (
                     <TableRow key={att._key} hover>
                       <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
                       <TableCell>
@@ -9061,7 +9106,10 @@ PRUDEV II BDS Team`
 
               {/* Summary table — mirrors the PRUDEV II attendance sheet footer */}
               {sessionAttendees.length > 0 && (() => {
-                const present = sessionAttendees;
+                const isMultiDay = sessionDays(selectedSession).length > 1;
+                const present = isMultiDay
+                  ? sessionAttendees.filter(a => a.attendance_date === attendanceDay)
+                  : sessionAttendees;
                 const male   = present.filter(a => a.gender === 'M');
                 const female = present.filter(a => a.gender === 'F');
                 const youth  = present.filter(a => a.age_group === '18-34');

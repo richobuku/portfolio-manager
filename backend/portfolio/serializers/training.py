@@ -100,6 +100,7 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
         return [
             {
                 'id': a.id,
+                'attendance_date': str(a.attendance_date) if a.attendance_date else None,
                 'attendee_name': a.attendee_name,
                 'attendee_phone': a.attendee_phone,
                 'msme_name': a.msme.business_name if a.msme_id else '',
@@ -108,7 +109,7 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
                 'refugee_status': a.refugee_status,
                 'present': a.present,
             }
-            for a in obj.attendances.select_related('msme').order_by('attendee_name')
+            for a in obj.attendances.select_related('msme').order_by('attendance_date', 'attendee_name')
         ]
 
 
