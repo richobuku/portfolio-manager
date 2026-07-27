@@ -332,6 +332,149 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
         return resp
 
+    @action(detail=False, methods=['get'], url_path='activity-pdf')
+    def activity_pdf(self, request):
+        """Stream a Programme Activity Report PDF for a date range.
+
+        Query params:
+          start  — YYYY-MM-DD (required)
+          end    — YYYY-MM-DD (required)
+          label  — display label, e.g. 'Q2 2026' (optional)
+          dl     — any value → Content-Disposition: attachment (optional)
+        """
+        import datetime
+        import re
+        from ..models import TrainingSession, MentorTrainingReport
+        from ..pdf_reports import render_activity_report
+
+        start_str = request.query_params.get('start', '').strip()
+        end_str   = request.query_params.get('end',   '').strip()
+        label     = request.query_params.get('label', '').strip()
+
+        start_date = end_date = None
+        for param_name, param_val in [('start', start_str), ('end', end_str)]:
+            if param_val:
+                try:
+                    parsed = datetime.date.fromisoformat(param_val)
+                    if param_name == 'start':
+                        start_date = parsed
+                    else:
+                        end_date = parsed
+                except ValueError:
+                    return Response(
+                        {'detail': f"Invalid '{param_name}' date — expected YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        # Data-update visits
+        data_updates = self.get_queryset().filter(visit_type='data_update')
+        if start_date:
+            data_updates = data_updates.filter(visit_date__gte=start_date)
+        if end_date:
+            data_updates = data_updates.filter(visit_date__lte=end_date)
+
+        # Training sessions
+        sessions_qs = TrainingSession.objects.all()
+        if start_date:
+            sessions_qs = sessions_qs.filter(date__gte=start_date)
+        if end_date:
+            sessions_qs = sessions_qs.filter(date__lte=end_date)
+
+        # Mentor reports
+        mentor_qs = MentorTrainingReport.objects.all()
+        if start_date:
+            mentor_qs = mentor_qs.filter(session__date__gte=start_date)
+        if end_date:
+            mentor_qs = mentor_qs.filter(session__date__lte=end_date)
+
+        if not label and start_date and end_date:
+            label = f'{start_date.strftime("%d %b %Y")} – {end_date.strftime("%d %b %Y")}'
+
+        buf = render_activity_report(
+            data_updates, sessions_qs, mentor_qs,
+            start_date=start_date, end_date=end_date, label=label,
+        )
+
+        safe_label = re.sub(r'[^\w\-]', '_', label or 'period')
+        fname = f'PRUDEV2_Activity_Report_{safe_label}.pdf'
+        disposition = 'attachment' if request.query_params.get('dl') else 'inline'
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
+
+    @action(detail=False, methods=['get'], url_path='activity-excel')
+    def activity_excel(self, request):
+        """Stream a Programme Activity Report Excel workbook for a date range.
+
+        Query params:
+          start  — YYYY-MM-DD (required)
+          end    — YYYY-MM-DD (required)
+          label  — display label (optional)
+          dl     — any value → Content-Disposition: attachment (optional)
+        """
+        import datetime
+        import re
+        from ..models import TrainingSession, MentorTrainingReport
+        from ..excel_reports import generate_activity_excel
+
+        start_str = request.query_params.get('start', '').strip()
+        end_str   = request.query_params.get('end',   '').strip()
+        label     = request.query_params.get('label', '').strip()
+
+        start_date = end_date = None
+        for param_name, param_val in [('start', start_str), ('end', end_str)]:
+            if param_val:
+                try:
+                    parsed = datetime.date.fromisoformat(param_val)
+                    if param_name == 'start':
+                        start_date = parsed
+                    else:
+                        end_date = parsed
+                except ValueError:
+                    return Response(
+                        {'detail': f"Invalid '{param_name}' date — expected YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        # Data-update visits
+        data_updates = self.get_queryset().filter(visit_type='data_update')
+        if start_date:
+            data_updates = data_updates.filter(visit_date__gte=start_date)
+        if end_date:
+            data_updates = data_updates.filter(visit_date__lte=end_date)
+
+        # Training sessions
+        sessions_qs = TrainingSession.objects.all()
+        if start_date:
+            sessions_qs = sessions_qs.filter(date__gte=start_date)
+        if end_date:
+            sessions_qs = sessions_qs.filter(date__lte=end_date)
+
+        # Mentor reports
+        mentor_qs = MentorTrainingReport.objects.all()
+        if start_date:
+            mentor_qs = mentor_qs.filter(session__date__gte=start_date)
+        if end_date:
+            mentor_qs = mentor_qs.filter(session__date__lte=end_date)
+
+        if not label and start_date and end_date:
+            label = f'{start_date.strftime("%d %b %Y")} – {end_date.strftime("%d %b %Y")}'
+
+        buf = generate_activity_excel(
+            data_updates, sessions_qs, mentor_qs,
+            start_date=start_date, end_date=end_date, label=label,
+        )
+
+        safe_label = re.sub(r'[^\w\-]', '_', label or 'period')
+        fname = f'PRUDEV2_Activity_Report_{safe_label}.xlsx'
+        disposition = 'attachment' if request.query_params.get('dl') else 'inline'
+        resp = HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
+
     @action(detail=True, methods=['post'], url_path='revert')
     def revert(self, request, pk=None):
         """Admin-only: revert a submitted/reviewed report back to draft

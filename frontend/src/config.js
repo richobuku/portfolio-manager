@@ -65,6 +65,8 @@ export const REPORT_REVERT_URL              = (id) => `${API_BASE_URL}/api/repor
 export const WORK_ORDER_ATTACHMENT_DOWNLOAD_URL = (id) => `${API_BASE_URL}/api/work-order-attachments/${id}/download/`;
 export const REPORTS_BGE_SUMMARY_URL = (params) => `${API_BASE_URL}/api/reports/bge-summary/?${params}`;
 export const REPORTS_QUARTERLY_PDF_URL = (params) => `${API_BASE_URL}/api/reports/quarterly-pdf/?${params}`;
+export const REPORTS_ACTIVITY_PDF_URL   = (params) => `${API_BASE_URL}/api/reports/activity-pdf/?${params}`;
+export const REPORTS_ACTIVITY_EXCEL_URL = (params) => `${API_BASE_URL}/api/reports/activity-excel/?${params}`;
 export const GROUP_REPORT_REVERT_URL        = (id) => `${API_BASE_URL}/api/group-reports/${id}/revert/`;
 export const TRAINING_REPORT_REVERT_URL     = (id) => `${API_BASE_URL}/api/training-reports/${id}/revert/`;
 export const MENTOR_REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/mentor-reports/${id}/revert/`;

@@ -1351,3 +1351,325 @@ def render_quarterly_report(qs, start_date=None, end_date=None, label=''):
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
     return buf
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Programme Activity Report
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_activity_report(data_updates, sessions, mentor_reports,
+                           start_date=None, end_date=None, label=''):
+    """Generate a Programme Activity Report PDF.
+
+    Args:
+        data_updates:   QuerySet of MSMEReport (visit_type='data_update')
+                        with select_related('bge', 'msme') already applied.
+        sessions:       QuerySet of TrainingSession with prefetch_related applied.
+        mentor_reports: QuerySet of MentorTrainingReport with select_related applied.
+        start_date:     datetime.date or None (display only).
+        end_date:       datetime.date or None (display only).
+        label:          Optional period label string.
+
+    Returns:
+        io.BytesIO with the PDF bytes, seeked to 0.
+    """
+    import datetime as _dt
+    from collections import defaultdict
+    from reportlab.graphics.shapes import Drawing
+    from reportlab.graphics.charts.barcharts import VerticalBarChart
+
+    NAVY2   = HexColor('#162A3A')
+    ACCENT2 = HexColor('#C0392B')
+    GREEN   = HexColor('#2E7D32')
+    AMBER   = HexColor('#E67E22')
+    MID     = HexColor('#2B5278')
+
+    sq = _qr_styles()
+
+    # ── Materialise querysets once ────────────────────────────────────────────
+    updates_list  = list(data_updates.select_related('bge', 'msme')
+                         .order_by('visit_date'))
+    sessions_list = list(sessions.prefetch_related('attendances', 'topic')
+                         .order_by('date'))
+    mentor_list   = list(mentor_reports.select_related('bge', 'session')
+                         .order_by('session__date'))
+
+    # KPI figures
+    n_updates    = len(updates_list)
+    n_sessions   = len(sessions_list)
+    n_attendance = sum(
+        s_obj.attendances.filter(present=True).count()
+        for s_obj in sessions_list
+    )
+    n_mentor = len(mentor_list)
+
+    dates_all = (
+        [r.visit_date for r in updates_list if r.visit_date]
+        + [s_obj.date for s_obj in sessions_list if s_obj.date]
+        + [m.session.date for m in mentor_list if m.session and m.session.date]
+    )
+    period_str = label or (
+        f'{min(dates_all)} to {max(dates_all)}' if dates_all else 'All dates'
+    )
+
+    # ── Monthly activity counts for chart ────────────────────────────────────
+    month_data = defaultdict(lambda: [0, 0, 0])  # [data_updates, training, mentor]
+    for r in updates_list:
+        if r.visit_date:
+            key = r.visit_date.strftime('%b %y')
+            month_data[key][0] += 1
+    for s_obj in sessions_list:
+        if s_obj.date:
+            key = s_obj.date.strftime('%b %y')
+            month_data[key][1] += 1
+    for m in mentor_list:
+        if m.session and m.session.date:
+            key = m.session.date.strftime('%b %y')
+            month_data[key][2] += 1
+
+    buf, doc = _build_doc()
+    import reportlab.lib.pagesizes as _pgsizes
+    PAGE_W = _pgsizes.A4[0]
+    LM = RM = 20 * mm
+    CW = PAGE_W - LM - RM
+    story = []
+
+    # ── Title block ───────────────────────────────────────────────────────────
+    story.append(Spacer(1, 6))
+    story.append(Paragraph('PRUDEV II — Programme Activity Report', sq['title']))
+    story.append(Paragraph(f'Period: {period_str}', sq['sub']))
+    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width='100%', thickness=1.5, color=ACCENT2, spaceAfter=6))
+
+    # ── KPI strip ─────────────────────────────────────────────────────────────
+    def _kpi_cell(num_txt, lbl_txt, idx):
+        num_s = ParagraphStyle(f'akn{idx}', fontName='Helvetica-Bold', fontSize=18,
+                               textColor=HexColor('#FFFFFF'), alignment=TA_CENTER, leading=22)
+        lbl_s = ParagraphStyle(f'akl{idx}', fontName='Helvetica', fontSize=7.5,
+                               textColor=HexColor('#FFFFFF'), alignment=TA_CENTER)
+        return [Paragraph(num_txt, num_s), Paragraph(lbl_txt, lbl_s)]
+
+    kpi_t = Table([[
+        _kpi_cell(str(n_updates),    'Data Update Visits',        0),
+        _kpi_cell(str(n_sessions),   'Training Sessions',         1),
+        _kpi_cell(str(n_attendance), 'Total Training Attendance', 2),
+        _kpi_cell(str(n_mentor),     'Mentor Sessions',           3),
+    ]], colWidths=[CW / 4] * 4)
+    kpi_t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), ACCENT2),
+        ('BACKGROUND', (1, 0), (1, 0), MID),
+        ('BACKGROUND', (2, 0), (2, 0), GREEN),
+        ('BACKGROUND', (3, 0), (3, 0), AMBER),
+        ('TOPPADDING',    (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('VALIGN',  (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',   (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    story.append(kpi_t)
+    story.append(Spacer(1, 12))
+
+    # ── Monthly bar chart ─────────────────────────────────────────────────────
+    if month_data:
+        sorted_months = sorted(
+            month_data.keys(),
+            key=lambda k: _dt.datetime.strptime(k, '%b %y'),
+        )
+        chart_w = float(CW)
+        chart_h = 80.0
+        d = Drawing(chart_w, chart_h + 20)
+        bc = VerticalBarChart()
+        bc.x = 30
+        bc.y = 20
+        bc.width  = chart_w - 40
+        bc.height = chart_h
+        bc.data = [
+            [month_data[m][0] for m in sorted_months],
+            [month_data[m][1] for m in sorted_months],
+            [month_data[m][2] for m in sorted_months],
+        ]
+        bc.categoryAxis.categoryNames   = sorted_months
+        bc.categoryAxis.labels.fontSize = 6
+        bc.categoryAxis.labels.angle    = 30
+        bc.categoryAxis.labels.boxAnchor = 'ne'
+        bc.valueAxis.labels.fontSize    = 7
+        bc.valueAxis.minimumTickSpacing = 1
+        bc.valueAxis.rangeRound         = 'both'
+        bc.bars[0].fillColor = HexColor('#C0392B')
+        bc.bars[1].fillColor = HexColor('#2B5278')
+        bc.bars[2].fillColor = HexColor('#E67E22')
+        bc.groupSpacing = 4
+        bc.barSpacing   = 1
+        d.add(bc)
+
+        story.append(Paragraph('Monthly Activity Overview', sq['h1']))
+        story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=4))
+        leg_style = ParagraphStyle('ar_leg', fontName='Helvetica', fontSize=7.5,
+                                   textColor=NAVY2)
+        leg_t = Table([[
+            [Paragraph('<font color="#C0392B">&#9632;</font> Data Updates', leg_style)],
+            [Paragraph('<font color="#2B5278">&#9632;</font> Training Sessions', leg_style)],
+            [Paragraph('<font color="#E67E22">&#9632;</font> Mentor Sessions', leg_style)],
+        ]], colWidths=[CW / 3] * 3, hAlign='LEFT')
+        leg_t.setStyle(TableStyle([
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING',    (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        story.append(leg_t)
+        story.append(d)
+        story.append(Spacer(1, 10))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # SECTION 1: Data Collection Visits
+    # ═════════════════════════════════════════════════════════════════════════
+    story.append(Paragraph('Section 1 — Data Collection Visits', sq['h1']))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=4))
+
+    if not updates_list:
+        story.append(Paragraph('No data-collection visits recorded for this period.', sq['body']))
+    else:
+        by_bge_u = defaultdict(list)
+        for r in updates_list:
+            by_bge_u[r.bge].append(r)
+
+        u_rows = [[
+            Paragraph('BGE Name',      sq['th']),
+            Paragraph('MSMEs Visited', sq['th']),
+            Paragraph('Visit Dates',   sq['th']),
+            Paragraph('No. Visits',    sq['th']),
+        ]]
+        for bge_obj, rpts in sorted(by_bge_u.items(),
+                                    key=lambda x: x[0].name if x[0] else ''):
+            msmes_visited = ', '.join(sorted({
+                r.msme.business_name for r in rpts if r.msme
+            }))
+            dates_str = ', '.join(sorted({
+                str(r.visit_date) for r in rpts if r.visit_date
+            }))
+            bge_name = bge_obj.name if bge_obj else '—'
+            u_rows.append([
+                Paragraph(_safe_html(bge_name), sq['td']),
+                Paragraph(_safe_html(msmes_visited or '—'), sq['td']),
+                Paragraph(_safe_html(dates_str or '—'), sq['td']),
+                Paragraph(str(len(rpts)), sq['tdc']),
+            ])
+        story.append(_qr_table(u_rows, [CW*0.22, CW*0.38, CW*0.28, CW*0.12]))
+
+    story.append(Spacer(1, 12))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # SECTION 2: Training Sessions
+    # ═════════════════════════════════════════════════════════════════════════
+    story.append(Paragraph('Section 2 — Training Sessions', sq['h1']))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=4))
+
+    if not sessions_list:
+        story.append(Paragraph('No training sessions recorded for this period.', sq['body']))
+    else:
+        ts_rows = [[
+            Paragraph('Date',     sq['th']),
+            Paragraph('Title',    sq['th']),
+            Paragraph('Location', sq['th']),
+            Paragraph('Topic',    sq['th']),
+            Paragraph('Total',    sq['th']),
+            Paragraph('Male',     sq['th']),
+            Paragraph('Female',   sq['th']),
+        ]]
+        total_m = total_f = total_youth_m = total_youth_f = 0
+        total_refugee = total_host = 0
+        for sess in sessions_list:
+            atts = list(sess.attendances.filter(present=True))
+            t_total = len(atts)
+            t_male  = sum(1 for a in atts if a.gender == 'M')
+            t_fem   = sum(1 for a in atts if a.gender == 'F')
+            total_m += t_male
+            total_f += t_fem
+            total_youth_m   += sum(1 for a in atts if a.gender == 'M' and a.age_group == '18-34')
+            total_youth_f   += sum(1 for a in atts if a.gender == 'F' and a.age_group == '18-34')
+            total_refugee   += sum(1 for a in atts if a.refugee_status == 'R')
+            total_host      += sum(1 for a in atts if a.refugee_status == 'H')
+            topic_name = sess.topic.name if sess.topic else '—'
+            ts_rows.append([
+                Paragraph(str(sess.date), sq['tdc']),
+                Paragraph(_safe_html(sess.title), sq['td']),
+                Paragraph(_safe_html(sess.location or '—'), sq['td']),
+                Paragraph(_safe_html(topic_name), sq['td']),
+                Paragraph(str(t_total), sq['tdc']),
+                Paragraph(str(t_male),  sq['tdc']),
+                Paragraph(str(t_fem),   sq['tdc']),
+            ])
+        story.append(_qr_table(
+            ts_rows,
+            [CW*0.1, CW*0.25, CW*0.18, CW*0.18, CW*0.1, CW*0.095, CW*0.095],
+        ))
+        story.append(Spacer(1, 6))
+
+        grand_total = total_m + total_f
+        if grand_total:
+            pct_m = int(100 * total_m / grand_total)
+            pct_f = 100 - pct_m
+            summary_txt = (
+                f'Across {n_sessions} training session{"s" if n_sessions != 1 else ""}, '
+                f'a total of <b>{grand_total}</b> participants attended '
+                f'({total_m} male / {total_f} female — {pct_m}% / {pct_f}%). '
+                f'Youth participants (18–34): <b>{total_youth_m + total_youth_f}</b> '
+                f'({total_youth_m} male, {total_youth_f} female). '
+                f'Refugee participants: <b>{total_refugee}</b>; '
+                f'Host-community participants: <b>{total_host}</b>.'
+            )
+            story.append(Paragraph(summary_txt, sq['body']))
+
+    story.append(Spacer(1, 12))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # SECTION 3: Mentorship Support
+    # ═════════════════════════════════════════════════════════════════════════
+    story.append(Paragraph('Section 3 — Mentorship Support', sq['h1']))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=4))
+
+    if not mentor_list:
+        story.append(Paragraph('No mentorship reports recorded for this period.', sq['body']))
+    else:
+        by_bge_m = defaultdict(list)
+        for m in mentor_list:
+            by_bge_m[m.bge].append(m)
+
+        m_rows = [[
+            Paragraph('Mentor BGE',      sq['th']),
+            Paragraph('Sessions',        sq['th']),
+            Paragraph('MSMEs Supported', sq['th']),
+            Paragraph('Session Dates',   sq['th']),
+        ]]
+        for bge_obj, mrpts in sorted(by_bge_m.items(),
+                                     key=lambda x: x[0].name if x[0] else ''):
+            sess_dates = ', '.join(sorted({
+                str(m.session.date)
+                for m in mrpts if m.session and m.session.date
+            }))
+            msmes_parts = [
+                m.msmes_mentored.strip()
+                for m in mrpts if m.msmes_mentored and m.msmes_mentored.strip()
+            ]
+            msmes_combined = '; '.join(msmes_parts) if msmes_parts else '—'
+            bge_name = bge_obj.name if bge_obj else '—'
+            m_rows.append([
+                Paragraph(_safe_html(bge_name), sq['td']),
+                Paragraph(str(len(mrpts)), sq['tdc']),
+                Paragraph(_safe_html(msmes_combined[:300]), sq['td']),
+                Paragraph(_safe_html(sess_dates or '—'), sq['td']),
+            ])
+        story.append(_qr_table(m_rows, [CW*0.25, CW*0.1, CW*0.38, CW*0.27]))
+
+    story.append(Spacer(1, 12))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=NAVY2, spaceAfter=4))
+    story.append(Paragraph(
+        f'Generated from PRUDEV II Portfolio Management System  ·  Period: {period_str}',
+        ParagraphStyle('ar_foot', fontName='Helvetica', fontSize=7.5,
+                       textColor=HexColor('#888888'), alignment=TA_CENTER),
+    ))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf

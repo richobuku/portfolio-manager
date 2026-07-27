@@ -28,7 +28,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -311,6 +311,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [qrEnd, setQrEnd]             = useState('');
   const [qrLabel, setQrLabel]         = useState('');
   const [qrGenerating, setQrGenerating] = useState(false);
+  const [arStart, setArStart]         = useState('');
+  const [arEnd, setArEnd]             = useState('');
+  const [arGenerating, setArGenerating] = useState(false);
 
   // ── BGE Assignment Summary ────────────────────────────────────────────────
   const [bsStart, setBsStart]         = useState('');
@@ -1109,6 +1112,32 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify('Failed to generate quarterly report PDF', 'error');
     } finally {
       setQrGenerating(false);
+    }
+  };
+
+  const generateActivityReport = async (format) => {
+    if (!arStart || !arEnd) { notify('Select a start and end date', 'error'); return; }
+    setArGenerating(true);
+    try {
+      const params = new URLSearchParams({ start: arStart, end: arEnd, dl: '1' });
+      const url = format === 'excel'
+        ? REPORTS_ACTIVITY_EXCEL_URL(params.toString())
+        : REPORTS_ACTIVITY_PDF_URL(params.toString());
+      const mimeType = format === 'excel'
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : 'application/pdf';
+      const ext = format === 'excel' ? 'xlsx' : 'pdf';
+      const resp = await axios.get(url, { headers, responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(new Blob([resp.data], { type: mimeType }));
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `PRUDEV2_Activity_Report_${arStart}_${arEnd}.${ext}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch {
+      notify('Failed to generate report', 'error');
+    } finally {
+      setArGenerating(false);
     }
   };
 
@@ -4676,6 +4705,49 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
             Generates a consolidated PDF with KPI summary, per-BGE table, and full visit narratives for the selected date range.
+          </Typography>
+        </Paper>
+      </Box>
+
+      {/* ── Programme Activity Report ───────────────────────────────────── */}
+      <Box sx={{ mb: 3 }}>
+        <SectionHeader
+          title="Programme Activity Report"
+          subtitle="Download a cross-cutting report covering data collection visits, training sessions, and mentorship support"
+        />
+        <Paper variant="outlined" sx={{ p: 2.5 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <TextField
+              label="Start Date" type="date" size="small"
+              value={arStart} onChange={e => setArStart(e.target.value)}
+              InputLabelProps={{ shrink: true }} sx={{ minWidth: 150 }}
+            />
+            <TextField
+              label="End Date" type="date" size="small"
+              value={arEnd} onChange={e => setArEnd(e.target.value)}
+              InputLabelProps={{ shrink: true }} sx={{ minWidth: 150 }}
+            />
+            <Button
+              variant="contained"
+              startIcon={arGenerating ? <CircularProgress size={16} color="inherit" /> : <PictureAsPdf />}
+              onClick={() => generateActivityReport('pdf')}
+              disabled={arGenerating || !arStart || !arEnd}
+              sx={{ bgcolor: '#C0392B', '&:hover': { bgcolor: '#A93226' }, whiteSpace: 'nowrap' }}
+            >
+              {arGenerating ? 'Generating…' : 'Download PDF'}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={arGenerating ? <CircularProgress size={16} color="inherit" /> : <Download />}
+              onClick={() => generateActivityReport('excel')}
+              disabled={arGenerating || !arStart || !arEnd}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              {arGenerating ? 'Generating…' : 'Download Excel'}
+            </Button>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Generates a multi-section report with KPI summary, data update visits, training session attendance (by gender and age), and mentorship support — available as PDF or Excel.
           </Typography>
         </Paper>
       </Box>
