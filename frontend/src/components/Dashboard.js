@@ -9139,7 +9139,7 @@ PRUDEV II BDS Team`
                 <TableBody>
                   {dayAttendees.map((att, idx) => (
                     <AttendeeRow key={att._key} att={att} idx={idx} msmes={msmes}
-                      bgeParticipants={selectedSession?.bge_participants_detail || []}
+                      bgeParticipants={experts}
                       updateAttendee={updateAttendee} removeAttendeeRow={removeAttendeeRow} />
                   ))}
                 </TableBody>
