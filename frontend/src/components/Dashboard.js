@@ -54,9 +54,12 @@ const NAV_ITEMS = [
   { key: 'tshirts',        label: 'T-Shirt Receipts', icon: <Checkroom /> },
 ];
 
-const AttendeeRow = React.memo(function AttendeeRow({ att, idx, msmes, updateAttendee, removeAttendeeRow }) {
+const AttendeeRow = React.memo(function AttendeeRow({ att, idx, msmes, bgeParticipants, updateAttendee, removeAttendeeRow }) {
   const [name, setName] = React.useState(att.attendee_name);
   const [phone, setPhone] = React.useState(att.attendee_phone);
+  // selectVal tracks the dropdown display; BGE selections use 'bge:{id}' prefix
+  // so they don't pollute att.msme (which expects an MSME id or empty)
+  const [selectVal, setSelectVal] = React.useState(att.msme || '');
   return (
     <TableRow hover>
       <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
@@ -76,18 +79,34 @@ const AttendeeRow = React.memo(function AttendeeRow({ att, idx, msmes, updateAtt
       </TableCell>
       <TableCell>
         <Select size="small" variant="standard" displayEmpty
-          value={att.msme || ''}
+          value={selectVal}
           onChange={e => {
-            const m = msmes.find(x => x.id === e.target.value);
-            updateAttendee(att._key, 'msme', e.target.value);
-            if (m && !name) {
-              const ownerName = m.owner_name || '';
-              setName(ownerName);
-              updateAttendee(att._key, 'attendee_name', ownerName);
+            const val = e.target.value;
+            setSelectVal(val);
+            if (typeof val === 'string' && val.startsWith('bge:')) {
+              const b = (bgeParticipants || []).find(x => `bge:${x.id}` === val);
+              updateAttendee(att._key, 'msme', '');
+              if (b && !name) {
+                setName(b.name);
+                updateAttendee(att._key, 'attendee_name', b.name);
+              }
+            } else {
+              const m = msmes.find(x => x.id === val);
+              updateAttendee(att._key, 'msme', val);
+              if (m && !name) {
+                const ownerName = m.owner_name || '';
+                setName(ownerName);
+                updateAttendee(att._key, 'attendee_name', ownerName);
+              }
             }
           }}
           sx={{ minWidth: 160 }}>
           <MenuItem value=""><em>— walk-in —</em></MenuItem>
+          {(bgeParticipants || []).length > 0 && <ListSubheader>BGE Participants</ListSubheader>}
+          {(bgeParticipants || []).map(b => (
+            <MenuItem key={`bge:${b.id}`} value={`bge:${b.id}`}>{b.name}{b.bge_code ? ` (${b.bge_code})` : ''}</MenuItem>
+          ))}
+          {msmes.filter(m => m.is_active).length > 0 && <ListSubheader>MSMEs</ListSubheader>}
           {msmes.filter(m => m.is_active).map(m => (
             <MenuItem key={m.id} value={m.id}>{m.business_name}</MenuItem>
           ))}
@@ -9120,6 +9139,7 @@ PRUDEV II BDS Team`
                 <TableBody>
                   {dayAttendees.map((att, idx) => (
                     <AttendeeRow key={att._key} att={att} idx={idx} msmes={msmes}
+                      bgeParticipants={selectedSession?.bge_participants_detail || []}
                       updateAttendee={updateAttendee} removeAttendeeRow={removeAttendeeRow} />
                   ))}
                 </TableBody>
