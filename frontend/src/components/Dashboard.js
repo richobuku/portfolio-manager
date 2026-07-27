@@ -171,6 +171,24 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [sessionAttendees, setSessionAttendees] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
 
+  // Returns all calendar dates (YYYY-MM-DD strings) from start to end inclusive
+  const sessionDays = React.useCallback((session) => {
+    if (!session?.date) return [];
+    const start = new Date(session.date);
+    const end = session.end_date ? new Date(session.end_date) : start;
+    const days = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }, []);
+
+  const activeDays = React.useMemo(() => sessionDays(selectedSession), [sessionDays, selectedSession]);
+  const dayAttendees = React.useMemo(
+    () => activeDays.length > 1 ? sessionAttendees.filter(a => a.attendance_date === attendanceDay) : sessionAttendees,
+    [activeDays.length, sessionAttendees, attendanceDay],
+  );
+
   // ── participation summary ──────────────────────────────────────────────────
   const [participationSummary, setParticipationSummary] = useState(null);
   const [participationLoading, setParticipationLoading] = useState(false);
@@ -1114,18 +1132,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     consent_contact: true,
     present: true,
   });
-
-  // Returns all calendar dates (YYYY-MM-DD strings) from start to end inclusive
-  const sessionDays = (session) => {
-    if (!session?.date) return [];
-    const start = new Date(session.date);
-    const end = session.end_date ? new Date(session.end_date) : start;
-    const days = [];
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      days.push(d.toISOString().slice(0, 10));
-    }
-    return days;
-  };
 
   const deleteSession = async (session) => {
     if (!window.confirm(`Delete "${session.title}"? This will also remove all attendance records and reports for this session.`)) return;
@@ -8989,9 +8995,9 @@ PRUDEV II BDS Team`
           ) : (
             <Box>
               {/* Day tabs for multi-day sessions */}
-              {sessionDays(selectedSession).length > 1 && (
+              {activeDays.length > 1 && (
                 <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {sessionDays(selectedSession).map((day, i) => (
+                  {activeDays.map((day, i) => (
                     <Box
                       key={day}
                       onClick={() => setAttendanceDay(day)}
@@ -9027,7 +9033,7 @@ PRUDEV II BDS Team`
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {sessionAttendees.filter(a => sessionDays(selectedSession).length <= 1 || a.attendance_date === attendanceDay).map((att, idx) => (
+                  {dayAttendees.map((att, idx) => (
                     <TableRow key={att._key} hover>
                       <TableCell sx={{ color: 'text.secondary', fontSize: 12 }}>{idx + 1}</TableCell>
                       <TableCell>
@@ -9105,11 +9111,8 @@ PRUDEV II BDS Team`
               </Table>
 
               {/* Summary table — mirrors the PRUDEV II attendance sheet footer */}
-              {sessionAttendees.length > 0 && (() => {
-                const isMultiDay = sessionDays(selectedSession).length > 1;
-                const present = isMultiDay
-                  ? sessionAttendees.filter(a => a.attendance_date === attendanceDay)
-                  : sessionAttendees;
+              {dayAttendees.length > 0 && (() => {
+                const present = dayAttendees;
                 const male   = present.filter(a => a.gender === 'M');
                 const female = present.filter(a => a.gender === 'F');
                 const youth  = present.filter(a => a.age_group === '18-34');
