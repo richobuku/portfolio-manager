@@ -42,18 +42,50 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
         ).distinct().order_by('business_name')
 
     def get_assigned_msme_count(self, obj):
+        # Use DB-level annotation when the viewset provides it (no extra query).
+        if hasattr(obj, '_assigned_msme_count'):
+            return obj._assigned_msme_count
         return self._all_msmes(obj).count()
 
     def get_assigned_msmes_list(self, obj):
-        rows = list(
+        # Fast path: use prefetch caches set by the viewset Prefetch objects.
+        # Covers primary + co-assigned in 0 extra queries; group-assigned still
+        # handled by the fallback queryset below so nothing is silently dropped.
+        if hasattr(obj, '_primary_msmes') and hasattr(obj, '_co_assigned_msmes'):
+            seen = set()
+            rows = []
+            for m in obj._primary_msmes:
+                seen.add(m.id)
+                rows.append(self._msme_row(m, is_co=False))
+            for m in obj._co_assigned_msmes:
+                if m.id not in seen:
+                    seen.add(m.id)
+                    rows.append(self._msme_row(m, is_co=True))
+            rows.sort(key=lambda r: r['business_name'])
+            return rows
+        # Fallback: original queryset path (used when prefetch caches are absent)
+        raw = list(
             self._all_msmes(obj)
             .values('id', 'business_name', 'msme_code', 'business_type', 'sector', 'city',
                     'assignment_objectives', 'assignment_date', 'assigned_bge')
         )
-        # Flag co-assigned so the UI can distinguish primary vs joint
-        for row in rows:
+        for row in raw:
             row['is_co_assigned'] = row.pop('assigned_bge') != obj.id
-        return rows
+        return raw
+
+    @staticmethod
+    def _msme_row(m, *, is_co):
+        return {
+            'id': m.id,
+            'business_name': m.business_name,
+            'msme_code': m.msme_code,
+            'business_type': m.business_type,
+            'sector': m.sector,
+            'city': m.city,
+            'assignment_objectives': m.assignment_objectives,
+            'assignment_date': str(m.assignment_date) if m.assignment_date else None,
+            'is_co_assigned': is_co,
+        }
 
     def get_group_names(self, obj):
         # Same pattern — use prefetch cache if available

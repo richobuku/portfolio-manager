@@ -14,9 +14,11 @@ import io
 from pywebpush import webpush, WebPushException
 import json as _json
 
+from django.db.models import Prefetch
 from ..models import (
     BusinessGrowthExpert, BGEGroup, SupportRequest, MSME, PushSubscription,
 )
+from ..pagination import BGEPagination
 from ..serializers import (
     BusinessGrowthExpertSerializer, BGEGroupSerializer, SupportRequestSerializer,
     MSMESerializer,
@@ -291,6 +293,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
     queryset = BusinessGrowthExpert.objects.all()
     serializer_class = BusinessGrowthExpertSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = BGEPagination
 
     def get_queryset(self):
         qs = BusinessGrowthExpert.objects.all()
@@ -300,10 +303,34 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         group = self.request.query_params.get('group')
         if group:
             qs = qs.filter(bge_groups__id=group)
-        # Prefetch the relations the serializer pulls in (assigned_msmes,
-        # bge_groups). Without this, listing N BGEs caused 2*N extra queries
-        # (each BGE serialized triggered .assigned_msmes.all() and .bge_groups.all()).
-        return qs.prefetch_related('assigned_msmes', 'bge_groups').order_by('-created_at')
+
+        # Slim queryset for MSME prefetch — only the fields needed by the
+        # serializer's _msme_row helper, nothing else.
+        _msme_qs = MSME.objects.filter(is_active=True).only(
+            'id', 'business_name', 'msme_code', 'business_type',
+            'sector', 'city', 'assignment_objectives', 'assignment_date',
+            'assigned_bge_id',
+        ).order_by('business_name')
+
+        return (
+            qs
+            # Annotate MSME count without an extra round-trip per BGE.
+            .annotate(
+                _assigned_msme_count=Count(
+                    'assigned_msmes',
+                    filter=Q(assigned_msmes__is_active=True),
+                    distinct=True,
+                )
+            )
+            # Prefetch primary and co-assigned MSMEs into named caches so
+            # get_assigned_msmes_list uses 0 extra queries per BGE.
+            .prefetch_related(
+                Prefetch('assigned_msmes', queryset=_msme_qs, to_attr='_primary_msmes'),
+                Prefetch('co_assigned_msmes', queryset=_msme_qs, to_attr='_co_assigned_msmes'),
+                'bge_groups',
+            )
+            .order_by('-created_at')
+        )
 
     def destroy(self, request, *args, **kwargs):
         if not request.user.is_staff and not request.user.is_superuser:

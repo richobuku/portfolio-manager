@@ -1,5 +1,5 @@
 from .portfolio import PortfolioSerializer, InvestmentSerializer, TransactionSerializer
-from .msme import ProgrammeGroupSerializer, CohortSerializer, MSMESerializer, MSMEGrowthSnapshotSerializer
+from .msme import ProgrammeGroupSerializer, CohortSerializer, MSMESerializer, MSMEListSerializer, MSMEGrowthSnapshotSerializer
 from .bge import BusinessGrowthExpertSerializer, BGEGroupSerializer, SupportRequestSerializer
 from .training import (
     TrainingTopicSerializer,

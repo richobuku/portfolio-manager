@@ -226,7 +226,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [filterCohort, setFilterCohort] = useState('');
 
   // ── pagination ─────────────────────────────────────────────────────────────
-  const [msmePage, setMsmePage] = useState(0);
+  const [msmePage, setMsmePage] = useState(0);       // 0-indexed server page
+  const [msmeTotalCount, setMsmeTotalCount] = useState(0); // total from API
   const [expertPage, setExpertPage] = useState(0);
   const [sessionPage, setSessionPage] = useState(0);
 
@@ -395,6 +396,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (filterType) params.append('business_type', filterType);
       if (filterSector) params.append('sector', filterSector);
       if (filterCohort) params.append('cohort', filterCohort);
+      params.append('page', '1');
+      params.append('page_size', '50');
 
       const reportParams = new URLSearchParams();
       if (reportFilterBge) reportParams.append('bge', reportFilterBge);
@@ -402,7 +405,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes] = await Promise.all([
         axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
-        axios.get(API_ENDPOINTS.EXPERTS, { headers: h }),
+        axios.get(`${API_ENDPOINTS.EXPERTS}?page_size=200`, { headers: h }),
         axios.get(API_ENDPOINTS.COHORTS, { headers: h }),
         axios.get(API_ENDPOINTS.BGE_GROUPS, { headers: h }),
         axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
@@ -418,6 +421,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
       setMsmes(toArr(mRes.data));
+      setMsmeTotalCount(mRes.data?.count ?? toArr(mRes.data).length);
       setExperts(toArr(eRes.data));
       setCohorts(toArr(cRes.data));
       setBgeGroups(toArr(gRes.data));
@@ -548,7 +552,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, fetchTshirtReceipts]);
 
-  // Lightweight, debounced refetch JUST for the MSME list when search/filter
+  // Lightweight, debounced refetch JUST for the MSME list when search/filter/page
   // changes. AbortController cancels any in-flight request when the user keeps
   // typing, so we never paint stale results over fresh ones.
   useEffect(() => {
@@ -561,20 +565,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (filterType) params.append('business_type', filterType);
       if (filterSector) params.append('sector', filterSector);
       if (filterCohort) params.append('cohort', filterCohort);
+      params.append('page', String(msmePage + 1));
+      params.append('page_size', '50');
       try {
         const r = await axios.get(`${API_ENDPOINTS.MSMES}?${params}`, {
           headers: h, signal: controller.signal,
         });
         setMsmes(Array.isArray(r.data) ? r.data : (r.data.results || []));
+        setMsmeTotalCount(r.data?.count ?? (Array.isArray(r.data) ? r.data.length : (r.data.results || []).length));
       } catch (e) {
         if (!axios.isCancel(e) && e.name !== 'CanceledError') {
-          // surface non-abort errors only
           setError('Failed to refresh MSME list.');
         }
       }
     }, 300);
     return () => { clearTimeout(handle); controller.abort(); };
-  }, [token, msmeSearch, filterType, filterSector, filterCohort]);
+  }, [token, msmeSearch, filterType, filterSector, filterCohort, msmePage]);
 
   // Same pattern for the Reports list — debounced + cancellable
   useEffect(() => {
@@ -1643,7 +1649,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
         <TextField
           size="small" placeholder="Search name, owner, sector…" value={msmeSearch}
-          onChange={e => startTransition(() => setMsmeSearch(e.target.value))}
+          onChange={e => { setMsmePage(0); startTransition(() => setMsmeSearch(e.target.value)); }}
           onKeyDown={e => e.key === 'Enter' && fetchAll()}
           InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
           sx={{ flex: '1 1 160px', minWidth: 0 }}
@@ -1672,7 +1678,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button variant="contained" size="small" onClick={fetchAll}>Search</Button>
           {(msmeSearch || filterType || filterSector || filterCohort) &&
-            <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); }}>Clear</Button>}
+            <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); setMsmePage(0); }}>Clear</Button>}
         </Box>
       </Paper>
 
@@ -1695,9 +1701,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {paginate(msmes, msmePage).length === 0 ? (
+            {msmes.length === 0 ? (
               <TableRow><TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
-            ) : paginate(msmes, msmePage).map(m => (
+            ) : msmes.map(m => (
               <TableRow key={m.id} hover>
                 <TableCell><Chip label={m.msme_code} size="small" variant="outlined" /></TableCell>
                 <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
@@ -1832,8 +1838,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </TableBody>
         </Table>
         <TablePagination
-          component="div" count={msmes.length} page={msmePage}
-          rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
+          component="div" count={msmeTotalCount} page={msmePage}
+          rowsPerPage={50} rowsPerPageOptions={[50]}
           onPageChange={(_, p) => setMsmePage(p)}
         />
       </TableContainer>

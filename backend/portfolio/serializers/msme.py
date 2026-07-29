@@ -90,6 +90,29 @@ class MSMESerializer(serializers.ModelSerializer):
         return str(max(dates)) if dates else None
 
 
+class MSMEListSerializer(MSMESerializer):
+    """Lightweight serializer for list endpoints — excludes large TextFields and
+    all diag_* baseline columns that are only needed on the detail/edit view."""
+
+    class Meta(MSMESerializer.Meta):
+        fields = None  # clear parent's fields = '__all__' so exclude is honoured
+        exclude = (
+            # Long free-text fields not needed for list cards
+            'business_description', 'challenges', 'opportunities',
+            'assignment_objectives', 'address',
+            # All diagnostic baseline fields (confirmed against model)
+            'diag_annual_turnover', 'diag_total_assets',
+            'diag_employees_ft_male', 'diag_employees_ft_female',
+            'diag_employees_pt_male', 'diag_employees_pt_female',
+            'diag_has_tin', 'diag_has_unbs',
+            'diag_has_business_bank', 'diag_has_mobile_money',
+            'diag_is_green_business', 'diag_green_categories',
+            'diag_owner_sex', 'diag_owner_age',
+            'diag_owner_education', 'diag_years_operating',
+            'diag_district', 'diag_imported_at',
+        )
+
+
 class MSMEGrowthSnapshotSerializer(serializers.ModelSerializer):
     collected_by_name = serializers.CharField(source='collected_by.name', read_only=True)
     msme_name         = serializers.CharField(source='msme.business_name', read_only=True)

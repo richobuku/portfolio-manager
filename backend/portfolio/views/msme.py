@@ -17,6 +17,8 @@ from ..models import (
 from ..serializers import (
     CohortSerializer, MSMESerializer, MSMEGrowthSnapshotSerializer,
 )
+from ..serializers.msme import MSMEListSerializer
+from ..pagination import MSMEPagination
 from .mixins import (
     ViewerReadOnlyMixin, _managed_groups, _is_viewer, _is_programme_manager,
 )
@@ -172,6 +174,12 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     queryset = MSME.objects.filter(is_active=True)
     serializer_class = MSMESerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = MSMEPagination
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return MSMEListSerializer
+        return MSMESerializer
 
     def get_queryset(self):
         qs = MSME.objects.filter(is_active=True)
@@ -232,7 +240,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
 
         return (
             qs.select_related('cohort', 'assigned_bge', 'assigned_group')
-            .prefetch_related('programme_groups')
+            .prefetch_related('programme_groups', 'co_assigned_bges')
             # Annotate counts and latest dates at the DB level to eliminate the
             # N+1 queries that MSMESerializer.get_total_reports / get_last_support_date
             # would otherwise fire (one round-trip per row).
