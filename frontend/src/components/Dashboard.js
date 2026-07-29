@@ -6117,6 +6117,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
+            <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
@@ -8315,7 +8316,7 @@ PRUDEV II BDS Team`
               <Divider sx={{ mb: 2 }} />
 
               {/* Signature preview + admin rotation controls */}
-              {(viewItem.signature_url || viewItem.signature_data) && (
+              {viewItem.signature_url && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Signature</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
@@ -8367,7 +8368,7 @@ PRUDEV II BDS Team`
                   </Box>
                 </Box>
               )}
-              {isStaff && !viewItem.signature_url && !viewItem.signature_data && (
+              {isStaff && !viewItem.signature_url && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.disabled">No signature uploaded yet.</Typography>
                 </Box>

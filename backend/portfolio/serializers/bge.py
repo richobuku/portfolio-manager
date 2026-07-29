@@ -11,11 +11,11 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BusinessGrowthExpert
-        fields = '__all__'
-        # signature and signature_data are managed via the dedicated
-        # upload-signature / rotate-signature endpoints only — sending them
-        # as plain JSON in a PATCH causes Django to reject the request.
-        read_only_fields = ('signature', 'signature_data')
+        # Exclude signature_data — it's a raw binary blob that bloats every BGE
+        # list payload.  The derived signature_url field is the display handle;
+        # the dedicated upload/rotate endpoints manage the data itself.
+        exclude = ('signature_data',)
+        read_only_fields = ('signature',)
 
     # Fields only an admin (staff/superuser) may set — a BGE editing their own
     # profile must not be able to self-approve, promote themselves to senior,
@@ -62,7 +62,7 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
         return list(obj.bge_groups.values_list('name', flat=True))
 
     def get_signature_url(self, obj):
-        if not (obj.signature_data or obj.signature):
+        if not obj.signature_data:
             return None
         path = f'/api/experts/{obj.id}/signature-image/'
         request = self.context.get('request')

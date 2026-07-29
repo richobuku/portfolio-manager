@@ -999,6 +999,7 @@ class WorkOrder(models.Model):
         ('bge_bcp_participant_mentor', 'Agro-processors — Business Continuity & Strategic Planning (BGE Support)'),
         ('bcp_senior_facilitator',  'Agro-processors BCP — Senior BGE Lead Facilitator'),
         ('outcome_assessment_tool', 'Outcome Assessment Tool Delivery'),
+        ('fi_mobilisation_bcp',   'BCP Tool - Field Implementation'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [

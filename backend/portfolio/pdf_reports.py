@@ -694,6 +694,50 @@ def render_work_order(work_order):
             for i, item in enumerate(items):
                 story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', outcome_item_style))
 
+    if work_order.work_order_type == 'fi_mobilisation_bcp':
+        _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('EXPECTED OUTCOMES', s['sectiontitle']))
+        story.append(Paragraph(
+            'The Business Growth Expert&#x2019;s technical support will contribute to the following outcomes:',
+            ParagraphStyle('outcome_intro', parent=s['body'], fontSize=9, spaceBefore=4, spaceAfter=4),
+        ))
+        fi_outcome_groups = [
+            ('Immediate Outcomes', [
+                'Agro-processors gain a clear understanding of business continuity management and its relevance to their operations.',
+                'Each MSME identifies and documents critical business functions and key operational dependencies.',
+                'Participants develop awareness of financial and operational risks that threaten business continuity.',
+                'Participants understand how financial institutions assess business resilience when evaluating access to finance applications.',
+                'Each MSME completes a structured Business Impact Analysis (BIA) for their enterprise.',
+            ]),
+            ('Intermediate Outcomes', [
+                'Each participating agro-processor develops a practical business continuity strategy tailored to their operational context.',
+                'Participating MSMEs develop a business operational plan with clear implementation priorities.',
+                'Agro-processors improve their preparedness for disruptions including supply chain interruptions, market shocks, and climate-related risks.',
+                'Improved documentation of business operations, increasing credibility and readiness for financial institution requirements.',
+                'Enhanced capacity to communicate business resilience to financial institutions when applying for access to finance.',
+            ]),
+            ('Long-Term Outcomes', [
+                'Agro-processing enterprises demonstrate improved business resilience and continuity during disruptions.',
+                'Improved financial management practices leading to increased eligibility for access to finance products.',
+                'Participating MSMEs develop stronger relationships with financial institutions supported by improved documentation and planning.',
+                'Increased productivity and sustainability of supported agro-processing enterprises.',
+                'Strengthened business performance contributing to employment creation and income growth in Northern Uganda.',
+            ]),
+            ('Institutional Outcomes', [
+                'Increased financial institution confidence in the creditworthiness and operational resilience of PRUDEV II-supported MSMEs.',
+                'Improved data and evidence base for PRUDEV II programme reporting on business resilience and access to finance outcomes.',
+                'Strengthened coordination between the BDS programme and financial institution partners in Northern Uganda.',
+                'PRUDEV II contributes to a model for integrating business continuity into access to finance programming.',
+                'Long-term sustainability of enterprise development outcomes through improved MSME institutional capacity.',
+            ]),
+        ]
+        fi_outcome_item_style = ParagraphStyle('fi_outcome_item', parent=s['body'], fontSize=9, leftIndent=14, spaceBefore=2)
+        for heading, items in fi_outcome_groups:
+            story.append(Paragraph(f'<b>{heading}</b>', ParagraphStyle('fi_outcome_hd', parent=s['body'], fontSize=10, spaceBefore=6, spaceAfter=2)))
+            for i, item in enumerate(items):
+                story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', fi_outcome_item_style))
+
     story.append(Spacer(1, 8))
 
     story.append(Paragraph('SCHEDULE 2 — PAYMENT TERMS', s['sectiontitle']))
@@ -779,6 +823,17 @@ def render_work_order(work_order):
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             'Any changes to the scope or schedule require written approval from the Team Leader.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
+        ]
+    elif work_order.work_order_type == 'fi_mobilisation_bcp':
+        CONDITIONS = [
+            'The BGE must use standardised PRUDEV II tools and report templates only — no custom tools, forms, or approaches may be substituted without written approval from the BDS Expert.',
+            'Any MSME that is unwilling or unable to engage must be formally documented in the non-engagement register within 2 working days of the attempted contact, with reasons noted and the Senior BGE notified promptly.',
+            'All MSME data, business information, and financial records shared during the assignment must be treated as strictly confidential.',
+            'All outputs, tools, documents, and deliverables produced under this work order are the property of GOPA AFC.',
+            'GOPA AFC reserves the right to terminate this work order in the event of non-performance, breach of confidentiality, or failure to comply with PRUDEV II programme standards.',
+            'Transport costs will be reimbursed upon submission of original receipts. Distances above 7 km will be reimbursed as per public transportation rates.',
+            'Payment is made monthly upon submission and approval of all deliverables, a signed timesheet, and an approved invoice, validated by the Business Development Expert.',
+            'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA AFC GmbH.',
         ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [

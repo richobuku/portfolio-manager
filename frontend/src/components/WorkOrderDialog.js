@@ -391,6 +391,20 @@ xii. Compile and submit a consolidated workshop report covering observations, pa
       },
     ],
   },
+  fi_mobilisation_bcp: {
+    objective: `To develop a business continuity strategy and business operational plan for 05 agro-processors attached to you. These two documents are meant to help agro-processors to protect their businesses from disruptions.`,
+    key_tasks: `1. Conduct a Business Impact Analysis (BIA)
+2. Perform a Risk Assessment
+3. Develop Recovery Strategies
+4. Document the Plan
+5. Train and Test`,
+    deliverables_json: [
+      { task_num: 1, description: 'Business continuity strategy and business operational plan submitted for each assigned agro-processor', due_date: '1 week after deployment', quantitative_result: 'Business continuity strategy and operational plan submitted for all assigned agro-processors within 1 week of deployment', qualitative_result: 'Plans are practical, tailored to each enterprise, and meet PRUDEV II quality standards', means_of_verification: 'Submitted business continuity strategy and operational plan (soft and hard copy)', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline and approved by BDS Expert' },
+      { task_num: 2, description: 'Non-engagement register — documented record of any MSME that was unavailable or declined engagement', due_date: 'Rolling — within 2 days of each attempted contact', quantitative_result: '100% of non-engaging MSMEs documented within 2 days of each attempted contact', qualitative_result: 'Register is complete with reasons documented and Senior BGE notified promptly', means_of_verification: 'Completed non-engagement register', unit_rate: '', payment_condition: 'Included in monthly deliverable — required for payment processing' },
+      { task_num: 3, description: 'Close-out report submitted — covering activities, MSME engagement, and key findings', due_date: 'Within 02 days after submission of BCP plan', quantitative_result: '1 close-out report submitted within 02 days of the final BCP plan submission', qualitative_result: 'Report covers all assigned MSMEs, summarises activities, engagement challenges, and provides recommendations', means_of_verification: 'Submitted and approved close-out report', unit_rate: '', payment_condition: 'Payment processed upon approval of close-out report' },
+      { task_num: 4, description: 'Approved invoice and signed timesheet', due_date: 'Within 02 days after submission of BCP plan', quantitative_result: '1 approved invoice and 1 signed timesheet submitted within 02 days of BCP plan submission', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of invoice, timesheet, and close-out report' },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -528,6 +542,14 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
       extra.team_leader_position = 'Team Leader';
     }
+    if (type === 'fi_mobilisation_bcp') {
+      extra.duration     = 'Maximum of 4 days per MSME';
+      extra.max_days     = 4;
+      extra.rate_per_day = 60000;
+      extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
@@ -642,6 +664,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="bge_bcp_participant_mentor">Agro-processors — Business Continuity &amp; Strategic Planning (BGE Support)</MenuItem>
                 <MenuItem value="bcp_senior_facilitator">Agro-processors BCP — Senior BGE Lead Facilitator</MenuItem>
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
+                <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>

@@ -23,7 +23,7 @@ class TshirtReceiptEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ['signed', 'signed_at']
 
     def get_has_signature(self, obj):
-        return bool(obj.bge.signature_data or obj.bge.signature)
+        return bool(obj.bge.signature_data)
 
 
 class TshirtReceiptSerializer(serializers.ModelSerializer):

@@ -3,7 +3,7 @@ import io as _io
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Count, Q
 from django.core.mail import EmailMultiAlternatives
@@ -765,7 +765,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             'detail': 'Signature uploaded and processed successfully.',
         })
 
-    @action(detail=True, methods=['get'], url_path='signature-image')
+    @action(detail=True, methods=['get'], url_path='signature-image', permission_classes=[AllowAny])
     def signature_image(self, request, pk=None):
         """Serve the BGE's stored signature as a PNG.
 
