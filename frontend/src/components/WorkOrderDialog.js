@@ -393,11 +393,11 @@ xii. Compile and submit a consolidated workshop report covering observations, pa
   },
   fi_mobilisation_bcp: {
     objective: `To develop a business continuity strategy and business operational plan for 05 agro-processors attached to you. These two documents are meant to help agro-processors to protect their businesses from disruptions.`,
-    key_tasks: `1. Conduct a Business Impact Analysis (BIA)
-2. Perform a Risk Assessment
-3. Develop Recovery Strategies
-4. Document the Plan
-5. Train and Test`,
+    key_tasks: `1. Conduct a Business Impact Analysis (BIA): Identify time-sensitive operations, estimate the financial and operational impacts of disruptions, and determine their Maximum Tolerable Downtime (MTD) for critical processes.
+2. Perform a Risk Assessment: Identify potential threats (e.g., inflation, raw material seasonality, cyberattacks, supply chain failures, natural disasters) and evaluate the probability and impact of each to prioritize mitigation efforts.
+3. Develop Recovery Strategies: Outline specific, actionable steps to resume critical functions for the business.
+4. Document the Plan: Create a clear, easily accessible written document detailing response procedures, team member roles and contact lists, communication protocols, among others.
+5. Train and Test: Educate employees on their specific responsibilities during a crisis as per the strategy. Conduct a simulation exercise (tabletop or full-scale) to identify weaknesses and refine the strategy.`,
     deliverables_json: [
       { task_num: 1, description: 'Business continuity strategy and business operational plan submitted for each assigned agro-processor', due_date: '1 week after deployment', quantitative_result: 'Business continuity strategy and operational plan submitted for all assigned agro-processors within 1 week of deployment', qualitative_result: 'Plans are practical, tailored to each enterprise, and meet PRUDEV II quality standards', means_of_verification: 'Submitted business continuity strategy and operational plan (soft and hard copy)', unit_rate: '', payment_condition: 'Pay only if submitted within required timeline and approved by BDS Expert' },
       { task_num: 2, description: 'Non-engagement register — documented record of any MSME that was unavailable or declined engagement', due_date: 'Rolling — within 2 days of each attempted contact', quantitative_result: '100% of non-engaging MSMEs documented within 2 days of each attempted contact', qualitative_result: 'Register is complete with reasons documented and Senior BGE notified promptly', means_of_verification: 'Completed non-engagement register', unit_rate: '', payment_condition: 'Included in monthly deliverable — required for payment processing' },
