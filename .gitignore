@@ -178,3 +178,6 @@ logs/
 *.tmp
 *.temp 
 .vercel
+
+# Google Drive service account key (never commit)
+backend/drive_service_account.json
