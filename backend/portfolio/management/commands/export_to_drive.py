@@ -38,9 +38,39 @@ def _safe_name(name: str) -> str:
 
 
 def _drive_service():
+    """
+    Build a Drive API client.
+
+    Priority:
+      1. OAuth2 refresh token (GOOGLE_OAUTH2_* env vars) — works with personal Gmail,
+         uploads count against the real user's quota.
+      2. Service account JSON (GOOGLE_DRIVE_CREDENTIALS env var or local file) —
+         only works with Shared Drives / Google Workspace.
+    """
+    from googleapiclient.discovery import build
+
+    client_id     = os.environ.get('GOOGLE_OAUTH2_CLIENT_ID')
+    client_secret = os.environ.get('GOOGLE_OAUTH2_CLIENT_SECRET')
+    refresh_token = os.environ.get('GOOGLE_OAUTH2_REFRESH_TOKEN')
+
+    if client_id and client_secret and refresh_token:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+
+        creds = Credentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=SCOPES,
+        )
+        creds.refresh(Request())
+        return build('drive', 'v3', credentials=creds, cache_discovery=False)
+
+    # Fallback: service account (requires Shared Drive or Google Workspace)
     import json
     from google.oauth2 import service_account
-    from googleapiclient.discovery import build
 
     raw = os.environ.get('GOOGLE_DRIVE_CREDENTIALS')
     if raw:
@@ -58,9 +88,9 @@ def _drive_service():
             key_path = os.path.join(settings.BASE_DIR, '..', 'drive_service_account.json')
         if not os.path.exists(key_path):
             raise CommandError(
-                'Google Drive credentials not found. '
-                'Set the GOOGLE_DRIVE_CREDENTIALS environment variable (JSON contents) '
-                'or place drive_service_account.json in the backend/ directory.'
+                'No Google Drive credentials found. Set GOOGLE_OAUTH2_CLIENT_ID, '
+                'GOOGLE_OAUTH2_CLIENT_SECRET, and GOOGLE_OAUTH2_REFRESH_TOKEN in Render, '
+                'or run backend/get_drive_token.py to generate them.'
             )
         creds = service_account.Credentials.from_service_account_file(key_path, scopes=SCOPES)
 
