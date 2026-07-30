@@ -32,16 +32,21 @@ class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, 
         user = self.request.user
         qs = TrainingReport.objects.select_related('session', 'bge')
         if user.is_staff or user.is_superuser:
-            return qs
-        if _is_programme_manager(user):
+            pass
+        elif _is_programme_manager(user):
             group_ids = _managed_groups(user) or []
-            return qs.filter(
+            qs = qs.filter(
                 session__businesses__programme_groups__in=group_ids
             ).distinct()
-        try:
-            return qs.filter(bge=user.bge_profile)
-        except Exception:
-            return qs.none()
+        else:
+            try:
+                qs = qs.filter(bge=user.bge_profile)
+            except Exception:
+                return qs.none()
+        bge_id = self.request.query_params.get('bge')
+        if bge_id:
+            qs = qs.filter(bge_id=bge_id)
+        return qs
 
     def perform_create(self, serializer):
         bge = None
@@ -153,16 +158,21 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             'session__facilitation_assignments__bge',
         )
         if user.is_staff or user.is_superuser:
-            return qs
-        if _is_programme_manager(user):
+            pass
+        elif _is_programme_manager(user):
             group_ids = _managed_groups(user) or []
-            return qs.filter(
+            qs = qs.filter(
                 session__businesses__programme_groups__in=group_ids
             ).distinct()
-        try:
-            return qs.filter(bge=user.bge_profile)
-        except Exception:
-            return qs.none()
+        else:
+            try:
+                qs = qs.filter(bge=user.bge_profile)
+            except Exception:
+                return qs.none()
+        bge_id = self.request.query_params.get('bge')
+        if bge_id:
+            qs = qs.filter(bge_id=bge_id)
+        return qs
 
     def perform_create(self, serializer):
         bge = None

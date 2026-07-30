@@ -668,15 +668,26 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // Track the currently-requested expert id so a slow response from a previously
   // closed dialog can't overwrite the data of whatever the user has open now.
   const expertFetchSeq = React.useRef(0);
+  const [bgeTrReports, setBgeTrReports] = useState([]);
+  const [bgeMrReports, setBgeMrReports] = useState([]);
   const openExpertView = async (bge) => {
     const seq = ++expertFetchSeq.current;
     setViewItem(bge);
     setViewType('expert');
+    setBgeTrReports([]);
+    setBgeMrReports([]);
     try {
-      const res = await axios.get(`${API_ENDPOINTS.EXPERTS}${bge.id}/`, { headers });
-      // Only commit the response if no newer openExpertView() has fired since
-      // we started, AND the dialog is still showing the same expert.
-      if (seq === expertFetchSeq.current) setViewItem(res.data);
+      const [res, trRes, mrRes] = await Promise.all([
+        axios.get(`${API_ENDPOINTS.EXPERTS}${bge.id}/`, { headers }),
+        axios.get(`${API_ENDPOINTS.TRAINING_REPORTS}?bge=${bge.id}&page_size=100`, { headers }).catch(() => ({ data: [] })),
+        axios.get(`${API_ENDPOINTS.MENTOR_REPORTS}?bge=${bge.id}&page_size=100`, { headers }).catch(() => ({ data: [] })),
+      ]);
+      if (seq === expertFetchSeq.current) {
+        setViewItem(res.data);
+        const toArr = d => Array.isArray(d) ? d : (d.results || []);
+        setBgeTrReports(toArr(trRes.data));
+        setBgeMrReports(toArr(mrRes.data));
+      }
     } catch {
       // keep the cached item already shown
     }
@@ -8288,7 +8299,7 @@ PRUDEV II BDS Team`
       </Box>
 
       {/* ── View dialog ──────────────────────────────────────────────────── */}
-      <Dialog open={!!viewItem} onClose={() => { setViewItem(null); setMsmeDetailTab(0); }} maxWidth="sm" fullWidth>
+      <Dialog open={!!viewItem} onClose={() => { setViewItem(null); setMsmeDetailTab(0); setBgeTrReports([]); setBgeMrReports([]); }} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 0 }}>
           <Typography variant="subtitle1" fontWeight={700}>{viewItem?.business_name || viewItem?.name} — Details</Typography>
           {viewItem && viewType === 'msme' && (
@@ -8430,6 +8441,90 @@ PRUDEV II BDS Team`
                   </>
                 );
               })()}
+
+              {/* ── Training & Mentor Reports for this BGE ── */}
+              {(bgeTrReports.length > 0 || bgeMrReports.length > 0) && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                    Reports ({bgeTrReports.length} lead · {bgeMrReports.length} mentor)
+                  </Typography>
+
+                  {bgeTrReports.length > 0 && (
+                    <Box sx={{ mb: bgeMrReports.length > 0 ? 2 : 0 }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}
+                        sx={{ textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75 }}>
+                        Lead Reports
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                        {bgeTrReports.map(r => (
+                          <Box key={r.id} sx={{
+                            display: 'flex', alignItems: 'center', gap: 1,
+                            p: 1, borderRadius: 1, border: '1px solid #E8EDF2', bgcolor: '#F8FAFC',
+                          }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={500} noWrap>{r.session_title}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {[r.session_date, r.session_location].filter(Boolean).join(' · ')}
+                              </Typography>
+                            </Box>
+                            <Chip label={r.status} size="small"
+                              color={r.status === 'submitted' ? 'primary' : 'default'}
+                              sx={{ fontSize: 10, height: 18 }} />
+                            <Tooltip title="Open PDF">
+                              <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'view')}>
+                                <PictureAsPdf fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Download PDF">
+                              <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'download')}>
+                                <Download fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {bgeMrReports.length > 0 && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}
+                        sx={{ textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75 }}>
+                        Mentor Reports
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                        {bgeMrReports.map(r => (
+                          <Box key={r.id} sx={{
+                            display: 'flex', alignItems: 'center', gap: 1,
+                            p: 1, borderRadius: 1, border: '1px solid #E8EDF2', bgcolor: '#F8FAFC',
+                          }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={500} noWrap>{r.session_title}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {[r.session_date, r.session_location].filter(Boolean).join(' · ')}
+                              </Typography>
+                            </Box>
+                            <Chip label={r.status} size="small"
+                              color={r.status === 'submitted' ? 'primary' : 'default'}
+                              sx={{ fontSize: 10, height: 18 }} />
+                            <Tooltip title="Open PDF">
+                              <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'view')}>
+                                <PictureAsPdf fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Download PDF">
+                              <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'download')}>
+                                <Download fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                </>
+              )}
             </Box>
           ) : viewItem && viewType === 'msme' && msmeDetailTab === 0 ? (
             /* ── MSME Profile tab ── */
