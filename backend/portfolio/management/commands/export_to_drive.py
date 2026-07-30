@@ -32,10 +32,19 @@ def _drive_service():
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 
-    # Prefer env var (Render/production) — falls back to local JSON file
+    # Prefer env var (Render/production) — falls back to local JSON file.
+    # Value may be plain JSON or base64-encoded JSON (to survive Render's env var handling).
     raw = os.environ.get('GOOGLE_DRIVE_CREDENTIALS')
     if raw:
-        info = json.loads(raw)
+        import base64
+        raw = raw.strip()
+        try:
+            # Try base64 first (preferred for Render)
+            decoded = base64.b64decode(raw).decode('utf-8')
+            info = json.loads(decoded)
+        except Exception:
+            # Fall back to plain JSON
+            info = json.loads(raw)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
     else:
         key_path = SERVICE_ACCOUNT_PATH
