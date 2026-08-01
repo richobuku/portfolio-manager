@@ -1000,6 +1000,7 @@ class WorkOrder(models.Model):
         ('bcp_senior_facilitator',  'Agro-processors BCP — Senior BGE Lead Facilitator'),
         ('outcome_assessment_tool', 'Outcome Assessment Tool Delivery'),
         ('fi_mobilisation_bcp',   'BCP Tool - Field Implementation'),
+        ('carbon_emissions_training', 'Carbon Emissions Measurement Framework — Training & Field Implementation'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [

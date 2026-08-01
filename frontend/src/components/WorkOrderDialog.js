@@ -405,6 +405,23 @@ xii. Compile and submit a consolidated workshop report covering observations, pa
       { task_num: 4, description: 'Approved invoice and signed timesheet', due_date: 'Within 02 days after submission of BCP plan', quantitative_result: '1 approved invoice and 1 signed timesheet submitted within 02 days of BCP plan submission', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of invoice, timesheet, and close-out report' },
     ],
   },
+  carbon_emissions_training: {
+    objective: `To equip BGEs with practical skills in the Carbon Footprint Tool and Carbon Emissions Measurement Framework, enabling them to support MSMEs in understanding, measuring, and reducing their carbon emissions. Each BGE will demonstrate competency in using the tool, measuring emissions for themselves and at least 2 MSMEs, identifying emission hotspots, and building MSME motivation to reduce emissions by showing how emission reduction directly translates to cost savings — working towards PRUDEV II's target of at least 1% carbon emission reduction per MSME over 12 months.`,
+    key_tasks: `1. Carbon Footprint Tool Orientation & Account Setup: Participate in practical training sessions on the Carbon Footprint Tool. Create your own account, navigate the full tool independently, and demonstrate ability to measure personal/operational carbon emissions. Each BGE must show demonstrable competency before proceeding to MSME onboarding.
+2. MSME Account Creation & Baseline Measurement: Create accounts on the Carbon Footprint Tool for a minimum of 2 assigned MSMEs during the training period. Record baseline emissions data for each MSME, covering all relevant emission sources (energy, transport, waste, materials).
+3. Emission Hotspot Analysis: Facilitate a structured review of each MSME's emission profile to identify the top emission hotspots. Document hotspots by category and link each to a specific operational cost within the MSME's business — demonstrating that emission sources are also cost centres.
+4. Waste as a Unit of Emission: Conduct practical exercises with MSMEs on understanding waste as a measurable unit of carbon emission. Develop clear, MSME-specific cost reduction strategies linked to waste reduction, showing the dual benefit of cost savings and emission reduction.
+5. Emission Mitigation & Reduction Planning: Co-develop an emission mitigation and reduction plan with each MSME, targeting a minimum 1% emissions reduction over 12 months. Plans must include specific actions, responsible parties, timelines, and expected cost savings — framed so the MSME is incentivised by the financial benefit.
+6. BGE Coaching Competency Demonstration: Demonstrate the ability to coach an MSME owner through their emissions profile and cost reduction opportunities. Show how reducing operational costs (energy, waste, materials) simultaneously reduces carbon emissions — building MSME motivation to act without relying on regulatory pressure.`,
+    deliverables_json: [
+      { task_num: 1, description: 'BGE personal account created on the Carbon Footprint Tool and own baseline emissions measured and documented', due_date: 'During training (Day 1–2)', quantitative_result: '1 completed personal emissions profile per BGE', qualitative_result: 'BGE demonstrates independent ability to navigate the tool and interpret results', means_of_verification: 'Screenshot of completed account and emissions dashboard', unit_rate: '', payment_condition: 'Required as evidence of training completion' },
+      { task_num: 2, description: 'Carbon Footprint Tool accounts created for a minimum of 2 MSMEs, with documented baseline emissions data', due_date: 'During training (Day 2–3)', quantitative_result: 'Minimum 2 MSME accounts with full baseline data recorded', qualitative_result: 'Data covers all major emission categories (energy, transport, waste, materials); figures verified with MSME owner', means_of_verification: 'Screenshots of completed MSME accounts and baseline emission reports', unit_rate: '', payment_condition: 'Pay only if minimum 2 MSME accounts are completed with full data' },
+      { task_num: 3, description: 'Emission hotspot analysis for each enrolled MSME, with costs linked to emission sources', due_date: 'Within 1 day of baseline measurement', quantitative_result: '1 hotspot analysis per MSME, covering top 3 emission sources linked to operational costs', qualitative_result: 'Analysis is specific to the MSME\'s operations; MSME owner can identify their key emission-cost centres', means_of_verification: 'Completed hotspot analysis form per MSME, co-signed by BGE and MSME owner', unit_rate: '', payment_condition: 'Included in overall training deliverable' },
+      { task_num: 4, description: 'Emission mitigation and reduction plan for each MSME, targeting ≥1% emissions reduction over 12 months', due_date: 'By end of field implementation period', quantitative_result: '1 emission reduction plan per MSME with specific actions, timelines, and projected cost savings', qualitative_result: 'Plan is practical and MSME-owned; cost savings are quantified and linked to emission reduction targets', means_of_verification: 'Signed emission mitigation and reduction plan (soft and hard copy) per MSME', unit_rate: '', payment_condition: 'Pay only if plan is completed and signed by both BGE and MSME owner' },
+      { task_num: 5, description: 'Training completion report demonstrating BGE competency across all outcome areas', due_date: 'Within 2 days of end of training', quantitative_result: '1 training completion report per BGE covering all 6 competency areas', qualitative_result: 'Report provides evidence of demonstrable understanding across hotspot analysis, waste emissions, and MSME coaching', means_of_verification: 'Submitted and approved training completion report', unit_rate: '', payment_condition: 'Payment processed upon approval of training completion report' },
+      { task_num: 6, description: 'Approved invoice and signed timesheet', due_date: 'Within 2 days of training completion', quantitative_result: '1 approved invoice and 1 signed timesheet submitted on time', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of invoice, timesheet, and training completion report' },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -550,6 +567,14 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
       extra.team_leader_position = 'Team Leader';
     }
+    if (type === 'carbon_emissions_training') {
+      extra.duration     = 'Maximum of 5 days';
+      extra.max_days     = 5;
+      extra.rate_per_day = 60000;
+      extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
@@ -665,6 +690,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="bcp_senior_facilitator">Agro-processors BCP — Senior BGE Lead Facilitator</MenuItem>
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
+                <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework — Training &amp; Field Implementation</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
