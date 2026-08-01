@@ -10,6 +10,7 @@ from .training import (
     TrainingReportSerializer,
     AnnualReviewReportSerializer,
     MentorTrainingReportSerializer,
+    BGEParticipantTrainingReportSerializer,
 )
 from .visit_reports import (
     MSMEReportSerializer,
@@ -40,6 +41,7 @@ __all__ = [
     'TrainingReportSerializer',
     'AnnualReviewReportSerializer',
     'MentorTrainingReportSerializer',
+    'BGEParticipantTrainingReportSerializer',
     'MSMEReportSerializer',
     'GroupReportSerializer',
     'GroupReportContributionSerializer',

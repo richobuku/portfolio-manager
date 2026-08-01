@@ -28,7 +28,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_REVERT_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -330,13 +330,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [emailSending, setEmailSending] = useState(false);
   const [provisioningBgeId, setProvisioningBgeId] = useState(null);
 
-  // ── training / mentor reports (admin) ─────────────────────────────────────
+  // ── training / mentor / participant reports (admin) ────────────────────────
   const [adminTrainingReports, setAdminTrainingReports] = useState([]);
   const [adminMentorReports, setAdminMentorReports] = useState([]);
+  const [adminParticipantReports, setAdminParticipantReports] = useState([]);
   const [trReportsLoaded, setTrReportsLoaded] = useState(false);
   const [trReportTab, setTrReportTab] = useState(0);
   const [viewTrReport, setViewTrReport] = useState(null);
   const [viewMrReport, setViewMrReport] = useState(null);
+  const [viewPtReport, setViewPtReport] = useState(null);
 
   // ── assignment dialog ──────────────────────────────────────────────────────
   const [assignDialog, setAssignDialog] = useState(false);
@@ -461,10 +463,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     Promise.all([
       axios.get(API_ENDPOINTS.TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
       axios.get(API_ENDPOINTS.MENTOR_REPORTS, { headers: h }).catch(() => ({ data: [] })),
-    ]).then(([trRes, mrRes]) => {
+      axios.get(API_ENDPOINTS.PARTICIPANT_TRAINING_REPORTS, { headers: h }).catch(() => ({ data: [] })),
+    ]).then(([trRes, mrRes, ptRes]) => {
       const toArr = d => Array.isArray(d) ? d : d.results || [];
       setAdminTrainingReports(toArr(trRes.data));
       setAdminMentorReports(toArr(mrRes.data));
+      setAdminParticipantReports(toArr(ptRes.data));
       setTrReportsLoaded(true);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1061,12 +1065,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   const revertReport = async (kind, id) => {
-    const label = kind === 'group' ? 'group report' : kind === 'training' ? 'training report' : kind === 'mentor' ? 'mentor report' : 'visit report';
+    const label = kind === 'group' ? 'group report' : kind === 'training' ? 'training report' : kind === 'mentor' ? 'mentor report' : kind === 'participant' ? 'participant training report' : 'visit report';
     if (!window.confirm(`Revert this ${label} to draft? The BGE will be able to edit and resubmit it.`)) return;
     try {
       const url = kind === 'group' ? GROUP_REPORT_REVERT_URL(id)
         : kind === 'training' ? TRAINING_REPORT_REVERT_URL(id)
         : kind === 'mentor' ? MENTOR_REPORT_REVERT_URL(id)
+        : kind === 'participant' ? PARTICIPANT_TRAINING_REPORT_REVERT_URL(id)
         : REPORT_REVERT_URL(id);
       await axios.post(url, {}, { headers });
       notify(`${label.charAt(0).toUpperCase() + label.slice(1)} reverted to draft`);
@@ -1175,7 +1180,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   const openTrainingReportPdf = async (kind, reportId, mode = 'view') => {
-    const urlFn = kind === 'mentor' ? MENTOR_REPORT_PDF_URL : TRAINING_REPORT_PDF_URL;
+    const urlFn = kind === 'mentor' ? MENTOR_REPORT_PDF_URL
+                : kind === 'participant' ? PARTICIPANT_TRAINING_REPORT_PDF_URL
+                : TRAINING_REPORT_PDF_URL;
+    const label = kind === 'mentor' ? 'MentorReport'
+                : kind === 'participant' ? 'ParticipantTrainingReport'
+                : 'TrainingReport';
     try {
       const res = await axios.get(
         `${urlFn(reportId)}${mode === 'download' ? '?dl=1' : ''}`,
@@ -1185,7 +1195,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (mode === 'download') {
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${kind === 'mentor' ? 'MentorReport' : 'TrainingReport'}_${reportId}.pdf`;
+        a.download = `${label}_${reportId}.pdf`;
         document.body.appendChild(a); a.click(); a.remove();
       } else {
         window.open(url, '_blank');
@@ -5112,12 +5122,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Box sx={{ mt: 4 }}>
         <SectionHeader
           title="Training Reports"
-          subtitle={`${adminTrainingReports.length} lead · ${adminMentorReports.length} mentor`}
+          subtitle={`${adminTrainingReports.length} lead · ${adminMentorReports.length} mentor · ${adminParticipantReports.length} participant`}
         />
         <Tabs value={trReportTab} onChange={(_, v) => setTrReportTab(v)}
           sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
           <Tab label={`Lead Reports (${adminTrainingReports.length})`} />
           <Tab label={`Mentor Reports (${adminMentorReports.length})`} />
+          <Tab label={`Participant Reports (${adminParticipantReports.length})`} />
         </Tabs>
 
         {trReportTab === 0 && (
@@ -5246,6 +5257,83 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           {isAdmin && r.status !== 'draft' && (
                             <Tooltip title="Revert to draft">
                               <IconButton size="small" color="warning" onClick={() => revertReport('mentor', r.id)}>
+                                <Undo fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )
+        )}
+
+        {trReportTab === 2 && (
+          adminParticipantReports.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+              No participant training reports submitted yet.
+            </Paper>
+          ) : (
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell>Training Title</TableCell>
+                    <TableCell>Dates</TableCell>
+                    <TableCell>Venue</TableCell>
+                    <TableCell>BGE</TableCell>
+                    <TableCell>Attendees</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {adminParticipantReports.map(r => (
+                    <TableRow key={r.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={500}>{r.training_title || '—'}</Typography>
+                        {r.facilitator_name && (
+                          <Typography variant="caption" color="text.secondary">Facilitator: {r.facilitator_name}</Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{r.training_dates || '—'}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{r.venue || '—'}</Typography>
+                        {r.district && <Typography variant="caption" color="text.secondary">{r.district}</Typography>}
+                      </TableCell>
+                      <TableCell>{r.bge_name || '—'}</TableCell>
+                      <TableCell>
+                        {(r.attendees || []).length > 0
+                          ? <Chip label={`${r.attendees.length} attendees`} size="small" variant="outlined" />
+                          : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={r.status} size="small"
+                          color={r.status === 'submitted' ? 'primary' : 'default'} />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Tooltip title="View report">
+                            <IconButton size="small" color="primary" onClick={() => setViewPtReport(r)}>
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Open PDF">
+                            <IconButton size="small" onClick={() => openTrainingReportPdf('participant', r.id, 'view')}>
+                              <PictureAsPdf fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download PDF">
+                            <IconButton size="small" onClick={() => openTrainingReportPdf('participant', r.id, 'download')}>
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {isAdmin && r.status !== 'draft' && (
+                            <Tooltip title="Revert to draft">
+                              <IconButton size="small" color="warning" onClick={() => revertReport('participant', r.id)}>
                                 <Undo fontSize="small" />
                               </IconButton>
                             </Tooltip>
@@ -10147,6 +10235,112 @@ PRUDEV II BDS Team`
                 Download
               </Button>
               <Button onClick={() => setViewMrReport(null)}>Close</Button>
+            </DialogActions>
+          </>;
+        })()}
+      </Dialog>
+
+      {/* ── View Participant Training Report ───────────────────────────── */}
+      <Dialog open={!!viewPtReport} onClose={() => setViewPtReport(null)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { maxHeight: '90vh' } }}>
+        {viewPtReport && (() => {
+          const pt = viewPtReport;
+          const SECTIONS = [
+            { key: 'topics_covered',         label: 'Topics / Modules Covered' },
+            { key: 'key_learnings',          label: 'Key Learnings & Insights' },
+            { key: 'practical_application',  label: 'Practical Application with MSMEs' },
+            { key: 'msmes_as_test_subjects', label: 'MSMEs Used as Practice Subjects' },
+            { key: 'challenges',             label: 'Challenges Encountered' },
+            { key: 'action_plan',            label: 'Action Plan & Next Steps' },
+          ];
+          return <>
+            <Box sx={{ bgcolor: '#1A5276', px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+                  BGE Participant Training Report
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.3 }}>
+                  {pt.training_title || 'Training Report'}
+                </Typography>
+              </Box>
+              <Chip label={pt.status} size="small" color={pt.status === 'submitted' ? 'primary' : 'default'} />
+            </Box>
+            <DialogContent sx={{ p: 0 }}>
+              <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+                {[
+                  ['BGE', pt.bge_name],
+                  ['Training Dates', pt.training_dates],
+                  ['Venue', pt.venue],
+                  ['District', pt.district],
+                  ['Facilitator', pt.facilitator_name],
+                ].filter(([, v]) => v).map(([label, val]) => (
+                  <Box key={label}>
+                    <Typography variant="caption" color="text.secondary" display="block"
+                      sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{val}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Box sx={{ px: 3, py: 2 }}>
+                {SECTIONS.map(({ key, label }, idx) => (
+                  <Box key={key} sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                      <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#1A5276',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Typography sx={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>{idx + 1}</Typography>
+                      </Box>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1A5276' }}>{label}</Typography>
+                    </Box>
+                    <Box sx={{ bgcolor: '#F4F6F9', borderRadius: 1.5, px: 2, py: 1.5,
+                      borderLeft: `3px solid ${pt[key] ? '#1A5276' : '#E5E7EB'}` }}>
+                      {pt[key] ? (
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{pt[key]}</Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>No information recorded.</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                ))}
+                {(pt.attendees || []).length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1A5276', mb: 1 }}>
+                      Attendance Register ({pt.attendees.length} participants)
+                    </Typography>
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead sx={{ bgcolor: '#1A5276' }}>
+                          <TableRow>
+                            {['#', 'Name', 'BGE Code', 'Phone', 'Gender', 'Organisation'].map(h => (
+                              <TableCell key={h} sx={{ color: '#fff', fontSize: 11 }}>{h}</TableCell>
+                            ))}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {pt.attendees.map((a, i) => (
+                            <TableRow key={i} sx={{ bgcolor: i % 2 === 0 ? '#F8FAFC' : '#fff' }}>
+                              <TableCell>{i + 1}</TableCell>
+                              <TableCell>{a.name || '—'}</TableCell>
+                              <TableCell>{a.bge_code || '—'}</TableCell>
+                              <TableCell>{a.phone || '—'}</TableCell>
+                              <TableCell>{a.gender || '—'}</TableCell>
+                              <TableCell>{a.organisation || '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ borderTop: '1px solid #E5E7EB', gap: 1 }}>
+              <Button onClick={() => openTrainingReportPdf('participant', pt.id, 'view')} startIcon={<PictureAsPdf />}>
+                Open PDF
+              </Button>
+              <Button onClick={() => openTrainingReportPdf('participant', pt.id, 'download')} startIcon={<Download />}>
+                Download
+              </Button>
+              <Button onClick={() => setViewPtReport(null)}>Close</Button>
             </DialogActions>
           </>;
         })()}

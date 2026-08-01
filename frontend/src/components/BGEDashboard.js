@@ -19,6 +19,7 @@ import {
 import axios from 'axios';
 import {
   API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS,
+  PARTICIPANT_TRAINING_REPORTS, PARTICIPANT_TRAINING_REPORT_PDF_URL,
   TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL,
   WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
   WORK_ORDER_ATTACHMENT_DOWNLOAD_URL,
@@ -149,6 +150,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // Training tab — assigned sessions
   const [leadSessions, setLeadSessions] = useState([]);
   const [mentorSessions, setMentorSessions] = useState([]);
+  const [participantSessions, setParticipantSessions] = useState([]);
 
   // Training report dialog (lead sessions)
   const [trDialog, setTrDialog] = useState(false);
@@ -197,6 +199,21 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     key_observations: '', challenges: '', recommendations: '', next_steps: '',
     status: 'draft',
   };
+
+  // Participant training report
+  const [ptReports, setPtReports] = useState([]);
+  const [ptDialog, setPtDialog] = useState(false);
+  const [ptEdit, setPtEdit] = useState(null);
+  const [ptSaving, setPtSaving] = useState(false);
+  const [trainingTab, setTrainingTab] = useState(0);
+  const EMPTY_PT = {
+    training_title: '', training_dates: '', venue: '', district: '', facilitator_name: '',
+    topics_covered: '', key_learnings: '', practical_application: '',
+    msmes_as_test_subjects: '', challenges: '', action_plan: '',
+    attendees: [], status: 'draft',
+  };
+  const [ptForm, setPtForm] = useState({ ...EMPTY_PT });
+  const [ptAttendeeRow, setPtAttendeeRow] = useState({ name: '', bge_code: '', phone: '', gender: '', organisation: '' });
 
   // Work orders
   const [workOrders, setWorkOrders] = useState([]);
@@ -558,6 +575,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       const mentorIds  = new Set(allAssignments.filter(a => a.role === 'mentor' && a.session).map(a => a.session));
       setLeadSessions(enriched.filter(s => leadTopics.has(s.topic)));
       setMentorSessions(enriched.filter(s => mentorIds.has(s.id)));
+      setParticipantSessions(enriched.filter(s =>
+        (s.bge_participants || []).some(p => p.id === myBgeId)
+      ));
+    } catch { /* silent */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, myBgeId]);
+
+  const fetchPtReports = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(PARTICIPANT_TRAINING_REPORTS, { headers: h });
+      setPtReports(Array.isArray(res.data) ? res.data : res.data.results || []);
     } catch { /* silent */ }
   }, [token]);
 
@@ -744,6 +773,45 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     finally { setMrSaving(false); }
   };
 
+  const openPtDialog = (report = null, sessionDefaults = {}) => {
+    setPtEdit(report);
+    setPtForm(report ? { ...EMPTY_PT, ...report } : { ...EMPTY_PT, ...sessionDefaults });
+    setPtAttendeeRow({ name: '', bge_code: '', phone: '', gender: '', organisation: '' });
+    setPtDialog(true);
+  };
+
+  const savePtReport = async (submitNow = false) => {
+    setPtSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    const payload = { ...ptForm, status: submitNow ? 'submitted' : (ptForm.status || 'draft') };
+    try {
+      if (ptEdit?.id) {
+        await axios.patch(`${PARTICIPANT_TRAINING_REPORTS}${ptEdit.id}/`, payload, { headers: h });
+      } else {
+        await axios.post(PARTICIPANT_TRAINING_REPORTS, payload, { headers: h });
+      }
+      notify(submitNow ? 'Report submitted!' : 'Draft saved');
+      setPtDialog(false);
+      fetchPtReports();
+    } catch (err) { notify(err.response?.data?.detail || 'Failed to save', 'error'); }
+    finally { setPtSaving(false); }
+  };
+
+  const openPtPdf = async (id, mode = 'view') => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(`${PARTICIPANT_TRAINING_REPORT_PDF_URL(id)}${mode === 'download' ? '?dl=1' : ''}`,
+        { headers: h, responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (mode === 'download') {
+        const a = document.createElement('a');
+        a.href = url; a.download = `ParticipantReport_${id}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else { window.open(url, '_blank'); }
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch { notify('Failed to render PDF', 'error'); }
+  };
+
   const pushAttempted = useRef(false);
 
   useEffect(() => {
@@ -756,12 +824,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchPayments();
     fetchAttachments();
     fetchSessions();
+    fetchPtReports();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, token]);
+  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, fetchPtReports, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -1309,7 +1378,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
     { key: 'training',   label: 'Training',       icon: <School />,
-      badge: leadSessions.length + mentorSessions.length || undefined },
+      badge: leadSessions.length + mentorSessions.length + participantSessions.length || undefined },
     { key: 'tshirts',    label: 'T-Shirts',       icon: <Checkroom />,
       badge: tshirtEntries.filter(e => !e.signed).length || undefined },
   ];
@@ -2560,12 +2629,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         {section === 'training' && (
           <Box>
             <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" fontWeight={700}>My Training Sessions</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Sessions you are assigned to as lead facilitator or mentor.
-              </Typography>
+              <Typography variant="h6" fontWeight={700}>Training</Typography>
             </Box>
 
+            <Tabs value={trainingTab} onChange={(_, v) => setTrainingTab(v)}
+              sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Tab label={`Facilitated (${leadSessions.length + mentorSessions.length})`} />
+              <Tab label={`Participant (${participantSessions.length})`} />
+              <Tab label={`My Reports (${ptReports.length})`} />
+            </Tabs>
+
+            {trainingTab === 0 && (
+            <>
             {leadSessions.length === 0 && mentorSessions.length === 0 ? (
               <Paper sx={{ p: 6, textAlign: 'center' }}>
                 <School sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
@@ -2650,6 +2725,153 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     </CardContent>
                   </Card>
                 ))}
+              </Box>
+            )}
+            </>
+            )}
+
+            {/* ── Tab 1: Sessions assigned as participant ── */}
+            {trainingTab === 1 && (
+              <Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Training sessions where you are registered as a participant learner.
+                  Click "Write Report" to document your learning outcomes.
+                </Typography>
+                {participantSessions.length === 0 ? (
+                  <Paper sx={{ p: 6, textAlign: 'center' }}>
+                    <School sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                    <Typography color="text.secondary" gutterBottom>No participant sessions yet.</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      You will appear here once the programme administrator registers you as a participant in a training session.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {participantSessions.map(s => {
+                      const existing = ptReports.find(r => r.training_title === s.title && r.training_dates === s.date);
+                      return (
+                        <Card key={s.id} sx={{ borderLeft: '4px solid #1A5276', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', minWidth: 0 }}>
+                                <School sx={{ color: '#1A5276', fontSize: 20, mt: 0.3, flexShrink: 0 }} />
+                                <Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                    <Chip label="Participant" size="small" sx={{ bgcolor: '#1A5276', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                                    <Typography fontWeight={700} fontSize={15}>{s.title}</Typography>
+                                  </Box>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {s.date}{s.end_date && s.end_date !== s.date ? ` – ${s.end_date}` : ''}
+                                    {s.location ? ` · ${s.location}` : ''}
+                                    {(s.team || []).find(m => m.role === 'lead')?.bge_name
+                                      ? ` · Lead: ${(s.team || []).find(m => m.role === 'lead').bge_name}` : ''}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                                <Chip
+                                  label={existing ? (existing.status === 'submitted' ? 'Submitted' : 'Draft') : 'Pending'}
+                                  size="small"
+                                  color={existing?.status === 'submitted' ? 'success' : existing ? 'warning' : 'default'} />
+                                <Button size="small" variant="contained" startIcon={<Edit />}
+                                  onClick={() => openPtDialog(existing, {
+                                    training_title: s.title,
+                                    training_dates: s.date + (s.end_date && s.end_date !== s.date ? ` – ${s.end_date}` : ''),
+                                    venue: s.location || '',
+                                  })}
+                                  sx={{ bgcolor: '#1A5276', '&:hover': { bgcolor: '#154360' }, fontSize: 12 }}>
+                                  {existing ? 'Edit Report' : 'Write Report'}
+                                </Button>
+                                {existing && (
+                                  <>
+                                    <Tooltip title="Open PDF">
+                                      <IconButton size="small" onClick={() => openPtPdf(existing.id, 'view')}>
+                                        <PictureAsPdf fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Download PDF">
+                                      <IconButton size="small" onClick={() => openPtPdf(existing.id, 'download')}>
+                                        <Download fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                )}
+                              </Box>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {/* ── Tab 2: Standalone participant training reports ── */}
+            {trainingTab === 2 && (
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Reports for any training you attended as a participant, including external trainings.
+                  </Typography>
+                  <Button variant="contained" startIcon={<Add />} size="small" onClick={() => openPtDialog()}>
+                    New Report
+                  </Button>
+                </Box>
+
+                {ptReports.length === 0 ? (
+                  <Paper sx={{ p: 6, textAlign: 'center' }}>
+                    <School sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                    <Typography color="text.secondary" gutterBottom>No participant training reports yet.</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Click "New Report" to document a training session you attended as a learner.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {ptReports.map(r => (
+                      <Card key={r.id} sx={{ borderLeft: '4px solid #1A5276', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography fontWeight={700} fontSize={15}>{r.training_title || '(Untitled)'}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {r.training_dates}{r.venue ? ` · ${r.venue}` : ''}
+                                {r.facilitator_name ? ` · Facilitator: ${r.facilitator_name}` : ''}
+                              </Typography>
+                              {(r.attendees || []).length > 0 && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  {r.attendees.length} attendees in register
+                                </Typography>
+                              )}
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                              <Chip label={r.status} size="small"
+                                color={r.status === 'submitted' ? 'success' : 'warning'} />
+                              <Tooltip title="Open PDF">
+                                <IconButton size="small" onClick={() => openPtPdf(r.id, 'view')}>
+                                  <PictureAsPdf fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Download PDF">
+                                <IconButton size="small" onClick={() => openPtPdf(r.id, 'download')}>
+                                  <Download fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              {r.status !== 'submitted' && (
+                                <Button size="small" variant="contained" startIcon={<Edit />}
+                                  onClick={() => openPtDialog(r)}
+                                  sx={{ bgcolor: '#1A5276', '&:hover': { bgcolor: '#154360' }, fontSize: 12 }}>
+                                  Edit
+                                </Button>
+                              )}
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
+                )}
               </Box>
             )}
           </Box>
@@ -2936,6 +3158,110 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </Button>
             <Button variant="contained" color="success" onClick={() => saveMrReport(true)} disabled={mrSaving}>
               {mrSaving ? 'Submitting…' : 'Submit Report'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* ── Participant Training Report dialog ───────────────────────────── */}
+      {ptDialog && (
+        <Dialog open onClose={() => setPtDialog(false)} maxWidth="md" fullWidth
+          PaperProps={{ sx: { maxHeight: '95vh' } }}>
+          <DialogTitle sx={{ pb: 0.5 }}>
+            {ptEdit ? 'Edit Participant Training Report' : 'New Participant Training Report'}
+            <Typography variant="caption" display="block" color="text.secondary">
+              Report for training you attended as a participant (not as a facilitator)
+            </Typography>
+          </DialogTitle>
+          <DialogContent dividers sx={{ pt: 2 }}>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12}><TextField fullWidth size="small" label="Training Title *"
+                value={ptForm.training_title} onChange={e => setPtForm(f => ({ ...f, training_title: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Training Dates (e.g. 17–19 Feb 2026)"
+                value={ptForm.training_dates} onChange={e => setPtForm(f => ({ ...f, training_dates: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Facilitator / Trainer Name"
+                value={ptForm.facilitator_name} onChange={e => setPtForm(f => ({ ...f, facilitator_name: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Venue"
+                value={ptForm.venue} onChange={e => setPtForm(f => ({ ...f, venue: e.target.value }))} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="District"
+                value={ptForm.district} onChange={e => setPtForm(f => ({ ...f, district: e.target.value }))} /></Grid>
+            </Grid>
+
+            {[
+              { key: 'topics_covered',         label: 'Topics / Modules Covered', rows: 3 },
+              { key: 'key_learnings',          label: 'Key Learnings & Insights', rows: 3 },
+              { key: 'practical_application',  label: 'How will you apply these learnings with your MSMEs?', rows: 3 },
+              { key: 'msmes_as_test_subjects', label: 'MSMEs Used as Practice Subjects During Training', rows: 2 },
+              { key: 'challenges',             label: 'Challenges Encountered', rows: 2 },
+              { key: 'action_plan',            label: 'Action Plan & Next Steps', rows: 3 },
+            ].map(({ key, label, rows }) => (
+              <TextField key={key} fullWidth multiline minRows={rows} size="small" label={label} sx={{ mb: 2 }}
+                value={ptForm[key] || ''} onChange={e => setPtForm(f => ({ ...f, [key]: e.target.value }))} />
+            ))}
+
+            {/* Attendance register */}
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Attendance Register — BGE Participants
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                {['Name *', 'BGE Code', 'Phone', 'Gender (M/F)', 'Organisation'].map((lbl, i) => {
+                  const keys = ['name', 'bge_code', 'phone', 'gender', 'organisation'];
+                  return (
+                    <TextField key={i} size="small" label={lbl} sx={{ flex: '1 1 100px', minWidth: 80 }}
+                      value={ptAttendeeRow[keys[i]] || ''}
+                      onChange={e => setPtAttendeeRow(r => ({ ...r, [keys[i]]: e.target.value }))} />
+                  );
+                })}
+                <Button variant="outlined" size="small"
+                  onClick={() => {
+                    if (!ptAttendeeRow.name.trim()) return;
+                    setPtForm(f => ({ ...f, attendees: [...(f.attendees || []), { ...ptAttendeeRow }] }));
+                    setPtAttendeeRow({ name: '', bge_code: '', phone: '', gender: '', organisation: '' });
+                  }}>
+                  Add
+                </Button>
+              </Box>
+              {(ptForm.attendees || []).length > 0 && (
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 200 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                        {['#', 'Name', 'BGE Code', 'Phone', 'Gender', 'Organisation', ''].map(h => (
+                          <TableCell key={h} sx={{ fontSize: 11, fontWeight: 700 }}>{h}</TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {ptForm.attendees.map((a, i) => (
+                        <TableRow key={i}>
+                          <TableCell sx={{ fontSize: 11 }}>{i + 1}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{a.name}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{a.bge_code || '—'}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{a.phone || '—'}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{a.gender || '—'}</TableCell>
+                          <TableCell sx={{ fontSize: 11 }}>{a.organisation || '—'}</TableCell>
+                          <TableCell>
+                            <IconButton size="small" color="error"
+                              onClick={() => setPtForm(f => ({ ...f, attendees: f.attendees.filter((_, j) => j !== i) }))}>
+                              <Close fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+            <Button onClick={() => setPtDialog(false)} disabled={ptSaving}>Cancel</Button>
+            <Button variant="outlined" onClick={() => savePtReport(false)} disabled={ptSaving}>
+              {ptSaving ? 'Saving…' : 'Save Draft'}
+            </Button>
+            <Button variant="contained" color="success" onClick={() => savePtReport(true)} disabled={ptSaving}>
+              {ptSaving ? 'Submitting…' : 'Submit Report'}
             </Button>
           </DialogActions>
         </Dialog>

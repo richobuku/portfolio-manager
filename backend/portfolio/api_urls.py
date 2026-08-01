@@ -9,6 +9,7 @@ from .views import (
     GroupReportAttendanceViewSet, ProgrammeGroupViewSet, MSMEGrowthSnapshotViewSet,
     VisitReportTemplateViewSet, TrainingFacilitationAssignmentViewSet,
     TrainingReportViewSet, AnnualReviewReportViewSet, MentorTrainingReportViewSet,
+    BGEParticipantTrainingReportViewSet,
     TshirtReceiptViewSet, TshirtReceiptEntryViewSet,
     WorkOrderSubmissionViewSet, WorkOrderPaymentViewSet, WorkOrderAttachmentViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
@@ -50,6 +51,7 @@ router.register(r'facilitation-assignments', TrainingFacilitationAssignmentViewS
 router.register(r'training-reports', TrainingReportViewSet, basename='training-report')
 router.register(r'annual-reviews', AnnualReviewReportViewSet, basename='annual-review')
 router.register(r'mentor-reports', MentorTrainingReportViewSet, basename='mentor-report')
+router.register(r'participant-training-reports', BGEParticipantTrainingReportViewSet, basename='participant-training-report')
 router.register(r'tshirt-receipts', TshirtReceiptViewSet, basename='tshirt-receipt')
 router.register(r'tshirt-entries', TshirtReceiptEntryViewSet, basename='tshirt-entry')
 router.register(r'blockchain/transactions', BlockchainTransactionViewSet)

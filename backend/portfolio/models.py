@@ -653,6 +653,47 @@ class MentorTrainingReport(models.Model):
         return f"Mentor Report: {self.bge} @ {self.session} ({self.status})"
 
 
+class BGEParticipantTrainingReport(models.Model):
+    """Report filed by a BGE who attended a training as a participant (not a facilitator).
+    There are no MSMEs in the room — the BGEs are the learners, and they test
+    concepts on their own MSMEs as practice subjects outside the classroom."""
+
+    STATUS_CHOICES = [('draft', 'Draft'), ('submitted', 'Submitted')]
+
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='participant_training_reports',
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    training_title   = models.CharField(max_length=300, blank=True)
+    training_dates   = models.CharField(max_length=100, blank=True, help_text='e.g. "17–19 February 2026"')
+    venue            = models.CharField(max_length=200, blank=True)
+    district         = models.CharField(max_length=100, blank=True)
+    facilitator_name = models.CharField(max_length=200, blank=True)
+
+    topics_covered        = models.TextField(blank=True, help_text='Topics/modules covered in the training')
+    key_learnings         = models.TextField(blank=True, help_text='Key lessons and insights from the training')
+    practical_application = models.TextField(blank=True, help_text='How will you apply these learnings with your MSMEs?')
+    msmes_as_test_subjects = models.TextField(blank=True, help_text='MSMEs used as practice subjects during the training')
+    challenges            = models.TextField(blank=True, help_text='Challenges encountered during the training')
+    action_plan           = models.TextField(blank=True, help_text='Planned next steps and follow-up actions')
+
+    # Attendance register: list of {name, phone, gender, bge_code, organisation}
+    attendees = models.JSONField(default=list, blank=True,
+                                 help_text='Attendance register of BGE participants in the training')
+
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Participant Report: {self.bge} — {self.training_title} ({self.status})"
+
+
 class Attendance(models.Model):
     AGE_GROUP_CHOICES = [
         ('18-34', '18–34 (Youth)'),
@@ -997,7 +1038,6 @@ class WorkOrder(models.Model):
         ('group_session',         'Peer-to-Peer Group Session'),
         ('bcp_tool_training',       'BCP Tool Training — BGE Participant'),
         ('bge_bcp_participant_mentor', 'Agro-processors — Business Continuity & Strategic Planning (BGE Support)'),
-        ('bcp_senior_facilitator',  'Agro-processors BCP — Senior BGE Lead Facilitator'),
         ('outcome_assessment_tool', 'Outcome Assessment Tool Delivery'),
         ('fi_mobilisation_bcp',   'BCP Tool - Field Implementation'),
         ('carbon_emissions_training', 'Carbon Emissions Measurement Framework — Training & Field Implementation'),

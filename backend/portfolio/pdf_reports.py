@@ -1111,6 +1111,85 @@ def render_mentor_report(report):
     return buf
 
 
+def render_participant_training_report(report):
+    """Build a styled PDF for one BGEParticipantTrainingReport."""
+    s = _styles()
+    buf, doc = _build_doc()
+    story = []
+    bge = report.bge
+
+    title_text = report.training_title or 'BGE Participant Training Report'
+    story.append(Paragraph(_safe_html(f'BGE Participant Training Report — {title_text}'), s['h1']))
+    story.append(Paragraph('Training Participation Report (BGE as Learner)', s['sub']))
+
+    story.append(_kv_table([
+        ['Training Title',   report.training_title or '—'],
+        ['Training Dates',   report.training_dates or '—'],
+        ['Venue',            report.venue or '—'],
+        ['District',         report.district or '—'],
+        ['Facilitator',      report.facilitator_name or '—'],
+        ['Reporting BGE',    bge.name if bge else '—'],
+        ['Status',           report.get_status_display()],
+    ]))
+
+    story.append(Spacer(1, 8))
+
+    for title, body in [
+        ('Topics / Modules Covered',        report.topics_covered),
+        ('Key Learnings & Insights',        report.key_learnings),
+        ('Practical Application with MSMEs', report.practical_application),
+        ('MSMEs Used as Practice Subjects', report.msmes_as_test_subjects),
+        ('Challenges Encountered',          report.challenges),
+        ('Action Plan & Next Steps',        report.action_plan),
+    ]:
+        story.extend(_section(s, title, body))
+
+    # Attendance register
+    attendees = report.attendees or []
+    if attendees:
+        story.append(Spacer(1, 6))
+        story.append(Paragraph('Attendance Register — BGE Participants', s['sectiontitle']))
+        tdata = [[
+            Paragraph('No.', s['label']),
+            Paragraph('Name', s['label']),
+            Paragraph('BGE Code', s['label']),
+            Paragraph('Phone', s['label']),
+            Paragraph('Gender', s['label']),
+            Paragraph('Organisation', s['label']),
+        ]]
+        for i, a in enumerate(attendees, 1):
+            tdata.append([
+                Paragraph(str(i), s['meta']),
+                Paragraph(_safe_html(a.get('name', '')), s['meta']),
+                Paragraph(_safe_html(a.get('bge_code', '')), s['meta']),
+                Paragraph(_safe_html(a.get('phone', '')), s['meta']),
+                Paragraph(_safe_html(a.get('gender', '')), s['meta']),
+                Paragraph(_safe_html(a.get('organisation', '')), s['meta']),
+            ])
+        t = Table(tdata, colWidths=[10*mm, 45*mm, 25*mm, 30*mm, 15*mm, 42*mm], hAlign='LEFT')
+        t.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
+            ('TEXTCOLOR',     (0, 0), (-1, 0), HexColor('#FFFFFF')),
+            ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',      (0, 0), (-1, -1), 8),
+            ('GRID',          (0, 0), (-1, -1), 0.3, LIGHT_GREY),
+            ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING',    (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 5),
+            *[('BACKGROUND', (0, i), (-1, i), LIGHT_GREY) for i in range(2, len(tdata), 2)],
+        ]))
+        story.append(t)
+
+    story.append(Spacer(1, 12))
+    story.append(_sig_block(s, bge, signed_date=report.updated_at))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Quarterly / Programme-period summary report
 # ─────────────────────────────────────────────────────────────────────────────

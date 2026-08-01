@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ..models import (
     TrainingTopic, TrainingSession, Attendance, VisitReportTemplate,
     TrainingFacilitationAssignment, TrainingReport, AnnualReviewReport,
-    MentorTrainingReport,
+    MentorTrainingReport, BGEParticipantTrainingReport,
 )
 
 
@@ -238,3 +238,13 @@ class MentorTrainingReportSerializer(serializers.ModelSerializer):
             }
             for a in obj.session.attendances.order_by('attendee_name')
         ]
+
+
+class BGEParticipantTrainingReportSerializer(serializers.ModelSerializer):
+    bge_name = serializers.CharField(source='bge.name', read_only=True, allow_null=True)
+    bge_code = serializers.CharField(source='bge.bge_code', read_only=True, allow_null=True)
+
+    class Meta:
+        model  = BGEParticipantTrainingReport
+        fields = '__all__'
+        read_only_fields = ['bge', 'created_at', 'updated_at', 'submitted_at']

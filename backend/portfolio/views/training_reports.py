@@ -7,9 +7,10 @@ from rest_framework.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.utils import timezone
 
-from ..models import TrainingReport, AnnualReviewReport, MentorTrainingReport
+from ..models import TrainingReport, AnnualReviewReport, MentorTrainingReport, BGEParticipantTrainingReport
 from ..serializers import (
     TrainingReportSerializer, AnnualReviewReportSerializer, MentorTrainingReportSerializer,
+    BGEParticipantTrainingReportSerializer,
 )
 from .mixins import (
     ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin,
@@ -216,6 +217,75 @@ class MentorTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         fname = _safe_filename(f"MentorReport_{safe}_{report.session.date}.pdf")
         dl = request.query_params.get('dl')
         buf = render_mentor_report(report)
+        resp = HttpResponse(buf.read(), content_type='application/pdf')
+        disposition = 'attachment' if dl else 'inline'
+        resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
+        return resp
+
+
+class BGEParticipantTrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
+    """
+    Reports filed by a BGE who attended a training as a participant.
+    BGEs can create/edit only their own reports; admins see all.
+    """
+    serializer_class   = BGEParticipantTrainingReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = BGEParticipantTrainingReport.objects.select_related('bge')
+        if user.is_staff or user.is_superuser:
+            pass
+        elif _is_viewer(user):
+            pass
+        elif _is_programme_manager(user):
+            pass
+        else:
+            try:
+                qs = qs.filter(bge=user.bge_profile)
+            except Exception:
+                return qs.none()
+        bge_id = self.request.query_params.get('bge')
+        if bge_id:
+            qs = qs.filter(bge_id=bge_id)
+        return qs
+
+    def perform_create(self, serializer):
+        bge = None
+        try:
+            bge = self.request.user.bge_profile
+        except Exception:
+            pass
+        serializer.save(bge=bge)
+
+    def perform_update(self, serializer):
+        data = {}
+        if serializer.validated_data.get('status') == 'submitted':
+            data['submitted_at'] = timezone.now()
+        serializer.save(**data)
+
+    @action(detail=True, methods=['post'], url_path='revert')
+    def revert(self, request, pk=None):
+        """Admin-only: revert a submitted participant report back to draft."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can revert reports.")
+        report = self.get_object()
+        if report.status == 'draft':
+            return Response({'detail': 'Report is already a draft.'}, status=status.HTTP_400_BAD_REQUEST)
+        report.status = 'draft'
+        report.submitted_at = None
+        report.save(update_fields=['status', 'submitted_at'])
+        return Response(BGEParticipantTrainingReportSerializer(report, context={'request': request}).data)
+
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """Render this participant training report as a branded PDF."""
+        from ..pdf_reports import render_participant_training_report
+        report = self.get_object()
+        title_safe = (report.training_title or 'Report')[:40].replace(' ', '_')
+        fname = _safe_filename(f"ParticipantTraining_{title_safe}_{report.pk}.pdf")
+        dl = request.query_params.get('dl')
+        buf = render_participant_training_report(report)
         resp = HttpResponse(buf.read(), content_type='application/pdf')
         disposition = 'attachment' if dl else 'inline'
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'

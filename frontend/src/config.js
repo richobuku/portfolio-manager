@@ -34,6 +34,7 @@ export const API_ENDPOINTS = {
   ANNUAL_REVIEWS:            `${API_BASE_URL}/api/annual-reviews/`,
   BULK_EMAIL:                `${API_BASE_URL}/api/bulk-email/`,
   MENTOR_REPORTS:            `${API_BASE_URL}/api/mentor-reports/`,
+  PARTICIPANT_TRAINING_REPORTS: `${API_BASE_URL}/api/participant-training-reports/`,
   TSHIRT_RECEIPTS:           `${API_BASE_URL}/api/tshirt-receipts/`,
   TSHIRT_ENTRIES:            `${API_BASE_URL}/api/tshirt-entries/`,
   WORK_ORDER_SUBMISSIONS:    `${API_BASE_URL}/api/work-order-submissions/`,
@@ -70,6 +71,9 @@ export const REPORTS_ACTIVITY_EXCEL_URL = (params) => `${API_BASE_URL}/api/repor
 export const GROUP_REPORT_REVERT_URL        = (id) => `${API_BASE_URL}/api/group-reports/${id}/revert/`;
 export const TRAINING_REPORT_REVERT_URL     = (id) => `${API_BASE_URL}/api/training-reports/${id}/revert/`;
 export const MENTOR_REPORT_REVERT_URL       = (id) => `${API_BASE_URL}/api/mentor-reports/${id}/revert/`;
+export const PARTICIPANT_TRAINING_REPORT_PDF_URL    = (id) => `${API_BASE_URL}/api/participant-training-reports/${id}/pdf/`;
+export const PARTICIPANT_TRAINING_REPORT_REVERT_URL = (id) => `${API_BASE_URL}/api/participant-training-reports/${id}/revert/`;
+export const PARTICIPANT_TRAINING_REPORTS = `${API_BASE_URL}/api/participant-training-reports/`;
 export const EXPERT_EMAIL_URL = EXPERT_SEND_EMAIL_URL;
 export const CHANGE_PASSWORD_URL = `${API_BASE_URL}/api/auth/change-password/`;
 export const BULK_EMAIL = API_ENDPOINTS.BULK_EMAIL;
