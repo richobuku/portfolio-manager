@@ -40,12 +40,13 @@ class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         elif _managed_groups(user) is not None or _is_viewer(user):
             pass  # programme managers and viewers see all sessions
         else:
-            # BGEs see sessions they are assigned to (as lead or mentor)
+            # BGEs see sessions they are assigned to (as lead, mentor, or participant)
             try:
                 bge = user.bge_profile
                 qs = qs.filter(
                     Q(topic_id__in=TrainingFacilitationAssignment.objects.filter(bge=bge).values('topic_id')) |
-                    Q(facilitation_assignments__bge=bge)
+                    Q(facilitation_assignments__bge=bge) |
+                    Q(bge_participants=bge)
                 ).distinct()
             except Exception:
                 return qs.none()

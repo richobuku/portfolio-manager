@@ -576,7 +576,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       setLeadSessions(enriched.filter(s => leadTopics.has(s.topic)));
       setMentorSessions(enriched.filter(s => mentorIds.has(s.id)));
       setParticipantSessions(enriched.filter(s =>
-        (s.bge_participants || []).some(p => p.id === myBgeId)
+        (s.bge_participants || []).includes(myBgeId)
       ));
     } catch { /* silent */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -775,7 +775,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const openPtDialog = (report = null, sessionDefaults = {}) => {
     setPtEdit(report);
-    setPtForm(report ? { ...EMPTY_PT, ...report } : { ...EMPTY_PT, ...sessionDefaults });
+    // If opened from a session card (sessionDefaults has attendees), always use the
+    // session's current bge_participants list — the admin controls who was registered.
+    // If no sessionDefaults, use what was saved on the report (or empty).
+    const base = report ? { ...EMPTY_PT, ...report } : { ...EMPTY_PT };
+    const merged = sessionDefaults.attendees
+      ? { ...base, ...sessionDefaults, attendees: sessionDefaults.attendees }
+      : { ...base, ...sessionDefaults };
+    setPtForm(merged);
     setPtAttendeeRow({ name: '', bge_code: '', phone: '', gender: '', organisation: '' });
     setPtDialog(true);
   };
@@ -2778,6 +2785,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     training_title: s.title,
                                     training_dates: s.date + (s.end_date && s.end_date !== s.date ? ` – ${s.end_date}` : ''),
                                     venue: s.location || '',
+                                    attendees: (s.bge_participants_detail || []).map(p => ({
+                                      name: p.name, bge_code: p.bge_code || '', phone: '', gender: '', organisation: '',
+                                    })),
                                   })}
                                   sx={{ bgcolor: '#1A5276', '&:hover': { bgcolor: '#154360' }, fontSize: 12 }}>
                                   {existing ? 'Edit Report' : 'Write Report'}
