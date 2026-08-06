@@ -58,8 +58,15 @@ class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, 
         serializer.save(bge=bge)
 
     def perform_update(self, serializer):
+        user = self.request.user
+        report = self.get_object()
+        new_status = serializer.validated_data.get('status')
+        # Prevent non-admins from self-reverting a submitted report back to draft
+        if new_status == 'draft' and report.status == 'submitted':
+            if not (user.is_staff or user.is_superuser):
+                raise PermissionDenied("Only admins can revert a submitted report.")
         data = {}
-        if serializer.validated_data.get('status') == 'submitted':
+        if new_status == 'submitted' and report.status != 'submitted':
             data['submitted_at'] = timezone.now()
         serializer.save(**data)
 

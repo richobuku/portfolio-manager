@@ -639,7 +639,8 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             raise PermissionDenied("Only admins can set deployment objectives.")
         bge = self.get_object()
         bge.deployment_objectives = request.data.get('deployment_objectives', '').strip()
-        bge.save()
+        # Use update_fields to avoid overwriting signature/signature_data on a full save
+        bge.save(update_fields=['deployment_objectives'])
         return Response(BusinessGrowthExpertSerializer(bge).data)
 
     @action(detail=True, methods=['get'], url_path='preview-email')
@@ -1027,7 +1028,9 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
                         existing.location = location
                         existing.bge_code = bge_code
                         existing.status = 'approved'
-                        existing.save()
+                        # Explicit update_fields prevents overwriting signature/signature_data
+                        # on a full save (the ephemeral Render FS may not have the file).
+                        existing.save(update_fields=['email', 'phone', 'location', 'bge_code', 'status'])
                         updated += 1
                     else:
                         errors.append(f'Row {i + 2}: {name} — Duplicate skipped')

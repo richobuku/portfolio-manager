@@ -1640,7 +1640,8 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             raise PermissionDenied("Only admins can set deployment objectives.")
         bge = self.get_object()
         bge.deployment_objectives = request.data.get('deployment_objectives', '').strip()
-        bge.save()
+        # Use update_fields to avoid overwriting signature/signature_data on a full save
+        bge.save(update_fields=['deployment_objectives'])
         return Response(BusinessGrowthExpertSerializer(bge).data)
 
     @action(detail=True, methods=['get'], url_path='preview-email')
@@ -3310,7 +3311,7 @@ class BGEUserViewSet(viewsets.ViewSet):
                 # Unlink any previous user linked to this BGE
                 BusinessGrowthExpert.objects.filter(user=user).update(user=None)
                 bge.user = user
-                bge.save()
+                bge.save(update_fields=['user'])
             except BusinessGrowthExpert.DoesNotExist:
                 return Response({'error': 'BGE not found.'}, status=status.HTTP_404_NOT_FOUND)
         else:
