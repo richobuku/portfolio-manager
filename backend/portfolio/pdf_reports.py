@@ -740,6 +740,24 @@ def render_work_order(work_order):
 
     story.append(Spacer(1, 8))
 
+    # Expected Outcomes — only for CSA Rapid Assessment
+    if work_order.work_order_type == 'csa_rapid_assessment':
+        story.append(Paragraph('EXPECTED OUTCOMES OF THE ASSIGNMENT', s['sectiontitle']))
+        CSA_OUTCOMES = [
+            ('Adoption Status', 'Clear picture of which CSA practices (e.g., agroforestry, water harvesting, conservation tillage) are being implemented and at what scale.'),
+            ('Capacity Gaps', 'Identification of weaknesses in technical knowledge or market access that hinder CSA effectiveness.'),
+            ('Productivity and Resilience', 'Evidence of improved yields, soil fertility, and water-use efficiency, alongside resilience to droughts, floods, or pests.'),
+            ('Economic Benefits', 'Insights into increased incomes, reduced input costs, and improved market competitiveness for CSA products.'),
+            ('Social Outcomes', 'Evaluation of inclusivity (youth, women participation), community cohesion, and knowledge-sharing among members.'),
+            ('Policy and Scaling Potential', 'Evidence to inform government, NGOs, and cooperatives on where to invest for wider CSA adoption.'),
+        ]
+        for title, desc in CSA_OUTCOMES:
+            story.append(Paragraph(
+                f'<b>● {_safe_html(title)}:</b> {_safe_html(desc)}',
+                ParagraphStyle('outcome', parent=s['body'], fontSize=9, leftIndent=10, spaceAfter=4),
+            ))
+        story.append(Spacer(1, 8))
+
     story.append(Paragraph('SCHEDULE 2 — PAYMENT TERMS', s['sectiontitle']))
     gross = work_order.rate_per_day * work_order.max_days
     wht   = int(gross * 0.06)
@@ -834,6 +852,17 @@ def render_work_order(work_order):
             'Transport costs will be reimbursed upon submission of original receipts. Distances above 7 km will be reimbursed as per public transportation rates.',
             'Payment is made monthly upon submission and approval of all deliverables, a signed timesheet, and an approved invoice, validated by the Business Development Expert.',
             'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA AFC GmbH.',
+        ]
+    elif work_order.work_order_type == 'csa_rapid_assessment':
+        CONDITIONS = [
+            'BGE must use only the standardised PRUDEV II tools and templates and submit all reports in the provided formats. The designated data collection tool for this assignment is the KoboToolbox form at: https://ee-eu.kobotoolbox.org/x/HFlLk5ba',
+            'Any farmer group that is unavailable or not interested in participating must be formally documented in the non-engagement register with the reason stated. Undocumented gaps in group engagement will be treated as a performance concern.',
+            'All group data and business information must be handled with strict confidentiality.',
+            'GOPA AFC retains ownership of all outputs, reports, and data produced under this Work Order.',
+            'GOPA AFC reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
+            'Transport costs will be refunded based on public transport rates upon attendance and submission of valid original receipts.',
+            'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
+            'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA AFC GmbH.',
         ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [

@@ -422,6 +422,47 @@ xii. Compile and submit a consolidated workshop report covering observations, pa
       { task_num: 6, description: 'Approved invoice and signed timesheet', due_date: 'Within 2 days of training completion', quantitative_result: '1 approved invoice and 1 signed timesheet submitted on time', qualitative_result: 'Invoice and timesheet accurately reflect days worked and are consistent with work order terms', means_of_verification: 'Approved invoice and countersigned timesheet', unit_rate: '', payment_condition: 'Payment processed upon approval of invoice, timesheet, and training completion report' },
     ],
   },
+  csa_rapid_assessment: {
+    objective: `To rapidly assess the quality of Climate Smart Agriculture (CSA) training delivered by Farm Enterprise Trainers (FETs), the quality and frequency of mentorship provided by FETs, adoption of CSA practices by group members at household level, technical backstopping provided by Agricultural Officers, and early evidence of changes in farming practices, productivity, resilience and sustainability.`,
+    key_tasks: `The BGE will visit the assigned groups to carry out an assessment of Climate Smart Agriculture Activities through a Focus Group Discussion (FGD) with the farmer groups, triangulated through field observations and household spot checks.
+
+Data Collection Tool (mandatory): https://ee-eu.kobotoolbox.org/x/HFlLk5ba
+All assessment data must be submitted through the above KoboToolbox form.
+
+Target: 2 farmer groups per day for 5 working days = 10 groups per BGE.`,
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'CSA Assessment — completed FGDs with assigned farmer groups. Assess quality of CSA training by FETs, quality and frequency of FET mentorship, adoption of CSA practices at household level, technical backstopping by Agricultural Officers, and early evidence of changes in farming practices, productivity, resilience and sustainability.',
+        due_date: 'Ongoing — 2 groups per day for 5 working days (10 groups total)',
+        quantitative_result: '10 completed FGDs (2 groups/day × 5 days) submitted via KoboToolbox',
+        qualitative_result: 'All data accurately captured using the standardised KoboToolbox form; field observations and household spot checks triangulated',
+        means_of_verification: 'Submitted KoboToolbox records and signed group attendance sheets',
+        unit_rate: 'UGX 60,000 per FGD day',
+        payment_condition: 'Pay per approved FGD day, up to maximum 5 days',
+      },
+      {
+        task_num: 2,
+        description: 'Assessment Report — covering all assigned farmer groups, key findings on CSA adoption, mentorship quality, and evidence of changes in farming practices, productivity, resilience and sustainability.',
+        due_date: 'Within 2 days after completion of the assignment',
+        quantitative_result: '1 assessment report covering all 10 assigned groups submitted within 2 days of assignment completion',
+        qualitative_result: 'Report is evidence-based, covers all groups, and addresses all assessment dimensions',
+        means_of_verification: 'Submitted and approved assessment report',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of report',
+      },
+      {
+        task_num: 3,
+        description: 'Approved timesheets and signed invoices related to this assignment.',
+        due_date: 'Within 2 days after completion of the assignment',
+        quantitative_result: '1 signed timesheet and 1 approved invoice submitted within 2 days of assignment completion',
+        qualitative_result: 'Timesheet and invoice accurately reflect days worked and are consistent with work order terms',
+        means_of_verification: 'Approved invoice and countersigned timesheet',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of timesheet and invoice alongside all deliverables',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -575,6 +616,17 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_name     = 'Stephen Maxi Opwonya';
       extra.team_leader_position = 'Team Leader';
     }
+    if (type === 'csa_rapid_assessment') {
+      extra.duration     = 'Maximum of 5 days per MSME';
+      extra.max_days     = 5;
+      extra.rate_per_day = 60000;
+      extra.location     = 'Northern Uganda (Gulu, Kitgum, Adjumani & Lira)';
+      extra.project_name = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      extra.start_date   = '2026-08-10';
+      extra.end_date     = '2026-08-21';
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
@@ -691,6 +743,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
                 <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework — Training &amp; Field Implementation</MenuItem>
+                <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>

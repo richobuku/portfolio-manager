@@ -6594,6 +6594,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
             <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
+            <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework</MenuItem>
+            <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>

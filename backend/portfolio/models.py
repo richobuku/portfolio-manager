@@ -1041,6 +1041,7 @@ class WorkOrder(models.Model):
         ('outcome_assessment_tool', 'Outcome Assessment Tool Delivery'),
         ('fi_mobilisation_bcp',   'BCP Tool - Field Implementation'),
         ('carbon_emissions_training', 'Carbon Emissions Measurement Framework — Training & Field Implementation'),
+        ('csa_rapid_assessment',  'CSA Rapid Assessment — Resilience Activity'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [
