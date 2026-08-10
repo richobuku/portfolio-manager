@@ -243,6 +243,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [saApplyTo, setSaApplyTo]   = useState('all'); // 'all' | 'unassigned'
   const [saSearch, setSaSearch]     = useState('');
   const [saTab, setSaTab]           = useState(0);      // 0=Summary 1=Detail
+  const [saExclude, setSaExclude]   = useState([]);     // [{id, name}] BGEs excluded from pool
 
   // ── filters ────────────────────────────────────────────────────────────────
   const [msmeSearch, setMsmeSearch] = useState('');
@@ -6106,11 +6107,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   // ── Smart assignment handlers ─────────────────────────────────────────────
-  const loadSmartAssign = async (applyTo = saApplyTo) => {
+  const loadSmartAssign = async (applyTo = saApplyTo, excludeList = saExclude) => {
     setSaLoading(true);
     setSaData(null);
+    const excludeParam = excludeList.map(b => b.id).join(',');
     try {
-      const res = await axios.get(`${SMART_ASSIGN_URL}?apply_to=${applyTo}`, { headers });
+      const res = await axios.get(
+        `${SMART_ASSIGN_URL}?apply_to=${applyTo}${excludeParam ? `&exclude=${excludeParam}` : ''}`,
+        { headers }
+      );
       setSaData(res.data);
     } catch (e) {
       setError(e.response?.data?.error || 'Could not load assignment preview.');
@@ -6121,7 +6126,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const applySmartAssign = async () => {
     setSaApplying(true);
     try {
-      const res = await axios.post(SMART_ASSIGN_URL, { apply_to: saApplyTo }, { headers });
+      const res = await axios.post(SMART_ASSIGN_URL, {
+        apply_to: saApplyTo,
+        exclude_bge_ids: saExclude.map(b => b.id),
+      }, { headers });
       setSuccess(`Applied: ${res.data.applied} MSMEs assigned, ${res.data.unchanged} unchanged.`);
       setSaData(prev => prev ? { ...prev, _applied: true, ...res.data } : prev);
     } catch (e) {
@@ -6132,10 +6140,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
   const downloadSmartAssignExcel = async () => {
     try {
-      const res = await axios.get(`${SMART_ASSIGN_EXPORT_URL}?apply_to=${saApplyTo}`, {
-        headers,
-        responseType: 'blob',
-      });
+      const excludeParam = saExclude.map(b => b.id).join(',');
+      const res = await axios.get(
+        `${SMART_ASSIGN_EXPORT_URL}?apply_to=${saApplyTo}${excludeParam ? `&exclude=${excludeParam}` : ''}`,
+        { headers, responseType: 'blob' }
+      );
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
@@ -6336,6 +6345,55 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Chip label={`✅ Applied — ${saData.applied} updated`} color="success" sx={{ ml: 'auto' }} />
           )}
         </Paper>
+
+        {/* Exclude BGEs panel — shown once we have a BGE list from the preview */}
+        {saData?.bge_summary?.length > 0 && (
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+              Exclude BGEs from pool
+              {saExclude.length > 0 && (
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  ({saExclude.length} excluded — click Refresh Preview to recompute)
+                </Typography>
+              )}
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {/* Chips for all BGEs in the current summary */}
+              {(saData.bge_summary || []).map(b => {
+                const isExcluded = saExclude.some(e => e.id === b.bge_id);
+                return (
+                  <Chip
+                    key={b.bge_id}
+                    label={b.bge_name}
+                    size="small"
+                    color={isExcluded ? 'error' : 'default'}
+                    variant={isExcluded ? 'filled' : 'outlined'}
+                    onClick={() => {
+                      setSaExclude(prev =>
+                        isExcluded
+                          ? prev.filter(e => e.id !== b.bge_id)
+                          : [...prev, { id: b.bge_id, name: b.bge_name }]
+                      );
+                      setSaData(null); // clear stale preview so user knows to reload
+                    }}
+                    sx={{ cursor: 'pointer' }}
+                  />
+                );
+              })}
+              {/* Also show any excluded BGEs that are no longer in summary */}
+              {saExclude.filter(e => !(saData?.bge_summary || []).some(b => b.bge_id === e.id)).map(e => (
+                <Chip
+                  key={e.id}
+                  label={e.name}
+                  size="small"
+                  color="error"
+                  variant="filled"
+                  onDelete={() => setSaExclude(prev => prev.filter(x => x.id !== e.id))}
+                />
+              ))}
+            </Box>
+          </Paper>
+        )}
 
         {saLoading && <Box sx={{ textAlign: 'center', py: 6 }}><CircularProgress /></Box>}
 

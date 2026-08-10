@@ -93,26 +93,25 @@ def _location_score(bge_location: str, msme_city: str) -> tuple[int, str]:
 # Core algorithm
 # ---------------------------------------------------------------------------
 
-def _compute_assignments(apply_to: str = 'all'):
+def _compute_assignments(apply_to: str = 'all', exclude_ids=None):
     """
-    Returns a list of dicts describing proposed assignments:
-      {msme_id, msme_code, msme_name, msme_city, msme_sector,
-       current_bge_id, current_bge_name,
-       proposed_bge_id, proposed_bge_name, proposed_bge_code,
-       engagement_score, location_score, total_score,
-       engagement_reason, location_reason,
-       status}   # 'unchanged' | 'reassigned' | 'new'
+    Returns (assignments, bge_summary, cap).
+
+    exclude_ids: iterable of BGE primary-key integers to omit from the pool.
     """
     from ..models import MSME, BusinessGrowthExpert, MSMEReport
+
+    exclude_ids = set(int(x) for x in (exclude_ids or []))
 
     # ── 1. Load data ────────────────────────────────────────────────────────
     bges = list(
         BusinessGrowthExpert.objects.filter(status='approved')
+        .exclude(id__in=exclude_ids)
         .order_by('name')
         .values('id', 'name', 'bge_code', 'location')
     )
     if not bges:
-        return [], []
+        return [], [], 0
 
     msme_qs = MSME.objects.filter(is_active=True).order_by('city', 'business_name')
     if apply_to == 'unassigned':
@@ -123,7 +122,7 @@ def _compute_assignments(apply_to: str = 'all'):
         'assigned_bge_id',
     ))
     if not msmes:
-        return [], bges
+        return [], bges, 0
 
     # ── 2. Precompute engagement counts: (msme_id, bge_id) → count ─────────
     report_counts: dict[tuple, int] = defaultdict(int)
@@ -244,6 +243,23 @@ def _require_admin(request):
         raise PermissionDenied("Only admins can manage BGE assignments.")
 
 
+def _parse_exclude(raw: str) -> set:
+    """Parse comma-separated BGE IDs from a query-string value."""
+    result = set()
+    for part in (raw or '').split(','):
+        part = part.strip()
+        if part.isdigit():
+            result.add(int(part))
+    return result
+
+
+def _parse_exclude_list(raw) -> set:
+    """Parse a list or comma-string of BGE IDs from POST body."""
+    if isinstance(raw, (list, tuple)):
+        return {int(x) for x in raw if str(x).strip().isdigit()}
+    return _parse_exclude(str(raw) if raw else '')
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def smart_assign(request):
@@ -254,10 +270,12 @@ def smart_assign(request):
     _require_admin(request)
 
     apply_to = request.query_params.get('apply_to', 'all') or 'all'
+    exclude_ids = _parse_exclude(request.query_params.get('exclude', ''))
     if request.method == 'POST':
         apply_to = request.data.get('apply_to', 'all')
+        exclude_ids = _parse_exclude_list(request.data.get('exclude_bge_ids', []))
 
-    assignments, bge_summary, cap = _compute_assignments(apply_to)
+    assignments, bge_summary, cap = _compute_assignments(apply_to, exclude_ids)
 
     stats = {
         'total':      len(assignments),
@@ -305,7 +323,8 @@ def smart_assign_export(request):
     _require_admin(request)
 
     apply_to = request.query_params.get('apply_to', 'all')
-    assignments, bge_summary, cap = _compute_assignments(apply_to)
+    exclude_ids = _parse_exclude(request.query_params.get('exclude', ''))
+    assignments, bge_summary, cap = _compute_assignments(apply_to, exclude_ids)
 
     try:
         from openpyxl import Workbook
