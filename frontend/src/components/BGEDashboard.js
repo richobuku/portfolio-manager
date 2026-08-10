@@ -1531,11 +1531,53 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             m.assigned_bge !== myBgeId &&
             (m.co_assigned_bge_names || []).some(b => b.id === myBgeId)
           );
+
+          // ── Monthly visit tracking ──────────────────────────────────────
+          const VISIT_TARGET = 3;
+          const now = new Date();
+          const nowYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const monthLabel = now.toLocaleString('default', { month: 'long' });
+
+          const visitsThisMonthFor = (msmeId) =>
+            reports.filter(r => r.msme === msmeId && (r.visit_date || '').startsWith(nowYM)).length;
+
+          const visitDotColor = (count) =>
+            count >= VISIT_TARGET ? '#2e7d32' : count >= 1 ? '#f57c00' : '#bdbdbd';
+
+          const VisitTracker = ({ msmeId }) => {
+            const count = visitsThisMonthFor(msmeId);
+            const color = visitDotColor(count);
+            const dots = Math.max(VISIT_TARGET, count); // show extra dots if over target
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, mb: 0.5 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 82 }}>
+                  {monthLabel} visits
+                </Typography>
+                <Box sx={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                  {Array.from({ length: dots }, (_, i) => (
+                    <Box key={i} sx={{
+                      width: 11, height: 11, borderRadius: '50%',
+                      bgcolor: i < count ? color : 'grey.300',
+                      border: `1.5px solid ${i < count ? color : '#ccc'}`,
+                      flexShrink: 0,
+                    }} />
+                  ))}
+                </Box>
+                <Typography variant="caption" fontWeight={700} sx={{ color }}>
+                  {count}/{VISIT_TARGET}{count >= VISIT_TARGET ? ' ✓' : ''}
+                </Typography>
+              </Box>
+            );
+          };
+
+          // Month-level summary across all direct MSMEs
+          const metTarget   = directMsmes.filter(m => visitsThisMonthFor(m.id) >= VISIT_TARGET).length;
+          const partialVisit = directMsmes.filter(m => { const v = visitsThisMonthFor(m.id); return v > 0 && v < VISIT_TARGET; }).length;
+          const notVisited  = directMsmes.filter(m => visitsThisMonthFor(m.id) === 0).length;
+
           return (
             <Box>
-              {/* Responsive header: stacks vertically on phones so the
-                  "New Report" button gets full width and the subtitle has
-                  room to breathe instead of being squeezed against the button. */}
+              {/* Responsive header */}
               <Box sx={{ mb: 2 }}>
                 <Typography variant="h6" fontWeight={700}>My MSMEs</Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -1557,6 +1599,28 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   </Box>
                 </Typography>
               </Box>
+
+              {/* Monthly visit summary banner (direct MSMEs only) */}
+              {directMsmes.length > 0 && (
+                <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <Typography variant="body2" fontWeight={700} sx={{ mr: 0.5 }}>
+                    {monthLabel} visit progress
+                  </Typography>
+                  <Chip size="small" label={`${metTarget} on track`}
+                    sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 600 }} />
+                  {partialVisit > 0 && (
+                    <Chip size="small" label={`${partialVisit} in progress`}
+                      sx={{ bgcolor: '#fff3e0', color: '#f57c00', fontWeight: 600 }} />
+                  )}
+                  {notVisited > 0 && (
+                    <Chip size="small" label={`${notVisited} not visited`}
+                      sx={{ bgcolor: '#fce4ec', color: '#c62828', fontWeight: 600 }} />
+                  )}
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                    Target: {VISIT_TARGET} visits / MSME / month
+                  </Typography>
+                </Paper>
+              )}
 
               {/* Active work order period banner */}
               {(() => {
@@ -1691,6 +1755,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                   </Grid>
                                 </Grid>
 
+                                {/* Monthly visit tracker */}
+                                <VisitTracker msmeId={m.id} />
+
                                 {/* Assignment objectives (truncated) */}
                                 {m.assignment_objectives && (
                                   <Alert severity="info" icon={false} sx={{ py: 0.5, mt: 0.5 }}>
@@ -1802,6 +1869,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     </Typography>
                                   </Grid>
                                 </Grid>
+
+                                {/* Monthly visit tracker */}
+                                <VisitTracker msmeId={m.id} />
 
                                 {m.assignment_objectives && (
                                   <Alert severity="info" icon={false} sx={{ py: 0.5, mt: 0.5 }}>
