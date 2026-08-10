@@ -133,7 +133,15 @@ def _compute_assignments(apply_to: str = 'all'):
     # BGE name lookup
     bge_by_id = {b['id']: b for b in bges}
 
-    # ── 3. Greedy scored round-robin ────────────────────────────────────────
+    # ── 3. Capped scored round-robin ────────────────────────────────────────
+    # Hard cap: each BGE gets at most ceil(total / num_bges) MSMEs.
+    # This guarantees a spread of ±1.  Within that constraint, engagement
+    # and location scores decide which BGE is best for each MSME.
+    import math
+    n_bges = len(bges)
+    n_msmes = len(msmes)
+    cap = math.ceil(n_msmes / n_bges)   # e.g. 34 MSMEs / 8 BGEs → cap = 5
+
     # Sort MSMEs so those with existing engagement come first (clearer choices)
     def _msme_priority(m):
         total_reports = sum(
@@ -154,7 +162,13 @@ def _compute_assignments(apply_to: str = 'all'):
         best_loc_r    = ''
         best_eng_r    = ''
 
-        for b in bges:
+        # Eligible BGEs: those not yet at the cap.
+        # If somehow all are at cap (shouldn't happen with ceil), fall back.
+        eligible = [b for b in bges if load[b['id']] < cap]
+        if not eligible:
+            eligible = bges  # safety fallback
+
+        for b in eligible:
             eng_count = report_counts.get((m['id'], b['id']), 0)
             eng_score = min(eng_count, 5) * 20          # 0 – 100
 
@@ -162,10 +176,7 @@ def _compute_assignments(apply_to: str = 'all'):
 
             continuity = 30 if m['assigned_bge_id'] == b['id'] else 0
 
-            # Penalty: each additional assignment costs 3 pts (keeps balance)
-            load_penalty = load[b['id']] * 3
-
-            total = eng_score + loc_score + continuity - load_penalty
+            total = eng_score + loc_score + continuity
 
             if total > best_score:
                 best_score   = total
@@ -221,7 +232,7 @@ def _compute_assignments(apply_to: str = 'all'):
             'count':     count,
         })
 
-    return results, bge_summary
+    return results, bge_summary, cap
 
 
 # ---------------------------------------------------------------------------
@@ -246,13 +257,14 @@ def smart_assign(request):
     if request.method == 'POST':
         apply_to = request.data.get('apply_to', 'all')
 
-    assignments, bge_summary = _compute_assignments(apply_to)
+    assignments, bge_summary, cap = _compute_assignments(apply_to)
 
     stats = {
         'total':      len(assignments),
         'unchanged':  sum(1 for a in assignments if a['status'] == 'unchanged'),
         'new':        sum(1 for a in assignments if a['status'] == 'new'),
         'reassigned': sum(1 for a in assignments if a['status'] == 'reassigned'),
+        'cap_per_bge': cap,
     }
 
     if request.method == 'GET':
@@ -293,7 +305,7 @@ def smart_assign_export(request):
     _require_admin(request)
 
     apply_to = request.query_params.get('apply_to', 'all')
-    assignments, bge_summary = _compute_assignments(apply_to)
+    assignments, bge_summary, cap = _compute_assignments(apply_to)
 
     try:
         from openpyxl import Workbook
