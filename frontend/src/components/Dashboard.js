@@ -5,7 +5,7 @@ import {
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, FormControl, InputLabel, Select, MenuItem, Alert,
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
-  Tooltip, Checkbox, Card, CardContent, Grid, Drawer, List,
+  Tooltip, Checkbox, FormControlLabel, Card, CardContent, Grid, Drawer, List,
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
   Badge, Accordion, AccordionSummary, AccordionDetails,
   Tab, Tabs, ListSubheader, Popover,
@@ -218,6 +218,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [woAttachments, setWoAttachments] = useState([]);
   const [woPaymentForms, setWoPaymentForms] = useState({});   // { [workOrderId]: { amount, payment_date, reference, notes } }
   const [woPaymentSaving, setWoPaymentSaving] = useState(null);
+
+  // ── Data-update bulk work order distributor ───────────────────────────────
+  const [duDialog, setDuDialog]         = useState(false);
+  const [duPreview, setDuPreview]       = useState(null);   // GET response
+  const [duLoading, setDuLoading]       = useState(false);
+  const [duCreating, setDuCreating]     = useState(false);
+  const today = new Date();
+  const [duStartDate, setDuStartDate]   = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`);
+  const [duEndDate, setDuEndDate]       = useState(() => {
+    const d = new Date(today.getFullYear(), today.getMonth()+1, 0);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+  const [duMaxDays, setDuMaxDays]       = useState(4);
+  const [duRatePerDay, setDuRatePerDay] = useState(60000);
+  const [duUpdateAssign, setDuUpdateAssign] = useState(true);
+  const [duResult, setDuResult]         = useState(null);
 
   // ── filters ────────────────────────────────────────────────────────────────
   const [msmeSearch, setMsmeSearch] = useState('');
@@ -6042,6 +6058,43 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const openWoCreate = () => startTransition(() => { setWoEditing(null); setWoDialog(true); });
   const openWoEdit = (wo) => startTransition(() => { setWoEditing(wo); setWoDialog(true); });
 
+  // ── Data-update distributor ───────────────────────────────────────────────
+  const openDuDialog = async () => {
+    setDuDialog(true);
+    setDuPreview(null);
+    setDuResult(null);
+    setDuLoading(true);
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.WORK_ORDERS}auto-create-data-updates/`, { headers });
+      setDuPreview(res.data);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Could not load preview.');
+    } finally {
+      setDuLoading(false);
+    }
+  };
+  const createDuWorkOrders = async () => {
+    setDuCreating(true);
+    try {
+      const res = await axios.post(`${API_ENDPOINTS.WORK_ORDERS}auto-create-data-updates/`, {
+        start_date: duStartDate,
+        end_date: duEndDate,
+        max_days: duMaxDays,
+        rate_per_day: duRatePerDay,
+        update_assignments: duUpdateAssign,
+      }, { headers });
+      setDuResult(res.data);
+      setSuccess(`Created ${res.data.created} data-update work orders.`);
+      // Refresh work orders list
+      const wo = await axios.get(API_ENDPOINTS.WORK_ORDERS, { headers });
+      setWorkOrders(wo.data.results || wo.data);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to create work orders.');
+    } finally {
+      setDuCreating(false);
+    }
+  };
+
   const issueWo = async (wo) => {
     setWoIssuing(wo.id);
     try {
@@ -6187,6 +6240,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderWorkOrders = () => (
     <Box>
       <SectionHeader title="Work Orders" subtitle={`${workOrders.length} work orders`}>
+        <Button variant="outlined" size="small" onClick={openDuDialog} sx={{ mr: 1 }}>📊 Distribute Data Updates</Button>
         <Button variant="contained" startIcon={<Add />} size="small" onClick={openWoCreate}>New Work Order</Button>
       </SectionHeader>
 
@@ -6578,6 +6632,117 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           ))}
         </Box>
       )}
+
+      {/* ── Data-Update Distribution Dialog ─────────────────────────────── */}
+      <Dialog open={duDialog} onClose={() => { setDuDialog(false); setDuResult(null); }} maxWidth="md" fullWidth>
+        <DialogTitle>📊 Distribute Data-Update Work Orders</DialogTitle>
+        <DialogContent dividers>
+          {duLoading && <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress /></Box>}
+
+          {!duLoading && duPreview && !duResult && (
+            <>
+              {/* Summary chips */}
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <Chip label={`${duPreview.total_qualifying_msmes} qualifying MSMEs`} color="primary" />
+                <Chip label={`${duPreview.total_bges} active BGEs`} color="secondary" />
+                <Chip label={`~${duPreview.per_bge_target} per BGE`} color="success" />
+              </Box>
+
+              {/* Config fields */}
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <TextField label="Start Date" type="date" size="small" value={duStartDate}
+                  onChange={e => setDuStartDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 140px' }} />
+                <TextField label="End Date" type="date" size="small" value={duEndDate}
+                  onChange={e => setDuEndDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 140px' }} />
+                <TextField label="Max Days" type="number" size="small" value={duMaxDays}
+                  onChange={e => setDuMaxDays(Number(e.target.value))} sx={{ flex: '1 1 100px' }} />
+                <TextField label="Rate/Day (UGX)" type="number" size="small" value={duRatePerDay}
+                  onChange={e => setDuRatePerDay(Number(e.target.value))} sx={{ flex: '1 1 140px' }} />
+              </Box>
+              <FormControlLabel
+                control={<Checkbox checked={duUpdateAssign} onChange={e => setDuUpdateAssign(e.target.checked)} size="small" />}
+                label="Also update assigned_bge on each MSME"
+                sx={{ mb: 2 }}
+              />
+
+              {/* Distribution preview table */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Proposed Distribution</Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 340, overflow: 'auto' }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>BGE</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">MSMEs</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>MSME Names</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {duPreview.distribution.map(row => (
+                      <TableRow key={row.bge_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>{row.bge_name}</Typography>
+                          {row.bge_code && <Typography variant="caption" color="text.secondary">{row.bge_code}</Typography>}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip label={row.count} size="small" color={row.count > 0 ? 'primary' : 'default'} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary">
+                            {row.msmes.slice(0, 5).map(m => m.name).join(', ')}
+                            {row.msmes.length > 5 && ` +${row.msmes.length - 5} more`}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
+
+          {/* Result after creation */}
+          {duResult && (
+            <Box>
+              <Typography variant="h6" color="success.main" sx={{ mb: 1 }}>
+                ✅ {duResult.created} work orders created
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>Work Order #</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>BGE</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">MSMEs</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(duResult.work_orders || []).map(w => (
+                      <TableRow key={w.work_order_id}>
+                        <TableCell><Typography variant="body2" fontWeight={600}>{w.work_order_number}</Typography></TableCell>
+                        <TableCell>{w.bge_name}</TableCell>
+                        <TableCell align="center"><Chip label={w.msme_count} size="small" color="primary" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {duResult.errors?.length > 0 && (
+                <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                  {duResult.errors.map(e => `${e.bge}: ${e.error}`).join('; ')}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDuDialog(false); setDuResult(null); }}>Close</Button>
+          {!duResult && duPreview && (
+            <Button variant="contained" onClick={createDuWorkOrders} disabled={duCreating}>
+              {duCreating ? 'Creating…' : `Create ${duPreview.total_bges} Work Orders`}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* Create / Edit Dialog — extracted to WorkOrderDialog to prevent full-Dashboard re-renders on keystrokes */}
       <WorkOrderDialog

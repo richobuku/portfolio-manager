@@ -332,6 +332,177 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
 
         return Response(self.get_serializer(work_order).data)
 
+    # ── Data-update auto-distribution ─────────────────────────────────────────
+
+    @action(detail=False, methods=['get', 'post'], url_path='auto-create-data-updates')
+    def auto_create_data_updates(self, request):
+        """
+        GET  → preview the proposed distribution (no writes).
+        POST → create draft msme_data_update work orders and update assigned_bge.
+
+        Qualifying MSMEs: active, with at least one of:
+          - any MSMEReport filed
+          - any MSMEGrowthSnapshot recorded
+          - diagnostic baseline imported (diag_imported_at set)
+
+        Distribution: round-robin across approved BGEs sorted alphabetically,
+        MSMEs sorted by district then business name for geographic clustering.
+
+        POST body (all optional):
+          start_date   YYYY-MM-DD   (default: first day of current month)
+          end_date     YYYY-MM-DD   (default: last day of current month)
+          max_days     int          (default: 4)
+          rate_per_day int          (default: 60000)
+          update_assignments bool   (default: true — update assigned_bge on MSMEs)
+        """
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can create bulk data-update work orders.")
+
+        from ..models import MSME, BusinessGrowthExpert, MSMEGrowthSnapshot
+        from django.db.models import Q, Exists, OuterRef
+        import datetime, math
+
+        # ── 1. Qualifying MSMEs ────────────────────────────────────────────
+        from ..models import MSMEReport as _R, MSMEGrowthSnapshot as _S
+        qualifying_qs = (
+            MSME.objects.filter(is_active=True)
+            .filter(
+                Q(reports__isnull=False) |
+                Q(growth_snapshots__isnull=False) |
+                Q(diag_imported_at__isnull=False)
+            )
+            .distinct()
+            .order_by('district', 'business_name')
+        )
+        msmes = list(qualifying_qs.values('id', 'business_name', 'district', 'assigned_bge_id'))
+
+        # ── 2. Active BGEs ─────────────────────────────────────────────────
+        bges = list(
+            BusinessGrowthExpert.objects.filter(status='approved')
+            .order_by('name')
+            .values('id', 'name', 'bge_code')
+        )
+
+        if not bges:
+            return Response({'error': 'No approved BGEs found.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not msmes:
+            return Response({'error': 'No qualifying MSMEs found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ── 3. Round-robin distribution ────────────────────────────────────
+        n_bges  = len(bges)
+        n_msmes = len(msmes)
+        per_bge = math.ceil(n_msmes / n_bges)
+
+        # Build: bge_id → list of msme dicts
+        distribution = {b['id']: [] for b in bges}
+        for i, msme in enumerate(msmes):
+            bge_id = bges[i % n_bges]['id']
+            distribution[bge_id].append(msme)
+
+        # ── 4. Preview payload ─────────────────────────────────────────────
+        preview_rows = []
+        for b in bges:
+            assigned = distribution[b['id']]
+            preview_rows.append({
+                'bge_id':   b['id'],
+                'bge_name': b['name'],
+                'bge_code': b['bge_code'],
+                'count':    len(assigned),
+                'msmes':    [{'id': m['id'], 'name': m['business_name'], 'district': m['district']} for m in assigned],
+            })
+
+        summary = {
+            'total_qualifying_msmes': n_msmes,
+            'total_bges':             n_bges,
+            'per_bge_target':         per_bge,
+            'distribution':           preview_rows,
+        }
+
+        if request.method == 'GET':
+            return Response(summary)
+
+        # ── 5. POST: create work orders ────────────────────────────────────
+        today = timezone.now().date()
+        first_of_month = today.replace(day=1)
+        # last day of month
+        if first_of_month.month == 12:
+            last_of_month = first_of_month.replace(year=first_of_month.year + 1, month=1, day=1) - datetime.timedelta(days=1)
+        else:
+            last_of_month = first_of_month.replace(month=first_of_month.month + 1, day=1) - datetime.timedelta(days=1)
+
+        start_date   = request.data.get('start_date') or str(first_of_month)
+        end_date     = request.data.get('end_date')   or str(last_of_month)
+        max_days     = int(request.data.get('max_days', 4))
+        rate_per_day = int(request.data.get('rate_per_day', 60000))
+        update_assign = str(request.data.get('update_assignments', 'true')).lower() != 'false'
+
+        OBJECTIVE = (
+            "Conduct data verification and business performance update visits to assigned MSMEs. "
+            "Collect current operational and financial data to update the programme's MSME database, "
+            "track business growth, and inform ongoing support planning."
+        )
+        KEY_TASKS = (
+            "Visit each assigned MSME and collect updated business data\n"
+            "Record current revenue, costs, assets, and liabilities\n"
+            "Update employment figures (full-time and part-time, male and female)\n"
+            "Document any changes in products, services, or operations\n"
+            "Verify and update owner contact information\n"
+            "Note challenges or support needs and provide appropriate guidance\n"
+            "Submit a completed Data Collection Visit report for each MSME via the Portfolio BDS system"
+        )
+
+        created_wos = []
+        errors = []
+
+        for b in bges:
+            assigned = distribution[b['id']]
+            if not assigned:
+                continue
+            msme_ids = [m['id'] for m in assigned]
+
+            try:
+                wo = WorkOrder.objects.create(
+                    bge_id           = b['id'],
+                    work_order_type  = 'msme_data_update',
+                    issue_date       = today,
+                    start_date       = start_date,
+                    end_date         = end_date,
+                    max_days         = max_days,
+                    rate_per_day     = rate_per_day,
+                    objective        = OBJECTIVE,
+                    key_tasks        = KEY_TASKS,
+                    msme_ids_snapshot = msme_ids,
+                    deliverables_json = [
+                        {'task_num': '1', 'description': f'Updated data records for all {len(msme_ids)} assigned MSMEs', 'due_date': end_date},
+                        {'task_num': '2', 'description': 'Data Collection Visit report submitted for each MSME', 'due_date': end_date},
+                    ],
+                    created_by = request.user,
+                    status = 'draft',
+                )
+                created_wos.append({
+                    'work_order_id':     wo.id,
+                    'work_order_number': wo.work_order_number,
+                    'bge_id':            b['id'],
+                    'bge_name':          b['name'],
+                    'msme_count':        len(msme_ids),
+                })
+
+                # Optionally update assigned_bge on MSMEs
+                if update_assign:
+                    MSME.objects.filter(id__in=msme_ids).update(
+                        assigned_bge_id=b['id'],
+                        assignment_date=today,
+                    )
+            except Exception as exc:
+                errors.append({'bge': b['name'], 'error': str(exc)})
+
+        return Response({
+            'created':  len(created_wos),
+            'errors':   errors,
+            'work_orders': created_wos,
+            'summary':  summary,
+        }, status=status.HTTP_201_CREATED)
+
 
 class WorkOrderSubmissionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """BGE timesheet & invoice (Excel) uploads against a work order.
