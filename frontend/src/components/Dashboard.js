@@ -6130,8 +6130,24 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setSaApplying(false);
     }
   };
-  const downloadSmartAssignExcel = () => {
-    window.open(`${SMART_ASSIGN_EXPORT_URL}?apply_to=${saApplyTo}`, '_blank');
+  const downloadSmartAssignExcel = async () => {
+    try {
+      const res = await axios.get(`${SMART_ASSIGN_EXPORT_URL}?apply_to=${saApplyTo}`, {
+        headers,
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      a.download = `BGE_Assignment_${date}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError('Failed to download Excel export.');
+    }
   };
 
   const issueWo = async (wo) => {
