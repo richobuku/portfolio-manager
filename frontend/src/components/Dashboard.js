@@ -6123,14 +6123,18 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setSaLoading(false);
     }
   };
-  const applySmartAssign = async () => {
+  const applySmartAssign = async (clearFirst = false) => {
     setSaApplying(true);
     try {
       const res = await axios.post(SMART_ASSIGN_URL, {
         apply_to: saApplyTo,
         exclude_bge_ids: saExclude.map(b => b.id),
+        clear_first: clearFirst,
       }, { headers });
-      setSuccess(`Applied: ${res.data.applied} MSMEs assigned, ${res.data.unchanged} unchanged.`);
+      const msg = clearFirst
+        ? `Reset & reassigned: ${res.data.applied} MSMEs assigned fresh.`
+        : `Applied: ${res.data.applied} updated, ${res.data.unchanged} unchanged.`;
+      setSuccess(msg);
       setSaData(prev => prev ? { ...prev, _applied: true, ...res.data } : prev);
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to apply assignments.');
@@ -6138,6 +6142,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setSaApplying(false);
     }
   };
+  const [saResetConfirm, setSaResetConfirm] = useState(false);
   const downloadSmartAssignExcel = async () => {
     try {
       const excludeParam = saExclude.map(b => b.id).join(',');
@@ -6337,9 +6342,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               onChange={e => setSaSearch(e.target.value)} sx={{ flex: '1 1 220px' }} />
           )}
           {saData && !saData._applied && (
-            <Button variant="contained" color="warning" size="small" onClick={applySmartAssign} disabled={saApplying} sx={{ ml: 'auto' }}>
-              {saApplying ? 'Applying…' : `Apply ${saData.stats?.total || ''} Assignments`}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+              <Button variant="outlined" color="error" size="small"
+                onClick={() => setSaResetConfirm(true)} disabled={saApplying}>
+                Reset &amp; Reassign All
+              </Button>
+              <Button variant="contained" color="warning" size="small"
+                onClick={() => applySmartAssign(false)} disabled={saApplying}>
+                {saApplying ? 'Applying…' : `Apply ${saData.stats?.total || ''} Assignments`}
+              </Button>
+            </Box>
           )}
           {saData?._applied && (
             <Chip label={`✅ Applied — ${saData.applied} updated`} color="success" sx={{ ml: 'auto' }} />
@@ -6504,6 +6516,40 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Typography variant="caption">Factors: previous engagement + location proximity + load balancing</Typography>
           </Box>
         )}
+
+        {/* ── Reset & Reassign confirmation dialog ── */}
+        <Dialog open={saResetConfirm} onClose={() => setSaResetConfirm(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ color: 'error.main', fontWeight: 700 }}>
+            ⚠️ Reset All Assignments?
+          </DialogTitle>
+          <DialogContent>
+            <Typography gutterBottom>
+              This will <strong>clear every existing MSME assignment</strong> and replace them with
+              the proposed distribution shown in the preview.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              • All <strong>{saData?.stats?.total || 0} active MSMEs</strong> will be reassigned
+            </Typography>
+            {saExclude.length > 0 && (
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                • <strong>{saExclude.map(e => e.name).join(', ')}</strong> are excluded from the pool
+              </Typography>
+            )}
+            <Typography variant="body2" color="text.secondary">
+              • This action cannot be undone automatically — export the Excel first if you need a record of the previous state.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSaResetConfirm(false)}>Cancel</Button>
+            <Button
+              variant="contained" color="error"
+              disabled={saApplying}
+              onClick={() => { setSaResetConfirm(false); applySmartAssign(true); }}
+            >
+              {saApplying ? 'Resetting…' : 'Yes, Reset & Reassign'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   };

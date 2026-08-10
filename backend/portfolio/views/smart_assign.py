@@ -293,21 +293,41 @@ def smart_assign(request):
         })
 
     # POST — apply
+    from django.db import transaction
     from ..models import MSME
     today = timezone.now().date()
+    clear_first = bool(request.data.get('clear_first', False))
     updated = 0
-    for a in assignments:
-        if a['status'] != 'unchanged':
-            MSME.objects.filter(id=a['msme_id']).update(
-                assigned_bge_id=a['proposed_bge_id'],
-                assignment_date=today,
+
+    with transaction.atomic():
+        if clear_first:
+            # Wipe all existing assignments so every MSME is treated as fresh.
+            # We computed BEFORE clearing so engagement/continuity bonuses still
+            # informed the algorithm — now we apply everything unconditionally.
+            MSME.objects.filter(is_active=True).update(
+                assigned_bge_id=None,
+                assignment_date=None,
             )
-            updated += 1
+            for a in assignments:
+                MSME.objects.filter(id=a['msme_id']).update(
+                    assigned_bge_id=a['proposed_bge_id'],
+                    assignment_date=today,
+                )
+            updated = len(assignments)
+        else:
+            for a in assignments:
+                if a['status'] != 'unchanged':
+                    MSME.objects.filter(id=a['msme_id']).update(
+                        assigned_bge_id=a['proposed_bge_id'],
+                        assignment_date=today,
+                    )
+                    updated += 1
 
     return Response({
-        'applied': updated,
-        'unchanged': stats['unchanged'],
-        'stats': stats,
+        'applied':   updated,
+        'unchanged': 0 if clear_first else stats['unchanged'],
+        'cleared':   clear_first,
+        'stats':     stats,
         'bge_summary': bge_summary,
     })
 
