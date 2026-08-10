@@ -6124,8 +6124,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       const res = await axios.post(SMART_ASSIGN_URL, { apply_to: saApplyTo }, { headers });
       setSuccess(`Applied: ${res.data.applied} MSMEs assigned, ${res.data.unchanged} unchanged.`);
       setSaData(prev => prev ? { ...prev, _applied: true, ...res.data } : prev);
-      // Refresh MSME list to show new assignments
-      fetchMsmes();
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to apply assignments.');
     } finally {
