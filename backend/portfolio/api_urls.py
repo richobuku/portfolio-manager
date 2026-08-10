@@ -18,6 +18,7 @@ from .views import (
     scheduled_messages_view, scheduled_message_cancel_view, scheduled_messages_process_view,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
+from .views.smart_assign import smart_assign, smart_assign_export
 from .blockchain.api_views import (
     BlockchainTransactionViewSet, SmartContractViewSet, TokenViewSet,
     MSMEFundingContractViewSet, InvestmentPoolViewSet, DecentralizedIdentityViewSet,
@@ -80,4 +81,6 @@ urlpatterns = [
     path('api/scheduled-messages/', scheduled_messages_view, name='scheduled_messages'),
     path('api/scheduled-messages/<int:pk>/cancel/', scheduled_message_cancel_view, name='scheduled_message_cancel'),
     path('api/scheduled-messages/process/', scheduled_messages_process_view, name='scheduled_messages_process'),
+    path('api/msmes/smart-assign/',        smart_assign,        name='smart_assign'),
+    path('api/msmes/smart-assign/export/', smart_assign_export, name='smart_assign_export'),
 ]

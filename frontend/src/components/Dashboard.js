@@ -28,7 +28,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_REVERT_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_REVERT_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, SMART_ASSIGN_URL, SMART_ASSIGN_EXPORT_URL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -49,6 +49,7 @@ const NAV_ITEMS = [
   { key: 'participation',  label: 'Participation',  icon: <TrendingUp /> },
   { key: 'reports',        label: 'Reports',        icon: <PictureAsPdf /> },
   { key: 'workorders',     label: 'Work Orders',    icon: <Assignment /> },
+  { key: 'bgeassignment',  label: 'BGE Assignment', icon: <LocationOn /> },
   { key: 'analytics',      label: 'Analytics',      icon: <Assessment /> },
   { key: 'communications', label: 'Communications', icon: <Campaign /> },
   { key: 'tshirts',        label: 'T-Shirt Receipts', icon: <Checkroom /> },
@@ -234,6 +235,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [duRatePerDay, setDuRatePerDay] = useState(60000);
   const [duUpdateAssign, setDuUpdateAssign] = useState(true);
   const [duResult, setDuResult]         = useState(null);
+
+  // ── Smart BGE Assignment ─────────────────────────────────────────────────
+  const [saLoading, setSaLoading]   = useState(false);
+  const [saApplying, setSaApplying] = useState(false);
+  const [saData, setSaData]         = useState(null);   // preview response
+  const [saApplyTo, setSaApplyTo]   = useState('all'); // 'all' | 'unassigned'
+  const [saSearch, setSaSearch]     = useState('');
+  const [saTab, setSaTab]           = useState(0);      // 0=Summary 1=Detail
 
   // ── filters ────────────────────────────────────────────────────────────────
   const [msmeSearch, setMsmeSearch] = useState('');
@@ -1922,6 +1931,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       { key: 'analytics',     label: 'Analytics',         icon: <Assessment />,    desc: 'Programme-wide insights and trends' },
       { key: 'participation', label: 'Participation',     icon: <TrendingUp />,    desc: 'Per-session MSME participation' },
       { key: 'workorders',    label: 'Work Orders',       icon: <Assignment />,    desc: 'Issue and track BGE work orders' },
+      { key: 'bgeassignment', label: 'BGE Assignment',    icon: <LocationOn />,    desc: 'Smart focal-person assignment by proximity & engagement' },
       { key: 'communications',label: 'Communications',    icon: <Campaign />,      desc: 'Email MSMEs and send bulk messages' },
     ];
 
@@ -6095,6 +6105,37 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  // ── Smart assignment handlers ─────────────────────────────────────────────
+  const loadSmartAssign = async (applyTo = saApplyTo) => {
+    setSaLoading(true);
+    setSaData(null);
+    try {
+      const res = await axios.get(`${SMART_ASSIGN_URL}?apply_to=${applyTo}`, { headers });
+      setSaData(res.data);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Could not load assignment preview.');
+    } finally {
+      setSaLoading(false);
+    }
+  };
+  const applySmartAssign = async () => {
+    setSaApplying(true);
+    try {
+      const res = await axios.post(SMART_ASSIGN_URL, { apply_to: saApplyTo }, { headers });
+      setSuccess(`Applied: ${res.data.applied} MSMEs assigned, ${res.data.unchanged} unchanged.`);
+      setSaData(prev => prev ? { ...prev, _applied: true, ...res.data } : prev);
+      // Refresh MSME list to show new assignments
+      fetchMsmes();
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to apply assignments.');
+    } finally {
+      setSaApplying(false);
+    }
+  };
+  const downloadSmartAssignExcel = () => {
+    window.open(`${SMART_ASSIGN_EXPORT_URL}?apply_to=${saApplyTo}`, '_blank');
+  };
+
   const issueWo = async (wo) => {
     setWoIssuing(wo.id);
     try {
@@ -6235,6 +6276,164 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } finally {
       setWoPaymentNotifying(null);
     }
+  };
+
+  // ── BGE Assignment section ────────────────────────────────────────────────
+  const renderBgeAssignment = () => {
+    const STATUS_COLOR = { unchanged: 'success', new: 'default', reassigned: 'warning' };
+    const STATUS_LABEL = { unchanged: 'Unchanged', new: 'New', reassigned: 'Changed' };
+    const filteredRows = (saData?.assignments || []).filter(a => {
+      const q = saSearch.toLowerCase();
+      return !q || a.msme_name.toLowerCase().includes(q)
+        || a.msme_city?.toLowerCase().includes(q)
+        || a.proposed_bge_name?.toLowerCase().includes(q);
+    });
+
+    return (
+      <Box>
+        <SectionHeader title="BGE Assignment" subtitle="Smart focal-person assignment by proximity & engagement">
+          <Button variant="outlined" size="small" startIcon={<Download />} onClick={downloadSmartAssignExcel} disabled={!saData} sx={{ mr: 1 }}>
+            Export Excel
+          </Button>
+          <Button variant="contained" size="small" onClick={() => loadSmartAssign(saApplyTo)} disabled={saLoading}>
+            {saLoading ? 'Loading…' : saData ? 'Refresh Preview' : 'Load Preview'}
+          </Button>
+        </SectionHeader>
+
+        {/* Controls */}
+        <Paper variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Scope</InputLabel>
+            <Select value={saApplyTo} label="Scope" onChange={e => { setSaApplyTo(e.target.value); setSaData(null); }}>
+              <MenuItem value="all">All active MSMEs</MenuItem>
+              <MenuItem value="unassigned">Unassigned MSMEs only</MenuItem>
+            </Select>
+          </FormControl>
+          {saData && (
+            <TextField size="small" placeholder="Search MSME / BGE / district…" value={saSearch}
+              onChange={e => setSaSearch(e.target.value)} sx={{ flex: '1 1 220px' }} />
+          )}
+          {saData && !saData._applied && (
+            <Button variant="contained" color="warning" size="small" onClick={applySmartAssign} disabled={saApplying} sx={{ ml: 'auto' }}>
+              {saApplying ? 'Applying…' : `Apply ${saData.stats?.total || ''} Assignments`}
+            </Button>
+          )}
+          {saData?._applied && (
+            <Chip label={`✅ Applied — ${saData.applied} updated`} color="success" sx={{ ml: 'auto' }} />
+          )}
+        </Paper>
+
+        {saLoading && <Box sx={{ textAlign: 'center', py: 6 }}><CircularProgress /></Box>}
+
+        {saData && (
+          <>
+            {/* Summary chips */}
+            <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
+              <Chip label={`${saData.stats?.total} MSMEs`} color="primary" />
+              <Chip label={`${saData.stats?.unchanged} unchanged`} color="success" variant="outlined" />
+              <Chip label={`${saData.stats?.new} new assignments`} color="default" variant="outlined" />
+              <Chip label={`${saData.stats?.reassigned} to be changed`} color="warning" variant="outlined" />
+            </Box>
+
+            <Tabs value={saTab} onChange={(_, v) => setSaTab(v)} sx={{ mb: 2 }}>
+              <Tab label={`By BGE (${saData.bge_summary?.length || 0})`} />
+              <Tab label={`All MSMEs (${filteredRows.length})`} />
+            </Tabs>
+
+            {/* Tab 0: BGE summary cards */}
+            {saTab === 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                {(saData.bge_summary || []).map(b => (
+                  <Paper key={b.bge_id} variant="outlined" sx={{ p: 2, flex: '1 1 260px', maxWidth: 340 }}>
+                    <Typography fontWeight={700} fontSize={14}>{b.bge_name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{b.bge_code} · {b.location || 'No location'}</Typography>
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Chip label={`${b.count} MSMEs`} size="small" color="primary" />
+                    </Box>
+                    <Box sx={{ mt: 1 }}>
+                      {(saData.assignments || [])
+                        .filter(a => a.proposed_bge_id === b.bge_id)
+                        .slice(0, 6)
+                        .map(a => (
+                          <Typography key={a.msme_id} variant="caption" display="block" noWrap color="text.secondary">
+                            {a.msme_name} <span style={{ color: '#999' }}>· {a.msme_city}</span>
+                          </Typography>
+                        ))}
+                      {b.count > 6 && (
+                        <Typography variant="caption" color="primary">+{b.count - 6} more</Typography>
+                      )}
+                    </Box>
+                  </Paper>
+                ))}
+              </Box>
+            )}
+
+            {/* Tab 1: Full MSME table */}
+            {saTab === 1 && (
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 520, overflow: 'auto' }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>MSME</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>City</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Focal BGE</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Previous BGE</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textAlign: 'center' }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textAlign: 'center' }}>Eng.</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textAlign: 'center' }}>Loc.</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Reason</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredRows.map(a => (
+                      <TableRow key={a.msme_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600} noWrap>{a.msme_name}</Typography>
+                          {a.msme_code && <Typography variant="caption" color="text.secondary">{a.msme_code}</Typography>}
+                        </TableCell>
+                        <TableCell><Typography variant="body2">{a.msme_city}</Typography></TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>{a.proposed_bge_name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{a.proposed_bge_loc}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color={a.current_bge_name ? 'text.primary' : 'text.disabled'}>
+                            {a.current_bge_name || '—'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip label={STATUS_LABEL[a.status]} color={STATUS_COLOR[a.status]} size="small" />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip label={a.engagement_score} size="small" color={a.engagement_score > 0 ? 'success' : 'default'} variant="outlined" />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip label={a.location_score} size="small" color={a.location_score > 0 ? 'info' : 'default'} variant="outlined" />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary">{a.engagement_reason}</Typography>
+                          {a.location_score > 0 && (
+                            <Typography variant="caption" display="block" color="info.main">{a.location_reason}</Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </>
+        )}
+
+        {!saData && !saLoading && (
+          <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
+            <LocationOn sx={{ fontSize: 48, mb: 1, opacity: 0.3 }} />
+            <Typography>Click "Load Preview" to compute the smart assignment.</Typography>
+            <Typography variant="caption">Factors: previous engagement + location proximity + load balancing</Typography>
+          </Box>
+        )}
+      </Box>
+    );
   };
 
   const renderWorkOrders = () => (
@@ -8497,6 +8696,7 @@ PRUDEV II BDS Team`
     participation: renderParticipation,
     reports: renderReports,
     workorders: renderWorkOrders,
+    bgeassignment: renderBgeAssignment,
     analytics: renderAnalytics,
     communications: renderCommunications,
     tshirts: renderTshirtReceipts,

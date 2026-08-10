@@ -85,5 +85,7 @@ export const SCHEDULED_MESSAGES = `${API_BASE_URL}/api/scheduled-messages/`;
 export const SCHEDULED_MESSAGES_PROCESS = `${API_BASE_URL}/api/scheduled-messages/process/`;
 export const SCHEDULED_MESSAGE_CANCEL = (id) => `${API_BASE_URL}/api/scheduled-messages/${id}/cancel/`;
 export const MENTOR_REPORTS = API_ENDPOINTS.MENTOR_REPORTS;
+export const SMART_ASSIGN_URL        = `${API_BASE_URL}/api/msmes/smart-assign/`;
+export const SMART_ASSIGN_EXPORT_URL = `${API_BASE_URL}/api/msmes/smart-assign/export/`;
 
 export default API_BASE_URL;
