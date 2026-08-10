@@ -63,6 +63,10 @@ router.register(r'blockchain/investment-pools', InvestmentPoolViewSet)
 router.register(r'blockchain/identities', DecentralizedIdentityViewSet)
 
 urlpatterns = [
+    # Custom paths that would otherwise be swallowed by the router's <pk> pattern
+    # MUST come before path('api/', include(router.urls))
+    path('api/msmes/smart-assign/export/', smart_assign_export, name='smart_assign_export'),
+    path('api/msmes/smart-assign/',        smart_assign,        name='smart_assign'),
     path('api/', include(router.urls)),
     path('api/auth/login/', login_view, name='api_login'),
     path('api/auth/logout/', logout_view, name='api_logout'),
@@ -81,6 +85,4 @@ urlpatterns = [
     path('api/scheduled-messages/', scheduled_messages_view, name='scheduled_messages'),
     path('api/scheduled-messages/<int:pk>/cancel/', scheduled_message_cancel_view, name='scheduled_message_cancel'),
     path('api/scheduled-messages/process/', scheduled_messages_process_view, name='scheduled_messages_process'),
-    path('api/msmes/smart-assign/',        smart_assign,        name='smart_assign'),
-    path('api/msmes/smart-assign/export/', smart_assign_export, name='smart_assign_export'),
 ]
