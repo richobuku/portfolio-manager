@@ -116,7 +116,19 @@ class MSME(models.Model):
         ('SMALL', 'Small Enterprise'),
         ('MEDIUM', 'Medium Enterprise'),
     ]
-    
+
+    BUSINESS_CATEGORIES = [
+        ('agro_processor',        'Agro Processor'),
+        ('agro_input_dealer',     'Agro-Input Dealer'),
+        ('farm_enterprise',       'Farm Enterprise'),
+        ('produce_bulking',       'Produce Bulking'),
+        ('green_business',        'Green Business'),
+        ('forestry_agroforestry', 'Forestry & Agroforestry'),
+        ('trade_commerce',        'Trade & Commerce'),
+        ('services',              'Services'),
+        ('other',                 'Other / Unclassified'),
+    ]
+
     SECTORS = [
         ('MANUFACTURING', 'Manufacturing'),
         ('SERVICES', 'Services'),
@@ -136,6 +148,10 @@ class MSME(models.Model):
     business_name = models.CharField(max_length=200)
     business_type = models.CharField(max_length=10, choices=BUSINESS_TYPES)
     sector = models.CharField(max_length=20, choices=SECTORS)
+    business_category = models.CharField(
+        max_length=30, choices=BUSINESS_CATEGORIES, blank=True, default='',
+        help_text='PRUDEV II portfolio business category (e.g. Agro Processor, Farm Enterprise)',
+    )
     registration_number = models.CharField(max_length=50, blank=True)
     
     # Contact Information
@@ -1042,6 +1058,7 @@ class WorkOrder(models.Model):
         ('fi_mobilisation_bcp',   'BCP Tool - Field Implementation'),
         ('carbon_emissions_training', 'Carbon Emissions Measurement Framework — Training & Field Implementation'),
         ('csa_rapid_assessment',  'CSA Rapid Assessment — Resilience Activity'),
+        ('bds_manual_module',     'BDS Manual — Additional Module'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [

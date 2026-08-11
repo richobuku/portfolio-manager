@@ -864,6 +864,21 @@ def render_work_order(work_order):
             'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
             'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA AFC GmbH.',
         ]
+    elif work_order.work_order_type == 'bds_manual_module':
+        CONDITIONS = [
+            'The Consultant shall develop all BDS Manual Additional Module content to the required PRUDEV II quality standard, incorporating current PPDA guidelines, public procurement procedures, and URA 2026 regulatory changes.',
+            'All drafted content must be reviewed and approved by the BDS Expert and Team Leader before the finalised module is printed or distributed.',
+            'The Consultant shall deliver DCO training in Gulu and Lira (1st week of September 2026) using the developed training materials and shall ensure sessions are practical, participatory, and calibrated to the DCO audience.',
+            'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of each training day and included in the post-training report.',
+            'The Consultant shall treat all PRUDEV II programme information, MSME data, and BGE/DCO contact information as strictly confidential.',
+            'All outputs, modules, training materials, and documents produced under this work order are the intellectual property of GOPA AFC and shall not be reproduced, shared, or distributed beyond PRUDEV II without prior written approval.',
+            'Phase 1 fees shall be released upon approval of the finalised BDS Manual Additional Module (Deliverable 7). Phase 2 fees shall be released upon approval of the post-training report (Deliverable 10).',
+            'Transport and accommodation costs for training delivery in Gulu and Lira are reimbursed at actual cost upon submission of original receipts.',
+            'GOPA AFC reserves the right to withhold or recover payment for content that is inaccurate, plagiarised, or does not meet PRUDEV II quality standards.',
+            'Any changes to the scope, content structure, or training schedule require written approval from the Team Leader.',
+            'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
+            'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA AFC GmbH.',
+        ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [
             'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA AFC and GIZ quality standards.',
