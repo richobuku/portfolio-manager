@@ -11,7 +11,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python manage.py collectstatic --noinput && python manage.py migrate && python manage.py init_admin && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python manage.py collectstatic --noinput && python manage.py migrate && python manage.py init_admin && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --max-requests 200 --max-requests-jitter 20 --timeout 90
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -55,7 +55,7 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     schedule: "0 2 * * *"   # 02:00 UTC = 05:00 EAT every day
-    startCommand: pip install -r requirements.txt && python manage.py export_to_drive
+    startCommand: python -m pip install -r requirements.txt && python manage.py export_to_drive
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
