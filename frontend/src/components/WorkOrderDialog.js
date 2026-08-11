@@ -113,7 +113,7 @@ const WO_DEFAULTS = {
   access_to_finance_bge: {
     objective: `To increase access to finance for assigned MSMEs in Gulu and Adjumani by assessing their credit readiness, preparing bankable documents, and linking creditworthy businesses to appropriate banks and financial service providers (FSPs). The BGE will work directly with MSMEs through one-on-one visits and credit clinics, collaborating with bank credit officers and accompanying bank staff to MSME premises for further credit assessment. The assignment runs for 10 working days (12–25 August 2026).
 
-Targets per BGE (standard — Adjumani BGEs have higher targets, noted below):
+Targets per BGE:
 • Credit readiness assessment: 5 MSMEs (Adjumani: 10)
 • Bankable documents prepared: 6 MSMEs (Adjumani/Mali: 7)
 • MSMEs linked/walked to bank or FSP: 4 (Adjumani: 5)
@@ -142,7 +142,7 @@ Targets per BGE (standard — Adjumani BGEs have higher targets, noted below):
       },
       {
         task_num: 2,
-        description: 'Credit readiness assessments completed — 5 MSMEs (Adjumani: 10)',
+        description: 'Credit readiness assessments completed for all assigned MSMEs',
         due_date: 'Days 1–8',
         quantitative_result: '5 MSMEs assessed for credit readiness (Adjumani BGEs: 10 MSMEs)',
         qualitative_result: 'Each assessment clearly identifies readiness level, key gaps, and recommended next steps',
@@ -162,7 +162,7 @@ Targets per BGE (standard — Adjumani BGEs have higher targets, noted below):
       },
       {
         task_num: 4,
-        description: 'Bankable documents prepared — 6 MSMEs (Adjumani/Mali: 7)',
+        description: 'Bankable documents prepared for credit-ready MSMEs',
         due_date: 'Days 2–9',
         quantitative_result: '6 MSMEs with bankable documents prepared (Adjumani/Mali BGEs: 7 MSMEs)',
         qualitative_result: 'Documents are complete, correctly formatted, and accepted by the relevant FSP',
@@ -172,7 +172,7 @@ Targets per BGE (standard — Adjumani BGEs have higher targets, noted below):
       },
       {
         task_num: 5,
-        description: 'MSMEs linked or walked to bank/FSP for credit — 4 MSMEs (Adjumani: 5)',
+        description: 'MSMEs linked or walked to bank or FSP for credit',
         due_date: 'Days 5–10',
         quantitative_result: '4 MSMEs linked to or accompanied to their bank/FSP (Adjumani BGEs: 5 MSMEs)',
         qualitative_result: 'Each MSME has been walked through the FSP engagement process or led a bank field visit to their premises',
