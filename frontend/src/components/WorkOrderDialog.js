@@ -995,11 +995,11 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
                 <MenuItem value="bcp_tool_training">BCP Tool Training — BGE Participant</MenuItem>
                 <MenuItem value="bge_bcp_participant_mentor">Agro-processors — Business Continuity &amp; Strategic Planning (BGE Support)</MenuItem>
-                <MenuItem value="bcp_senior_facilitator">Agro-processors BCP — Senior BGE Lead Facilitator</MenuItem>
                 <MenuItem value="outcome_assessment_tool">Outcome Assessment Tool Delivery</MenuItem>
                 <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
                 <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework — Training &amp; Field Implementation</MenuItem>
                 <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
+                <MenuItem value="bds_manual_module">BDS Manual — Additional Module</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
