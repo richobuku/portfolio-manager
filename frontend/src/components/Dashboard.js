@@ -22,6 +22,7 @@ import {
   RotateLeft, RotateRight, Dashboard as DashboardIcon,
   ArrowForward, TaskAlt, Payments, Description,
   FormatBold, FormatListBulleted, CalendarToday,
+  GpsFixed, GpsNotFixed, MyLocation,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -770,6 +771,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         'signature', 'signature_data', 'signature_url',
         'assigned_msme_count', 'assigned_msmes_list', 'group_names',
         'created_at', 'updated_at',
+        '_gpsLoading',   // UI-only flag, not a model field
       ];
       const payload = Object.fromEntries(
         Object.entries(editForm).filter(([k]) => !STRIP_FIELDS.includes(k))
@@ -9203,6 +9205,67 @@ PRUDEV II BDS Team`
               ))}
               <Grid item xs={12}>
                 <TextField fullWidth size="small" multiline rows={2} label="Description" value={editForm.business_description || ''} onChange={e => setEditForm({...editForm, business_description: e.target.value})} />
+              </Grid>
+
+              {/* ── GPS Location ── */}
+              <Grid item xs={12}>
+                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <MyLocation sx={{ fontSize: 14 }} /> GPS Business Location
+                    </Typography>
+                    <Button
+                      size="small" variant="outlined"
+                      startIcon={editForm._gpsLoading ? <CircularProgress size={12} /> : (editForm.latitude ? <GpsFixed sx={{ fontSize: 14 }} /> : <GpsNotFixed sx={{ fontSize: 14 }} />)}
+                      disabled={!!editForm._gpsLoading}
+                      onClick={() => {
+                        if (!navigator.geolocation) return;
+                        setEditForm(f => ({ ...f, _gpsLoading: true }));
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => setEditForm(f => ({
+                            ...f,
+                            latitude:  pos.coords.latitude.toFixed(6),
+                            longitude: pos.coords.longitude.toFixed(6),
+                            _gpsLoading: false,
+                          })),
+                          () => setEditForm(f => ({ ...f, _gpsLoading: false })),
+                          { enableHighAccuracy: true, timeout: 15000 },
+                        );
+                      }}
+                      sx={{ fontSize: 11, py: 0.25 }}
+                    >
+                      {editForm._gpsLoading ? 'Locating…' : editForm.latitude ? 'Recapture' : 'Capture Location'}
+                    </Button>
+                  </Box>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}>
+                      <TextField fullWidth size="small" label="Latitude" type="number"
+                        inputProps={{ step: 'any' }}
+                        value={editForm.latitude || ''}
+                        onChange={e => setEditForm(f => ({ ...f, latitude: e.target.value }))}
+                        placeholder="e.g. 2.774950"
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField fullWidth size="small" label="Longitude" type="number"
+                        inputProps={{ step: 'any' }}
+                        value={editForm.longitude || ''}
+                        onChange={e => setEditForm(f => ({ ...f, longitude: e.target.value }))}
+                        placeholder="e.g. 32.299110"
+                      />
+                    </Grid>
+                  </Grid>
+                  {editForm.latitude && editForm.longitude && (
+                    <Typography variant="caption" color="success.main" sx={{ mt: 0.75, display: 'block' }}>
+                      📍 {Number(editForm.latitude).toFixed(6)}, {Number(editForm.longitude).toFixed(6)}
+                      {' · '}
+                      <a href={`https://maps.google.com/?q=${editForm.latitude},${editForm.longitude}`}
+                        target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
+                        View on map ↗
+                      </a>
+                    </Typography>
+                  )}
+                </Box>
               </Grid>
             </Grid>
           )}

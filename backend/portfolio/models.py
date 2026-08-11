@@ -256,6 +256,16 @@ class MSME(models.Model):
     diag_imported_at          = models.DateTimeField(null=True, blank=True,
         help_text='When the diagnostic baseline was imported')
 
+    # ── GPS location of the business premises ────────────────────────────────
+    latitude  = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text='GPS latitude of business premises (decimal degrees)',
+    )
+    longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text='GPS longitude of business premises (decimal degrees)',
+    )
+
     def __str__(self):
         return f"{self.business_name} - {self.business_type} ({self.sector})"
     
@@ -825,6 +835,20 @@ class MSMEReport(models.Model):
     recommendations       = models.TextField(blank=True, help_text='BGE follow-up actions / next session plan')
     next_steps            = models.TextField(blank=True)
     additional_notes      = models.TextField(blank=True)
+
+    # ── GPS location captured at time of visit ───────────────────────────────
+    visit_latitude  = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text='GPS latitude captured when the report was filed',
+    )
+    visit_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text='GPS longitude captured when the report was filed',
+    )
+    visit_gps_accuracy = models.FloatField(
+        null=True, blank=True,
+        help_text='GPS accuracy in metres at time of capture',
+    )
 
     # ── Data quality (annual_review visits) ──────────────────────────────────
     data_confidence_level    = models.CharField(

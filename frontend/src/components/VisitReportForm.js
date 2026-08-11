@@ -8,6 +8,7 @@ import {
 import {
   Close, Save, Send, Person, School, Psychology, Assessment,
   Flag, EventNote, Build, EmojiEvents, ArrowForward, QueryStats,
+  GpsFixed, GpsNotFixed, MyLocation,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
@@ -212,6 +213,10 @@ const EMPTY_FORM = {
   records_sighted:             null,
   owner_certainty_observation: '',
   data_collection_challenges:  '',
+  // GPS location captured at time of visit
+  visit_latitude:      null,
+  visit_longitude:     null,
+  visit_gps_accuracy:  null,
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -264,6 +269,8 @@ export default function VisitReportForm({
   const [selectedTools, setSelectedTools] = useState([]);
   const [toolsOther, setToolsOther]       = useState('');
   const [draftBanner, setDraftBanner]     = useState(null); // { savedAt, key }
+  const [gpsLoading, setGpsLoading]       = useState(false);
+  const [gpsError, setGpsError]           = useState('');
   const draftTimerRef = useRef(null);
   const currentDraftKey = useRef('');
 
@@ -280,7 +287,10 @@ export default function VisitReportForm({
       });
       f.msme       = editingReport.msme       || '';
       f.visit_type = editingReport.visit_type || 'one_on_one';
-      f.records_sighted = editingReport.records_sighted ?? null;
+      f.records_sighted   = editingReport.records_sighted   ?? null;
+      f.visit_latitude    = editingReport.visit_latitude    != null ? Number(editingReport.visit_latitude)    : null;
+      f.visit_longitude   = editingReport.visit_longitude   != null ? Number(editingReport.visit_longitude)   : null;
+      f.visit_gps_accuracy = editingReport.visit_gps_accuracy != null ? Number(editingReport.visit_gps_accuracy) : null;
       const parsed = parseTools(editingReport.tools_provided || '');
       const knownSelected = parsed.filter(t => TOOLS_OPTIONS.includes(t));
       const otherText = parsed.filter(t => !TOOLS_OPTIONS.includes(t)).join(', ');
@@ -355,6 +365,41 @@ export default function VisitReportForm({
     }
   };
 
+  /* ── GPS capture ── */
+  const captureGPS = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation is not supported by this browser.');
+      return;
+    }
+    setGpsLoading(true);
+    setGpsError('');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm(f => ({
+          ...f,
+          visit_latitude:     pos.coords.latitude,
+          visit_longitude:    pos.coords.longitude,
+          visit_gps_accuracy: pos.coords.accuracy,
+        }));
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsError(
+          err.code === 1 ? 'Location permission denied.'
+          : err.code === 2 ? 'Location unavailable — check GPS signal.'
+          : 'Location request timed out.',
+        );
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  }, []);
+
+  /* Auto-capture GPS when form opens (new reports only) */
+  useEffect(() => {
+    if (open && !editingReport) captureGPS();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const cfg = TYPE_CONFIG[form.visit_type] || DEFAULT_CONFIG;
   const typeInfo = VISIT_TYPES.find(t => t.value === form.visit_type) || VISIT_TYPES[0];
   const selectedMsme = msmes.find(x => x.id === Number(form.msme) || x.id === form.msme)
@@ -395,6 +440,10 @@ export default function VisitReportForm({
       records_sighted:             form.records_sighted,
       owner_certainty_observation: form.owner_certainty_observation,
       data_collection_challenges:  form.data_collection_challenges,
+      // GPS
+      visit_latitude:     form.visit_latitude  !== null ? form.visit_latitude  : null,
+      visit_longitude:    form.visit_longitude !== null ? form.visit_longitude : null,
+      visit_gps_accuracy: form.visit_gps_accuracy !== null ? form.visit_gps_accuracy : null,
     };
 
     try {
@@ -534,6 +583,72 @@ export default function VisitReportForm({
                 </Box>
               </Box>
             ))}
+
+            {/* ── GPS location panel ── */}
+            <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #E8EDF2' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <MyLocation sx={{ fontSize: 12 }} /> Visit Location
+                </Typography>
+                <IconButton size="small" onClick={captureGPS} disabled={gpsLoading}
+                  title={form.visit_latitude ? 'Recapture GPS' : 'Capture GPS location'}
+                  sx={{ p: 0.25 }}>
+                  {gpsLoading
+                    ? <CircularProgress size={14} />
+                    : form.visit_latitude
+                      ? <GpsFixed sx={{ fontSize: 16, color: '#2E7D32' }} />
+                      : <GpsNotFixed sx={{ fontSize: 16, color: '#90A4AE' }} />
+                  }
+                </IconButton>
+              </Box>
+
+              {form.visit_latitude ? (
+                <Box sx={{
+                  bgcolor: '#E8F5E9', borderRadius: 1, p: 1, fontSize: 11,
+                }}>
+                  <Typography fontSize={11} fontWeight={600} color="#2E7D32"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <GpsFixed sx={{ fontSize: 13 }} /> Location captured
+                  </Typography>
+                  <Typography fontSize={10} color="text.secondary" sx={{ mt: 0.25 }}>
+                    {Number(form.visit_latitude).toFixed(5)}, {Number(form.visit_longitude).toFixed(5)}
+                  </Typography>
+                  {form.visit_gps_accuracy && (
+                    <Typography fontSize={10} color="text.secondary">
+                      ±{Math.round(form.visit_gps_accuracy)} m accuracy
+                    </Typography>
+                  )}
+                  <a
+                    href={`https://maps.google.com/?q=${form.visit_latitude},${form.visit_longitude}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 10, color: '#1A73E8' }}
+                  >
+                    View on map ↗
+                  </a>
+                </Box>
+              ) : (
+                <Box sx={{
+                  bgcolor: '#F8F9FA', borderRadius: 1, p: 1, textAlign: 'center',
+                }}>
+                  {gpsLoading ? (
+                    <Typography fontSize={11} color="text.secondary">Capturing location…</Typography>
+                  ) : (
+                    <>
+                      <Typography fontSize={11} color="text.secondary">No location captured</Typography>
+                      {gpsError && (
+                        <Typography fontSize={10} color="error.main" sx={{ mt: 0.25 }}>{gpsError}</Typography>
+                      )}
+                      <Button size="small" sx={{ mt: 0.5, fontSize: 10 }}
+                        startIcon={<GpsNotFixed sx={{ fontSize: 12 }} />}
+                        onClick={captureGPS}>
+                        Try again
+                      </Button>
+                    </>
+                  )}
+                </Box>
+              )}
+            </Box>
           </Box>
 
           {/* ── Main content panel ── */}
