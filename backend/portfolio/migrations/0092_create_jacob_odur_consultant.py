@@ -7,9 +7,11 @@ This migration is idempotent — running it twice will not create duplicates.
 
 import datetime
 from django.db import migrations
+from django.contrib.auth.hashers import make_password
 
 
 def create_jacob_odur(apps, schema_editor):
+    # Keep everything on the historical models for consistency
     User = apps.get_model('auth', 'User')
     BusinessGrowthExpert = apps.get_model('portfolio', 'BusinessGrowthExpert')
     WorkOrder = apps.get_model('portfolio', 'WorkOrder')
@@ -21,6 +23,7 @@ def create_jacob_odur(apps, schema_editor):
             first_name='Jacob',
             last_name='Odur',
             email='jacob.odur@example.com',
+            password=make_password('ChangeMe2026!'),
             is_staff=False,
             is_active=True,
         ),
@@ -30,7 +33,7 @@ def create_jacob_odur(apps, schema_editor):
     bge, _ = BusinessGrowthExpert.objects.get_or_create(
         name='Jacob Odur',
         defaults=dict(
-            user=user,
+            user_id=user.pk,
             bge_code='PRUDEV II-BGE-JO-01',
             status='approved',
             is_senior=True,
@@ -43,7 +46,6 @@ def create_jacob_odur(apps, schema_editor):
     # ── Work Order ────────────────────────────────────────────────────────────
     wo_number = 'PRUDEV II-CONS-JO-01'
     if WorkOrder.objects.filter(work_order_number=wo_number).exists():
-        # Already present — just make sure it is issued
         WorkOrder.objects.filter(work_order_number=wo_number).update(
             status='issued',
             rate_per_day=80000,
@@ -51,7 +53,7 @@ def create_jacob_odur(apps, schema_editor):
         return
 
     WorkOrder.objects.create(
-        bge=bge,
+        bge_id=bge.pk,
         work_order_number=wo_number,
         work_order_type='bds_manual_module',
         project_name='Promoting Rural Development II (PRUDEV II)',
@@ -97,11 +99,11 @@ def create_jacob_odur(apps, schema_editor):
             {"task_num": "8", "description": "Co-facilitation of 5-day BGE/DCO Training (attendance + session notes)", "due_date": "2026-09-26"},
         ],
         payment_notes=(
-            "Phase 1 payment (30 days × UGX 80,000 = UGX 2,400,000): upon submission and acceptance "
+            "Phase 1 payment (30 days x UGX 80,000 = UGX 2,400,000): upon submission and acceptance "
             "of both final BDS Manual modules and all associated training content.\n"
-            "Phase 2 payment (10 days × UGX 80,000 = UGX 800,000): upon completion of 5-day BGE/DCO "
+            "Phase 2 payment (10 days x UGX 80,000 = UGX 800,000): upon completion of 5-day BGE/DCO "
             "training co-facilitation, confirmed by Team Leader sign-off.\n"
-            "Total contract value: UGX 3,200,000 (40 days × UGX 80,000/day).\n"
+            "Total contract value: UGX 3,200,000 (40 days x UGX 80,000/day).\n"
             "10% Withholding Tax (WHT) will be deducted at source per applicable tax regulations."
         ),
         team_leader_name='Stephen Maxi Opwonya',
@@ -111,7 +113,6 @@ def create_jacob_odur(apps, schema_editor):
 
 
 def reverse_jacob_odur(apps, schema_editor):
-    # Reverse: remove the work order (leave user/BGE in place)
     WorkOrder = apps.get_model('portfolio', 'WorkOrder')
     WorkOrder.objects.filter(work_order_number='PRUDEV II-CONS-JO-01').delete()
 
