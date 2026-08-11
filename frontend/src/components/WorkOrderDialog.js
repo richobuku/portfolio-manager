@@ -111,23 +111,135 @@ const WO_DEFAULTS = {
     ],
   },
   access_to_finance_bge: {
-    objective: `To support Access to Finance BGEs in onboarding MSMEs to digital finance platforms, building bankability, and mapping credit needs for follow-up engagement with financial institutions. This template focuses on 15 MSMEs over 7 working days, with an emphasis on practical digital onboarding and credit readiness documentation.`,
-    key_tasks: `1. Attend orientation on the Access to Finance assignment, digital finance platforms, and credit mapping requirements.
-2. Receive the assigned list of 15 MSMEs and develop a field visit and onboarding plan.
-3. Visit each MSME and support onboarding onto at least two digital finance platforms such as MOMO Pays, Flexy Pay, Wendi, or a business banking solution.
-4. Document each MSME's digital finance onboarding progress, including registration evidence and platform access details.
-5. Assess each MSME's interest in appropriate credit products and capture the preferred creditor and product type.
-6. Prepare a Credit Interest Mapping Report that summarises MSME readiness, product interest, and follow-up recommendations.
-7. Identify and document barriers to digital onboarding, including smartphone access, ID, or connectivity challenges.
-8. Submit daily progress updates and complete the final Access to Finance field report, invoice, and timesheet.`,
+    objective: `To increase access to finance for assigned MSMEs in Gulu and Adjumani by assessing their credit readiness, preparing bankable documents, and linking creditworthy businesses to appropriate banks and financial service providers (FSPs). The BGE will work directly with MSMEs through one-on-one visits and credit clinics, collaborating with bank credit officers and accompanying bank staff to MSME premises for further credit assessment. The assignment runs for 10 working days (12–25 August 2026).
+
+Targets per BGE (standard — Adjumani BGEs have higher targets, noted below):
+• Credit readiness assessment: 5 MSMEs (Adjumani: 10)
+• Bankable documents prepared: 6 MSMEs (Adjumani/Mali: 7)
+• MSMEs linked/walked to bank or FSP: 4 (Adjumani: 5)
+• MSMEs qualifying for financial clinic: at least 4`,
+    key_tasks: `1. Receive the list of assigned MSMEs and develop a field visit and engagement plan covering the full 10-day assignment period.
+2. Conduct one-on-one visits with each assigned MSME to assess their credit readiness — evaluate business records, cash flow, collateral, credit history, and existing bank relationships.
+3. Complete the TA Assessment Tool report for every MSME visited (use the link shared during the last deployment — this is mandatory at every visit).
+4. Support MSMEs to prepare bankable documents — including business registration, financial statements, business plans, loan application forms, and any other documents required by their preferred FSP.
+5. Identify MSMEs who are ready for credit and link or accompany them to their relevant bank or FSP. Where possible, lead bank staff directly to the MSME's business premises for further credit assessment.
+6. Liaise with the credit officer of the specific bank the MSME has a relationship with, and coordinate the bank's field assessment visit to the MSME location.
+7. Record and report on the number of MSMEs who open accounts, activate mobile wallets, or are appraised for loans and risk assessment — this number determines the size of the financial clinic to be organised.
+8. Participate in the credit/financial clinic to be organised for qualifying MSMEs (BGE participation is mandatory).
+9. Submit a signed timesheet for each MSME visit (timesheet must be signed by the MSME owner at point of visit).
+10. Complete the transport refund form (signed by the boda boda operator where boda transport was used).
+11. Submit the final report, invoice, and all supporting evidence by Day 10.`,
     deliverables_json: [
-      { task_num: 1, description: 'Orientation on digital finance onboarding and credit mapping completed', due_date: 'Day 1', quantitative_result: 'Orientation completed and documented for the assigned BGE', qualitative_result: 'BGE understands the digital finance onboarding and credit mapping process', means_of_verification: 'Signed orientation confirmation', unit_rate: '', payment_condition: 'Required prerequisite — no separate payment' },
-      { task_num: 2, description: 'Detailed field visit and onboarding plan for 15 assigned MSMEs', due_date: 'Day 1', quantitative_result: 'Onboarding plan submitted covering all 15 MSMEs and the planned schedule', qualitative_result: 'Plan is clear, logistically sound, and ready for execution', means_of_verification: 'Submitted onboarding plan', unit_rate: '', payment_condition: 'Required before field visits begin' },
-      { task_num: 3, description: 'Digital finance onboarding evidence for each MSME — minimum 2 platforms per MSME', due_date: 'Rolling across assignment', quantitative_result: 'At least 2 digital platforms onboarded for each MSME', qualitative_result: 'Onboarding evidence is complete, verified, and usable by the MSME', means_of_verification: 'Screenshots, confirmation messages, or account details per MSME', unit_rate: '', payment_condition: 'Pay only if onboarding evidence is complete and verified for at least 80% of MSMEs' },
-      { task_num: 4, description: 'Credit Interest Mapping Report with MSME product preferences and readiness assessment', due_date: 'Day 6', quantitative_result: 'Credit Interest Mapping Report submitted covering all 15 MSMEs', qualitative_result: 'Report accurately reflects MSME product interest and readiness level', means_of_verification: 'Submitted and approved report', unit_rate: '', payment_condition: 'Pay only if report is submitted on time and approved' },
-      { task_num: 5, description: 'Barrier Register capturing digital onboarding challenges per MSME', due_date: 'Day 6', quantitative_result: 'Barrier register submitted for MSMEs with onboarding challenges', qualitative_result: 'Register clearly documents issues and recommended follow-up actions', means_of_verification: 'Submitted barrier register', unit_rate: '', payment_condition: 'Required for payment — shows thorough field follow-up' },
-      { task_num: 6, description: 'Final Access to Finance field report with recommendations and next steps', due_date: 'Day 7', quantitative_result: 'Field report submitted by Day 7', qualitative_result: 'Report provides clear recommendations, next steps, and evidence of the assignment outcome', means_of_verification: 'Submitted final report', unit_rate: '', payment_condition: 'Payment processed upon approval of final report' },
-      { task_num: 7, description: 'Approved invoice and signed timesheet', due_date: 'Day 7', quantitative_result: 'Invoice and signed timesheet submitted by Day 7', qualitative_result: 'Invoice and timesheet accurately reflect the 7-day assignment', means_of_verification: 'Approved invoice and signed timesheet', unit_rate: '', payment_condition: 'Pay processed upon approval of all deliverables' },
+      {
+        task_num: 1,
+        description: 'Field visit and engagement plan covering all assigned MSMEs',
+        due_date: 'Day 1',
+        quantitative_result: 'Plan submitted covering all assigned MSMEs with schedule and approach',
+        qualitative_result: 'Plan is clear, realistic, and approved before field visits begin',
+        means_of_verification: 'Submitted engagement plan',
+        unit_rate: '',
+        payment_condition: 'Required before field activities begin — no separate payment',
+      },
+      {
+        task_num: 2,
+        description: 'Credit readiness assessments completed — 5 MSMEs (Adjumani: 10)',
+        due_date: 'Days 1–8',
+        quantitative_result: '5 MSMEs assessed for credit readiness (Adjumani BGEs: 10 MSMEs)',
+        qualitative_result: 'Each assessment clearly identifies readiness level, key gaps, and recommended next steps',
+        means_of_verification: 'Completed TA Assessment Tool reports per MSME + signed visit timesheets',
+        unit_rate: '',
+        payment_condition: 'Pay only if TA Assessment Tool reports are completed for each MSME visited',
+      },
+      {
+        task_num: 3,
+        description: 'TA Assessment Tool reports submitted for all MSMEs visited',
+        due_date: 'Rolling — submitted after each visit',
+        quantitative_result: 'One TA Assessment Tool report per MSME visited (minimum: all credit-assessed MSMEs)',
+        qualitative_result: 'Reports are complete, accurate, and clearly document the MSME\'s situation at point of visit',
+        means_of_verification: 'TA Assessment Tool reports (using link shared during last deployment)',
+        unit_rate: '',
+        payment_condition: 'Mandatory for payment — missing reports will delay payment',
+      },
+      {
+        task_num: 4,
+        description: 'Bankable documents prepared — 6 MSMEs (Adjumani/Mali: 7)',
+        due_date: 'Days 2–9',
+        quantitative_result: '6 MSMEs with bankable documents prepared (Adjumani/Mali BGEs: 7 MSMEs)',
+        qualitative_result: 'Documents are complete, correctly formatted, and accepted by the relevant FSP',
+        means_of_verification: 'Copies of documents prepared per MSME included in final report',
+        unit_rate: '',
+        payment_condition: 'Pay only if document preparation is evidenced for the required number of MSMEs',
+      },
+      {
+        task_num: 5,
+        description: 'MSMEs linked or walked to bank/FSP for credit — 4 MSMEs (Adjumani: 5)',
+        due_date: 'Days 5–10',
+        quantitative_result: '4 MSMEs linked to or accompanied to their bank/FSP (Adjumani BGEs: 5 MSMEs)',
+        qualitative_result: 'Each MSME has been walked through the FSP engagement process or led a bank field visit to their premises',
+        means_of_verification: 'Photos, bank visit records, or signed confirmation from credit officer',
+        unit_rate: '',
+        payment_condition: 'Pay only if linkage evidence is provided for the required number of MSMEs',
+      },
+      {
+        task_num: 6,
+        description: 'Report on MSMEs qualifying for financial clinic (minimum 4 per BGE)',
+        due_date: 'Day 9',
+        quantitative_result: 'At least 4 MSMEs identified as qualifying for the financial clinic',
+        qualitative_result: 'Report clearly identifies which MSMEs qualify (opened accounts, activated mobile wallets, or appraised for loans) and provides basis for clinic planning',
+        means_of_verification: 'Qualifying MSME list included in final report with supporting evidence',
+        unit_rate: '',
+        payment_condition: 'Required for clinic organisation — no separate payment',
+      },
+      {
+        task_num: 7,
+        description: 'Participation in the financial/credit clinic for qualifying MSMEs',
+        due_date: 'As scheduled',
+        quantitative_result: 'BGE attended and participated in the financial clinic',
+        qualitative_result: 'BGE contributed meaningfully to the clinic, supported their assigned MSMEs during the session',
+        means_of_verification: 'Signed clinic attendance register',
+        unit_rate: '',
+        payment_condition: 'BGE participation is mandatory — non-attendance without approval may affect payment',
+      },
+      {
+        task_num: 8,
+        description: 'Signed MSME visit timesheets for all field visits',
+        due_date: 'Rolling — collected at each visit',
+        quantitative_result: 'One signed timesheet per MSME visit (signed by MSME owner at point of visit)',
+        qualitative_result: 'Timesheets are complete and signed at time of visit — retrospective signing not accepted',
+        means_of_verification: 'Original signed timesheets submitted with final report',
+        unit_rate: '',
+        payment_condition: 'Missing timesheets will delay payment',
+      },
+      {
+        task_num: 9,
+        description: 'Transport refund form signed by boda boda operator (where applicable)',
+        due_date: 'Day 10',
+        quantitative_result: 'Transport refund form completed and signed by boda boda operator for all applicable trips',
+        qualitative_result: 'Form accurately reflects trips taken and is signed at point of travel',
+        means_of_verification: 'Completed and signed transport refund form',
+        unit_rate: '',
+        payment_condition: 'Required for transport reimbursement — unsigned forms will not be processed',
+      },
+      {
+        task_num: 10,
+        description: 'Final report including all evidence of work done',
+        due_date: 'Day 10',
+        quantitative_result: 'Final report submitted by Day 10 covering all assigned MSMEs, activities, outcomes, and evidence',
+        qualitative_result: 'Report is clear, comprehensive, and supported by photographic and documentary evidence',
+        means_of_verification: 'Submitted final report reviewed and approved by Team Leader',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of final report',
+      },
+      {
+        task_num: 11,
+        description: 'Approved invoice',
+        due_date: 'Day 10',
+        quantitative_result: 'Invoice submitted by Day 10 reflecting the 10-day assignment',
+        qualitative_result: 'Invoice is accurate, correctly formatted, and matches the approved deliverables',
+        means_of_verification: 'Approved invoice',
+        unit_rate: '',
+        payment_condition: 'Processed together with final report approval',
+      },
     ],
   },
   biz_continuity: {
@@ -684,12 +796,23 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   const applyWoDefaults = React.useCallback((type) => {
     const d = WO_DEFAULTS[type] || WO_DEFAULTS.other;
     const extra = {};
-    if (type === 'msme_access_finance' || type === 'access_to_finance_bge') {
+    if (type === 'msme_access_finance') {
       extra.start_date = '2026-06-03';
       extra.end_date   = '2026-06-16';
       extra.duration   = '7 working days';
       extra.max_days   = 7;
       extra.location   = 'Acholi Sub-region, Northern Uganda';
+    }
+    if (type === 'access_to_finance_bge') {
+      extra.start_date   = '2026-08-12';
+      extra.end_date     = '2026-08-25';
+      extra.duration     = '10 working days (12–25 August 2026)';
+      extra.max_days     = 10;
+      extra.location     = 'Gulu & Adjumani, Northern Uganda';
+      extra.transport_reimbursed = true;
+      extra.rate_per_day = 60000;
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
     }
     if (type === 'bcp_tool_training') {
       extra.duration     = '2 days';
