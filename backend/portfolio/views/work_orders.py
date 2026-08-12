@@ -1,4 +1,5 @@
 import logging
+import os
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,6 +9,12 @@ from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
+
+# Plain admin email address (for BCC/CC on outgoing WO emails).
+# ADMIN_EMAIL is set in Render env vars and is a bare address like foo@bar.com.
+# We deliberately do NOT use DEFAULT_FROM_EMAIL here — that is the formatted
+# "Name <addr>" sender string, not a valid inbound recipient address.
+_ADMIN_NOTIFY_EMAIL = os.environ.get('ADMIN_EMAIL', '').strip()
 
 from ..models import WorkOrder, WorkOrderSubmission, WorkOrderPayment, WorkOrderAttachment
 from ..serializers import (
@@ -213,7 +220,7 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
 
         bge = work_order.bge
         recipient_email = bge.email or ''
-        admin_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
+        admin_email = _ADMIN_NOTIFY_EMAIL
         recipients = [r for r in [recipient_email, admin_email] if r]
 
         if recipients:
@@ -306,7 +313,7 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
 
         bge = work_order.bge
         recipient_email = bge.email or ''
-        admin_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
+        admin_email = _ADMIN_NOTIFY_EMAIL
         recipients = [r for r in [recipient_email, admin_email] if r]
 
         if recipients:
