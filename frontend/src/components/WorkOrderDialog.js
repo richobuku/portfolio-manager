@@ -737,13 +737,16 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   const [woSaving, setWoSaving] = React.useState(false);
   const [woConflict, setWoConflict] = React.useState(null);
   const [woAllowOverlap, setWoAllowOverlap] = React.useState(false);
+  const [selectedBges, setSelectedBges] = React.useState([]);
 
-  // Reset conflict when dialog closes
-  React.useEffect(() => { if (!open) { setWoConflict(null); setWoAllowOverlap(false); } }, [open]);
+  // Reset conflict and BGE selection when dialog closes
+  React.useEffect(() => { if (!open) { setWoConflict(null); setWoAllowOverlap(false); setSelectedBges([]); } }, [open]);
 
   // Live overlap check whenever BGE or dates change
   React.useEffect(() => {
-    const { bge, start_date, end_date } = woForm;
+    const { start_date, end_date } = woForm;
+    // In edit mode use woForm.bge; in create mode only check when exactly one BGE is selected
+    const bge = woEditing ? woForm.bge : (selectedBges.length === 1 ? selectedBges[0] : null);
     if (!bge || !start_date || !end_date) { setWoConflict(null); return; }
     let cancelled = false;
     axios.get(API_ENDPOINTS.WORK_ORDERS, {
@@ -761,10 +764,11 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       if (!conflict) setWoAllowOverlap(false);
     }).catch(() => setWoConflict(null));
     return () => { cancelled = true; };
-  }, [woForm.bge, woForm.start_date, woForm.end_date, woEditing, headers]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [woForm.bge, selectedBges, woForm.start_date, woForm.end_date, woEditing, headers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!open) return;
+    setSelectedBges([]);
     if (woEditing) {
       setWoForm({
         bge: woEditing.bge,
@@ -887,25 +891,44 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
   }, []);
 
   const saveWo = React.useCallback(async () => {
-    if (!woForm.bge) { setWoErrors('BGE is required.'); return; }
+    if (woEditing) {
+      if (!woForm.bge) { setWoErrors('BGE is required.'); return; }
+    } else {
+      if (selectedBges.length === 0) { setWoErrors('Select at least one BGE.'); return; }
+    }
     if (!woForm.issue_date) { setWoErrors('Issue date is required.'); return; }
     setWoSaving(true); setWoErrors('');
     try {
-      const payload = { ...woForm, group: woForm.group || null, allow_overlap: woAllowOverlap || false };
       if (woEditing) {
+        const payload = { ...woForm, group: woForm.group || null, allow_overlap: woAllowOverlap || false };
         await axios.put(`${API_ENDPOINTS.WORK_ORDERS}${woEditing.id}/`, payload, { headers });
+        fetchWorkOrders();
+        onSaved('Work order updated.');
+      } else if (selectedBges.length > 1) {
+        // Bulk create — identical content, one WO per selected BGE
+        const { bge: _unused, ...rest } = woForm; // eslint-disable-line no-unused-vars
+        const payload = { ...rest, bge_ids: selectedBges, group: woForm.group || null, allow_overlap: woAllowOverlap || false };
+        const res = await axios.post(`${API_ENDPOINTS.WORK_ORDERS}bulk-create/`, payload, { headers });
+        fetchWorkOrders();
+        const d = res.data;
+        if (d.errors && d.errors.length > 0) {
+          const errSummary = d.errors.map(e => `${e.bge}: ${e.error}`).join('; ');
+          onSaved(`${d.created} work order(s) created. Issues: ${errSummary}`);
+        } else {
+          onSaved(`${d.created} work orders created successfully.`);
+        }
       } else {
+        const payload = { ...woForm, bge: selectedBges[0], group: woForm.group || null, allow_overlap: woAllowOverlap || false };
         await axios.post(API_ENDPOINTS.WORK_ORDERS, payload, { headers });
+        fetchWorkOrders();
+        onSaved('Work order created.');
       }
-      const msg = woEditing ? 'Work order updated.' : 'Work order created.';
-      fetchWorkOrders();
-      onSaved(msg);
     } catch (err) {
       setWoErrors(err.response?.data?.detail || JSON.stringify(err.response?.data || {}) || 'Save failed.');
     } finally {
       setWoSaving(false);
     }
-  }, [woForm, woEditing, woAllowOverlap, headers, fetchWorkOrders, onSaved]);
+  }, [woForm, selectedBges, woEditing, woAllowOverlap, headers, fetchWorkOrders, onSaved]);
 
   return (
     <Dialog
@@ -961,21 +984,45 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth size="small" required>
-              <InputLabel>BGE</InputLabel>
-              <Select value={woForm.bge} label="BGE" onChange={e => setWoForm(f => ({ ...f, bge: e.target.value }))}>
-                {woForm.work_order_type === 'bcp_senior_facilitator' ? (
-                  experts.filter(e => e.is_senior).length > 0
-                    ? experts.filter(e => e.is_senior).map(e =>
-                        <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
-                    : <MenuItem disabled value="">No Senior BGEs found</MenuItem>
-                ) : (
-                  experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name} ({e.bge_code})</MenuItem>)
-                )}
-              </Select>
+              <InputLabel>{woEditing ? 'BGE' : 'BGE(s)'}</InputLabel>
+              {woEditing ? (
+                <Select value={woForm.bge} label="BGE" onChange={e => setWoForm(f => ({ ...f, bge: e.target.value }))}>
+                  {woForm.work_order_type === 'bcp_senior_facilitator' ? (
+                    experts.filter(ex => ex.is_senior).length > 0
+                      ? experts.filter(ex => ex.is_senior).map(ex =>
+                          <MenuItem key={ex.id} value={ex.id}>{ex.name} ({ex.bge_code})</MenuItem>)
+                      : <MenuItem disabled value="">No Senior BGEs found</MenuItem>
+                  ) : (
+                    experts.map(ex => <MenuItem key={ex.id} value={ex.id}>{ex.name} ({ex.bge_code})</MenuItem>)
+                  )}
+                </Select>
+              ) : (
+                <Select
+                  multiple
+                  value={selectedBges}
+                  label="BGE(s)"
+                  onChange={e => setSelectedBges(e.target.value)}
+                  renderValue={sel => sel.map(id => experts.find(ex => ex.id === id)?.name || `#${id}`).join(', ')}
+                >
+                  {woForm.work_order_type === 'bcp_senior_facilitator' ? (
+                    experts.filter(ex => ex.is_senior).length > 0
+                      ? experts.filter(ex => ex.is_senior).map(ex =>
+                          <MenuItem key={ex.id} value={ex.id}>{ex.name} ({ex.bge_code})</MenuItem>)
+                      : <MenuItem disabled value="">No Senior BGEs found</MenuItem>
+                  ) : (
+                    experts.map(ex => <MenuItem key={ex.id} value={ex.id}>{ex.name} ({ex.bge_code})</MenuItem>)
+                  )}
+                </Select>
+              )}
             </FormControl>
             {woForm.work_order_type === 'bcp_senior_facilitator' && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
                 Only Senior BGEs are listed for this work order type.
+              </Typography>
+            )}
+            {!woEditing && selectedBges.length > 1 && (
+              <Typography variant="caption" color="primary" sx={{ mt: 0.5, display: 'block' }}>
+                {selectedBges.length} BGEs selected — one work order will be created for each.
               </Typography>
             )}
           </Grid>

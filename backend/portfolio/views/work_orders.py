@@ -29,15 +29,17 @@ from .mixins import (
 logger = logging.getLogger(__name__)
 
 
-class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
+class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """Work Order management.
 
     Visibility:
     - Admins see all work orders (any status).
     - BGEs see only their own work orders with status 'issued' or 'signed'.
 
-    Mutation (create / update / delete / issue):
-    - Admin-only. BGEs, programme managers and viewers have read-only access.
+    Mutation:
+    - Create / update: admins AND Programme Managers.
+    - Delete / issue / withdraw: admins only.
+    - BGEs and viewers have read-only access.
     """
     serializer_class = WorkOrderSerializer
     permission_classes = [IsAuthenticated]
@@ -45,6 +47,15 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
     def _is_admin(self):
         u = self.request.user
         return u.is_staff or u.is_superuser
+
+    def _can_manage_wo(self):
+        """Admins AND Programme Managers can create/edit work orders."""
+        u = self.request.user
+        return u.is_staff or u.is_superuser or _managed_groups(u) is not None
+
+    def _require_admin_or_pm(self):
+        if not self._can_manage_wo():
+            raise PermissionDenied("Work order management requires administrator or Programme Manager access.")
 
     def get_queryset(self):
         user = self.request.user
@@ -96,7 +107,7 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
             )
 
     def perform_create(self, serializer):
-        self._require_admin()
+        self._require_admin_or_pm()
         data = serializer.validated_data
         if not self.request.data.get('allow_overlap'):
             self._check_date_overlap(
@@ -107,7 +118,7 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
         serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        self._require_admin()
+        self._require_admin_or_pm()
         data = serializer.validated_data
         instance = self.get_object()
         bge = data.get('bge', instance.bge)
@@ -123,6 +134,68 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
     def destroy(self, request, *args, **kwargs):
         self._require_admin()
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=False, methods=['post'], url_path='bulk-create')
+    def bulk_create(self, request):
+        """Create the same work order content for multiple BGEs in one request.
+
+        POST body: all normal work order fields, PLUS:
+          bge_ids    list[int]   required — BGE IDs to create WOs for
+          allow_overlap bool     optional — skip date-overlap check (default False)
+
+        Returns:
+          created       int             how many WOs were created
+          work_orders   list[WOdata]    serialized created WOs
+          errors        list[{bge_id, bge, error}]  per-BGE failures
+        """
+        self._require_admin_or_pm()
+
+        bge_ids = request.data.get('bge_ids', [])
+        if not bge_ids or not isinstance(bge_ids, list):
+            raise ValidationError("bge_ids must be a non-empty list of BGE IDs.")
+
+        allow_overlap = request.data.get('allow_overlap', False)
+        created_data = []
+        errors = []
+
+        # Build the shared field payload (everything except bge_ids)
+        shared_fields = {k: v for k, v in request.data.items() if k not in ('bge_ids', 'allow_overlap')}
+
+        for bge_id in bge_ids:
+            per_bge_data = {**shared_fields, 'bge': bge_id}
+            serializer = self.get_serializer(data=per_bge_data)
+            try:
+                serializer.is_valid(raise_exception=True)
+                if not allow_overlap:
+                    d = serializer.validated_data
+                    self._check_date_overlap(
+                        bge_id=d.get('bge').pk if d.get('bge') else None,
+                        start_date=d.get('start_date'),
+                        end_date=d.get('end_date'),
+                    )
+                serializer.save(created_by=request.user)
+                created_data.append(serializer.data)
+            except Exception as exc:
+                from ..models import BusinessGrowthExpert as _BGE
+                try:
+                    bge_name = _BGE.objects.get(pk=bge_id).name
+                except Exception:
+                    bge_name = f'BGE #{bge_id}'
+                detail = getattr(exc, 'detail', None)
+                if detail is None:
+                    detail = str(exc)
+                elif hasattr(detail, 'items'):
+                    detail = '; '.join(f'{k}: {v}' for k, v in detail.items())
+                else:
+                    detail = str(detail)
+                errors.append({'bge_id': bge_id, 'bge': bge_name, 'error': detail})
+
+        resp_status = status.HTTP_201_CREATED if created_data else status.HTTP_400_BAD_REQUEST
+        return Response({
+            'created': len(created_data),
+            'work_orders': created_data,
+            'errors': errors,
+        }, status=resp_status)
 
     @action(detail=True, methods=['post'], url_path='sign')
     def sign(self, request, pk=None):
