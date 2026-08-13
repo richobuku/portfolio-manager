@@ -8,6 +8,73 @@ import { Add, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
 
+// ── Memoised sub-components ────────────────────────────────────────────────────
+// Defined at module level (outside WorkOrderDialog) so their identities are
+// stable across renders and React.memo can actually short-circuit re-renders.
+
+/** One row in the deliverables summary list at the top of the form. */
+const DeliverableRow = React.memo(function DeliverableRow({ d, i, onUpdate, onRemove }) {
+  return (
+    <Box sx={{
+      display: 'grid',
+      gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(150px, 200px) 40px' },
+      gap: 1,
+      mb: 1,
+      alignItems: 'flex-start',
+    }}>
+      <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
+      <TextField size="small" fullWidth multiline minRows={1} label="Deliverable / Task"
+        value={d.description}
+        onChange={e => onUpdate(i, 'description', e.target.value)} />
+      <TextField size="small" fullWidth label="Due date"
+        sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
+        value={d.due_date}
+        onChange={e => onUpdate(i, 'due_date', e.target.value)} />
+      <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }}
+        onClick={() => onRemove(i)}>
+        <Delete fontSize="small" />
+      </IconButton>
+    </Box>
+  );
+});
+
+/** Results-based outcome card in the lower section of the form. */
+const OutcomeCard = React.memo(function OutcomeCard({ d, i, onUpdate }) {
+  return (
+    <Box sx={{
+      mb: 2,
+      p: 1.5,
+      borderRadius: 1,
+      bgcolor: i % 2 === 0 ? 'grey.50' : 'background.paper',
+      border: '1px solid',
+      borderColor: 'divider',
+    }}>
+      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+        Task {d.task_num}{d.description ? ` — ${d.description}` : ''}
+      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
+        <TextField size="small" fullWidth multiline minRows={2} label="Quantitative Result Required"
+          value={d.quantitative_result || ''}
+          onChange={e => onUpdate(i, 'quantitative_result', e.target.value)} />
+        <TextField size="small" fullWidth multiline minRows={2} label="Qualitative Result Required"
+          value={d.qualitative_result || ''}
+          onChange={e => onUpdate(i, 'qualitative_result', e.target.value)} />
+        <TextField size="small" fullWidth multiline minRows={1} label="Means of Verification"
+          value={d.means_of_verification || ''}
+          onChange={e => onUpdate(i, 'means_of_verification', e.target.value)} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+          <TextField size="small" fullWidth label="Unit Rate (UGX)"
+            value={d.unit_rate || ''}
+            onChange={e => onUpdate(i, 'unit_rate', e.target.value)} />
+          <TextField size="small" fullWidth multiline minRows={1} label="Payment Condition"
+            value={d.payment_condition || ''}
+            onChange={e => onUpdate(i, 'payment_condition', e.target.value)} />
+        </Box>
+      </Box>
+    </Box>
+  );
+});
+
 // ── Work Order Dialog (memoised to prevent full-Dashboard re-renders on keystrokes) ──
 const WO_DEFAULTS = {
   msme_support: {
@@ -890,6 +957,44 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, []);
 
+  // ── Stable deliverable callbacks ──────────────────────────────────────────
+  // These use the functional updater form of setWoForm so they never close
+  // over stale state and never need to change identity — which lets
+  // DeliverableRow / OutcomeCard stay memoised across unrelated re-renders.
+
+  const updateDeliverable = React.useCallback((i, field, value) => {
+    setWoForm(f => {
+      const upd = [...f.deliverables_json];
+      upd[i] = { ...upd[i], [field]: value };
+      return { ...f, deliverables_json: upd };
+    });
+  }, []);
+
+  const removeDeliverable = React.useCallback((i) => {
+    setWoForm(f => ({
+      ...f,
+      deliverables_json: f.deliverables_json
+        .filter((_, j) => j !== i)
+        .map((x, j) => ({ ...x, task_num: j + 1 })),
+    }));
+  }, []);
+
+  const addDeliverable = React.useCallback(() => {
+    setWoForm(f => ({
+      ...f,
+      deliverables_json: [...f.deliverables_json, {
+        task_num: f.deliverables_json.length + 1,
+        description: '',
+        due_date: '',
+        quantitative_result: '',
+        qualitative_result: '',
+        means_of_verification: '',
+        unit_rate: '',
+        payment_condition: '',
+      }],
+    }));
+  }, []);
+
   const saveWo = React.useCallback(async () => {
     if (woEditing) {
       if (!woForm.bge) { setWoErrors('BGE is required.'); return; }
@@ -1086,52 +1191,10 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography variant="subtitle2" fontWeight={700}>Deliverables</Typography>
-              <Button size="small" startIcon={<Add />} onClick={() => setWoForm(f => ({
-                ...f,
-                deliverables_json: [...f.deliverables_json, {
-                  task_num: f.deliverables_json.length + 1,
-                  description: '',
-                  due_date: '',
-                  quantitative_result: '',
-                  qualitative_result: '',
-                  means_of_verification: '',
-                  unit_rate: '',
-                  payment_condition: '',
-                }],
-              }))}>Add row</Button>
+              <Button size="small" startIcon={<Add />} onClick={addDeliverable}>Add row</Button>
             </Box>
             {(woForm.deliverables_json || []).map((d, i) => (
-              <Box key={i} sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '24px 1fr 40px', sm: '28px minmax(0, 1fr) minmax(150px, 200px) 40px' },
-                gap: 1,
-                mb: 1,
-                alignItems: 'flex-start',
-              }}>
-                <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
-                <TextField size="small" fullWidth multiline minRows={1} label="Deliverable / Task"
-                  value={d.description}
-                  onChange={e => {
-                    const upd = [...woForm.deliverables_json];
-                    upd[i] = { ...d, description: e.target.value };
-                    setWoForm(f => ({ ...f, deliverables_json: upd }));
-                  }} />
-                <TextField size="small" fullWidth label="Due date"
-                  sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
-                  value={d.due_date}
-                  onChange={e => {
-                    const upd = [...woForm.deliverables_json];
-                    upd[i] = { ...d, due_date: e.target.value };
-                    setWoForm(f => ({ ...f, deliverables_json: upd }));
-                  }} />
-                <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }} onClick={() => {
-                  const upd = woForm.deliverables_json.filter((_, j) => j !== i)
-                    .map((x, j) => ({ ...x, task_num: j + 1 }));
-                  setWoForm(f => ({ ...f, deliverables_json: upd }));
-                }}>
-                  <Delete fontSize="small" />
-                </IconButton>
-              </Box>
+              <DeliverableRow key={i} d={d} i={i} onUpdate={updateDeliverable} onRemove={removeDeliverable} />
             ))}
           </Grid>
 
@@ -1144,46 +1207,9 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
                 A BGE must achieve BOTH: Quantitative Targets = 50% AND Qualitative Outcomes = 50% to qualify for payment.
               </Typography>
-              {(woForm.deliverables_json || []).map((d, i) => {
-                const updField = (field, val) => {
-                  const upd = [...woForm.deliverables_json];
-                  upd[i] = { ...d, [field]: val };
-                  setWoForm(f => ({ ...f, deliverables_json: upd }));
-                };
-                return (
-                  <Box key={i} sx={{
-                    mb: 2,
-                    p: 1.5,
-                    borderRadius: 1,
-                    bgcolor: i % 2 === 0 ? 'grey.50' : 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                      Task {d.task_num}{d.description ? ` — ${d.description}` : ''}
-                    </Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
-                      <TextField size="small" fullWidth multiline minRows={2} label="Quantitative Result Required"
-                        value={d.quantitative_result || ''}
-                        onChange={e => updField('quantitative_result', e.target.value)} />
-                      <TextField size="small" fullWidth multiline minRows={2} label="Qualitative Result Required"
-                        value={d.qualitative_result || ''}
-                        onChange={e => updField('qualitative_result', e.target.value)} />
-                      <TextField size="small" fullWidth multiline minRows={1} label="Means of Verification"
-                        value={d.means_of_verification || ''}
-                        onChange={e => updField('means_of_verification', e.target.value)} />
-                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                        <TextField size="small" fullWidth label="Unit Rate (UGX)"
-                          value={d.unit_rate || ''}
-                          onChange={e => updField('unit_rate', e.target.value)} />
-                        <TextField size="small" fullWidth multiline minRows={1} label="Payment Condition"
-                          value={d.payment_condition || ''}
-                          onChange={e => updField('payment_condition', e.target.value)} />
-                      </Box>
-                    </Box>
-                  </Box>
-                );
-              })}
+              {(woForm.deliverables_json || []).map((d, i) => (
+                <OutcomeCard key={i} d={d} i={i} onUpdate={updateDeliverable} />
+              ))}
             </Box>
           </Grid>
 
