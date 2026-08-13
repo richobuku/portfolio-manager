@@ -6248,6 +6248,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  const downloadAttachment = async (att) => {
+    try {
+      const res = await axios.get(WORK_ORDER_ATTACHMENT_DOWNLOAD_URL(att.id), { headers, responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = att.filename || 'attachment';
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      notify('Failed to download attachment', 'error');
+    }
+  };
+
   const setWoPaymentField = (woId, field, value) => {
     setWoPaymentForms(prev => ({ ...prev, [woId]: { ...prev[woId], [field]: value } }));
   };
@@ -6762,8 +6776,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                       <TableCell>
                                         <Tooltip title={att.filename}>
                                           <IconButton size="small" color="primary"
-                                            component="a" href={WORK_ORDER_ATTACHMENT_DOWNLOAD_URL(att.id)}
-                                            target="_blank" rel="noopener noreferrer">
+                                            onClick={() => downloadAttachment(att)}>
                                             <Download fontSize="small" />
                                           </IconButton>
                                         </Tooltip>
