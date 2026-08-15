@@ -690,6 +690,12 @@ class BGEParticipantTrainingReport(models.Model):
         'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='participant_training_reports',
     )
+    # Optional FK to the TrainingSession so the BGE portal can match reliably
+    # without depending on text equality of title + dates.
+    session = models.ForeignKey(
+        'TrainingSession', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='participant_reports',
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
 
     training_title   = models.CharField(max_length=300, blank=True)

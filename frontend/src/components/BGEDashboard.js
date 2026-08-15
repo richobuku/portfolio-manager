@@ -2825,7 +2825,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 ) : (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {participantSessions.map(s => {
-                      const existing = ptReports.find(r => r.training_title === s.title && r.training_dates === s.date);
+                      // Match by session FK first (if the report was saved with a session link),
+                      // then fall back to title + computed date range (same format the dialog pre-fills).
+                      const tDates = s.date + (s.end_date && s.end_date !== s.date ? ` – ${s.end_date}` : '');
+                      const existing = ptReports.find(r =>
+                        (r.session && r.session === s.id) ||
+                        (r.training_title === s.title && r.training_dates === tDates)
+                      );
                       return (
                         <Card key={s.id} sx={{ borderLeft: '4px solid #1A5276', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
                           <CardContent>
@@ -2852,6 +2858,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                   color={existing?.status === 'submitted' ? 'success' : existing ? 'warning' : 'default'} />
                                 <Button size="small" variant="contained" startIcon={<Edit />}
                                   onClick={() => openPtDialog(existing, {
+                                    session: s.id,
                                     training_title: s.title,
                                     training_dates: s.date + (s.end_date && s.end_date !== s.date ? ` – ${s.end_date}` : ''),
                                     venue: s.location || '',
