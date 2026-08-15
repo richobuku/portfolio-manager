@@ -55,7 +55,7 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     schedule: "0 2 * * *"   # 02:00 UTC = 05:00 EAT every day
-    startCommand: python -m pip install -r requirements.txt && python manage.py export_to_drive
+    startCommand: python manage.py export_to_drive
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
