@@ -5771,12 +5771,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderAssignments = () => {
     const unassigned = msmes.filter(m => !m.assigned_bge);
 
-    // Sort BGEs: those with assignments first (desc by count), then without
-    const sortedExperts = [...experts].sort((a, b) => {
-      const aCount = msmes.filter(m => m.assigned_bge === a.id).length;
-      const bCount = msmes.filter(m => m.assigned_bge === b.id).length;
-      return bCount - aCount;
-    });
+    // Sort BGEs: those with assignments first (desc by count), then without.
+    // Use assigned_msme_count from the serializer — it includes direct, co-assigned
+    // and group-assigned MSMEs, giving the accurate total per BGE.
+    const sortedExperts = [...experts].sort((a, b) =>
+      (b.assigned_msme_count || 0) - (a.assigned_msme_count || 0)
+    );
 
     return (
       <Box>
@@ -5827,7 +5827,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         ) : (
           <Grid container spacing={2}>
             {sortedExperts.map(e => {
-              const bgeMsmes = msmes.filter(m => m.assigned_bge === e.id);
+              // Use assigned_msmes_list from the serializer so direct, co-assigned,
+              // and group-assigned MSMEs are all counted. Enrich with full MSME data
+              // where available (for the assign dialog), falling back to the list row.
+              const bgeMsmes = e.assigned_msmes_list?.length
+                ? e.assigned_msmes_list.map(am => msmes.find(m => m.id === am.id) || am)
+                : msmes.filter(m => m.assigned_bge === e.id);
               // Initialize bgeObjectives from expert data if not already in state
               const objValue = e.id in bgeObjectives ? bgeObjectives[e.id] : (e.deployment_objectives || '');
 

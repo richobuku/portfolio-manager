@@ -14,7 +14,7 @@ import {
   Logout, Assignment, CheckCircle, Edit, PictureAsPdf,
   Group as GroupIcon, Star, Description, Print, Download,
   Delete, School, People, CloudUpload,
-  HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined,
+  HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined, MyLocation,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -285,6 +285,80 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [growthSnapshots, setGrowthSnapshots] = useState([]);
   const [growthSaving, setGrowthSaving] = useState(false);
   const [growthError, setGrowthError] = useState('');
+
+  // ── Quick Visit Update (GPS + revenue + employees) ───────────────────────
+  const [quickUpdateDialog, setQuickUpdateDialog] = useState(false);
+  const [quickUpdateMsme, setQuickUpdateMsme]     = useState(null);
+  const [quickUpdateSaving, setQuickUpdateSaving] = useState(false);
+  const [quickUpdateForm, setQuickUpdateForm]     = useState({
+    last_month_revenue: '', employees_ft_male: '', employees_ft_female: '',
+    employees_pt_male: '', employees_pt_female: '',
+    latitude: '', longitude: '', gpsStatus: 'idle', // 'idle'|'loading'|'ok'|'denied'
+  });
+
+  const openQuickUpdate = (msme) => {
+    setQuickUpdateMsme(msme);
+    setQuickUpdateForm({
+      last_month_revenue: '', employees_ft_male: '', employees_ft_female: '',
+      employees_pt_male: '', employees_pt_female: '',
+      latitude: '', longitude: '', gpsStatus: 'loading',
+    });
+    setQuickUpdateDialog(true);
+    // Auto-capture device GPS
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => setQuickUpdateForm(f => ({
+          ...f, gpsStatus: 'ok',
+          latitude:  pos.coords.latitude.toFixed(6),
+          longitude: pos.coords.longitude.toFixed(6),
+        })),
+        () => setQuickUpdateForm(f => ({ ...f, gpsStatus: 'denied' })),
+        { timeout: 10000 },
+      );
+    } else {
+      setQuickUpdateForm(f => ({ ...f, gpsStatus: 'denied' }));
+    }
+  };
+
+  const saveQuickUpdate = async () => {
+    if (!quickUpdateMsme) return;
+    setQuickUpdateSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    const bgeId = currentUser?.bge_profile?.id;
+    try {
+      const snapshotPayload = {
+        msme:                quickUpdateMsme.id,
+        snapshot_date:       new Date().toISOString().slice(0, 10),
+        source:              'bge_visit',
+        collected_by:        bgeId || null,
+        last_month_revenue:  quickUpdateForm.last_month_revenue  || null,
+        employees_ft_male:   quickUpdateForm.employees_ft_male   !== '' ? Number(quickUpdateForm.employees_ft_male)   : null,
+        employees_ft_female: quickUpdateForm.employees_ft_female !== '' ? Number(quickUpdateForm.employees_ft_female) : null,
+        employees_pt_male:   quickUpdateForm.employees_pt_male   !== '' ? Number(quickUpdateForm.employees_pt_male)   : null,
+        employees_pt_female: quickUpdateForm.employees_pt_female !== '' ? Number(quickUpdateForm.employees_pt_female) : null,
+        ...(quickUpdateForm.gpsStatus === 'ok' ? {
+          latitude:  parseFloat(quickUpdateForm.latitude),
+          longitude: parseFloat(quickUpdateForm.longitude),
+        } : {}),
+      };
+      await axios.post(API_ENDPOINTS.GROWTH_SNAPSHOTS, snapshotPayload, { headers: h });
+
+      // Also update the MSME's own GPS pin if we captured a location
+      if (quickUpdateForm.gpsStatus === 'ok') {
+        await axios.patch(`${API_ENDPOINTS.MSMES}${quickUpdateMsme.id}/`, {
+          latitude:  parseFloat(quickUpdateForm.latitude),
+          longitude: parseFloat(quickUpdateForm.longitude),
+        }, { headers: h });
+      }
+
+      notify('Visit data saved ✓');
+      setQuickUpdateDialog(false);
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Failed to save visit data', 'error');
+    } finally {
+      setQuickUpdateSaving(false);
+    }
+  };
 
   // T-shirt receipts (BGE signs their own entry)
   const [tshirtEntries, setTshirtEntries] = useState([]);
@@ -1707,7 +1781,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                         <Add fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
-                                    <Tooltip title="Update MSME data">
+                                    <Tooltip title="Quick visit check-in: GPS + revenue + employees">
+                                      <IconButton size="small" sx={{ color: '#1565C0' }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
+                                        <MyLocation fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Full growth data update">
                                       <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
                                         <TrendingUp fontSize="small" />
                                       </IconButton>
@@ -1823,7 +1902,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                         <Add fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
-                                    <Tooltip title="Update MSME data">
+                                    <Tooltip title="Quick visit check-in: GPS + revenue + employees">
+                                      <IconButton size="small" sx={{ color: '#1565C0' }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
+                                        <MyLocation fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Full growth data update">
                                       <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
                                         <TrendingUp fontSize="small" />
                                       </IconButton>
@@ -2057,7 +2141,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       <Add fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
-                                  <Tooltip title="Update MSME data">
+                                  <Tooltip title="Quick visit check-in: GPS + revenue + employees">
+                                    <IconButton size="small" sx={{ color: '#1565C0' }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
+                                      <MyLocation fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Full growth data update">
                                     <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
                                       <TrendingUp fontSize="small" />
                                     </IconButton>
@@ -3720,6 +3809,75 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </>
           );
         })()}
+      </Dialog>
+
+      {/* ── Quick Visit Check-in dialog ── */}
+      <Dialog open={quickUpdateDialog} onClose={() => setQuickUpdateDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <MyLocation color="primary" />
+            <Box>
+              <Typography fontWeight={700}>Visit Check-in</Typography>
+              {quickUpdateMsme && (
+                <Typography variant="caption" color="text.secondary">{quickUpdateMsme.business_name}</Typography>
+              )}
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {/* GPS status */}
+          <Box sx={{ mb: 2, p: 1.5, borderRadius: 1, bgcolor: quickUpdateForm.gpsStatus === 'ok' ? 'success.light' : 'grey.100', display: 'flex', alignItems: 'center', gap: 1 }}>
+            {quickUpdateForm.gpsStatus === 'loading' && <CircularProgress size={16} />}
+            {quickUpdateForm.gpsStatus === 'ok'      && <MyLocation sx={{ color: 'success.dark', fontSize: 18 }} />}
+            {quickUpdateForm.gpsStatus === 'denied'  && <MyLocation sx={{ color: 'text.disabled', fontSize: 18 }} />}
+            <Box sx={{ flex: 1 }}>
+              {quickUpdateForm.gpsStatus === 'loading' && <Typography variant="caption">Getting GPS location…</Typography>}
+              {quickUpdateForm.gpsStatus === 'ok'      && (
+                <Typography variant="caption" color="success.dark">
+                  📍 {quickUpdateForm.latitude}, {quickUpdateForm.longitude}
+                </Typography>
+              )}
+              {quickUpdateForm.gpsStatus === 'denied'  && (
+                <Typography variant="caption" color="text.secondary">
+                  GPS not available — location won't be recorded
+                </Typography>
+              )}
+            </Box>
+          </Box>
+
+          {/* Last month revenue */}
+          <TextField fullWidth size="small" label="Last Month's Revenue (UGX)" type="number"
+            inputProps={{ min: 0 }} sx={{ mb: 2 }}
+            value={quickUpdateForm.last_month_revenue}
+            onChange={e => setQuickUpdateForm(f => ({ ...f, last_month_revenue: e.target.value }))} />
+
+          {/* Employee counts */}
+          <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10} display="block" sx={{ mb: 1 }}>
+            Employees
+          </Typography>
+          <Grid container spacing={1} sx={{ mb: 1 }}>
+            {[
+              { key: 'employees_ft_male',   label: 'FT Male' },
+              { key: 'employees_ft_female', label: 'FT Female' },
+              { key: 'employees_pt_male',   label: 'PT Male' },
+              { key: 'employees_pt_female', label: 'PT Female' },
+            ].map(({ key, label }) => (
+              <Grid item xs={6} key={key}>
+                <TextField fullWidth size="small" label={label} type="number"
+                  inputProps={{ min: 0 }}
+                  value={quickUpdateForm[key]}
+                  onChange={e => setQuickUpdateForm(f => ({ ...f, [key]: e.target.value }))} />
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setQuickUpdateDialog(false)} disabled={quickUpdateSaving}>Cancel</Button>
+          <Button variant="contained" color="primary" disabled={quickUpdateSaving || quickUpdateForm.gpsStatus === 'loading'}
+            onClick={saveQuickUpdate}>
+            {quickUpdateSaving ? 'Saving…' : 'Save Check-in'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* ── Growth update form ── */}

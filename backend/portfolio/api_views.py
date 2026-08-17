@@ -1644,6 +1644,14 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         bge.save(update_fields=['deployment_objectives'])
         return Response(BusinessGrowthExpertSerializer(bge).data)
 
+    @staticmethod
+    def _bge_has_active_msmes(bge):
+        """Return True if bge has at least one active MSME via any assignment type."""
+        return MSME.objects.filter(
+            Q(assigned_bge=bge) | Q(co_assigned_bges=bge) | Q(assigned_group__members=bge),
+            is_active=True,
+        ).exists()
+
     @action(detail=True, methods=['get'], url_path='preview-email')
     def preview_email(self, request, pk=None):
         """Return the email that would be sent without actually sending it."""
@@ -1652,7 +1660,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         bge = self.get_object()
         if not bge.email:
             return Response({'error': 'This BGE expert has no email address on record.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not bge.assigned_msmes.filter(is_active=True).exists():
+        if not self._bge_has_active_msmes(bge):
             return Response({'error': 'This BGE expert has no assigned MSMEs.'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self._build_assignment_email(bge))
 
@@ -1665,7 +1673,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         bge = self.get_object()
         if not bge.email:
             return Response({'error': 'This BGE expert has no email address on record.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not bge.assigned_msmes.filter(is_active=True).exists():
+        if not self._bge_has_active_msmes(bge):
             return Response({'error': 'This BGE expert has no assigned MSMEs.'}, status=status.HTTP_400_BAD_REQUEST)
 
         email_data = self._build_assignment_email(bge)
