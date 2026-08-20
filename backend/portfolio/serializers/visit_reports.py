@@ -11,6 +11,17 @@ class MSMEReportSerializer(serializers.ModelSerializer):
     def get_template_name(self, obj):
         return obj.template.name if obj.template_id else None
 
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        for field in ('visit_latitude', 'visit_longitude'):
+            val = data.get(field)
+            if val not in (None, '', 'null'):
+                try:
+                    data[field] = round(float(val), 6)
+                except (ValueError, TypeError):
+                    pass
+        return super().to_internal_value(data)
+
     class Meta:
         model = MSMEReport
         fields = '__all__'

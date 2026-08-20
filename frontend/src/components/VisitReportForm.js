@@ -258,6 +258,13 @@ function clearDraft(key) {
   try { localStorage.removeItem(key); } catch { /* ignore */ }
 }
 
+/* ── Coordinate round helper (6 decimal places max for GPS) ──────────────── */
+const roundCoord = (val) => {
+  if (val === null || val === undefined || val === '') return null;
+  const num = Number(val);
+  return isNaN(num) ? null : parseFloat(num.toFixed(6));
+};
+
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function VisitReportForm({
   open, onClose, onSaved, msme: preselectedMsme, msmes = [],
@@ -288,8 +295,8 @@ export default function VisitReportForm({
       f.msme       = editingReport.msme       || '';
       f.visit_type = editingReport.visit_type || 'one_on_one';
       f.records_sighted   = editingReport.records_sighted   ?? null;
-      f.visit_latitude    = editingReport.visit_latitude    != null ? Number(editingReport.visit_latitude)    : null;
-      f.visit_longitude   = editingReport.visit_longitude   != null ? Number(editingReport.visit_longitude)   : null;
+      f.visit_latitude    = roundCoord(editingReport.visit_latitude);
+      f.visit_longitude   = roundCoord(editingReport.visit_longitude);
       f.visit_gps_accuracy = editingReport.visit_gps_accuracy != null ? Number(editingReport.visit_gps_accuracy) : null;
       const parsed = parseTools(editingReport.tools_provided || '');
       const knownSelected = parsed.filter(t => TOOLS_OPTIONS.includes(t));
@@ -314,7 +321,15 @@ export default function VisitReportForm({
         setSelectedTools(saved.tools || []);
         setToolsOther(saved.toolsOther || '');
       } else {
-        setForm({ ...EMPTY_FORM, msme: preselectedMsme?.id || '' });
+        const initialMsme = preselectedMsme || msmes.find(x => x.id === Number(EMPTY_FORM.msme));
+        const msmeLat = roundCoord(initialMsme?.latitude);
+        const msmeLng = roundCoord(initialMsme?.longitude);
+        setForm({
+          ...EMPTY_FORM,
+          msme: preselectedMsme?.id || '',
+          visit_latitude: msmeLat,
+          visit_longitude: msmeLng,
+        });
         setSelectedTools([]);
         setToolsOther('');
         setDraftBanner(null);
@@ -334,6 +349,20 @@ export default function VisitReportForm({
   const set = (key, val) => {
     setForm(f => {
       const next = { ...f, [key]: val };
+      scheduleDraftSave(next, selectedTools, toolsOther);
+      return next;
+    });
+  };
+
+  const handleMsmeChange = (newMsmeId) => {
+    const selected = msmes.find(x => x.id === Number(newMsmeId) || x.id === newMsmeId);
+    setForm(f => {
+      const next = { ...f, msme: newMsmeId };
+      // If form doesn't already have GPS coordinates, or MSME has coordinates on file, use them
+      if (selected?.latitude != null && selected?.longitude != null && (f.visit_latitude == null || f.visit_longitude == null)) {
+        next.visit_latitude = roundCoord(selected.latitude);
+        next.visit_longitude = roundCoord(selected.longitude);
+      }
       scheduleDraftSave(next, selectedTools, toolsOther);
       return next;
     });
@@ -359,7 +388,13 @@ export default function VisitReportForm({
     clearDraft(currentDraftKey.current);
     setDraftBanner(null);
     if (!editingReport) {
-      setForm({ ...EMPTY_FORM, msme: preselectedMsme?.id || '' });
+      const initialMsme = preselectedMsme || msmes.find(x => x.id === Number(EMPTY_FORM.msme));
+      setForm({
+        ...EMPTY_FORM,
+        msme: preselectedMsme?.id || '',
+        visit_latitude: roundCoord(initialMsme?.latitude),
+        visit_longitude: roundCoord(initialMsme?.longitude),
+      });
       setSelectedTools([]);
       setToolsOther('');
     }
@@ -375,12 +410,16 @@ export default function VisitReportForm({
     setGpsError('');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setForm(f => ({
-          ...f,
-          visit_latitude:     pos.coords.latitude,
-          visit_longitude:    pos.coords.longitude,
-          visit_gps_accuracy: pos.coords.accuracy,
-        }));
+        setForm(f => {
+          const next = {
+            ...f,
+            visit_latitude:     roundCoord(pos.coords.latitude),
+            visit_longitude:    roundCoord(pos.coords.longitude),
+            visit_gps_accuracy: pos.coords.accuracy ? Math.round(pos.coords.accuracy * 10) / 10 : null,
+          };
+          scheduleDraftSave(next, selectedTools, toolsOther);
+          return next;
+        });
         setGpsLoading(false);
       },
       (err) => {
@@ -393,11 +432,18 @@ export default function VisitReportForm({
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
-  }, []);
+  }, [scheduleDraftSave, selectedTools, toolsOther]);
 
-  /* Auto-capture GPS when form opens (new reports only) */
+  /* Auto-capture GPS when form opens (new reports only, and ONLY if neither MSME nor draft has coordinates) */
   useEffect(() => {
-    if (open && !editingReport) captureGPS();
+    if (open && !editingReport) {
+      const currentMsme = preselectedMsme || msmes.find(x => x.id === Number(form.msme) || x.id === form.msme);
+      const hasGps = (form.visit_latitude != null && form.visit_longitude != null) ||
+                     (currentMsme?.latitude != null && currentMsme?.longitude != null);
+      if (!hasGps) {
+        captureGPS();
+      }
+    }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cfg = TYPE_CONFIG[form.visit_type] || DEFAULT_CONFIG;
@@ -440,10 +486,10 @@ export default function VisitReportForm({
       records_sighted:             form.records_sighted,
       owner_certainty_observation: form.owner_certainty_observation,
       data_collection_challenges:  form.data_collection_challenges,
-      // GPS
-      visit_latitude:     form.visit_latitude  !== null ? form.visit_latitude  : null,
-      visit_longitude:    form.visit_longitude !== null ? form.visit_longitude : null,
-      visit_gps_accuracy: form.visit_gps_accuracy !== null ? form.visit_gps_accuracy : null,
+      // GPS (properly rounded to 6 decimal places to prevent DRF 400 max_digits errors)
+      visit_latitude:     roundCoord(form.visit_latitude),
+      visit_longitude:    roundCoord(form.visit_longitude),
+      visit_gps_accuracy: form.visit_gps_accuracy !== null && form.visit_gps_accuracy !== '' ? Number(form.visit_gps_accuracy) : null,
     };
 
     try {
@@ -537,7 +583,7 @@ export default function VisitReportForm({
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
               <InputLabel>MSME *</InputLabel>
               <Select value={form.msme} label="MSME *"
-                onChange={e => set('msme', e.target.value)}>
+                onChange={e => handleMsmeChange(e.target.value)}>
                 {msmes.map(x => (
                   <MenuItem key={x.id} value={x.id}>{x.business_name}</MenuItem>
                 ))}

@@ -53,6 +53,17 @@ class MSMESerializer(serializers.ModelSerializer):
         'assigned_group', 'is_active', 'assignment_objectives', 'assignment_date',
     )
 
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        for field in ('latitude', 'longitude'):
+            val = data.get(field)
+            if val not in (None, '', 'null'):
+                try:
+                    data[field] = round(float(val), 6)
+                except (ValueError, TypeError):
+                    pass
+        return super().to_internal_value(data)
+
     def update(self, instance, validated_data):
         request = self.context.get('request')
         if request is not None:
