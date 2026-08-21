@@ -196,6 +196,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── data ───────────────────────────────────────────────────────────────────
   const [msmes, setMsmes] = useState([]);
+  const [allMsmes, setAllMsmes] = useState([]);
   const [experts, setExperts] = useState([]);
   const [cohorts, setCohorts] = useState([]);
   const [bgeGroups, setBgeGroups] = useState([]);
@@ -435,8 +436,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (reportFilterBge) reportParams.append('bge', reportFilterBge);
       if (reportFilterStatus) reportParams.append('status', reportFilterStatus);
 
-      const [mRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes] = await Promise.all([
+      const [mRes, allMRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes] = await Promise.all([
         axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
+        axios.get(`${API_ENDPOINTS.MSMES}?all=1`, { headers: h }).catch(() => ({ data: [] })),
         axios.get(`${API_ENDPOINTS.EXPERTS}?page_size=200`, { headers: h }),
         axios.get(API_ENDPOINTS.COHORTS, { headers: h }),
         axios.get(API_ENDPOINTS.BGE_GROUPS, { headers: h }),
@@ -453,6 +455,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
       setMsmes(toArr(mRes.data));
+      setAllMsmes(toArr(allMRes.data).length > 0 ? toArr(allMRes.data) : toArr(mRes.data));
       setMsmeTotalCount(mRes.data?.count ?? toArr(mRes.data).length);
       setExperts(toArr(eRes.data));
       setCohorts(toArr(cRes.data));
@@ -1719,7 +1722,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       {msmeViewMode === 'map' ? (
         <MSMEMap
-          msmes={msmes}
+          msmes={allMsmes.length > 0 ? allMsmes : msmes}
           experts={experts}
           cohorts={cohorts}
           programmeGroups={programmeGroups}
@@ -1940,7 +1943,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     <Box>
       <SectionHeader title="Northern Uganda Spatial Location Maps" subtitle="Interactive spatial GPS mapping for MSMEs & BGE Experts" />
       <MSMEMap
-        msmes={msmes}
+        msmes={allMsmes.length > 0 ? allMsmes : msmes}
         experts={experts}
         cohorts={cohorts}
         programmeGroups={programmeGroups}
@@ -2101,7 +2104,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </Button>
           </Box>
           <MSMEMap
-            msmes={msmes}
+            msmes={allMsmes.length > 0 ? allMsmes : msmes}
             experts={experts}
             cohorts={cohorts}
             programmeGroups={programmeGroups}
