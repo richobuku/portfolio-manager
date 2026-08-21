@@ -35,7 +35,6 @@ import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
 import SectionHeader from './SectionHeader';
 import MSMEMap from './MSMEMap';
-import LocationPickerModal from './LocationPickerModal';
 import { Place } from '@mui/icons-material';
 
 const ROWS_PER_PAGE = 15;
@@ -256,7 +255,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [filterSector, setFilterSector] = useState('');
   const [filterCohort, setFilterCohort] = useState('');
   const [msmeViewMode, setMsmeViewMode] = useState('table'); // 'table' | 'map'
-  const [editLocationPickerOpen, setEditLocationPickerOpen] = useState(false);
   const [removingCoId, setRemovingCoId] = useState(null);
 
   // ── pagination ─────────────────────────────────────────────────────────────
@@ -875,20 +873,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       notify(err.response?.data?.error || 'Failed to remove co-assignee', 'error');
     } finally {
       setRemovingCoId(null);
-    }
-  };
-
-  const handleUpdateMsmeLocation = async (msme, { latitude, longitude, presetTown }) => {
-    try {
-      const payload = { latitude, longitude };
-      if (presetTown && !msme.city) {
-        payload.city = presetTown;
-      }
-      const res = await axios.patch(`${API_ENDPOINTS.MSMES}${msme.id}/`, payload, { headers });
-      setMsmes(prev => prev.map(m => m.id === msme.id ? { ...m, ...res.data } : m));
-      notify(`Updated GPS location for ${msme.business_name}`);
-    } catch (err) {
-      notify(err.response?.data?.error || 'Failed to update GPS location', 'error');
     }
   };
 
@@ -1743,7 +1727,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             setViewItem(m);
             setViewType('msme');
           }}
-          onUpdateMsmeLocation={handleUpdateMsmeLocation}
+          onOpenExpert={(e) => {
+            openExpertView(e);
+          }}
         />
       ) : (
         <>
@@ -1952,7 +1938,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   const renderMaps = () => (
     <Box>
-      <SectionHeader title="Northern Uganda MSME Spatial Maps" subtitle="Interactive spatial GPS mapping & location management" />
+      <SectionHeader title="Northern Uganda Spatial Location Maps" subtitle="Interactive spatial GPS mapping for MSMEs & BGE Experts" />
       <MSMEMap
         msmes={msmes}
         experts={experts}
@@ -1962,7 +1948,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           setViewItem(m);
           setViewType('msme');
         }}
-        onUpdateMsmeLocation={handleUpdateMsmeLocation}
+        onOpenExpert={(e) => {
+          openExpertView(e);
+        }}
       />
     </Box>
   );
@@ -9305,38 +9293,34 @@ PRUDEV II BDS Team`
                     <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <MyLocation sx={{ fontSize: 14 }} /> GPS Business Location
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button
-                        size="small" variant="contained" color="success"
-                        startIcon={<Place sx={{ fontSize: 14 }} />}
-                        onClick={() => setEditLocationPickerOpen(true)}
-                        sx={{ fontSize: 11, py: 0.25, textTransform: 'none', fontWeight: 600 }}
-                      >
-                        Pick on Map / Presets
-                      </Button>
-                      <Button
-                        size="small" variant="outlined"
-                        startIcon={editForm._gpsLoading ? <CircularProgress size={12} /> : (editForm.latitude ? <GpsFixed sx={{ fontSize: 14 }} /> : <GpsNotFixed sx={{ fontSize: 14 }} />)}
-                        disabled={!!editForm._gpsLoading}
-                        onClick={() => {
-                          if (!navigator.geolocation) return;
-                          setEditForm(f => ({ ...f, _gpsLoading: true }));
-                          navigator.geolocation.getCurrentPosition(
-                            (pos) => setEditForm(f => ({
-                              ...f,
-                              latitude:  pos.coords.latitude.toFixed(6),
-                              longitude: pos.coords.longitude.toFixed(6),
-                              _gpsLoading: false,
-                            })),
-                            () => setEditForm(f => ({ ...f, _gpsLoading: false })),
-                            { enableHighAccuracy: true, timeout: 15000 },
-                          );
-                        }}
-                        sx={{ fontSize: 11, py: 0.25, textTransform: 'none' }}
-                      >
-                        {editForm._gpsLoading ? 'Locating…' : editForm.latitude ? 'Recapture Live GPS' : 'Live GPS'}
-                      </Button>
-                    </Box>
+                    <Button
+                      size="small" variant="outlined" color="success"
+                      startIcon={editForm._gpsLoading ? <CircularProgress size={12} /> : (editForm.latitude ? <GpsFixed sx={{ fontSize: 14 }} /> : <GpsNotFixed sx={{ fontSize: 14 }} />)}
+                      disabled={!!editForm._gpsLoading}
+                      onClick={() => {
+                        if (!navigator.geolocation) {
+                          notify('Geolocation is not supported by your browser', 'error');
+                          return;
+                        }
+                        setEditForm(f => ({ ...f, _gpsLoading: true }));
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => setEditForm(f => ({
+                            ...f,
+                            latitude:  pos.coords.latitude.toFixed(6),
+                            longitude: pos.coords.longitude.toFixed(6),
+                            _gpsLoading: false,
+                          })),
+                          () => {
+                            notify('Unable to retrieve device GPS location. Please ensure location permissions are granted.', 'error');
+                            setEditForm(f => ({ ...f, _gpsLoading: false }));
+                          },
+                          { enableHighAccuracy: true, timeout: 15000 },
+                        );
+                      }}
+                      sx={{ fontSize: 11, py: 0.25, textTransform: 'none', fontWeight: 600 }}
+                    >
+                      {editForm._gpsLoading ? 'Capturing GPS…' : editForm.latitude ? 'Recapture Live Location' : 'Capture Live Location'}
+                    </Button>
                   </Box>
                   <Grid container spacing={1}>
                     <Grid item xs={6}>
@@ -9372,7 +9356,7 @@ PRUDEV II BDS Team`
           )}
           {editType === 'expert' && (
             <Grid container spacing={2}>
-              {[['name','Name'],['email','Email'],['phone','Phone'],['location','Location']].map(([f,l]) => (
+              {[['name','Name'],['email','Email'],['phone','Phone'],['location','Base District / Location']].map(([f,l]) => (
                 <Grid item xs={12} sm={6} key={f}>
                   <TextField fullWidth size="small" label={l} value={editForm[f] || ''} onChange={e => setEditForm({...editForm, [f]: e.target.value})} />
                 </Grid>
@@ -9392,6 +9376,68 @@ PRUDEV II BDS Team`
                   <TextField fullWidth size="small" label={l} value={editForm[f] || ''} onChange={e => setEditForm({...editForm, [f]: e.target.value})} />
                 </Grid>
               ))}
+
+              {/* ── BGE GPS Location ── */}
+              <Grid item xs={12}>
+                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <MyLocation sx={{ fontSize: 14 }} /> BGE Base GPS Location
+                    </Typography>
+                    <Button
+                      size="small" variant="outlined" color="primary"
+                      startIcon={editForm._gpsLoading ? <CircularProgress size={12} /> : (editForm.latitude ? <GpsFixed sx={{ fontSize: 14 }} /> : <GpsNotFixed sx={{ fontSize: 14 }} />)}
+                      disabled={!!editForm._gpsLoading}
+                      onClick={() => {
+                        if (!navigator.geolocation) {
+                          notify('Geolocation is not supported by your browser', 'error');
+                          return;
+                        }
+                        setEditForm(f => ({ ...f, _gpsLoading: true }));
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => setEditForm(f => ({
+                            ...f,
+                            latitude:  pos.coords.latitude.toFixed(6),
+                            longitude: pos.coords.longitude.toFixed(6),
+                            _gpsLoading: false,
+                          })),
+                          () => {
+                            notify('Unable to retrieve device GPS location. Please ensure location permissions are granted.', 'error');
+                            setEditForm(f => ({ ...f, _gpsLoading: false }));
+                          },
+                          { enableHighAccuracy: true, timeout: 15000 },
+                        );
+                      }}
+                      sx={{ fontSize: 11, py: 0.25, textTransform: 'none', fontWeight: 600 }}
+                    >
+                      {editForm._gpsLoading ? 'Capturing GPS…' : editForm.latitude ? 'Recapture BGE Location' : 'Capture BGE Location'}
+                    </Button>
+                  </Box>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}>
+                      <TextField fullWidth size="small" label="Latitude" type="number"
+                        inputProps={{ step: 'any' }}
+                        value={editForm.latitude || ''}
+                        onChange={e => setEditForm(f => ({ ...f, latitude: e.target.value }))}
+                        placeholder="e.g. 2.774950"
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField fullWidth size="small" label="Longitude" type="number"
+                        inputProps={{ step: 'any' }}
+                        value={editForm.longitude || ''}
+                        onChange={e => setEditForm(f => ({ ...f, longitude: e.target.value }))}
+                        placeholder="e.g. 32.299110"
+                      />
+                    </Grid>
+                  </Grid>
+                  {editForm.latitude && editForm.longitude && (
+                    <Typography variant="caption" color="primary.main" sx={{ mt: 0.75, display: 'block' }}>
+                      📍 {Number(editForm.latitude).toFixed(6)}, {Number(editForm.longitude).toFixed(6)}
+                    </Typography>
+                  )}
+                </Box>
+              </Grid>
             </Grid>
           )}
         </DialogContent>
@@ -9402,26 +9448,6 @@ PRUDEV II BDS Team`
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* ── Location Picker Modal for Edit Form ────────────────────────────── */}
-      {editLocationPickerOpen && (
-        <LocationPickerModal
-          open={editLocationPickerOpen}
-          onClose={() => setEditLocationPickerOpen(false)}
-          initialLatitude={editForm.latitude}
-          initialLongitude={editForm.longitude}
-          initialBusinessName={editForm.business_name}
-          onLocationSelected={({ latitude, longitude, presetTown }) => {
-            setEditForm(f => ({
-              ...f,
-              latitude: latitude !== null ? latitude.toFixed(6) : '',
-              longitude: longitude !== null ? longitude.toFixed(6) : '',
-              ...(presetTown && !f.city ? { city: presetTown } : {}),
-            }));
-            setEditLocationPickerOpen(false);
-          }}
-        />
-      )}
 
       {/* ── Delete confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!deleteItem} onClose={() => setDeleteItem(null)} maxWidth="xs" fullWidth>

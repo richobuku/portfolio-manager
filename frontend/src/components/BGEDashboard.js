@@ -29,7 +29,6 @@ import { BRAND } from '../theme';
 import { subscribePush } from '../index';
 import VisitReportForm from './VisitReportForm';
 import MSMEMap from './MSMEMap';
-import LocationPickerModal from './LocationPickerModal';
 
 const DRAWER_WIDTH = 220;
 const ROWS_PER_PAGE = 15;
@@ -293,7 +292,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [quickUpdateDialog, setQuickUpdateDialog] = useState(false);
   const [quickUpdateMsme, setQuickUpdateMsme]     = useState(null);
   const [quickUpdateSaving, setQuickUpdateSaving] = useState(false);
-  const [quickLocationPickerOpen, setQuickLocationPickerOpen] = useState(false);
   const [quickUpdateForm, setQuickUpdateForm]     = useState({
     last_month_revenue: '', employees_ft_male: '', employees_ft_female: '',
     employees_pt_male: '', employees_pt_female: '',
@@ -2006,20 +2004,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             </Box>
             <MSMEMap
               msmes={msmes.filter(m => m.assigned_bge === myBgeId || (m.co_assigned_bge_names || []).some(b => b.id === myBgeId))}
+              experts={currentUser?.bge_profile ? [currentUser.bge_profile] : []}
               onOpenMsme={openMsmeDetail}
-              onUpdateMsmeLocation={async (msme, { latitude, longitude, presetTown }) => {
-                try {
-                  const payload = { latitude, longitude };
-                  if (presetTown && !msme.city) payload.city = presetTown;
-                  const res = await axios.patch(`${API_ENDPOINTS.MSMES}${msme.id}/`, payload, {
-                    headers: { Authorization: `Bearer ${token}` }
-                  });
-                  setMsmes(prev => prev.map(m => m.id === msme.id ? { ...m, ...res.data } : m));
-                  notify(`Updated location for ${msme.business_name} ✓`);
-                } catch (err) {
-                  notify(err.response?.data?.error || 'Failed to update location', 'error');
-                }
-              }}
             />
           </Box>
         )}
@@ -3860,35 +3846,23 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         </DialogTitle>
         <DialogContent dividers>
           {/* GPS status */}
-          <Box sx={{ mb: 2, p: 1.5, borderRadius: 1, bgcolor: quickUpdateForm.gpsStatus === 'ok' ? '#E8F5E9' : 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {quickUpdateForm.gpsStatus === 'loading' && <CircularProgress size={16} />}
-              {quickUpdateForm.gpsStatus === 'ok'      && <MyLocation sx={{ color: 'success.dark', fontSize: 18 }} />}
-              {quickUpdateForm.gpsStatus === 'denied'  && <MyLocation sx={{ color: 'text.disabled', fontSize: 18 }} />}
-              <Box>
-                {quickUpdateForm.gpsStatus === 'loading' && <Typography variant="caption">Getting GPS location…</Typography>}
-                {quickUpdateForm.gpsStatus === 'ok'      && (
-                  <Typography variant="caption" color="success.dark" fontWeight={600}>
-                    📍 {Number(quickUpdateForm.latitude).toFixed(6)}, {Number(quickUpdateForm.longitude).toFixed(6)}
-                  </Typography>
-                )}
-                {quickUpdateForm.gpsStatus === 'denied'  && (
-                  <Typography variant="caption" color="text.secondary">
-                    GPS not available
-                  </Typography>
-                )}
-              </Box>
+          <Box sx={{ mb: 2, p: 1.5, borderRadius: 1, bgcolor: quickUpdateForm.gpsStatus === 'ok' ? '#E8F5E9' : 'grey.100', display: 'flex', alignItems: 'center', gap: 1 }}>
+            {quickUpdateForm.gpsStatus === 'loading' && <CircularProgress size={16} />}
+            {quickUpdateForm.gpsStatus === 'ok'      && <MyLocation sx={{ color: 'success.dark', fontSize: 18 }} />}
+            {quickUpdateForm.gpsStatus === 'denied'  && <MyLocation sx={{ color: 'text.disabled', fontSize: 18 }} />}
+            <Box sx={{ flex: 1 }}>
+              {quickUpdateForm.gpsStatus === 'loading' && <Typography variant="caption">Acquiring device GPS location…</Typography>}
+              {quickUpdateForm.gpsStatus === 'ok'      && (
+                <Typography variant="caption" color="success.dark" fontWeight={600}>
+                  📍 {Number(quickUpdateForm.latitude).toFixed(6)}, {Number(quickUpdateForm.longitude).toFixed(6)}
+                </Typography>
+              )}
+              {quickUpdateForm.gpsStatus === 'denied'  && (
+                <Typography variant="caption" color="text.secondary">
+                  GPS not available — visit recorded without coordinates
+                </Typography>
+              )}
             </Box>
-            <Button
-              size="small"
-              variant="outlined"
-              color="success"
-              startIcon={<Place sx={{ fontSize: 13 }} />}
-              onClick={() => setQuickLocationPickerOpen(true)}
-              sx={{ fontSize: 11, py: 0.2, textTransform: 'none', whiteSpace: 'nowrap', fontWeight: 600 }}
-            >
-              Pick on Map / Presets
-            </Button>
           </Box>
 
           {/* Last month revenue */}
@@ -3925,26 +3899,6 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* ── Location Picker Modal for BGE Quick Visit Check-in ── */}
-      {quickLocationPickerOpen && (
-        <LocationPickerModal
-          open={quickLocationPickerOpen}
-          onClose={() => setQuickLocationPickerOpen(false)}
-          initialLatitude={quickUpdateForm.latitude}
-          initialLongitude={quickUpdateForm.longitude}
-          initialBusinessName={quickUpdateMsme?.business_name}
-          onLocationSelected={({ latitude, longitude }) => {
-            setQuickUpdateForm(f => ({
-              ...f,
-              gpsStatus: 'ok',
-              latitude: latitude !== null ? latitude.toFixed(6) : '',
-              longitude: longitude !== null ? longitude.toFixed(6) : '',
-            }));
-            setQuickLocationPickerOpen(false);
-          }}
-        />
-      )}
 
       {/* ── Growth update form ── */}
       <Dialog open={growthDialog} onClose={() => setGrowthDialog(false)} maxWidth="sm" fullWidth>
