@@ -432,7 +432,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Only admins can create MSMEs.")
         return super().create(request, *args, **kwargs)
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch', 'post'])
     def assign_bge(self, request, pk=None):
         if not self._is_admin_or_cohort_admin(request):
             raise PermissionDenied("Only admins can assign BGEs.")
@@ -445,46 +445,46 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         bge_id = request.data.get('bge_id')
         objectives = (request.data.get('objectives') or '').strip()
         assignment_date = request.data.get('assignment_date') or None
+        is_co_assign = request.data.get('is_co_assign', False)
         bge = None  # initialise so the notification block below is always safe
         if bge_id:
             try:
                 bge = BusinessGrowthExpert.objects.get(pk=bge_id)
-                # Prevent assigning the same BGE twice as primary
-                if msme.assigned_bge_id and msme.assigned_bge_id == bge.id:
-                    return Response(
-                        {'error': f'{msme.business_name} is already assigned to {bge.name}.'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                if msme.assigned_bge_id and msme.assigned_bge_id != bge.id:
-                    # MSME already has a primary BGE — add the new BGE as co-assigned
-                    # so BOTH BGEs keep the MSME in their list (joint deployment).
-                    existing_primary = msme.assigned_bge  # capture before save
+                if is_co_assign:
+                    if msme.assigned_bge_id and msme.assigned_bge_id == bge.id:
+                        return Response(
+                            {'error': f'{bge.name} is already the Primary BGE for {msme.business_name}.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
                     msme.co_assigned_bges.add(bge)
                     msme.save()
-                    # Notify the new (co-assigned) BGE via push
                     _notify_bge(
                         bge,
                         title='Joint MSME Assignment',
-                        body=f'You have been co-assigned to {msme.business_name} alongside {existing_primary.name}. Check your dashboard for details.',
+                        body=f'You have been co-assigned to {msme.business_name}' + (f' alongside {msme.assigned_bge.name}.' if msme.assigned_bge else '.'),
                         url='/bge'
                     )
-                    # Notify the existing primary BGE via push + email
-                    _notify_bge(
-                        existing_primary,
-                        title='Joint Deployment Notice',
-                        body=f'{bge.name} has also been assigned to visit {msme.business_name}. Check your dashboard for details.',
-                        url='/bge'
-                    )
-                    _send_co_assignment_alert(existing_primary, bge, msme)
-                    return Response(MSMESerializer(msme).data)
-                # No existing primary — set this BGE as primary
+                    if msme.assigned_bge:
+                        _notify_bge(
+                            msme.assigned_bge,
+                            title='Joint Deployment Notice',
+                            body=f'{bge.name} has also been assigned to visit {msme.business_name}. Check your dashboard for details.',
+                            url='/bge'
+                        )
+                        _send_co_assignment_alert(msme.assigned_bge, bge, msme)
+                    return Response(MSMESerializer(msme, context={'request': request}).data)
+
+                # Updating primary BGE
+                msme.co_assigned_bges.remove(bge)
                 msme.assigned_bge = bge
             except BusinessGrowthExpert.DoesNotExist:
                 return Response({'error': 'BGE not found'}, status=status.HTTP_404_NOT_FOUND)
         else:
-            # Unassign: clear primary and all co-assignees
+            # Unassign primary BGE
             msme.assigned_bge = None
-            msme.co_assigned_bges.clear()
+            if request.data.get('clear_co_assigned', False):
+                msme.co_assigned_bges.clear()
+
         msme.assignment_objectives = objectives
         msme.assignment_date = assignment_date
         msme.save()
@@ -493,10 +493,61 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             _notify_bge(
                 bge,
                 title='New MSME Assignment',
-                body=f'You have been assigned to {msme.business_name}. Check your dashboard for details.',
+                body=f'You have been assigned as Primary BGE to {msme.business_name}. Check your dashboard for details.',
                 url='/bge'
             )
-        return Response(MSMESerializer(msme).data)
+        return Response(MSMESerializer(msme, context={'request': request}).data)
+
+    @action(detail=True, methods=['patch', 'post'])
+    def add_co_assigned(self, request, pk=None):
+        if not self._is_admin_or_cohort_admin(request):
+            raise PermissionDenied("Only admins can modify BGE assignments.")
+        msme = self.get_object()
+        bge_id = request.data.get('bge_id')
+        if not bge_id:
+            return Response({'error': 'bge_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            bge = BusinessGrowthExpert.objects.get(pk=bge_id)
+            if msme.assigned_bge_id and msme.assigned_bge_id == bge.id:
+                return Response(
+                    {'error': f'{bge.name} is already the Primary BGE for {msme.business_name}.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            msme.co_assigned_bges.add(bge)
+            msme.save()
+            _notify_bge(
+                bge,
+                title='Joint MSME Assignment',
+                body=f'You have been co-assigned to {msme.business_name}' + (f' alongside {msme.assigned_bge.name}.' if msme.assigned_bge else '.'),
+                url='/bge'
+            )
+            if msme.assigned_bge:
+                _notify_bge(
+                    msme.assigned_bge,
+                    title='Joint Deployment Notice',
+                    body=f'{bge.name} has also been assigned to visit {msme.business_name}. Check your dashboard for details.',
+                    url='/bge'
+                )
+                _send_co_assignment_alert(msme.assigned_bge, bge, msme)
+        except BusinessGrowthExpert.DoesNotExist:
+            return Response({'error': 'BGE not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(MSMESerializer(msme, context={'request': request}).data)
+
+    @action(detail=True, methods=['patch', 'post'])
+    def remove_co_assigned(self, request, pk=None):
+        if not self._is_admin_or_cohort_admin(request):
+            raise PermissionDenied("Only admins can modify BGE assignments.")
+        msme = self.get_object()
+        bge_id = request.data.get('bge_id')
+        if not bge_id:
+            return Response({'error': 'bge_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            bge = BusinessGrowthExpert.objects.get(pk=bge_id)
+            msme.co_assigned_bges.remove(bge)
+            msme.save()
+        except BusinessGrowthExpert.DoesNotExist:
+            return Response({'error': 'BGE not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(MSMESerializer(msme, context={'request': request}).data)
 
     @action(detail=True, methods=['patch'])
     def assign_cohort(self, request, pk=None):

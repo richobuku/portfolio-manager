@@ -34,6 +34,9 @@ import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
 import SectionHeader from './SectionHeader';
+import MSMEMap from './MSMEMap';
+import LocationPickerModal from './LocationPickerModal';
+import { Place } from '@mui/icons-material';
 
 const ROWS_PER_PAGE = 15;
 const DRAWER_WIDTH = 220;
@@ -41,6 +44,7 @@ const DRAWER_WIDTH = 220;
 const NAV_ITEMS = [
   { key: 'overview',    label: 'Overview',        icon: <DashboardIcon /> },
   { key: 'msmes',       label: 'MSMEs',          icon: <Business /> },
+  { key: 'maps',        label: 'MSME Maps',      icon: <Place /> },
   { key: 'experts',     label: 'BGE Experts',    icon: <People /> },
   { key: 'assignments', label: 'Assignments',    icon: <Assignment /> },
   { key: 'users',       label: 'User Accounts',  icon: <ManageAccounts /> },
@@ -251,6 +255,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [filterType, setFilterType] = useState('');
   const [filterSector, setFilterSector] = useState('');
   const [filterCohort, setFilterCohort] = useState('');
+  const [msmeViewMode, setMsmeViewMode] = useState('table'); // 'table' | 'map'
+  const [editLocationPickerOpen, setEditLocationPickerOpen] = useState(false);
+  const [removingCoId, setRemovingCoId] = useState(null);
 
   // ── pagination ─────────────────────────────────────────────────────────────
   const [msmePage, setMsmePage] = useState(0);       // 0-indexed server page
@@ -370,9 +377,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── assignment dialog ──────────────────────────────────────────────────────
   const [assignDialog, setAssignDialog] = useState(false);
   const [coAssignAdd, setCoAssignAdd] = useState('');
-  const [coAssignAddObjectives, setCoAssignAddObjectives] = useState('');
   const [coAssignSaving, setCoAssignSaving] = useState(false);
-  const [coAssignEditObjectives, setCoAssignEditObjectives] = useState({});
   const [inactiveMsmes, setInactiveMsmes]   = useState(null);  // null=unchecked, [] or array when loaded
   const [reactivating, setReactivating]     = useState(false);
 
@@ -813,8 +818,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       assignment_date: msme.assignment_date || new Date().toISOString().slice(0, 10),
     });
     setCoAssignAdd('');
-    setCoAssignAddObjectives('');
-    setCoAssignEditObjectives(msme.co_assignment_objectives || {});
     setAssignDialog(true);
   };
 
@@ -842,15 +845,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setCoAssignSaving(true);
     try {
       const res = await axios.patch(
-        `${API_ENDPOINTS.MSMES}${assignTarget.id}/assign_bge/`,
-        { bge_id: bgeId, co_objectives: coAssignAddObjectives },
+        `${API_ENDPOINTS.MSMES}${assignTarget.id}/add_co_assigned/`,
+        { bge_id: bgeId, is_co_assign: true },
         { headers }
       );
       setAssignTarget(res.data);
-      setCoAssignEditObjectives(res.data.co_assignment_objectives || {});
+      setMsmes(prev => prev.map(m => m.id === assignTarget.id ? { ...m, ...res.data } : m));
       setCoAssignAdd('');
-      setCoAssignAddObjectives('');
-      notify('Co-assignee added');
+      notify('Co-assigned BGE added successfully');
     } catch (err) {
       notify(err.response?.data?.error || 'Failed to add co-assignee', 'error');
     } finally {
@@ -859,6 +861,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   const removeCoAssignee = async (bgeId) => {
+    setRemovingCoId(bgeId);
     try {
       const res = await axios.patch(
         `${API_ENDPOINTS.MSMES}${assignTarget.id}/remove_co_assigned/`,
@@ -866,10 +869,26 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         { headers }
       );
       setAssignTarget(res.data);
-      setCoAssignEditObjectives(res.data.co_assignment_objectives || {});
-      notify('Co-assignee removed');
+      setMsmes(prev => prev.map(m => m.id === assignTarget.id ? { ...m, ...res.data } : m));
+      notify('Co-assigned BGE removed successfully');
     } catch (err) {
       notify(err.response?.data?.error || 'Failed to remove co-assignee', 'error');
+    } finally {
+      setRemovingCoId(null);
+    }
+  };
+
+  const handleUpdateMsmeLocation = async (msme, { latitude, longitude, presetTown }) => {
+    try {
+      const payload = { latitude, longitude };
+      if (presetTown && !msme.city) {
+        payload.city = presetTown;
+      }
+      const res = await axios.patch(`${API_ENDPOINTS.MSMES}${msme.id}/`, payload, { headers });
+      setMsmes(prev => prev.map(m => m.id === msme.id ? { ...m, ...res.data } : m));
+      notify(`Updated GPS location for ${msme.business_name}`);
+    } catch (err) {
+      notify(err.response?.data?.error || 'Failed to update GPS location', 'error');
     }
   };
 
@@ -1686,6 +1705,26 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderMSMEs = () => (
     <Box>
       <SectionHeader title="MSMEs" subtitle={`${msmes.length} records`}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Button
+            variant={msmeViewMode === 'table' ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => setMsmeViewMode('table')}
+            sx={{ textTransform: 'none', fontSize: 12 }}
+          >
+            Table View
+          </Button>
+          <Button
+            variant={msmeViewMode === 'map' ? 'contained' : 'outlined'}
+            color="success"
+            size="small"
+            startIcon={<Place sx={{ fontSize: 15 }} />}
+            onClick={() => setMsmeViewMode('map')}
+            sx={{ textTransform: 'none', fontSize: 12 }}
+          >
+            Spatial Map View
+          </Button>
+        </Box>
         <Button variant="outlined" color="warning" size="small" onClick={checkInactiveMsmes}>
           Check Inactive
         </Button>
@@ -1694,204 +1733,237 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </Button>
       </SectionHeader>
 
-      {/* filters */}
-      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-        <TextField
-          size="small" placeholder="Search name, owner, sector…" value={msmeSearch}
-          onChange={e => { setMsmePage(0); startTransition(() => setMsmeSearch(e.target.value)); }}
-          onKeyDown={e => e.key === 'Enter' && fetchAll()}
-          InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
-          sx={{ flex: '1 1 160px', minWidth: 0 }}
+      {msmeViewMode === 'map' ? (
+        <MSMEMap
+          msmes={msmes}
+          experts={experts}
+          cohorts={cohorts}
+          programmeGroups={programmeGroups}
+          onOpenMsme={(m) => {
+            setViewItem(m);
+            setViewType('msme');
+          }}
+          onUpdateMsmeLocation={handleUpdateMsmeLocation}
         />
-        <FormControl size="small" sx={{ flex: '1 1 100px', minWidth: 0 }}>
-          <InputLabel>Type</InputLabel>
-          <Select value={filterType} onChange={e => { setFilterType(e.target.value); setMsmePage(0); }} label="Type">
-            <MenuItem value="">All</MenuItem>
-            {['MICRO','SMALL','MEDIUM'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
-          <InputLabel>Sector</InputLabel>
-          <Select value={filterSector} onChange={e => { setFilterSector(e.target.value); setMsmePage(0); }} label="Sector">
-            <MenuItem value="">All</MenuItem>
-            {['MANUFACTURING','SERVICES','TRADE','AGRICULTURE','TECHNOLOGY','CONSTRUCTION','HEALTHCARE','EDUCATION','OTHER'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
-          <InputLabel>Cohort</InputLabel>
-          <Select value={filterCohort} onChange={e => { setFilterCohort(e.target.value); setMsmePage(0); }} label="Cohort">
-            <MenuItem value="">All</MenuItem>
-            {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="contained" size="small" onClick={fetchAll}>Search</Button>
-          {(msmeSearch || filterType || filterSector || filterCohort) &&
-            <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); setMsmePage(0); }}>Clear</Button>}
-        </Box>
-      </Paper>
+      ) : (
+        <>
+          {/* filters */}
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <TextField
+              size="small" placeholder="Search name, owner, sector…" value={msmeSearch}
+              onChange={e => { setMsmePage(0); startTransition(() => setMsmeSearch(e.target.value)); }}
+              onKeyDown={e => e.key === 'Enter' && fetchAll()}
+              InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
+              sx={{ flex: '1 1 160px', minWidth: 0 }}
+            />
+            <FormControl size="small" sx={{ flex: '1 1 100px', minWidth: 0 }}>
+              <InputLabel>Type</InputLabel>
+              <Select value={filterType} onChange={e => { setFilterType(e.target.value); setMsmePage(0); }} label="Type">
+                <MenuItem value="">All</MenuItem>
+                {['MICRO','SMALL','MEDIUM'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
+              <InputLabel>Sector</InputLabel>
+              <Select value={filterSector} onChange={e => { setFilterSector(e.target.value); setMsmePage(0); }} label="Sector">
+                <MenuItem value="">All</MenuItem>
+                {['MANUFACTURING','SERVICES','TRADE','AGRICULTURE','TECHNOLOGY','CONSTRUCTION','HEALTHCARE','EDUCATION','OTHER'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ flex: '1 1 120px', minWidth: 0 }}>
+              <InputLabel>Cohort</InputLabel>
+              <Select value={filterCohort} onChange={e => { setFilterCohort(e.target.value); setMsmePage(0); }} label="Cohort">
+                <MenuItem value="">All</MenuItem>
+                {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="contained" size="small" onClick={fetchAll}>Search</Button>
+              {(msmeSearch || filterType || filterSector || filterCohort) &&
+                <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); setMsmePage(0); }}>Clear</Button>}
+            </Box>
+          </Paper>
 
-      <TableContainer component={Paper} variant="outlined">
-        <Table size="small">
-          <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-            <TableRow>
-              <TableCell>Code</TableCell>
-              <TableCell>Business</TableCell>
-              <TableCell>Owner</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Cohort</TableCell>
-              <TableCell>Groups</TableCell>
-              <TableCell>Assigned BGE</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell align="center">Supports</TableCell>
-              <TableCell>Last Support</TableCell>
-              <TableCell>Growth Update</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {msmes.length === 0 ? (
-              <TableRow><TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
-            ) : msmes.map(m => (
-              <TableRow key={m.id} hover>
-                <TableCell><Chip label={m.msme_code} size="small" variant="outlined" /></TableCell>
-                <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
-                <TableCell>{m.owner_name}</TableCell>
-                <TableCell><Chip label={m.business_type} size="small" color="primary" /></TableCell>
-                <TableCell>
-                  <Select
-                    size="small" value={m.cohort || ''} displayEmpty variant="standard" disableUnderline
-                    onChange={e => assignCohort(m.id, e.target.value)}
-                    sx={{ fontSize: 12, minWidth: 90 }}
-                  >
-                    <MenuItem value=""><em>None</em></MenuItem>
-                    {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-                  </Select>
-                </TableCell>
-                <TableCell sx={{ minWidth: 160 }}>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
-                    {(m.programme_groups_detail || []).map(g => (
-                      <Chip
-                        key={g.id}
-                        label={g.name}
-                        size="small"
-                        onDelete={isAdmin ? () => toggleProgrammeGroup(m, g.id) : undefined}
-                        sx={{
-                          fontSize: 10, height: 20,
-                          bgcolor: g.color || '#1A2F4B',
-                          color: '#fff',
-                          '& .MuiChip-deleteIcon': { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
-                        }}
-                      />
-                    ))}
-                    {isAdmin && programmeGroups.filter(g =>
-                      !(m.programme_groups_detail || []).some(mg => mg.id === g.id)
-                    ).length > 0 && (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell>Code</TableCell>
+                  <TableCell>Business</TableCell>
+                  <TableCell>Owner</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Cohort</TableCell>
+                  <TableCell>Groups</TableCell>
+                  <TableCell>Assigned BGE</TableCell>
+                  <TableCell>Location</TableCell>
+                  <TableCell align="center">Supports</TableCell>
+                  <TableCell>Last Support</TableCell>
+                  <TableCell>Growth Update</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {msmes.length === 0 ? (
+                  <TableRow><TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
+                ) : msmes.map(m => (
+                  <TableRow key={m.id} hover>
+                    <TableCell><Chip label={m.msme_code} size="small" variant="outlined" /></TableCell>
+                    <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
+                    <TableCell>{m.owner_name}</TableCell>
+                    <TableCell><Chip label={m.business_type} size="small" color="primary" /></TableCell>
+                    <TableCell>
                       <Select
-                        value=""
-                        displayEmpty
-                        variant="standard"
-                        disableUnderline
-                        size="small"
-                        onChange={e => { if (e.target.value) toggleProgrammeGroup(m, e.target.value); }}
-                        sx={{ fontSize: 11, minWidth: 28, '& .MuiSelect-select': { py: 0, px: 0.5 } }}
-                        renderValue={() => <Typography sx={{ fontSize: 18, lineHeight: 1, color: 'text.secondary' }}>+</Typography>}
+                        size="small" value={m.cohort || ''} displayEmpty variant="standard" disableUnderline
+                        onChange={e => assignCohort(m.id, e.target.value)}
+                        sx={{ fontSize: 12, minWidth: 90 }}
                       >
-                        <MenuItem value="" disabled><em>Add to group…</em></MenuItem>
-                        {programmeGroups
-                          .filter(g => !(m.programme_groups_detail || []).some(mg => mg.id === g.id))
-                          .map(g => <MenuItem key={g.id} value={g.id} sx={{ fontSize: 13 }}>{g.name}</MenuItem>)
-                        }
+                        <MenuItem value=""><em>None</em></MenuItem>
+                        {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                       </Select>
-                    )}
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  {m.assigned_bge_name || (m.co_assigned_bge_names || []).length > 0 ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                      {m.assigned_bge_name && (
-                        <Chip
-                          label={m.assigned_bge_name}
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 160 }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                        {(m.programme_groups_detail || []).map(g => (
+                          <Chip
+                            key={g.id}
+                            label={g.name}
+                            size="small"
+                            onDelete={isAdmin ? () => toggleProgrammeGroup(m, g.id) : undefined}
+                            sx={{
+                              fontSize: 10, height: 20,
+                              bgcolor: g.color || '#1A2F4B',
+                              color: '#fff',
+                              '& .MuiChip-deleteIcon': { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
+                            }}
+                          />
+                        ))}
+                        {isAdmin && programmeGroups.filter(g =>
+                          !(m.programme_groups_detail || []).some(mg => mg.id === g.id)
+                        ).length > 0 && (
+                          <Select
+                            value=""
+                            displayEmpty
+                            variant="standard"
+                            disableUnderline
+                            size="small"
+                            onChange={e => { if (e.target.value) toggleProgrammeGroup(m, e.target.value); }}
+                            sx={{ fontSize: 11, minWidth: 28, '& .MuiSelect-select': { py: 0, px: 0.5 } }}
+                            renderValue={() => <Typography sx={{ fontSize: 18, lineHeight: 1, color: 'text.secondary' }}>+</Typography>}
+                          >
+                            <MenuItem value="" disabled><em>Add to group…</em></MenuItem>
+                            {programmeGroups
+                              .filter(g => !(m.programme_groups_detail || []).some(mg => mg.id === g.id))
+                              .map(g => <MenuItem key={g.id} value={g.id} sx={{ fontSize: 13 }}>{g.name}</MenuItem>)
+                            }
+                          </Select>
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {m.assigned_bge_name || (m.co_assigned_bge_names || []).length > 0 ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                          {m.assigned_bge_name && (
+                            <Chip
+                              label={m.assigned_bge_name}
+                              size="small"
+                              color="success"
+                              variant="outlined"
+                              onClick={() => openAssignDialog(m)}
+                              sx={{ cursor: 'pointer', fontSize: 11 }}
+                            />
+                          )}
+                          {(m.co_assigned_bge_names || []).map(b => (
+                            <Chip
+                              key={b.id}
+                              label={b.name}
+                              size="small"
+                              variant="outlined"
+                              sx={{ fontSize: 11, borderColor: '#7B1FA2', color: '#7B1FA2' }}
+                            />
+                          ))}
+                        </Box>
+                      ) : (
+                        <Button
                           size="small"
-                          color="success"
                           variant="outlined"
+                          startIcon={<People fontSize="small" />}
                           onClick={() => openAssignDialog(m)}
-                          sx={{ cursor: 'pointer', fontSize: 11 }}
-                        />
+                          sx={{ fontSize: 11, py: 0.3, px: 1 }}
+                        >
+                          Assign
+                        </Button>
                       )}
-                      {(m.co_assigned_bge_names || []).map(b => (
-                        <Chip
-                          key={b.id}
-                          label={b.name}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontSize: 11, borderColor: '#7B1FA2', color: '#7B1FA2' }}
-                        />
-                      ))}
-                    </Box>
-                  ) : (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<People fontSize="small" />}
-                      onClick={() => openAssignDialog(m)}
-                      sx={{ fontSize: 11, py: 0.3, px: 1 }}
-                    >
-                      Assign
-                    </Button>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: 12 }}>
-                    <LocationOn sx={{ fontSize: 14, color: 'text.secondary' }} />{m.city}
-                  </Box>
-                </TableCell>
-                <TableCell align="center">
-                  {m.total_reports > 0 ? (
-                    <Chip label={m.total_reports} size="small" color="primary" variant="outlined" />
-                  ) : (
-                    <Typography variant="caption" color="text.disabled">—</Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {m.last_support_date ? (
-                    <Typography variant="caption" color={
-                      // highlight recent (within 30 days) vs stale (>90 days)
-                      (new Date() - new Date(m.last_support_date)) / 86400000 < 30
-                        ? 'success.main'
-                        : (new Date() - new Date(m.last_support_date)) / 86400000 > 90
-                          ? 'warning.main'
-                          : 'text.primary'
-                    }>{m.last_support_date}</Typography>
-                  ) : (
-                    <Typography variant="caption" color="text.disabled">No visits yet</Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {(() => {
-                    const snaps = adminSnapshots.filter(s => s.msme === m.id);
-                    if (!snaps.length) return <Typography variant="caption" color="text.disabled">—</Typography>;
-                    const latest = snaps.sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date))[0];
-                    const days = Math.floor((new Date() - new Date(latest.snapshot_date)) / 86400000);
-                    const color = days <= 30 ? 'success.main' : days <= 90 ? 'warning.main' : 'error.main';
-                    return (
-                      <Tooltip title={`${snaps.length} update${snaps.length !== 1 ? 's' : ''}`}>
-                        <Typography variant="caption" color={color}>{latest.snapshot_date}</Typography>
-                      </Tooltip>
-                    );
-                  })()}
-                </TableCell>
-                <TableCell><ActionCell item={m} type="msme" /></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <TablePagination
-          component="div" count={msmeTotalCount} page={msmePage}
-          rowsPerPage={50} rowsPerPageOptions={[50]}
-          onPageChange={(_, p) => setMsmePage(p)}
-        />
-      </TableContainer>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: 12 }}>
+                        <LocationOn sx={{ fontSize: 14, color: 'text.secondary' }} />{m.city}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      {m.total_reports > 0 ? (
+                        <Chip label={m.total_reports} size="small" color="primary" variant="outlined" />
+                      ) : (
+                        <Typography variant="caption" color="text.disabled">—</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {m.last_support_date ? (
+                        <Typography variant="caption" color={
+                          // highlight recent (within 30 days) vs stale (>90 days)
+                          (new Date() - new Date(m.last_support_date)) / 86400000 < 30
+                            ? 'success.main'
+                            : (new Date() - new Date(m.last_support_date)) / 86400000 > 90
+                              ? 'warning.main'
+                              : 'text.primary'
+                        }>{m.last_support_date}</Typography>
+                      ) : (
+                        <Typography variant="caption" color="text.disabled">No visits yet</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const snaps = adminSnapshots.filter(s => s.msme === m.id);
+                        if (!snaps.length) return <Typography variant="caption" color="text.disabled">—</Typography>;
+                        const latest = snaps.sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date))[0];
+                        const days = Math.floor((new Date() - new Date(latest.snapshot_date)) / 86400000);
+                        const color = days <= 30 ? 'success.main' : days <= 90 ? 'warning.main' : 'error.main';
+                        return (
+                          <Tooltip title={`${snaps.length} update${snaps.length !== 1 ? 's' : ''}`}>
+                            <Typography variant="caption" color={color}>{latest.snapshot_date}</Typography>
+                          </Tooltip>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell><ActionCell item={m} type="msme" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <TablePagination
+              component="div" count={msmeTotalCount} page={msmePage}
+              rowsPerPage={50} rowsPerPageOptions={[50]}
+              onPageChange={(_, p) => setMsmePage(p)}
+            />
+          </TableContainer>
+        </>
+      )}
+    </Box>
+  );
+
+  const renderMaps = () => (
+    <Box>
+      <SectionHeader title="Northern Uganda MSME Spatial Maps" subtitle="Interactive spatial GPS mapping & location management" />
+      <MSMEMap
+        msmes={msmes}
+        experts={experts}
+        cohorts={cohorts}
+        programmeGroups={programmeGroups}
+        onOpenMsme={(m) => {
+          setViewItem(m);
+          setViewType('msme');
+        }}
+        onUpdateMsmeLocation={handleUpdateMsmeLocation}
+      />
     </Box>
   );
 
@@ -8827,6 +8899,7 @@ PRUDEV II BDS Team`
   const sectionMap = {
     overview: renderOverview,
     msmes: renderMSMEs,
+    maps: renderMaps,
     experts: renderExperts,
     assignments: renderAssignments,
     users: renderUsers,
@@ -9228,32 +9301,42 @@ PRUDEV II BDS Team`
               {/* ── GPS Location ── */}
               <Grid item xs={12}>
                 <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
                     <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <MyLocation sx={{ fontSize: 14 }} /> GPS Business Location
                     </Typography>
-                    <Button
-                      size="small" variant="outlined"
-                      startIcon={editForm._gpsLoading ? <CircularProgress size={12} /> : (editForm.latitude ? <GpsFixed sx={{ fontSize: 14 }} /> : <GpsNotFixed sx={{ fontSize: 14 }} />)}
-                      disabled={!!editForm._gpsLoading}
-                      onClick={() => {
-                        if (!navigator.geolocation) return;
-                        setEditForm(f => ({ ...f, _gpsLoading: true }));
-                        navigator.geolocation.getCurrentPosition(
-                          (pos) => setEditForm(f => ({
-                            ...f,
-                            latitude:  pos.coords.latitude.toFixed(6),
-                            longitude: pos.coords.longitude.toFixed(6),
-                            _gpsLoading: false,
-                          })),
-                          () => setEditForm(f => ({ ...f, _gpsLoading: false })),
-                          { enableHighAccuracy: true, timeout: 15000 },
-                        );
-                      }}
-                      sx={{ fontSize: 11, py: 0.25 }}
-                    >
-                      {editForm._gpsLoading ? 'Locating…' : editForm.latitude ? 'Recapture' : 'Capture Location'}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small" variant="contained" color="success"
+                        startIcon={<Place sx={{ fontSize: 14 }} />}
+                        onClick={() => setEditLocationPickerOpen(true)}
+                        sx={{ fontSize: 11, py: 0.25, textTransform: 'none', fontWeight: 600 }}
+                      >
+                        Pick on Map / Presets
+                      </Button>
+                      <Button
+                        size="small" variant="outlined"
+                        startIcon={editForm._gpsLoading ? <CircularProgress size={12} /> : (editForm.latitude ? <GpsFixed sx={{ fontSize: 14 }} /> : <GpsNotFixed sx={{ fontSize: 14 }} />)}
+                        disabled={!!editForm._gpsLoading}
+                        onClick={() => {
+                          if (!navigator.geolocation) return;
+                          setEditForm(f => ({ ...f, _gpsLoading: true }));
+                          navigator.geolocation.getCurrentPosition(
+                            (pos) => setEditForm(f => ({
+                              ...f,
+                              latitude:  pos.coords.latitude.toFixed(6),
+                              longitude: pos.coords.longitude.toFixed(6),
+                              _gpsLoading: false,
+                            })),
+                            () => setEditForm(f => ({ ...f, _gpsLoading: false })),
+                            { enableHighAccuracy: true, timeout: 15000 },
+                          );
+                        }}
+                        sx={{ fontSize: 11, py: 0.25, textTransform: 'none' }}
+                      >
+                        {editForm._gpsLoading ? 'Locating…' : editForm.latitude ? 'Recapture Live GPS' : 'Live GPS'}
+                      </Button>
+                    </Box>
                   </Box>
                   <Grid container spacing={1}>
                     <Grid item xs={6}>
@@ -9319,6 +9402,26 @@ PRUDEV II BDS Team`
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ── Location Picker Modal for Edit Form ────────────────────────────── */}
+      {editLocationPickerOpen && (
+        <LocationPickerModal
+          open={editLocationPickerOpen}
+          onClose={() => setEditLocationPickerOpen(false)}
+          initialLatitude={editForm.latitude}
+          initialLongitude={editForm.longitude}
+          initialBusinessName={editForm.business_name}
+          onLocationSelected={({ latitude, longitude, presetTown }) => {
+            setEditForm(f => ({
+              ...f,
+              latitude: latitude !== null ? latitude.toFixed(6) : '',
+              longitude: longitude !== null ? longitude.toFixed(6) : '',
+              ...(presetTown && !f.city ? { city: presetTown } : {}),
+            }));
+            setEditLocationPickerOpen(false);
+          }}
+        />
+      )}
 
       {/* ── Delete confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!deleteItem} onClose={() => setDeleteItem(null)} maxWidth="xs" fullWidth>
@@ -10257,13 +10360,13 @@ PRUDEV II BDS Team`
             </Accordion>
           )}
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel>Primary BGE Expert</InputLabel>
+            <InputLabel>Primary BGE Expert (Persistent)</InputLabel>
             <Select
               value={assignForm.bge_id}
-              label="Primary BGE Expert"
+              label="Primary BGE Expert (Persistent)"
               onChange={e => setAssignForm({ ...assignForm, bge_id: e.target.value })}
             >
-              <MenuItem value=""><em>None (unassign all)</em></MenuItem>
+              <MenuItem value=""><em>None (unassigned)</em></MenuItem>
               {experts.map(e => (
                 <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` · ${e.bge_code}` : ''}</MenuItem>
               ))}
@@ -10272,52 +10375,58 @@ PRUDEV II BDS Team`
 
           {/* Co-assigned BGEs — shown once a primary is assigned */}
           {assignTarget?.assigned_bge && (
-            <Box sx={{ mb: 2, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-              <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 1 }}>
-                CO-ASSIGNED BGEs
+            <Box sx={{ mb: 2, p: 1.5, border: '1px solid', borderColor: '#CE93D8', bgcolor: '#FDFBFE', borderRadius: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#7B1FA2', fontWeight: 700, letterSpacing: 0.5 }}>
+                  CO-ASSIGNED BGEs (JOINT DEPLOYMENT)
+                </Typography>
+                <Chip label="Primary BGE Protected" size="small" color="success" variant="outlined" sx={{ height: 18, fontSize: 9 }} />
+              </Box>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5, fontSize: 11 }}>
+                Joint deployment team supporting this MSME. Adding or removing co-assigned BGEs will never modify or remove the Primary BGE.
               </Typography>
 
               {(assignTarget.co_assigned_bge_names || []).length === 0 ? (
-                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', fontSize: 12, mb: 1.5 }}>
-                  None — add BGEs below to jointly assign them
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', fontSize: 12, mb: 1.5, p: 1, bgcolor: '#fff', borderRadius: 1, border: '1px dashed #E0E0E0' }}>
+                  No co-assigned BGEs yet — select a BGE below to jointly assign them
                 </Typography>
               ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 1.5 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.5 }}>
                   {(assignTarget.co_assigned_bge_names || []).map(b => (
-                    <Box key={b.id} sx={{ border: '1px solid', borderColor: '#E1BEE7', borderRadius: 1, p: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                        <Typography variant="body2" fontWeight={600} sx={{ color: '#7B1FA2' }}>
-                          {b.name}{b.bge_code ? ` · ${b.bge_code}` : ''}
-                        </Typography>
-                        <Button size="small" color="error" onClick={() => removeCoAssignee(b.id)}
-                          sx={{ minWidth: 0, px: 1, fontSize: 11 }}>Remove</Button>
+                    <Box key={b.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fff', border: '1px solid #E1BEE7', borderRadius: 1, p: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar sx={{ width: 24, height: 24, bgcolor: '#7B1FA2', fontSize: 11, fontWeight: 700 }}>
+                          {b.name ? b.name[0] : 'B'}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" fontWeight={600} sx={{ color: '#4A148C', lineHeight: 1.2 }}>
+                            {b.name}
+                          </Typography>
+                          {b.bge_code && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+                              {b.bge_code}
+                            </Typography>
+                          )}
+                        </Box>
                       </Box>
-                      <TextField
-                        fullWidth size="small" multiline rows={2}
-                        label="Deployment Objectives"
-                        placeholder="Objectives for this co-assigned BGE…"
-                        value={coAssignEditObjectives[String(b.id)] ?? ''}
-                        onChange={e => setCoAssignEditObjectives(prev => ({ ...prev, [String(b.id)]: e.target.value }))}
-                        onBlur={async () => {
-                          try {
-                            const res = await axios.patch(
-                              `${API_ENDPOINTS.MSMES}${assignTarget.id}/update_co_objectives/`,
-                              { bge_id: b.id, objectives: coAssignEditObjectives[String(b.id)] ?? '' },
-                              { headers }
-                            );
-                            setAssignTarget(res.data);
-                          } catch { notify('Failed to save objectives', 'error'); }
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                        sx={{ '& .MuiInputBase-input': { fontSize: 13 } }}
-                      />
+                      <Button
+                        size="small"
+                        color="error"
+                        variant="outlined"
+                        disabled={removingCoId === b.id}
+                        onClick={() => removeCoAssignee(b.id)}
+                        startIcon={removingCoId === b.id ? <CircularProgress size={12} color="inherit" /> : null}
+                        sx={{ minWidth: 0, px: 1.2, py: 0.2, fontSize: 11, textTransform: 'none' }}
+                      >
+                        {removingCoId === b.id ? 'Removing…' : 'Remove Co-Assignee'}
+                      </Button>
                     </Box>
                   ))}
                 </Box>
               )}
 
               {/* Add co-assignee row */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
                 <FormControl size="small" fullWidth>
                   <InputLabel>Add co-assignee</InputLabel>
                   <Select
@@ -10325,10 +10434,11 @@ PRUDEV II BDS Team`
                     label="Add co-assignee"
                     onChange={e => setCoAssignAdd(e.target.value)}
                   >
-                    <MenuItem value=""><em>Select BGE...</em></MenuItem>
+                    <MenuItem value=""><em>Select BGE to co-assign...</em></MenuItem>
                     {experts
                       .filter(e =>
                         e.id !== parseInt(assignForm.bge_id) &&
+                        e.id !== assignTarget.assigned_bge &&
                         !(assignTarget.co_assigned_bge_names || []).some(b => b.id === e.id)
                       )
                       .map(e => (
@@ -10336,26 +10446,16 @@ PRUDEV II BDS Team`
                       ))}
                   </Select>
                 </FormControl>
-                {coAssignAdd && (
-                  <TextField
-                    fullWidth size="small" multiline rows={2}
-                    label="Objectives for this co-assignee"
-                    placeholder="What will this BGE focus on?…"
-                    value={coAssignAddObjectives}
-                    onChange={e => setCoAssignAddObjectives(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ '& .MuiInputBase-input': { fontSize: 13 } }}
-                  />
-                )}
                 <Button
-                  variant="outlined"
+                  variant="contained"
                   size="small"
+                  color="secondary"
                   disabled={!coAssignAdd || coAssignSaving}
                   onClick={() => addCoAssignee(coAssignAdd)}
                   startIcon={coAssignSaving ? <CircularProgress size={14} color="inherit" /> : null}
-                  sx={{ alignSelf: 'flex-end' }}
+                  sx={{ alignSelf: 'flex-end', textTransform: 'none', bgcolor: '#7B1FA2', '&:hover': { bgcolor: '#6A1B9A' } }}
                 >
-                  {coAssignSaving ? 'Adding…' : 'Add Co-Assignee'}
+                  {coAssignSaving ? 'Adding…' : '+ Add Co-Assignee'}
                 </Button>
               </Box>
             </Box>
