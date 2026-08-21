@@ -100,6 +100,25 @@ class MSMESerializer(serializers.ModelSerializer):
             dates.append(gr)
         return str(max(dates)) if dates else None
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # If MSME has no direct latitude/longitude, dynamically fall back to latest visit report GPS
+        if ret.get('latitude') is None or ret.get('longitude') is None:
+            try:
+                latest_report_gps = (
+                    instance.reports
+                    .filter(visit_latitude__isnull=False, visit_longitude__isnull=False)
+                    .order_by('-visit_date', '-id')
+                    .values('visit_latitude', 'visit_longitude')
+                    .first()
+                )
+                if latest_report_gps:
+                    ret['latitude'] = str(latest_report_gps['visit_latitude'])
+                    ret['longitude'] = str(latest_report_gps['visit_longitude'])
+            except Exception:
+                pass
+        return ret
+
 
 class MSMEListSerializer(MSMESerializer):
     """Lightweight serializer for list endpoints — excludes large TextFields and

@@ -103,14 +103,30 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
                         f"({period_label}). Only one BGE can file this review per period."
                     )
 
-            serializer.save(bge=bge)
+            report = serializer.save(bge=bge)
+            self._update_msme_gps(report)
             return
-        serializer.save()
+        report = serializer.save()
+        self._update_msme_gps(report)
+
+    @staticmethod
+    def _update_msme_gps(report):
+        """Sync captured visit GPS coordinates to the parent MSME record."""
+        if report.visit_latitude is not None and report.visit_longitude is not None:
+            try:
+                msme = report.msme
+                if msme:
+                    msme.latitude = report.visit_latitude
+                    msme.longitude = report.visit_longitude
+                    msme.save(update_fields=['latitude', 'longitude'])
+            except Exception as e:
+                logger.warning('Failed to sync MSME GPS from visit report %s: %s', report.id, e)
 
     def perform_update(self, serializer):
         instance = serializer.instance
         new_status = serializer.validated_data.get('status', instance.status)
         report = serializer.save()
+        self._update_msme_gps(report)
 
         if instance.status != 'submitted' and new_status == 'submitted':
             # Freeze a PDF copy on first submission

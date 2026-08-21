@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.contrib.auth.models import User
 
 from .models import MSME, BusinessGrowthExpert, BGEGroup, WorkOrder
 from .serializers import BusinessGrowthExpertSerializer
@@ -122,4 +123,72 @@ class MSMEPrimaryAndCoAssignedBGETests(TestCase):
         force_authenticate(req, user=self.admin)
         res = view(req, pk=self.msme.id)
         self.assertEqual(res.status_code, 400)
+
+
+class MSMEGPSReportSyncTests(TestCase):
+    def setUp(self):
+        self.bge_user = User.objects.create_user(username='bge_tester', password='pw')
+        self.bge = BusinessGrowthExpert.objects.create(
+            user=self.bge_user,
+            name='Simon Tester',
+            bge_code='STEST-001',
+            status='approved'
+        )
+        self.msme = MSME.objects.create(
+            business_name='Northern Agro Ltd',
+            msme_code='MSME-GPS-01',
+            assigned_bge=self.bge,
+            latitude=None,
+            longitude=None,
+        )
+
+    def test_visit_report_syncs_gps_to_msme(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from .views.visit_reports import MSMEReportViewSet
+        from .models import MSMEReport
+
+        factory = APIRequestFactory()
+        view = MSMEReportViewSet.as_view({'post': 'create'})
+        data = {
+            'msme': self.msme.id,
+            'visit_type': 'followup',
+            'visit_date': '2026-08-20',
+            'visit_latitude': 2.774950,
+            'visit_longitude': 32.299110,
+            'visit_gps_accuracy': 5.2,
+        }
+        req = factory.post('/api/reports/', data, format='json')
+        force_authenticate(req, user=self.bge_user)
+        res = view(req)
+        self.assertEqual(res.status_code, 201)
+
+        # Confirm parent MSME now has synced coordinates
+        self.msme.refresh_from_db()
+        self.assertAlmostEqual(float(self.msme.latitude), 2.774950, places=5)
+        self.assertAlmostEqual(float(self.msme.longitude), 32.299110, places=5)
+
+    def test_msme_serializer_fallback_to_report_gps(self):
+        from .models import MSMEReport
+        from .serializers.msme import MSMESerializer
+
+        # Direct MSME has null GPS
+        self.msme.latitude = None
+        self.msme.longitude = None
+        self.msme.save()
+
+        # Create visit report with GPS
+        MSMEReport.objects.create(
+            msme=self.msme,
+            bge=self.bge,
+            visit_type='initial',
+            visit_date='2026-08-15',
+            visit_latitude=3.030300,
+            visit_longitude=30.910700,
+        )
+
+        serializer = MSMESerializer(self.msme)
+        data = serializer.data
+        self.assertEqual(float(data['latitude']), 3.030300)
+        self.assertEqual(float(data['longitude']), 30.910700)
+
 
