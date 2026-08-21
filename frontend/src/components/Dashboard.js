@@ -2084,6 +2084,37 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </Grid>
         </Grid>
 
+        {/* ── Spatial Map Overview ── */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="overline" color="text.secondary" fontWeight={700}>
+              Northern Uganda Spatial Deployment Map
+            </Typography>
+            <Button
+              size="small"
+              variant="text"
+              endIcon={<ArrowForward fontSize="small" />}
+              onClick={() => startTransition(() => setSection('maps'))}
+              sx={{ textTransform: 'none', fontSize: 12, fontWeight: 600 }}
+            >
+              Full Spatial View →
+            </Button>
+          </Box>
+          <MSMEMap
+            msmes={msmes}
+            experts={experts}
+            cohorts={cohorts}
+            programmeGroups={programmeGroups}
+            onOpenMsme={(m) => {
+              setViewItem(m);
+              setViewType('msme');
+            }}
+            onOpenExpert={(e) => {
+              openExpertView(e);
+            }}
+          />
+        </Box>
+
         {/* ── Quick links grid ── */}
         <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>Quick Access</Typography>
         <Grid container spacing={1.5} sx={{ mb: 3 }}>
