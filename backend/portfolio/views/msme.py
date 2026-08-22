@@ -221,8 +221,13 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             # form silently drops the BGE tenant scoping that was applied
             # above, leaking every other BGE's MSMEs into search results.
             from django.db.models import Q
+            search_alt = search.replace('AI-', 'Al-').replace('ai-', 'al-').replace('AI ', 'Al ').replace('ai ', 'al ')
+            if search_alt == search:
+                search_alt = search.replace('Al-', 'AI-').replace('al-', 'ai-').replace('Al ', 'AI ').replace('al ', 'ai ')
+
             qs = qs.filter(
                 Q(business_name__icontains=search) |
+                Q(business_name__icontains=search_alt) |
                 Q(owner_name__icontains=search)    |
                 Q(sector__icontains=search)        |
                 Q(business_category__icontains=search) |
