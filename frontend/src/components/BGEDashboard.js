@@ -261,6 +261,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [sigUrl, setSigUrl] = useState(currentUser?.bge_profile?.signature_url || null);
   const sigInputRef = useRef(null);
 
+  const [myBgeProfile, setMyBgeProfile] = useState(currentUser?.bge_profile || null);
+  const [bgeLocationDialog, setBgeLocationDialog] = useState(false);
+  const [bgeLocationForm, setBgeLocationForm] = useState({
+    location: currentUser?.bge_profile?.location || '',
+    latitude: currentUser?.bge_profile?.latitude || '',
+    longitude: currentUser?.bge_profile?.longitude || '',
+    loading: false,
+    saving: false,
+  });
+
   const myBgeId = currentUser?.bge_profile?.id;
   const myBgeCode = currentUser?.bge_profile?.bge_code || '';
 
@@ -1254,6 +1264,29 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  // ── BGE base location update ──────────────────────────────────────────────
+  const handleSaveBgeLocation = async () => {
+    if (!myBgeId) return;
+    try {
+      setBgeLocationForm(f => ({ ...f, saving: true }));
+      const payload = {
+        location: bgeLocationForm.location,
+        latitude: bgeLocationForm.latitude ? parseFloat(bgeLocationForm.latitude) : null,
+        longitude: bgeLocationForm.longitude ? parseFloat(bgeLocationForm.longitude) : null,
+      };
+      const res = await axios.patch(`${API_ENDPOINTS.EXPERTS}${myBgeId}/`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMyBgeProfile(prev => ({ ...prev, ...res.data }));
+      setBgeLocationDialog(false);
+      notify('Base GPS location updated successfully ✓');
+    } catch (err) {
+      notify(err.response?.data?.error || 'Failed to update base location', 'error');
+    } finally {
+      setBgeLocationForm(f => ({ ...f, saving: false }));
+    }
+  };
+
   // ── work order sign + download ────────────────────────────────────────────
   const signWo = async (wo) => {
     if (!window.confirm(`Sign work order ${wo.work_order_number}? This confirms your acceptance and cannot be undone.`)) return;
@@ -1996,15 +2029,36 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         {/* ── Northern Uganda Spatial Map ── */}
         {section === 'maps' && !loading && (
           <Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" fontWeight={700}>Northern Uganda MSME Spatial Map</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Spatial view of your assigned and co-assigned MSMEs across Northern Uganda
-              </Typography>
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>Northern Uganda MSME Spatial Map</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Spatial view of your assigned and co-assigned MSMEs across Northern Uganda
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                startIcon={<Place sx={{ fontSize: 16 }} />}
+                onClick={() => {
+                  setBgeLocationForm({
+                    location: myBgeProfile?.location || '',
+                    latitude: myBgeProfile?.latitude || '',
+                    longitude: myBgeProfile?.longitude || '',
+                    loading: false,
+                    saving: false,
+                  });
+                  setBgeLocationDialog(true);
+                }}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                {myBgeProfile?.latitude ? '📍 My Base GPS Pin: Set ✓' : '📍 Set My Base GPS Pin'}
+              </Button>
             </Box>
             <MSMEMap
               msmes={msmes.filter(m => m.assigned_bge === myBgeId || (m.co_assigned_bge_names || []).some(b => b.id === myBgeId))}
-              experts={currentUser?.bge_profile ? [currentUser.bge_profile] : []}
+              experts={myBgeProfile ? [myBgeProfile] : []}
               onOpenMsme={openMsmeDetail}
             />
           </Box>
@@ -3896,6 +3950,116 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           <Button variant="contained" color="primary" disabled={quickUpdateSaving || quickUpdateForm.gpsStatus === 'loading'}
             onClick={saveQuickUpdate}>
             {quickUpdateSaving ? 'Saving…' : 'Save Check-in'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── BGE Base Location Dialog ── */}
+      <Dialog open={bgeLocationDialog} onClose={() => setBgeLocationDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Place color="primary" />
+            <Typography variant="subtitle1" fontWeight={700}>Set My Field Base Location</Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setBgeLocationDialog(false)}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Your base pin appears as a gold star badge (★) on the Northern Uganda spatial map.
+          </Typography>
+
+          <TextField
+            fullWidth
+            size="small"
+            label="Base District / Town"
+            placeholder="e.g. Gulu City, Lira City, Arua, Kitgum"
+            value={bgeLocationForm.location}
+            onChange={e => setBgeLocationForm(f => ({ ...f, location: e.target.value }))}
+            sx={{ mb: 2 }}
+          />
+
+          <Box sx={{ p: 1.5, borderRadius: 1.5, border: '1px solid', borderColor: 'divider', mb: 2, bgcolor: '#F8FAFC' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                LIVE BASE GPS COORDINATES
+              </Typography>
+              <Button
+                size="small"
+                variant="contained"
+                color="primary"
+                startIcon={bgeLocationForm.loading ? <CircularProgress size={12} color="inherit" /> : <MyLocation sx={{ fontSize: 14 }} />}
+                disabled={bgeLocationForm.loading}
+                onClick={() => {
+                  if (!navigator.geolocation) {
+                    notify('Geolocation is not supported by your browser', 'error');
+                    return;
+                  }
+                  setBgeLocationForm(f => ({ ...f, loading: true }));
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => setBgeLocationForm(f => ({
+                      ...f,
+                      latitude: pos.coords.latitude.toFixed(6),
+                      longitude: pos.coords.longitude.toFixed(6),
+                      loading: false,
+                    })),
+                    () => {
+                      notify('Unable to acquire device GPS. Please check browser location permissions.', 'error');
+                      setBgeLocationForm(f => ({ ...f, loading: false }));
+                    },
+                    { enableHighAccuracy: true, timeout: 15000 }
+                  );
+                }}
+                sx={{ fontSize: 11, py: 0.3, textTransform: 'none' }}
+              >
+                {bgeLocationForm.loading ? 'Locating…' : bgeLocationForm.latitude ? 'Recapture GPS' : 'Capture Live GPS'}
+              </Button>
+            </Box>
+
+            <Grid container spacing={1}>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Latitude"
+                  type="number"
+                  inputProps={{ step: 'any' }}
+                  value={bgeLocationForm.latitude}
+                  onChange={e => setBgeLocationForm(f => ({ ...f, latitude: e.target.value }))}
+                  placeholder="e.g. 2.774950"
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Longitude"
+                  type="number"
+                  inputProps={{ step: 'any' }}
+                  value={bgeLocationForm.longitude}
+                  onChange={e => setBgeLocationForm(f => ({ ...f, longitude: e.target.value }))}
+                  placeholder="e.g. 32.299110"
+                />
+              </Grid>
+            </Grid>
+
+            {bgeLocationForm.latitude && bgeLocationForm.longitude && (
+              <Typography variant="caption" color="success.dark" fontWeight={600} sx={{ display: 'block', mt: 1 }}>
+                📍 {Number(bgeLocationForm.latitude).toFixed(6)}, {Number(bgeLocationForm.longitude).toFixed(6)}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBgeLocationDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSaveBgeLocation}
+            disabled={bgeLocationForm.saving || bgeLocationForm.loading}
+          >
+            {bgeLocationForm.saving ? <CircularProgress size={16} color="inherit" /> : 'Save Base Location'}
           </Button>
         </DialogActions>
       </Dialog>
