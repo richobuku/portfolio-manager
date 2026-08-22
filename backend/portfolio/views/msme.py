@@ -225,6 +225,9 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 Q(business_name__icontains=search) |
                 Q(owner_name__icontains=search)    |
                 Q(sector__icontains=search)        |
+                Q(business_category__icontains=search) |
+                Q(city__icontains=search)          |
+                Q(email__icontains=search)         |
                 Q(msme_code__icontains=search)
             )
 
