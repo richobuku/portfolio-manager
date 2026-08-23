@@ -88,4 +88,13 @@ export const MENTOR_REPORTS = API_ENDPOINTS.MENTOR_REPORTS;
 export const SMART_ASSIGN_URL        = `${API_BASE_URL}/api/msmes/smart-assign/`;
 export const SMART_ASSIGN_EXPORT_URL = `${API_BASE_URL}/api/msmes/smart-assign/export/`;
 
+// Payment Tracking & Confirmation Endpoints
+export const WORK_ORDER_SUBMIT_PAYMENT_URL = (id) => `${API_BASE_URL}/api/work-orders/${id}/submit-for-payment/`;
+export const WORK_ORDER_CONFIRM_PAYMENT_URL = (id) => `${API_BASE_URL}/api/work-orders/${id}/confirm-payment/`;
+export const WORK_ORDERS_CONFIRMED_PAYMENTS_URL = `${API_BASE_URL}/api/work-orders/confirmed-payments/`;
+export const REPORTS_SUBMIT_PAYMENT_URL = `${API_BASE_URL}/api/reports/submit-for-payment/`;
+export const REPORT_CONFIRM_PAYMENT_URL = (id) => `${API_BASE_URL}/api/reports/${id}/confirm-payment/`;
+export const GROUP_REPORTS_SUBMIT_PAYMENT_URL = `${API_BASE_URL}/api/group-reports/submit-for-payment/`;
+export const GROUP_REPORT_CONFIRM_PAYMENT_URL = (id) => `${API_BASE_URL}/api/group-reports/${id}/confirm-payment/`;
+
 export default API_BASE_URL;

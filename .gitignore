@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*oauth_client.json
+*credentials*.json
+.env*
 
 # C extensions
 *.so

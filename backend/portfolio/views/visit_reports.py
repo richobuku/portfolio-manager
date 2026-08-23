@@ -528,6 +528,107 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
         return resp
 
+    @action(detail=False, methods=['post'], url_path='submit-for-payment')
+    def submit_for_payment(self, request):
+        """Admin action: Mark one or more visit reports as submitted for payment."""
+        user = request.user
+        if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+            raise PermissionDenied("Only admins and programme managers can submit reports for payment.")
+
+        from django.utils import timezone
+        report_ids = request.data.get('report_ids', [])
+        single_id = request.data.get('report_id')
+        if single_id and single_id not in report_ids:
+            report_ids.append(single_id)
+        if not report_ids:
+            return Response({'error': 'report_ids list or report_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reference = request.data.get('payment_reference', '').strip()
+        notes = request.data.get('payment_notes', '').strip()
+        new_status = request.data.get('payment_status', 'submitted')
+        now = timezone.now()
+
+        qs = MSMEReport.objects.filter(id__in=report_ids)
+        updated_count = 0
+        for r in qs:
+            r.payment_status = new_status
+            r.payment_submitted_at = now
+            r.payment_submitted_by = user
+            if reference:
+                r.payment_reference = reference
+            if notes:
+                r.payment_notes = notes
+            if new_status == 'paid' and not r.payment_paid_at:
+                r.payment_paid_at = now
+            r.save(update_fields=['payment_status', 'payment_submitted_at', 'payment_submitted_by', 'payment_reference', 'payment_notes', 'payment_paid_at'])
+            updated_count += 1
+
+        return Response({
+            'success': True,
+            'updated_count': updated_count,
+            'payment_status': new_status,
+            'payment_reference': reference,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='confirm-payment')
+    def confirm_payment(self, request, pk=None):
+        """BGE action: Confirm receipt of payment for a visit report."""
+        from django.utils import timezone
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+
+        report = self.get_object()
+        user = request.user
+        is_admin = user.is_staff or user.is_superuser or _managed_groups(user) is not None
+
+        if not is_admin:
+            try:
+                bge = user.bge_profile
+                if report.bge_id != bge.id:
+                    raise PermissionDenied("You can only confirm payment for your own visit reports.")
+            except Exception:
+                raise PermissionDenied("No BGE profile linked to this account.")
+
+        now = timezone.now()
+        report.payment_status = 'confirmed'
+        report.payment_confirmed_by_bge = True
+        report.payment_confirmed_at = now
+        notes = request.data.get('notes', '').strip()
+        ref = request.data.get('reference', '').strip()
+        if notes:
+            report.payment_notes = f"{report.payment_notes}\n[BGE Confirmation]: {notes}".strip()
+        if ref:
+            report.payment_reference = f"{report.payment_reference} (Confirmed Ref: {ref})".strip()
+        report.save(update_fields=['payment_status', 'payment_confirmed_by_bge', 'payment_confirmed_at', 'payment_notes', 'payment_reference'])
+
+        # Notify Admin via Email
+        notify_email = getattr(settings, 'PAYMENT_CONFIRMATION_NOTIFY_EMAIL', 'richobuku@gmail.com')
+        if notify_email:
+            try:
+                subject = f"Payment Confirmed — MSME Visit Report ({report.msme.business_name})"
+                body = (
+                    f"Dear Admin,\n\n"
+                    f"BGE {report.bge.name} has confirmed receipt of payment for the following MSME visit report:\n\n"
+                    f"  • MSME: {report.msme.business_name} ({report.msme.msme_code or 'No Code'})\n"
+                    f"  • Visit Date: {report.visit_date}\n"
+                    f"  • Visit Type: {report.get_visit_type_display()}\n"
+                    f"  • Payment Reference: {report.payment_reference or 'N/A'}\n"
+                    f"  • Confirmed At: {now.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"{f'  • BGE Remarks: {notes}' if notes else ''}\n\n"
+                    f"You can view this report in the Admin Dashboard under the Reports tab.\n\n"
+                    f"Regards,\nPRUDEV II BDS Platform"
+                )
+                msg = EmailMultiAlternatives(
+                    subject, body,
+                    getattr(settings, 'DEFAULT_FROM_EMAIL', 'richobuku@gmail.com'),
+                    [notify_email],
+                )
+                msg.send(fail_silently=True)
+            except Exception as e:
+                logger.warning("Failed to send payment confirmation email to admin: %s", e)
+
+        return Response(MSMEReportSerializer(report, context={'request': request}).data)
+
 
 class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """Group-level reports.
@@ -690,6 +791,109 @@ class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vie
         resp = HttpResponse(buf.read(), content_type='application/pdf')
         resp['Content-Disposition'] = f'{disposition}; filename="{fname}"'
         return resp
+
+    @action(detail=False, methods=['post'], url_path='submit-for-payment')
+    def submit_for_payment(self, request):
+        """Admin action: Mark one or more group reports as submitted for payment."""
+        user = request.user
+        if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+            raise PermissionDenied("Only admins and programme managers can submit group reports for payment.")
+
+        from django.utils import timezone
+        report_ids = request.data.get('report_ids', [])
+        single_id = request.data.get('report_id')
+        if single_id and single_id not in report_ids:
+            report_ids.append(single_id)
+        if not report_ids:
+            return Response({'error': 'report_ids list or report_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reference = request.data.get('payment_reference', '').strip()
+        notes = request.data.get('payment_notes', '').strip()
+        new_status = request.data.get('payment_status', 'submitted')
+        now = timezone.now()
+
+        qs = GroupReport.objects.filter(id__in=report_ids)
+        updated_count = 0
+        for r in qs:
+            r.payment_status = new_status
+            r.payment_submitted_at = now
+            r.payment_submitted_by = user
+            if reference:
+                r.payment_reference = reference
+            if notes:
+                r.payment_notes = notes
+            if new_status == 'paid' and not r.payment_paid_at:
+                r.payment_paid_at = now
+            r.save(update_fields=['payment_status', 'payment_submitted_at', 'payment_submitted_by', 'payment_reference', 'payment_notes', 'payment_paid_at'])
+            updated_count += 1
+
+        return Response({
+            'success': True,
+            'updated_count': updated_count,
+            'payment_status': new_status,
+            'payment_reference': reference,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='confirm-payment')
+    def confirm_payment(self, request, pk=None):
+        """BGE team lead / member action: Confirm receipt of payment for a group report."""
+        from django.utils import timezone
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+
+        report = self.get_object()
+        user = request.user
+        is_admin = user.is_staff or user.is_superuser or _managed_groups(user) is not None
+
+        if not is_admin:
+            try:
+                bge = user.bge_profile
+                is_member = report.group.members.filter(id=bge.id).exists() or report.team_lead_id == bge.id
+                if not is_member:
+                    raise PermissionDenied("You can only confirm payment for group reports in your group.")
+            except Exception:
+                raise PermissionDenied("No BGE profile linked to this account.")
+
+        now = timezone.now()
+        report.payment_status = 'confirmed'
+        report.payment_confirmed_by_bge = True
+        report.payment_confirmed_at = now
+        notes = request.data.get('notes', '').strip()
+        ref = request.data.get('reference', '').strip()
+        if notes:
+            report.payment_notes = f"{report.payment_notes}\n[BGE Confirmation]: {notes}".strip()
+        if ref:
+            report.payment_reference = f"{report.payment_reference} (Confirmed Ref: {ref})".strip()
+        report.save(update_fields=['payment_status', 'payment_confirmed_by_bge', 'payment_confirmed_at', 'payment_notes', 'payment_reference'])
+
+        # Notify Admin via Email
+        notify_email = getattr(settings, 'PAYMENT_CONFIRMATION_NOTIFY_EMAIL', 'richobuku@gmail.com')
+        if notify_email:
+            try:
+                lead_name = report.team_lead.name if report.team_lead else "Team Lead"
+                subject = f"Payment Confirmed — Group Report ({report.group.name})"
+                body = (
+                    f"Dear Admin,\n\n"
+                    f"BGE {user.get_full_name() or user.username} has confirmed receipt of payment for group report:\n\n"
+                    f"  • Group: {report.group.name}\n"
+                    f"  • Visit Date: {report.visit_date}\n"
+                    f"  • Team Lead: {lead_name}\n"
+                    f"  • Payment Reference: {report.payment_reference or 'N/A'}\n"
+                    f"  • Confirmed At: {now.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"{f'  • Remarks: {notes}' if notes else ''}\n\n"
+                    f"You can view this group report in the Admin Dashboard under the Reports tab.\n\n"
+                    f"Regards,\nPRUDEV II BDS Platform"
+                )
+                msg = EmailMultiAlternatives(
+                    subject, body,
+                    getattr(settings, 'DEFAULT_FROM_EMAIL', 'richobuku@gmail.com'),
+                    [notify_email],
+                )
+                msg.send(fail_silently=True)
+            except Exception as e:
+                logger.warning("Failed to send group report payment confirmation email: %s", e)
+
+        return Response(GroupReportSerializer(report, context={'request': request}).data)
 
 
 class GroupReportContributionViewSet(viewsets.ModelViewSet):

@@ -56,12 +56,12 @@ def smart_sync_al_maghtas_and_bge(apps, schema_editor):
 
         msme = MSME.objects.create(
             msme_code=code,
-            business_name='Al-Maghtas Investment Ltd',
+            business_name='Al-Maghtas Investments Ltd',
             business_type='SMALL',
             sector='AGRICULTURE',
             business_category='agro_processor',
             owner_name='Angom Lilian',
-            phone='0784547010 / 078879877 / 0774627026',
+            phone='0784547010',
             email='info@al-maghtasinvestment.com',
             city='Kitgum',
             state='Kitgum',
@@ -72,13 +72,13 @@ def smart_sync_al_maghtas_and_bge(apps, schema_editor):
             is_active=True,
         )
     else:
-        msme.business_name = 'Al-Maghtas Investment Ltd'
+        msme.business_name = 'Al-Maghtas Investments Ltd'
         msme.business_category = 'agro_processor'
         msme.sector = 'AGRICULTURE'
         msme.cohort = cohort
         msme.assigned_bge = primary_bge
         msme.owner_name = 'Angom Lilian'
-        msme.phone = '0784547010 / 078879877 / 0774627026'
+        msme.phone = '0784547010'
         msme.email = 'info@al-maghtasinvestment.com'
         msme.city = 'Kitgum'
         msme.state = 'Kitgum'

@@ -157,7 +157,7 @@ class MSME(models.Model):
     # Contact Information
     owner_name = models.CharField(max_length=100)
     email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=100, blank=True)
     business_email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)
@@ -925,6 +925,25 @@ class MSMEReport(models.Model):
     submitted_pdf = models.FileField(upload_to='reports/submitted/', null=True, blank=True)
     submitted_pdf_data = models.BinaryField(null=True, blank=True)
 
+    # ── Payment tracking ──────────────────────────────────────────────────────
+    PAYMENT_STATUS_CHOICES = [
+        ('unsubmitted', 'Unsubmitted'),
+        ('submitted',   'Submitted for Payment'),
+        ('paid',        'Paid'),
+        ('confirmed',   'Payment Confirmed by BGE'),
+    ]
+    payment_status            = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unsubmitted')
+    payment_submitted_at      = models.DateTimeField(null=True, blank=True)
+    payment_submitted_by      = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='submitted_msme_reports_for_payment',
+    )
+    payment_reference         = models.CharField(max_length=150, blank=True, help_text='Requisition/voucher or batch reference')
+    payment_notes             = models.TextField(blank=True)
+    payment_paid_at           = models.DateTimeField(null=True, blank=True)
+    payment_confirmed_at      = models.DateTimeField(null=True, blank=True)
+    payment_confirmed_by_bge  = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -987,6 +1006,25 @@ class GroupReport(models.Model):
     updated_at  = models.DateTimeField(auto_now=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     approved_at  = models.DateTimeField(null=True, blank=True)
+
+    # ── Payment tracking ──────────────────────────────────────────────────────
+    PAYMENT_STATUS_CHOICES = [
+        ('unsubmitted', 'Unsubmitted'),
+        ('submitted',   'Submitted for Payment'),
+        ('paid',        'Paid'),
+        ('confirmed',   'Payment Confirmed by BGE'),
+    ]
+    payment_status            = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unsubmitted')
+    payment_submitted_at      = models.DateTimeField(null=True, blank=True)
+    payment_submitted_by      = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='submitted_group_reports_for_payment',
+    )
+    payment_reference         = models.CharField(max_length=150, blank=True, help_text='Requisition/voucher or batch reference')
+    payment_notes             = models.TextField(blank=True)
+    payment_paid_at           = models.DateTimeField(null=True, blank=True)
+    payment_confirmed_at      = models.DateTimeField(null=True, blank=True)
+    payment_confirmed_by_bge  = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-visit_date', '-created_at']
@@ -1163,6 +1201,24 @@ class WorkOrder(models.Model):
     )
     # PDF bytes stored in DB — survives filesystem wipes on Render deploys.
     signed_pdf_data = models.BinaryField(null=True, blank=True)
+
+    # ── Payment tracking ──────────────────────────────────────────────────────
+    PAYMENT_STATUS_CHOICES = [
+        ('pending_submission',    'Pending Submission'),
+        ('submitted_for_payment', 'Submitted for Payment'),
+        ('partially_paid',        'Partially Paid'),
+        ('paid',                  'Paid'),
+        ('payment_confirmed',     'Payment Confirmed by BGE'),
+    ]
+    payment_status            = models.CharField(max_length=30, choices=PAYMENT_STATUS_CHOICES, default='pending_submission')
+    payment_submitted_at      = models.DateTimeField(null=True, blank=True)
+    payment_submitted_by      = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='submitted_work_orders_for_payment',
+    )
+    payment_reference         = models.CharField(max_length=150, blank=True, help_text='Voucher, batch or invoice reference')
+    payment_confirmed_at      = models.DateTimeField(null=True, blank=True)
+    payment_confirmed_by_bge  = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -583,6 +583,140 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             'summary':  summary,
         }, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=['post'], url_path='submit-for-payment')
+    def submit_for_payment(self, request, pk=None):
+        """Admin action: Mark a work order as submitted for payment."""
+        user = request.user
+        if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+            raise PermissionDenied("Only admins and programme managers can submit work orders for payment.")
+
+        wo = self.get_object()
+        ref = request.data.get('payment_reference', '').strip()
+        new_status = request.data.get('payment_status', 'submitted_for_payment')
+        notes = request.data.get('payment_notes', '').strip()
+
+        wo.payment_status = new_status
+        wo.payment_submitted_at = timezone.now()
+        wo.payment_submitted_by = user
+        if ref:
+            wo.payment_reference = ref
+        if notes:
+            wo.payment_notes = f"{wo.payment_notes}\n[Payment Notes]: {notes}".strip()
+        wo.save(update_fields=['payment_status', 'payment_submitted_at', 'payment_submitted_by', 'payment_reference', 'payment_notes'])
+
+        return Response(self.get_serializer(wo).data)
+
+    @action(detail=True, methods=['post'], url_path='confirm-payment')
+    def confirm_payment(self, request, pk=None):
+        """BGE action: Confirm receipt of payment against a work order."""
+        wo = self.get_object()
+        user = request.user
+        is_admin = user.is_staff or user.is_superuser or _managed_groups(user) is not None
+
+        if not is_admin:
+            try:
+                bge = user.bge_profile
+                if bge.id != wo.bge_id and not wo.co_bges.filter(id=bge.id).exists():
+                    raise PermissionDenied("Only the assigned BGE can confirm payment receipt.")
+            except Exception:
+                raise PermissionDenied("No BGE profile linked to this account.")
+
+        now = timezone.now()
+        wo.payment_status = 'payment_confirmed'
+        wo.payment_confirmed_by_bge = True
+        wo.payment_confirmed_at = now
+        notes = request.data.get('notes', '').strip()
+        ref = request.data.get('reference', '').strip()
+        if ref:
+            wo.payment_reference = f"{wo.payment_reference} (Confirmed Ref: {ref})".strip()
+        if notes:
+            wo.payment_notes = f"{wo.payment_notes}\n[BGE Confirmation]: {notes}".strip()
+        wo.save(update_fields=['payment_status', 'payment_confirmed_by_bge', 'payment_confirmed_at', 'payment_reference', 'payment_notes'])
+
+        # Notify Admin via Email
+        notify_email = getattr(settings, 'PAYMENT_CONFIRMATION_NOTIFY_EMAIL', 'richobuku@gmail.com')
+        if notify_email:
+            try:
+                gross = wo.rate_per_day * wo.max_days
+                net_amount = gross - int(gross * 0.06)
+                subject = f"Payment Confirmed — Work Order {wo.work_order_number} ({wo.bge.name})"
+                body = (
+                    f"Dear Admin,\n\n"
+                    f"BGE {wo.bge.name} has confirmed receipt of payment for Work Order {wo.work_order_number}:\n\n"
+                    f"  • BGE: {wo.bge.name} ({wo.bge.bge_code or 'No Code'})\n"
+                    f"  • Work Order: {wo.work_order_number}\n"
+                    f"  • Type: {wo.get_work_order_type_display()}\n"
+                    f"  • Net Amount: UGX {net_amount:,.0f}\n"
+                    f"  • Reference: {wo.payment_reference or 'N/A'}\n"
+                    f"  • Confirmed At: {now.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"{f'  • BGE Remarks: {notes}' if notes else ''}\n\n"
+                    f"You can view this work order in the Admin Dashboard under Work Orders.\n\n"
+                    f"Regards,\nPRUDEV II BDS Platform"
+                )
+                msg = EmailMultiAlternatives(
+                    subject, body,
+                    getattr(settings, 'DEFAULT_FROM_EMAIL', 'richobuku@gmail.com'),
+                    [notify_email],
+                )
+                msg.send(fail_silently=True)
+            except Exception as e:
+                logger.warning("Failed to send work order payment confirmation email: %s", e)
+
+        return Response(self.get_serializer(wo).data)
+
+    @action(detail=False, methods=['get'], url_path='confirmed-payments')
+    def confirmed_payments(self, request):
+        """Admin overview endpoint for recent payment confirmations across work orders and reports."""
+        user = request.user
+        if not (user.is_staff or user.is_superuser or _managed_groups(user) is not None):
+            raise PermissionDenied("Only admins and managers can view confirmed payments summary.")
+
+        # Work Orders confirmed
+        wo_qs = WorkOrder.objects.filter(payment_confirmed_by_bge=True).select_related('bge').order_by('-payment_confirmed_at')[:20]
+        # Reports confirmed
+        r_qs = MSMEReport.objects.filter(payment_confirmed_by_bge=True).select_related('msme', 'bge').order_by('-payment_confirmed_at')[:20]
+        # Group reports confirmed
+        gr_qs = GroupReport.objects.filter(payment_confirmed_by_bge=True).select_related('group', 'team_lead').order_by('-payment_confirmed_at')[:20]
+
+        items = []
+        for wo in wo_qs:
+            gross = wo.rate_per_day * wo.max_days
+            items.append({
+                'type': 'work_order',
+                'id': wo.id,
+                'title': f"Work Order {wo.work_order_number}",
+                'bge_name': wo.bge.name,
+                'bge_code': wo.bge.bge_code,
+                'amount': gross - int(gross * 0.06),
+                'reference': wo.payment_reference,
+                'confirmed_at': wo.payment_confirmed_at,
+            })
+        for r in r_qs:
+            items.append({
+                'type': 'visit_report',
+                'id': r.id,
+                'title': f"Visit Report — {r.msme.business_name}",
+                'bge_name': r.bge.name,
+                'bge_code': r.bge.bge_code,
+                'amount': None,
+                'reference': r.payment_reference,
+                'confirmed_at': r.payment_confirmed_at,
+            })
+        for gr in gr_qs:
+            items.append({
+                'type': 'group_report',
+                'id': gr.id,
+                'title': f"Group Report — {gr.group.name}",
+                'bge_name': gr.team_lead.name if gr.team_lead else "Team Lead",
+                'bge_code': gr.team_lead.bge_code if gr.team_lead else "",
+                'amount': None,
+                'reference': gr.payment_reference,
+                'confirmed_at': gr.payment_confirmed_at,
+            })
+
+        items.sort(key=lambda x: x['confirmed_at'] or timezone.now(), reverse=True)
+        return Response({'confirmed_payments': items[:30]})
+
 
 class WorkOrderSubmissionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     """BGE timesheet & invoice (Excel) uploads against a work order.

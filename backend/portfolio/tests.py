@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
+from rest_framework.test import APIClient
 
 from .models import MSME, BusinessGrowthExpert, BGEGroup, WorkOrder
 from .serializers import BusinessGrowthExpertSerializer
@@ -190,5 +191,93 @@ class MSMEGPSReportSyncTests(TestCase):
         data = serializer.data
         self.assertEqual(float(data['latitude']), 3.030300)
         self.assertEqual(float(data['longitude']), 30.910700)
+
+
+class PaymentTrackingTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_tester', 'admin@test.com', 'pass1234')
+        self.bge_user = User.objects.create_user('bge_user', 'bge@test.com', 'pass1234')
+        self.bge = BusinessGrowthExpert.objects.create(
+            name="Denis Okello",
+            bge_code="PRUDEV II-BGE-010T-88",
+            user=self.bge_user,
+            email="bge@test.com",
+            status="approved",
+        )
+        self.msme = MSME.objects.create(
+            business_name="Northern Seedlings Ltd",
+            msme_code="PRUDEV2-GOPA-COHORT-888",
+            business_type="SMALL",
+            sector="AGRICULTURE",
+            owner_name="Denis Okello",
+            assigned_bge=self.bge,
+        )
+        self.work_order = WorkOrder.objects.create(
+            work_order_number="PRUDEV2-WO-TEST-01",
+            bge=self.bge,
+            issue_date="2026-08-01",
+            rate_per_day=60000,
+            max_days=4,
+            status="signed",
+        )
+        from .models import MSMEReport
+        self.report = MSMEReport.objects.create(
+            msme=self.msme,
+            bge=self.bge,
+            visit_type="coaching",
+            visit_date="2026-08-10",
+            status="submitted",
+        )
+        self.client = APIClient()
+
+    def test_admin_submit_work_order_for_payment(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.post(f'/api/work-orders/{self.work_order.id}/submit-for-payment/', {
+            'payment_reference': 'BATCH-2026-001',
+            'payment_notes': 'Submitted to finance for August cycle',
+        })
+        self.assertEqual(res.status_code, 200)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.payment_status, 'submitted_for_payment')
+        self.assertEqual(self.work_order.payment_reference, 'BATCH-2026-001')
+        self.assertIsNotNone(self.work_order.payment_submitted_at)
+
+    def test_bge_confirm_work_order_payment(self):
+        self.work_order.payment_status = 'submitted_for_payment'
+        self.work_order.save()
+
+        self.client.force_authenticate(user=self.bge_user)
+        res = self.client.post(f'/api/work-orders/{self.work_order.id}/confirm-payment/', {
+            'reference': 'MM-TXN-998822',
+            'notes': 'Received in full on Airtel Money',
+        })
+        self.assertEqual(res.status_code, 200)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.payment_status, 'payment_confirmed')
+        self.assertTrue(self.work_order.payment_confirmed_by_bge)
+        self.assertIsNotNone(self.work_order.payment_confirmed_at)
+
+    def test_admin_submit_and_bge_confirm_visit_report_payment(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.post('/api/reports/submit-for-payment/', {
+            'report_ids': [self.report.id],
+            'payment_reference': 'BATCH-REP-01',
+        })
+        self.assertEqual(res.status_code, 200)
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.payment_status, 'submitted')
+        self.assertEqual(self.report.payment_reference, 'BATCH-REP-01')
+
+        # BGE confirms
+        self.client.force_authenticate(user=self.bge_user)
+        c_res = self.client.post(f'/api/reports/{self.report.id}/confirm-payment/', {
+            'reference': 'MM-5544',
+            'notes': 'Confirmed payment received',
+        })
+        self.assertEqual(c_res.status_code, 200)
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.payment_status, 'confirmed')
+        self.assertTrue(self.report.payment_confirmed_by_bge)
+
 
 

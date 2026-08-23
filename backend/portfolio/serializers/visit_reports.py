@@ -7,9 +7,16 @@ class MSMEReportSerializer(serializers.ModelSerializer):
     msme_code     = serializers.CharField(source='msme.msme_code',     read_only=True)
     bge_name      = serializers.CharField(source='bge.name',           read_only=True)
     template_name = serializers.SerializerMethodField()
+    payment_submitted_by_name = serializers.SerializerMethodField()
 
     def get_template_name(self, obj):
         return obj.template.name if obj.template_id else None
+
+    def get_payment_submitted_by_name(self, obj):
+        if not obj.payment_submitted_by:
+            return None
+        name = obj.payment_submitted_by.get_full_name().strip()
+        return name or obj.payment_submitted_by.username
 
     def to_internal_value(self, data):
         data = data.copy() if hasattr(data, 'copy') else dict(data)
@@ -32,10 +39,17 @@ class GroupReportSerializer(serializers.ModelSerializer):
     group_name      = serializers.CharField(source='group.name', read_only=True)
     group_objectives= serializers.CharField(source='group.objectives', read_only=True)
     team_lead_name  = serializers.CharField(source='team_lead.name', read_only=True)
+    payment_submitted_by_name = serializers.SerializerMethodField()
     msme_count      = serializers.SerializerMethodField()
     msmes_detail    = serializers.SerializerMethodField()
     attendees_detail   = serializers.SerializerMethodField()
     contributions_detail = serializers.SerializerMethodField()
+
+    def get_payment_submitted_by_name(self, obj):
+        if not obj.payment_submitted_by:
+            return None
+        name = obj.payment_submitted_by.get_full_name().strip()
+        return name or obj.payment_submitted_by.username
 
     class Meta:
         model = GroupReport

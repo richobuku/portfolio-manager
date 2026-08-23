@@ -223,7 +223,13 @@ EMAIL_FAIL_SILENTLY = False
 # on Render. Set to empty string to disable.
 BGE_WELCOME_EMAIL_BCC = os.environ.get(
     'BGE_WELCOME_EMAIL_BCC',
-    os.environ.get('ADMIN_EMAIL', ''),
+    os.environ.get('ADMIN_EMAIL', 'richobuku@gmail.com'),
+).strip()
+
+# Admin notification recipient for BGE payment confirmations
+PAYMENT_CONFIRMATION_NOTIFY_EMAIL = os.environ.get(
+    'PAYMENT_CONFIRMATION_NOTIFY_EMAIL',
+    os.environ.get('ADMIN_EMAIL', 'richobuku@gmail.com'),
 ).strip()
 
 # ── SMS Configuration (Message Carrier) ──────────────────────────────────────

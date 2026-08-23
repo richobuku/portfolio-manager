@@ -23,7 +23,8 @@ import {
   PARTICIPANT_TRAINING_REPORTS, PARTICIPANT_TRAINING_REPORT_PDF_URL,
   TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL,
   WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
-  WORK_ORDER_ATTACHMENT_DOWNLOAD_URL,
+  WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, WORK_ORDER_CONFIRM_PAYMENT_URL,
+  REPORT_CONFIRM_PAYMENT_URL, GROUP_REPORT_CONFIRM_PAYMENT_URL,
 } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -131,6 +132,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [contributionDialog, setContributionDialog] = useState(false);
   const [contributionForm, setContributionForm] = useState(EMPTY_CONTRIBUTION);
   const [contributionSaving, setContributionSaving] = useState(false);
+
+  // Payment receipt confirmation dialog for BGEs
+  const [bgePaymentConfirmDialog, setBgePaymentConfirmDialog] = useState(false);
+  const [bgePaymentConfirmTarget, setBgePaymentConfirmTarget] = useState(null);
+  const [bgePaymentConfirmType, setBgePaymentConfirmType] = useState('work_order'); // 'work_order' | 'msme_report' | 'group_report'
+  const [bgePaymentConfirmForm, setBgePaymentConfirmForm] = useState({
+    reference: '',
+    notes: '',
+    payment_method: 'Mobile Money',
+  });
+  const [bgePaymentConfirming, setBgePaymentConfirming] = useState(false);
   const [contributionErrors, setContributionErrors] = useState('');
   const [contributionEditingId, setContributionEditingId] = useState(null);
 
@@ -1330,6 +1342,54 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     setWoReview(null);
   };
 
+  // ── BGE Payment Receipt Confirmation ──────────────────────────────────────
+  const openBgePaymentConfirm = (item, type = 'work_order') => {
+    setBgePaymentConfirmTarget(item);
+    setBgePaymentConfirmType(type);
+    setBgePaymentConfirmForm({
+      reference: '',
+      notes: '',
+      payment_method: 'Mobile Money',
+    });
+    setBgePaymentConfirmDialog(true);
+  };
+
+  const handleBgePaymentConfirm = async () => {
+    if (!bgePaymentConfirmTarget) return;
+    setBgePaymentConfirming(true);
+    try {
+      let endpoint = '';
+      if (bgePaymentConfirmType === 'work_order') {
+        endpoint = WORK_ORDER_CONFIRM_PAYMENT_URL(bgePaymentConfirmTarget.id);
+      } else if (bgePaymentConfirmType === 'group_report') {
+        endpoint = GROUP_REPORT_CONFIRM_PAYMENT_URL(bgePaymentConfirmTarget.id);
+      } else {
+        endpoint = REPORT_CONFIRM_PAYMENT_URL(bgePaymentConfirmTarget.id);
+      }
+
+      const res = await axios.post(endpoint, {
+        reference: bgePaymentConfirmForm.reference,
+        notes: `[${bgePaymentConfirmForm.payment_method}] ${bgePaymentConfirmForm.notes || ''}`.trim(),
+      }, { headers });
+
+      if (bgePaymentConfirmType === 'work_order') {
+        setWorkOrders(prev => prev.map(w => w.id === bgePaymentConfirmTarget.id ? res.data : w));
+      } else if (bgePaymentConfirmType === 'group_report') {
+        setGroupReports(prev => prev.map(g => g.id === bgePaymentConfirmTarget.id ? res.data : g));
+      } else {
+        setReports(prev => prev.map(r => r.id === bgePaymentConfirmTarget.id ? res.data : r));
+      }
+
+      notify('Payment receipt confirmed! Admin has been notified via email ✓', 'success');
+      setBgePaymentConfirmDialog(false);
+      setBgePaymentConfirmTarget(null);
+    } catch (err) {
+      notify(err.response?.data?.error || err.response?.data?.detail || 'Failed to confirm payment', 'error');
+    } finally {
+      setBgePaymentConfirming(false);
+    }
+  };
+
   // ── timesheet & invoice submissions ─────────────────────────────────────────
   const uploadSubmission = async (woId) => {
     if (!timesheetFile && !invoiceFile) { notify('Choose a timesheet and/or invoice file (.xlsx or .xls)', 'error'); return; }
@@ -2376,10 +2436,34 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Chip label={r.status} size="small" color={STATUS_COLORS[r.status] || 'default'} />
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                            <Chip label={r.status} size="small" color={STATUS_COLORS[r.status] || 'default'} />
+                            {r.payment_status === 'submitted' && (
+                              <Tooltip title={`Submitted for payment: ${r.payment_reference || 'N/A'}`}>
+                                <Chip label={r.payment_reference ? `Submitted: ${r.payment_reference}` : 'Submitted for Payment'} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontSize: 10, height: 20 }} />
+                              </Tooltip>
+                            )}
+                            {(r.payment_status === 'confirmed' || r.payment_confirmed_by_bge) && (
+                              <Tooltip title={`Payment confirmed on ${r.payment_confirmed_at ? r.payment_confirmed_at.slice(0, 10) : ''}`}>
+                                <Chip label="Payment Confirmed ✓" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontSize: 10, height: 20 }} />
+                              </Tooltip>
+                            )}
+                          </Box>
                         </TableCell>
                         <TableCell align="right">
-                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {r.payment_status === 'submitted' && !r.payment_confirmed_by_bge && (
+                              <Tooltip title="Confirm Payment Received">
+                                <Button
+                                  variant="outlined" size="small" color="success"
+                                  startIcon={<CheckCircle fontSize="small" />}
+                                  onClick={() => openBgePaymentConfirm(r, 'msme_report')}
+                                  sx={{ fontSize: 11, py: 0.25, height: 26, textTransform: 'none' }}
+                                >
+                                  Confirm Payment
+                                </Button>
+                              </Tooltip>
+                            )}
                             <Tooltip title="View report">
                               <IconButton size="small" color="primary"
                                 onClick={() => setViewReport({ ...r, _msme: msmes.find(m => m.id === r.msme), _bgeName: bgeName })}>
@@ -2554,6 +2638,47 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             </Tooltip>
                           </Box>
                         </Box>
+
+                        {/* Payment Banner & Confirmation Action for BGE */}
+                        {wo.payment_status === 'submitted_for_payment' && (
+                          <Alert
+                            severity="warning"
+                            sx={{ mt: 1.5, py: 0.75, bgcolor: '#FFF8E1', borderColor: '#FFE082', border: '1px solid', borderRadius: 1.5 }}
+                            action={
+                              <Button
+                                color="success"
+                                variant="contained"
+                                size="small"
+                                startIcon={<CheckCircle />}
+                                onClick={() => openBgePaymentConfirm(wo, 'work_order')}
+                                sx={{ textTransform: 'none', fontWeight: 700, fontSize: 12, bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
+                              >
+                                Confirm Payment Received
+                              </Button>
+                            }
+                          >
+                            <Typography variant="body2" fontWeight={700} color="#E65100">
+                              💰 Payment Submitted to Finance
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Net Payable: <strong>UGX {(wo.rate_per_day * wo.max_days * 0.94).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                              {wo.payment_reference ? ` · Reference: ${wo.payment_reference}` : ''}
+                              {wo.payment_submitted_at ? ` · Submitted on: ${wo.payment_submitted_at.slice(0, 10)}` : ''}
+                            </Typography>
+                          </Alert>
+                        )}
+
+                        {(wo.payment_confirmed_by_bge || wo.payment_status === 'payment_confirmed') && (
+                          <Alert severity="success" sx={{ mt: 1.5, py: 0.5, bgcolor: '#E8F5E9', borderColor: '#A5D6A7', border: '1px solid', borderRadius: 1.5 }}>
+                            <Typography variant="caption" fontWeight={700} color="#2E7D32" display="block">
+                              ✓ Payment Receipt Confirmed by You
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Confirmed on: {wo.payment_confirmed_at ? wo.payment_confirmed_at.slice(0, 16).replace('T', ' ') : 'Recently'}
+                              {wo.payment_reference ? ` · Ref: ${wo.payment_reference}` : ''}
+                            </Typography>
+                          </Alert>
+                        )}
 
                         {wo.objective && (
                           <Alert severity="info" sx={{ mt: 1.5, py: 0.5 }} icon={false}>
@@ -5269,6 +5394,90 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           </DialogActions>
         </Dialog>
       )}
+
+      {/* ── BGE Payment Receipt Confirmation Dialog ─────────────────────── */}
+      <Dialog open={bgePaymentConfirmDialog} onClose={() => setBgePaymentConfirmDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CheckCircle color="success" /> Confirm Payment Receipt
+        </DialogTitle>
+        <DialogContent dividers>
+          {bgePaymentConfirmTarget && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Alert severity="info" icon={false}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {bgePaymentConfirmType === 'work_order'
+                    ? `Work Order: ${bgePaymentConfirmTarget.work_order_number}`
+                    : bgePaymentConfirmType === 'group_report'
+                    ? `Group Report: ${bgePaymentConfirmTarget.group_name}`
+                    : `Visit Report: ${bgePaymentConfirmTarget.msme_name || bgePaymentConfirmTarget.msme?.business_name || 'MSME Visit'}`}
+                </Typography>
+                {bgePaymentConfirmTarget.rate_per_day && (
+                  <Typography variant="body2">
+                    Net Amount: <strong>UGX {(bgePaymentConfirmTarget.rate_per_day * bgePaymentConfirmTarget.max_days * 0.94).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                  </Typography>
+                )}
+                {bgePaymentConfirmTarget.payment_reference && (
+                  <Typography variant="body2" color="text.secondary">
+                    Submission Batch / Ref: <strong>{bgePaymentConfirmTarget.payment_reference}</strong>
+                  </Typography>
+                )}
+              </Alert>
+
+              <FormControl fullWidth size="small">
+                <InputLabel>Payment Method</InputLabel>
+                <Select
+                  value={bgePaymentConfirmForm.payment_method}
+                  label="Payment Method"
+                  onChange={e => setBgePaymentConfirmForm({ ...bgePaymentConfirmForm, payment_method: e.target.value })}
+                >
+                  <MenuItem value="Airtel Money">Airtel Money</MenuItem>
+                  <MenuItem value="MTN Mobile Money">MTN Mobile Money</MenuItem>
+                  <MenuItem value="Bank Transfer">Bank Transfer / EFT</MenuItem>
+                  <MenuItem value="Cash">Cash</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+              </FormControl>
+
+              <TextField
+                label="Mobile Money / Transaction ID (Optional)"
+                placeholder="e.g. MM-TXN-123456 or Bank deposit reference"
+                value={bgePaymentConfirmForm.reference}
+                onChange={e => setBgePaymentConfirmForm({ ...bgePaymentConfirmForm, reference: e.target.value })}
+                size="small"
+                fullWidth
+              />
+
+              <TextField
+                label="Confirmation Remarks / Notes (Optional)"
+                placeholder="e.g. Received in full on registered Airtel number..."
+                value={bgePaymentConfirmForm.notes}
+                onChange={e => setBgePaymentConfirmForm({ ...bgePaymentConfirmForm, notes: e.target.value })}
+                multiline
+                rows={2}
+                size="small"
+                fullWidth
+              />
+
+              <Typography variant="caption" color="text.secondary">
+                Upon confirming, the Admin Team will receive an automated notification email confirming that funds have safely reached you.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBgePaymentConfirmDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="success"
+            disabled={bgePaymentConfirming}
+            onClick={handleBgePaymentConfirm}
+            startIcon={bgePaymentConfirming ? <CircularProgress size={16} color="inherit" /> : <CheckCircle />}
+            sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
+          >
+            {bgePaymentConfirming ? 'Confirming…' : 'Confirm Receipt of Funds'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snack.open} autoHideDuration={4000} onClose={() => setSnack({ ...snack, open: false })}

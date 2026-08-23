@@ -29,7 +29,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_REVERT_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, SMART_ASSIGN_URL, SMART_ASSIGN_EXPORT_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_REVERT_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, SMART_ASSIGN_URL, SMART_ASSIGN_EXPORT_URL, WORK_ORDER_SUBMIT_PAYMENT_URL, WORK_ORDERS_CONFIRMED_PAYMENTS_URL, REPORTS_SUBMIT_PAYMENT_URL, GROUP_REPORTS_SUBMIT_PAYMENT_URL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -222,8 +222,29 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [woSubmissions, setWoSubmissions] = useState([]);
   const [woPayments, setWoPayments] = useState([]);
   const [woAttachments, setWoAttachments] = useState([]);
-  const [woPaymentForms, setWoPaymentForms] = useState({});   // { [workOrderId]: { amount, payment_date, reference, notes } }
+  const [woPaymentForms, setWoPaymentForms] = useState({});
   const [woPaymentSaving, setWoPaymentSaving] = useState(null);
+  const [woFilterPaymentStatus, setWoFilterPaymentStatus] = useState('');
+  const [woPaymentSubmitDialog, setWoPaymentSubmitDialog] = useState(false);
+  const [woPaymentSubmitTarget, setWoPaymentSubmitTarget] = useState(null);
+  const [woPaymentSubmitForm, setWoPaymentSubmitForm] = useState({
+    payment_reference: '',
+    payment_status: 'submitted_for_payment',
+    payment_notes: '',
+  });
+  const [woPaymentSubmitting, setWoPaymentSubmitting] = useState(false);
+
+  const [reportFilterPaymentStatus, setReportFilterPaymentStatus] = useState('');
+  const [reportPaymentSubmitDialog, setReportPaymentSubmitDialog] = useState(false);
+  const [reportPaymentSubmitTarget, setReportPaymentSubmitTarget] = useState(null);
+  const [reportPaymentSubmitType, setReportPaymentSubmitType] = useState('msme'); // 'msme' or 'group'
+  const [reportPaymentSubmitForm, setReportPaymentSubmitForm] = useState({
+    payment_reference: '',
+    payment_status: 'submitted',
+    payment_notes: '',
+  });
+  const [reportPaymentSubmitting, setReportPaymentSubmitting] = useState(false);
+  const [confirmedPaymentsFeed, setConfirmedPaymentsFeed] = useState([]);
 
   // ── Data-update bulk work order distributor ───────────────────────────────
   const [duDialog, setDuDialog]         = useState(false);
@@ -561,6 +582,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       fetchWoAttachments();
     }
   }, [section, fetchWoSubmissions, fetchWoPayments, fetchWoAttachments]);
+
+  const fetchConfirmedPayments = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await axios.get(WORK_ORDERS_CONFIRMED_PAYMENTS_URL, { headers: { Authorization: `Bearer ${token}` } });
+      setConfirmedPaymentsFeed(res.data.confirmed_payments || []);
+    } catch {
+      setConfirmedPaymentsFeed([]);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchConfirmedPayments();
+  }, [fetchConfirmedPayments]);
 
   const fetchTshirtReceipts = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -5083,90 +5118,131 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <MenuItem value="reviewed">Reviewed</MenuItem>
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: 0 }}>
+            <InputLabel>Payment Status</InputLabel>
+            <Select value={reportFilterPaymentStatus} label="Payment Status"
+              onChange={e => { setReportFilterPaymentStatus(e.target.value); setReportPage(0); }}>
+              <MenuItem value="">All Payments</MenuItem>
+              <MenuItem value="unsubmitted">Unsubmitted</MenuItem>
+              <MenuItem value="submitted">Submitted for Payment</MenuItem>
+              <MenuItem value="confirmed">Confirmed by BGE ✓</MenuItem>
+            </Select>
+          </FormControl>
         </Box>
       </SectionHeader>
 
-      <TableContainer component={Paper} variant="outlined">
-        <Table size="small">
-          <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-            <TableRow>
-              <TableCell>MSME</TableCell>
-              <TableCell>BGE Expert</TableCell>
-              <TableCell>Visit Type</TableCell>
-              <TableCell>Visit Date</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginate(reports, reportPage).length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                  No reports found
-                </TableCell>
-              </TableRow>
-            ) : paginate(reports, reportPage).map(r => {
-              const msme = msmes.find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
-              const bge  = experts.find(e => e.id === r.bge)  || { name: r.bge_name };
-              return (
-                <TableRow key={r.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight={500}>{r.msme_name || msme.business_name}</Typography>
-                    {(r.msme_code || msme.msme_code) &&
-                      <Typography variant="caption" color="text.secondary">{r.msme_code || msme.msme_code}</Typography>}
-                  </TableCell>
-                  <TableCell>{r.bge_name || bge.name}</TableCell>
-                  <TableCell>
-                    <Chip label={VISIT_LABELS[r.visit_type] || r.visit_type} size="small" variant="outlined" />
-                  </TableCell>
-                  <TableCell>{r.visit_date}</TableCell>
-                  <TableCell>
-                    <Chip label={r.status} size="small" color={REPORT_STATUS_COLORS[r.status] || 'default'} />
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="View report">
-                        <IconButton size="small" color="primary" onClick={() => setViewReport({ ...r, _msme: msme, _bgeName: r.bge_name || bge.name })}>
-                          <Visibility fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Open PDF">
-                        <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'view')}>
-                          <PictureAsPdf fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Download PDF">
-                        <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'download')}>
-                          <Download fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {r.status !== 'draft' && (
-                        <Tooltip title="Revert to draft">
-                          <IconButton size="small" color="warning" onClick={() => revertReport('msme', r.id)}>
-                            <Undo fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {r.status === 'draft' && (
-                        <Tooltip title="Delete draft">
-                          <IconButton size="small" color="error" onClick={() => deleteReport(r)}>
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </TableCell>
+      {(() => {
+        const filteredReports = reports.filter(r => {
+          if (!reportFilterPaymentStatus) return true;
+          if (reportFilterPaymentStatus === 'confirmed') return r.payment_status === 'confirmed' || r.payment_confirmed_by_bge;
+          if (reportFilterPaymentStatus === 'submitted') return r.payment_status === 'submitted';
+          if (reportFilterPaymentStatus === 'unsubmitted') return !r.payment_status || r.payment_status === 'unsubmitted';
+          return true;
+        });
+
+        return (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell>MSME</TableCell>
+                  <TableCell>BGE Expert</TableCell>
+                  <TableCell>Visit Type</TableCell>
+                  <TableCell>Visit Date</TableCell>
+                  <TableCell>Status &amp; Payment</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        <TablePagination
-          component="div" count={reports.length} page={reportPage}
-          rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
-          onPageChange={(_, p) => setReportPage(p)}
-        />
-      </TableContainer>
+              </TableHead>
+              <TableBody>
+                {paginate(filteredReports, reportPage).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                      No reports found
+                    </TableCell>
+                  </TableRow>
+                ) : paginate(filteredReports, reportPage).map(r => {
+                  const msme = msmes.find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
+                  const bge  = experts.find(e => e.id === r.bge)  || { name: r.bge_name };
+                  return (
+                    <TableRow key={r.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={500}>{r.msme_name || msme.business_name}</Typography>
+                        {(r.msme_code || msme.msme_code) &&
+                          <Typography variant="caption" color="text.secondary">{r.msme_code || msme.msme_code}</Typography>}
+                      </TableCell>
+                      <TableCell>{r.bge_name || bge.name}</TableCell>
+                      <TableCell>
+                        <Chip label={VISIT_LABELS[r.visit_type] || r.visit_type} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell>{r.visit_date}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                          <Chip label={r.status} size="small" color={REPORT_STATUS_COLORS[r.status] || 'default'} />
+                          {r.payment_status === 'submitted' && (
+                            <Tooltip title={`Submitted for payment: ${r.payment_reference || 'N/A'}`}>
+                              <Chip label={r.payment_reference ? `Submitted: ${r.payment_reference}` : 'Submitted'} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontSize: 10, height: 20 }} />
+                            </Tooltip>
+                          )}
+                          {(r.payment_status === 'confirmed' || r.payment_confirmed_by_bge) && (
+                            <Tooltip title={`Payment confirmed by BGE on ${r.payment_confirmed_at ? r.payment_confirmed_at.slice(0, 16).replace('T', ' ') : ''}`}>
+                              <Chip label="Confirmed ✓" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontSize: 10, height: 20 }} />
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Tooltip title="View report">
+                            <IconButton size="small" color="primary" onClick={() => setViewReport({ ...r, _msme: msme, _bgeName: r.bge_name || bge.name })}>
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Open PDF">
+                            <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'view')}>
+                              <PictureAsPdf fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download PDF">
+                            <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'download')}>
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {isStaff && (
+                            <Tooltip title="Submit for Payment / Update Reference">
+                              <IconButton size="small" color={r.payment_confirmed_by_bge ? 'success' : r.payment_status === 'submitted' ? 'warning' : 'default'} onClick={() => openReportPaymentSubmit(r, 'msme')}>
+                                <Payments fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {r.status !== 'draft' && (
+                            <Tooltip title="Revert to draft">
+                              <IconButton size="small" color="warning" onClick={() => revertReport('msme', r.id)}>
+                                <Undo fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {r.status === 'draft' && (
+                            <Tooltip title="Delete draft">
+                              <IconButton size="small" color="error" onClick={() => deleteReport(r)}>
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <TablePagination
+              component="div" count={filteredReports.length} page={reportPage}
+              rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
+              onPageChange={(_, p) => setReportPage(p)}
+            />
+          </TableContainer>
+        );
+      })()}
 
       {/* ── Group Reports panel (admin approval) ─────────────────────── */}
       <Box sx={{ mt: 4 }}>
@@ -5185,7 +5261,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <TableCell>Session</TableCell>
                   <TableCell>Visit Date</TableCell>
                   <TableCell>MSMEs</TableCell>
-                  <TableCell>Status</TableCell>
+                  <TableCell>Status &amp; Payment</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -5200,10 +5276,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <TableCell>{g.visit_date}</TableCell>
                     <TableCell>{g.msme_count || 0}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={g.status} size="small"
-                        color={g.status === 'approved' ? 'success' : (g.status === 'submitted' ? 'primary' : 'default')}
-                      />
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                        <Chip
+                          label={g.status} size="small"
+                          color={g.status === 'approved' ? 'success' : (g.status === 'submitted' ? 'primary' : 'default')}
+                        />
+                        {g.payment_status === 'submitted' && (
+                          <Tooltip title={`Submitted for payment: ${g.payment_reference || 'N/A'}`}>
+                            <Chip label={g.payment_reference ? `Submitted: ${g.payment_reference}` : 'Submitted'} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontSize: 10, height: 20 }} />
+                          </Tooltip>
+                        )}
+                        {(g.payment_status === 'confirmed' || g.payment_confirmed_by_bge) && (
+                          <Tooltip title={`Payment confirmed by BGE on ${g.payment_confirmed_at ? g.payment_confirmed_at.slice(0, 16).replace('T', ' ') : ''}`}>
+                            <Chip label="Confirmed ✓" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontSize: 10, height: 20 }} />
+                          </Tooltip>
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -5217,6 +5305,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             <Download fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        {isStaff && (
+                          <Tooltip title="Submit for Payment / Update Reference">
+                            <IconButton size="small" color={g.payment_confirmed_by_bge ? 'success' : g.payment_status === 'submitted' ? 'warning' : 'default'} onClick={() => openReportPaymentSubmit(g, 'group')}>
+                              <Payments fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         {g.status === 'submitted' && (
                           <Tooltip title="Approve report">
                             <IconButton size="small" color="success" onClick={() => approveGroupReport(g.id)}>
@@ -6331,6 +6426,65 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     } catch { notify('Failed to download PDF', 'error'); }
   };
 
+  const openWoPaymentSubmit = (wo) => {
+    setWoPaymentSubmitTarget(wo);
+    setWoPaymentSubmitForm({
+      payment_reference: wo.payment_reference || '',
+      payment_status: wo.payment_status === 'payment_confirmed' ? 'payment_confirmed' : (wo.payment_status || 'submitted_for_payment'),
+      payment_notes: '',
+    });
+    setWoPaymentSubmitDialog(true);
+  };
+
+  const handleWoPaymentSubmit = async () => {
+    if (!woPaymentSubmitTarget) return;
+    setWoPaymentSubmitting(true);
+    try {
+      await axios.post(WORK_ORDER_SUBMIT_PAYMENT_URL(woPaymentSubmitTarget.id), woPaymentSubmitForm, { headers });
+      notify(`Work Order ${woPaymentSubmitTarget.work_order_number} payment status updated ✓`, 'success');
+      setWoPaymentSubmitDialog(false);
+      setWoPaymentSubmitTarget(null);
+      fetchWorkOrders();
+      fetchConfirmedPayments();
+    } catch (err) {
+      notify(err.response?.data?.error || err.response?.data?.detail || 'Failed to update payment status', 'error');
+    } finally {
+      setWoPaymentSubmitting(false);
+    }
+  };
+
+  const openReportPaymentSubmit = (report, type = 'msme') => {
+    setReportPaymentSubmitTarget(report);
+    setReportPaymentSubmitType(type);
+    setReportPaymentSubmitForm({
+      payment_reference: report.payment_reference || '',
+      payment_status: report.payment_status || 'submitted',
+      payment_notes: '',
+    });
+    setReportPaymentSubmitDialog(true);
+  };
+
+  const handleReportPaymentSubmit = async () => {
+    if (!reportPaymentSubmitTarget) return;
+    setReportPaymentSubmitting(true);
+    try {
+      const url = reportPaymentSubmitType === 'group' ? GROUP_REPORTS_SUBMIT_PAYMENT_URL : REPORTS_SUBMIT_PAYMENT_URL;
+      await axios.post(url, {
+        report_id: reportPaymentSubmitTarget.id,
+        ...reportPaymentSubmitForm,
+      }, { headers });
+      notify(`Report submitted for payment [Ref: ${reportPaymentSubmitForm.payment_reference || 'N/A'}] ✓`, 'success');
+      setReportPaymentSubmitDialog(false);
+      setReportPaymentSubmitTarget(null);
+      fetchAll();
+      fetchConfirmedPayments();
+    } catch (err) {
+      notify(err.response?.data?.error || err.response?.data?.detail || 'Failed to submit report for payment', 'error');
+    } finally {
+      setReportPaymentSubmitting(false);
+    }
+  };
+
   const downloadSubmissionFile = async (sub, kind) => {
     const url = kind === 'timesheet' ? WORK_ORDER_SUBMISSION_TIMESHEET_URL(sub.id) : WORK_ORDER_SUBMISSION_INVOICE_URL(sub.id);
     const filename = kind === 'timesheet' ? sub.timesheet_filename : sub.invoice_filename;
@@ -6669,12 +6823,57 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     );
   };
 
-  const renderWorkOrders = () => (
+  const renderWorkOrders = () => {
+    const filteredWorkOrders = deferredWorkOrders.filter(wo => {
+      if (!woFilterPaymentStatus) return true;
+      if (woFilterPaymentStatus === 'payment_confirmed') return wo.payment_status === 'payment_confirmed' || wo.payment_confirmed_by_bge;
+      if (woFilterPaymentStatus === 'submitted_for_payment') return wo.payment_status === 'submitted_for_payment';
+      if (woFilterPaymentStatus === 'paid') return wo.payment_status === 'paid';
+      if (woFilterPaymentStatus === 'pending_submission') return !wo.payment_status || wo.payment_status === 'pending_submission';
+      return true;
+    });
+
+    return (
     <Box>
       <SectionHeader title="Work Orders" subtitle={`${workOrders.length} work orders`}>
         <Button variant="outlined" size="small" onClick={openDuDialog} sx={{ mr: 1 }}>📊 Distribute Data Updates</Button>
         <Button variant="contained" startIcon={<Add />} size="small" onClick={openWoCreate}>New Work Order</Button>
       </SectionHeader>
+
+      {/* Confirmed Payments Live Feed Banner */}
+      {confirmedPaymentsFeed && confirmedPaymentsFeed.length > 0 && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2.5, bgcolor: '#F1F8E9', borderColor: '#C8E6C9', borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CheckCircle sx={{ color: '#2E7D32', fontSize: 20 }} />
+              <Typography variant="subtitle2" fontWeight={700} color="#2E7D32">
+                Recent BGE Payment Confirmations ({confirmedPaymentsFeed.length})
+              </Typography>
+            </Box>
+            <Chip label="BGE Confirmed" size="small" color="success" sx={{ height: 20, fontSize: 10, fontWeight: 700 }} />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 0.5 }}>
+            {confirmedPaymentsFeed.slice(0, 6).map((item, idx) => (
+              <Paper key={idx} variant="outlined" sx={{ p: 1.2, minWidth: 220, bgcolor: '#fff', borderColor: '#E0E0E0', flexShrink: 0 }}>
+                <Typography variant="caption" fontWeight={700} display="block" color="#1b5e20">
+                  {item.bge_name} {item.bge_code ? `(${item.bge_code})` : ''}
+                </Typography>
+                <Typography variant="caption" color="text.primary" display="block">
+                  {item.title}
+                </Typography>
+                {item.amount && (
+                  <Typography variant="caption" fontWeight={700} color="primary.main" display="block">
+                    UGX {Number(item.amount).toLocaleString()}
+                  </Typography>
+                )}
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10 }}>
+                  Confirmed: {item.confirmed_at ? item.confirmed_at.slice(0, 10) : 'Recently'} {item.reference ? `· ${item.reference}` : ''}
+                </Typography>
+              </Paper>
+            ))}
+          </Box>
+        </Paper>
+      )}
 
       {/* Filters */}
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -6692,6 +6891,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="draft">Draft</MenuItem>
             <MenuItem value="issued">Issued</MenuItem>
             <MenuItem value="signed">Signed</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: 0 }}>
+          <InputLabel>Payment Status</InputLabel>
+          <Select value={woFilterPaymentStatus} label="Payment Status" onChange={e => { const v = e.target.value; startTransition(() => setWoFilterPaymentStatus(v)); }}>
+            <MenuItem value="">All Payment Statuses</MenuItem>
+            <MenuItem value="pending_submission">Pending Submission</MenuItem>
+            <MenuItem value="submitted_for_payment">Submitted for Payment</MenuItem>
+            <MenuItem value="paid">Paid</MenuItem>
+            <MenuItem value="payment_confirmed">Confirmed by BGE ✓</MenuItem>
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ flex: '1 1 160px', minWidth: 0 }}>
@@ -6716,14 +6925,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </FormControl>
       </Paper>
 
-      {deferredWorkOrders.length === 0 ? (
+      {filteredWorkOrders.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Assignment sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-          <Typography color="text.secondary">No work orders yet.</Typography>
+          <Typography color="text.secondary">No work orders match the selected filters.</Typography>
         </Paper>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {deferredWorkOrders.map(wo => (
+          {filteredWorkOrders.map(wo => (
             <Card variant="outlined" key={wo.id}
               sx={wo.work_order_type === 'training_facilitation' ? { borderLeft: '4px solid #7B1FA2' } : {}}>
               <CardContent>
@@ -6755,6 +6964,45 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       size="small"
                       color={wo.status === 'signed' ? 'success' : wo.status === 'issued' ? 'primary' : 'default'}
                     />
+
+                    {/* Payment Status Badges */}
+                    {wo.payment_status === 'submitted_for_payment' && (
+                      <Tooltip title={`Submitted for payment on ${wo.payment_submitted_at ? wo.payment_submitted_at.slice(0,10) : ''} · Ref: ${wo.payment_reference || 'N/A'}`}>
+                        <Chip
+                          label={wo.payment_reference ? `Submitted: ${wo.payment_reference}` : 'Submitted for Payment'}
+                          size="small"
+                          sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 600, border: '1px solid #FFE082' }}
+                        />
+                      </Tooltip>
+                    )}
+                    {(wo.payment_status === 'payment_confirmed' || wo.payment_confirmed_by_bge) && (
+                      <Tooltip title={`Payment confirmed by BGE on ${wo.payment_confirmed_at ? wo.payment_confirmed_at.slice(0, 16).replace('T', ' ') : ''}`}>
+                        <Chip
+                          label="✓ Confirmed by BGE"
+                          size="small"
+                          sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 600, border: '1px solid #A5D6A7' }}
+                        />
+                      </Tooltip>
+                    )}
+                    {wo.payment_status === 'paid' && !wo.payment_confirmed_by_bge && (
+                      <Chip label="Paid" size="small" color="info" />
+                    )}
+
+                    {/* Submit for Payment Action */}
+                    {isStaff && (
+                      <Tooltip title="Submit for payment / update payment batch reference">
+                        <Button
+                          variant="outlined" size="small"
+                          color={wo.payment_confirmed_by_bge ? 'success' : wo.payment_status === 'submitted_for_payment' ? 'warning' : 'primary'}
+                          startIcon={<Payments fontSize="small" />}
+                          onClick={() => openWoPaymentSubmit(wo)}
+                          sx={{ fontSize: 11, py: 0.25, height: 28 }}
+                        >
+                          {wo.payment_confirmed_by_bge ? 'Payment Confirmed' : wo.payment_status === 'submitted_for_payment' ? 'Payment Submitted' : 'Submit for Payment'}
+                        </Button>
+                      </Tooltip>
+                    )}
+
                     {isStaff && wo.status === 'draft' && (
                       <Tooltip title="Issue & email PDF to BGE">
                         <span>
@@ -7221,7 +7469,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </DialogActions>
       </Dialog>
     </Box>
-  );
+    );
+  };
 
   const renderParticipation = () => {
     const s = participationSummary;
@@ -11164,6 +11413,146 @@ PRUDEV II BDS Team`
             </DialogActions>
           </>;
         })()}
+      </Dialog>
+
+      {/* ── Submit Work Order for Payment Dialog ─────────────────────────── */}
+      <Dialog open={woPaymentSubmitDialog} onClose={() => setWoPaymentSubmitDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Payments color="primary" /> Submit Work Order for Payment
+        </DialogTitle>
+        <DialogContent dividers>
+          {woPaymentSubmitTarget && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Alert severity="info" icon={false}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  Work Order: {woPaymentSubmitTarget.work_order_number}
+                </Typography>
+                <Typography variant="body2">
+                  BGE Expert: <strong>{woPaymentSubmitTarget.bge_name}</strong> ({woPaymentSubmitTarget.bge_code_display || 'BGE'})
+                </Typography>
+                <Typography variant="body2">
+                  Net Amount: <strong>UGX {(woPaymentSubmitTarget.rate_per_day * woPaymentSubmitTarget.max_days * 0.94).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                </Typography>
+              </Alert>
+
+              <TextField
+                label="Payment / Batch Reference #"
+                placeholder="e.g. PRUDEV2-BATCH-AUG-001 or REQ-2026-08"
+                value={woPaymentSubmitForm.payment_reference}
+                onChange={e => setWoPaymentSubmitForm({ ...woPaymentSubmitForm, payment_reference: e.target.value })}
+                size="small"
+                fullWidth
+                helperText="Enter the finance requisition voucher or payment batch identifier"
+              />
+
+              <FormControl fullWidth size="small">
+                <InputLabel>Payment Status</InputLabel>
+                <Select
+                  value={woPaymentSubmitForm.payment_status}
+                  label="Payment Status"
+                  onChange={e => setWoPaymentSubmitForm({ ...woPaymentSubmitForm, payment_status: e.target.value })}
+                >
+                  <MenuItem value="submitted_for_payment">🟡 Submitted for Payment (Pending BGE Receipt)</MenuItem>
+                  <MenuItem value="paid">🔵 Paid by Finance</MenuItem>
+                  <MenuItem value="payment_confirmed">🟢 Payment Confirmed by BGE ✓</MenuItem>
+                </Select>
+              </FormControl>
+
+              <TextField
+                label="Finance / Administrative Notes"
+                placeholder="Optional notes regarding submission date, account details, or instructions..."
+                value={woPaymentSubmitForm.payment_notes}
+                onChange={e => setWoPaymentSubmitForm({ ...woPaymentSubmitForm, payment_notes: e.target.value })}
+                multiline
+                rows={3}
+                size="small"
+                fullWidth
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setWoPaymentSubmitDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={woPaymentSubmitting}
+            onClick={handleWoPaymentSubmit}
+            startIcon={woPaymentSubmitting ? <CircularProgress size={16} color="inherit" /> : <Payments />}
+          >
+            {woPaymentSubmitting ? 'Saving…' : 'Save Payment Submission'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Submit Visit / Group Report for Payment Dialog ────────────────── */}
+      <Dialog open={reportPaymentSubmitDialog} onClose={() => setReportPaymentSubmitDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Payments color="primary" /> Submit Report for Payment
+        </DialogTitle>
+        <DialogContent dividers>
+          {reportPaymentSubmitTarget && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Alert severity="info" icon={false}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {reportPaymentSubmitType === 'group'
+                    ? `Group Report: ${reportPaymentSubmitTarget.group_name}`
+                    : `Visit Report: ${reportPaymentSubmitTarget.msme_name || reportPaymentSubmitTarget.msme?.business_name || 'MSME Visit'}`}
+                </Typography>
+                <Typography variant="body2">
+                  BGE: <strong>{reportPaymentSubmitTarget.bge_name || reportPaymentSubmitTarget.team_lead_name || 'BGE Expert'}</strong>
+                </Typography>
+                <Typography variant="body2">
+                  Visit Date: <strong>{reportPaymentSubmitTarget.visit_date}</strong>
+                </Typography>
+              </Alert>
+
+              <TextField
+                label="Payment / Batch Reference #"
+                placeholder="e.g. BATCH-REPORTS-2026-08 or REQ-089"
+                value={reportPaymentSubmitForm.payment_reference}
+                onChange={e => setReportPaymentSubmitForm({ ...reportPaymentSubmitForm, payment_reference: e.target.value })}
+                size="small"
+                fullWidth
+                helperText="Enter the finance requisition voucher or payment batch identifier"
+              />
+
+              <FormControl fullWidth size="small">
+                <InputLabel>Payment Status</InputLabel>
+                <Select
+                  value={reportPaymentSubmitForm.payment_status}
+                  label="Payment Status"
+                  onChange={e => setReportPaymentSubmitForm({ ...reportPaymentSubmitForm, payment_status: e.target.value })}
+                >
+                  <MenuItem value="submitted">🟡 Submitted for Payment</MenuItem>
+                  <MenuItem value="paid">🔵 Paid by Finance</MenuItem>
+                  <MenuItem value="confirmed">🟢 Payment Confirmed by BGE ✓</MenuItem>
+                </Select>
+              </FormControl>
+
+              <TextField
+                label="Notes"
+                placeholder="Optional notes or batch details..."
+                value={reportPaymentSubmitForm.payment_notes}
+                onChange={e => setReportPaymentSubmitForm({ ...reportPaymentSubmitForm, payment_notes: e.target.value })}
+                multiline
+                rows={3}
+                size="small"
+                fullWidth
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReportPaymentSubmitDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={reportPaymentSubmitting}
+            onClick={handleReportPaymentSubmit}
+            startIcon={reportPaymentSubmitting ? <CircularProgress size={16} color="inherit" /> : <Payments />}
+          >
+            {reportPaymentSubmitting ? 'Saving…' : 'Save Payment Submission'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* ── Notifications ─────────────────────────────────────────────────── */}
