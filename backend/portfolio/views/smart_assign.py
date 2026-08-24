@@ -105,7 +105,7 @@ def _compute_assignments(apply_to: str = 'all', exclude_ids=None):
 
     # ── 1. Load data ────────────────────────────────────────────────────────
     bges = list(
-        BusinessGrowthExpert.objects.filter(status='approved')
+        BusinessGrowthExpert.objects.filter(status__in=['approved', 'active'])
         .exclude(id__in=exclude_ids)
         .order_by('name')
         .values('id', 'name', 'bge_code', 'location')

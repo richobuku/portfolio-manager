@@ -280,4 +280,125 @@ class PaymentTrackingTests(TestCase):
         self.assertTrue(self.report.payment_confirmed_by_bge)
 
 
+class MSMEStatusAndAssignmentFlaggingTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser('status_admin', 'admin@test.com', 'password123')
+        self.bge = BusinessGrowthExpert.objects.create(name='Expert One', bge_code='BGE-01', status='active')
+        self.co_bge = BusinessGrowthExpert.objects.create(name='Expert Two', bge_code='BGE-02', status='active')
+        self.group = BGEGroup.objects.create(name='Gulu Advisory Team')
+        self.group.members.add(self.bge)
+
+        self.active_msme = MSME.objects.create(
+            business_name='Active Agro Co',
+            business_type='SMALL',
+            sector='AGRICULTURE',
+            owner_name='John Doe',
+            status='active',
+        )
+        self.closed_msme = MSME.objects.create(
+            business_name='Temporarily Closed Millers',
+            business_type='SMALL',
+            sector='MANUFACTURING',
+            owner_name='Jane Smith',
+            status='temporarily_closed',
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    def test_msme_status_is_active_sync(self):
+        msme = MSME.objects.create(
+            business_name='Test Status Sync',
+            business_type='MICRO',
+            sector='TRADE',
+            owner_name='Tester',
+            status='temporarily_closed'
+        )
+        self.assertFalse(msme.is_active)
+        msme.status = 'active'
+        msme.save()
+        self.assertTrue(msme.is_active)
+        msme.status = 'out_of_business'
+        msme.save()
+        self.assertFalse(msme.is_active)
+        msme.status = 'unavailable'
+        msme.save()
+        self.assertFalse(msme.is_active)
+
+    def test_set_status_endpoints(self):
+        # MSME set-status
+        res = self.client.patch(f'/api/msmes/{self.active_msme.id}/set-status/', {'status': 'temporarily_closed'})
+        self.assertEqual(res.status_code, 200)
+        self.active_msme.refresh_from_db()
+        self.assertEqual(self.active_msme.status, 'temporarily_closed')
+        self.assertFalse(self.active_msme.is_active)
+
+        # Invalid status rejected
+        bad_res = self.client.patch(f'/api/msmes/{self.active_msme.id}/set-status/', {'status': 'invalid_choice'})
+        self.assertEqual(bad_res.status_code, 400)
+
+        # BGE set-status
+        bge_res = self.client.patch(f'/api/experts/{self.bge.id}/set-status/', {'status': 'unavailable'})
+        self.assertEqual(bge_res.status_code, 200)
+        self.bge.refresh_from_db()
+        self.assertEqual(self.bge.status, 'unavailable')
+
+    def test_inactive_msme_assign_bge_flagging(self):
+        # 1. Assigning inactive MSME without confirm_inactive should be flagged with 400
+        res = self.client.patch(f'/api/msmes/{self.closed_msme.id}/assign_bge/', {
+            'bge_id': self.bge.id,
+            'objectives': 'Test Objectives',
+        }, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertTrue(res.data.get('requires_confirmation'))
+
+        # 2. Assigning inactive MSME with confirm_inactive=True should succeed
+        res_confirmed = self.client.patch(f'/api/msmes/{self.closed_msme.id}/assign_bge/', {
+            'bge_id': self.bge.id,
+            'objectives': 'Test Objectives',
+            'confirm_inactive': True,
+        }, format='json')
+        self.assertEqual(res_confirmed.status_code, 200)
+        self.closed_msme.refresh_from_db()
+        self.assertEqual(self.closed_msme.assigned_bge, self.bge)
+
+    def test_inactive_msme_add_co_assigned_flagging(self):
+        # 1. Adding co-assignee to inactive MSME without confirm_inactive should be flagged
+        res = self.client.patch(f'/api/msmes/{self.closed_msme.id}/add_co_assigned/', {
+            'bge_id': self.co_bge.id,
+        }, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertTrue(res.data.get('requires_confirmation'))
+
+        # 2. Adding co-assignee with confirm_inactive=True should succeed
+        res_confirmed = self.client.patch(f'/api/msmes/{self.closed_msme.id}/add_co_assigned/', {
+            'bge_id': self.co_bge.id,
+            'confirm_inactive': True,
+        }, format='json')
+        self.assertEqual(res_confirmed.status_code, 200)
+        self.closed_msme.refresh_from_db()
+        self.assertIn(self.co_bge, self.closed_msme.co_assigned_bges.all())
+
+    def test_bge_group_assign_inactive_msmes_flagging(self):
+        # 1. Bulk assign to group containing an inactive MSME without confirmation
+        res = self.client.post(f'/api/bge-groups/{self.group.id}/assign-msmes/', {
+            'msme_ids': [self.active_msme.id, self.closed_msme.id],
+            'session_number': 1,
+        }, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertTrue(res.data.get('requires_confirmation'))
+
+        # 2. Bulk assign with confirm_inactive=True
+        res_confirmed = self.client.post(f'/api/bge-groups/{self.group.id}/assign-msmes/', {
+            'msme_ids': [self.active_msme.id, self.closed_msme.id],
+            'session_number': 1,
+            'confirm_inactive': True,
+        }, format='json')
+        self.assertEqual(res_confirmed.status_code, 200)
+        self.closed_msme.refresh_from_db()
+        self.active_msme.refresh_from_db()
+        self.assertEqual(self.closed_msme.assigned_group, self.group)
+        self.assertEqual(self.active_msme.assigned_group, self.group)
+
+
+
 

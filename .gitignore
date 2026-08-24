@@ -185,3 +185,8 @@ logs/
 # Google Drive service account key (never commit)
 backend/drive_service_account.json
 backend/oauth_client.json
+
+# Tool caches & IDE configs
+.claude/
+.claire/
+

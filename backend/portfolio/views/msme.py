@@ -188,7 +188,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         return MSMESerializer
 
     def get_queryset(self):
-        qs = MSME.objects.filter(is_active=True)
+        qs = MSME.objects.all()
 
         user = self.request.user
         group_ids = _managed_groups(user)
@@ -213,6 +213,15 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                     ).distinct()
                 except Exception:
                     qs = qs.none()
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            if status_param == 'inactive':
+                qs = qs.exclude(status='active')
+            elif status_param != 'all':
+                qs = qs.filter(status=status_param)
+        elif self.request.query_params.get('active_only') == '1':
+            qs = qs.filter(is_active=True)
 
         search = self.request.query_params.get('search')
         if search:
@@ -283,6 +292,24 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Only admins can create MSMEs.")
         return super().create(request, *args, **kwargs)
 
+    @action(detail=True, methods=['patch', 'post'], url_path='set-status')
+    def set_status(self, request, pk=None):
+        """Update operational status of an MSME (Active, Temporarily Closed, Out of Business, Unavailable)."""
+        if not self._is_admin_or_cohort_admin(request):
+            raise PermissionDenied("Only admins and programme managers can change MSME status.")
+        msme = self.get_object()
+        new_status = request.data.get('status')
+        valid_statuses = [s[0] for s in MSME.STATUS_CHOICES]
+        if not new_status or new_status not in valid_statuses:
+            return Response(
+                {'error': f"Invalid status '{new_status}'. Allowed: {', '.join(valid_statuses)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        msme.status = new_status
+        msme.is_active = (new_status == 'active')
+        msme.save(update_fields=['status', 'is_active', 'updated_at'])
+        return Response(MSMESerializer(msme, context={'request': request}).data)
+
     @action(detail=True, methods=['patch', 'post'])
     def assign_bge(self, request, pk=None):
         if not self._is_admin_or_cohort_admin(request):
@@ -297,6 +324,20 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         objectives = (request.data.get('objectives') or '').strip()
         assignment_date = request.data.get('assignment_date') or None
         is_co_assign = request.data.get('is_co_assign', False)
+        confirm_inactive = request.data.get('confirm_inactive') is True or str(request.data.get('confirm_inactive', '')).lower() in ('true', '1')
+
+        # Flag admin and PM if assigning an inactive MSME without explicit confirmation
+        if bge_id and msme.status != 'active' and not confirm_inactive:
+            return Response(
+                {
+                    'error': f"'{msme.business_name}' is currently {msme.get_status_display() or msme.status}. Please confirm to assign an inactive MSME.",
+                    'requires_confirmation': True,
+                    'msme_status': msme.status,
+                    'msme_status_display': msme.get_status_display(),
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         bge = None  # initialise so the notification block below is always safe
         if bge_id:
             try:
@@ -360,8 +401,22 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Only admins can modify BGE assignments.")
         msme = self.get_object()
         bge_id = request.data.get('bge_id')
+        confirm_inactive = request.data.get('confirm_inactive') is True or str(request.data.get('confirm_inactive', '')).lower() in ('true', '1')
         if not bge_id:
             return Response({'error': 'bge_id required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Flag admin and PM if assigning an inactive MSME without explicit confirmation
+        if msme.status != 'active' and not confirm_inactive:
+            return Response(
+                {
+                    'error': f"'{msme.business_name}' is currently {msme.get_status_display() or msme.status}. Please confirm to assign an inactive MSME.",
+                    'requires_confirmation': True,
+                    'msme_status': msme.status,
+                    'msme_status_display': msme.get_status_display(),
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             bge = BusinessGrowthExpert.objects.get(pk=bge_id)
             if msme.assigned_bge_id and msme.assigned_bge_id == bge.id:

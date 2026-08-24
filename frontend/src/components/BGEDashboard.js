@@ -48,6 +48,21 @@ const STATUS_COLORS = {
   reviewed: 'success',
 };
 
+const MSME_STATUS_CONFIG = {
+  active:             { label: 'Active',             color: 'success', bgcolor: '#E8F5E9', textColor: '#2E7D32', border: '#A5D6A7' },
+  temporarily_closed: { label: 'Temporarily Closed', color: 'warning', bgcolor: '#FFF3E0', textColor: '#E65100', border: '#FFE082' },
+  out_of_business:    { label: 'Out of Business',    color: 'error',   bgcolor: '#FFEBEE', textColor: '#C62828', border: '#EF9A9A' },
+  unavailable:        { label: 'Unavailable',        color: 'default', bgcolor: '#F3E5F5', textColor: '#6A1B9A', border: '#CE93D8' },
+};
+
+const getMsmeStatusInfo = (status) => MSME_STATUS_CONFIG[status] || {
+  label: (status || 'Active').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+  color: 'default',
+  bgcolor: '#F5F5F5',
+  textColor: '#616161',
+  border: '#E0E0E0',
+};
+
 const EMPTY_GROUP_REPORT = {
   group: '',
   session_number: '',
@@ -1867,6 +1882,23 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                   </Box>
                                   <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
                                     <Chip label={m.business_type || 'MSME'} size="small" variant="outlined" />
+                                    {m.status && m.status !== 'active' && (() => {
+                                      const sInfo = getMsmeStatusInfo(m.status);
+                                      return (
+                                        <Chip
+                                          label={sInfo.label}
+                                          size="small"
+                                          sx={{
+                                            bgcolor: sInfo.bgcolor,
+                                            color: sInfo.textColor,
+                                            border: `1px solid ${sInfo.border}`,
+                                            fontWeight: 600,
+                                            fontSize: 10,
+                                            height: 20,
+                                          }}
+                                        />
+                                      );
+                                    })()}
                                     <Tooltip title="View details & reports">
                                       <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMsmeDetail(m); }}>
                                         <Visibility fontSize="small" />
@@ -1988,6 +2020,23 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                   <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
                                     <Chip label={m.business_type || 'MSME'} size="small" variant="outlined" />
                                     <Chip label="Co-assigned" size="small" color="warning" />
+                                    {m.status && m.status !== 'active' && (() => {
+                                      const sInfo = getMsmeStatusInfo(m.status);
+                                      return (
+                                        <Chip
+                                          label={sInfo.label}
+                                          size="small"
+                                          sx={{
+                                            bgcolor: sInfo.bgcolor,
+                                            color: sInfo.textColor,
+                                            border: `1px solid ${sInfo.border}`,
+                                            fontWeight: 600,
+                                            fontSize: 10,
+                                            height: 20,
+                                          }}
+                                        />
+                                      );
+                                    })()}
                                     <Tooltip title="View details & reports">
                                       <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMsmeDetail(m); }}>
                                         <Visibility fontSize="small" />

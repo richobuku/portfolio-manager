@@ -38,6 +38,7 @@ class MSMESerializer(serializers.ModelSerializer):
     co_assigned_bge_names = serializers.SerializerMethodField()
     total_reports = serializers.SerializerMethodField()
     last_support_date = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     programme_groups_detail = ProgrammeGroupSerializer(source='programme_groups', many=True, read_only=True)
 
     class Meta:

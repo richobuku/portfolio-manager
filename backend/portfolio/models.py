@@ -143,6 +143,20 @@ class MSME(models.Model):
     
     # Auto-generated unique code
     msme_code = models.CharField(max_length=50, unique=True, blank=True)
+
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('temporarily_closed', 'Temporarily Closed'),
+        ('out_of_business', 'Out of Business'),
+        ('unavailable', 'Unavailable'),
+    ]
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default='active',
+        db_index=True,
+        help_text='Operational status: Active, Temporarily Closed, Out of Business, Unavailable',
+    )
     
     # Basic Information
     business_name = models.CharField(max_length=200)
@@ -295,6 +309,9 @@ class MSME(models.Model):
 
                 self.msme_code = f"PRUDEV2-GOPA-COHORT-{next_number:03d}"
                 try:
+                    # Sync is_active and status
+                    if self.status:
+                        self.is_active = (self.status == 'active')
                     return super().save(*args, **kwargs)
                 except IntegrityError:
                     # Another worker minted the same suffix; clear and retry.
@@ -302,6 +319,10 @@ class MSME(models.Model):
                     continue
             # Fall through (extremely unlikely): let the last attempt raise.
             self.msme_code = f"PRUDEV2-GOPA-COHORT-{next_number:03d}"
+
+        # Sync is_active and status
+        if self.status:
+            self.is_active = (self.status == 'active')
 
         super().save(*args, **kwargs)
     
@@ -418,8 +439,12 @@ class MSMEGrowthSnapshot(models.Model):
 
 class BusinessGrowthExpert(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending Approval'),
+        ('active', 'Active'),
+        ('temporarily_closed', 'Temporarily Closed'),
+        ('out_of_business', 'Out of Business'),
+        ('unavailable', 'Unavailable'),
         ('approved', 'Approved'),
+        ('pending', 'Pending Approval'),
         ('rejected', 'Rejected'),
     ]
     user = models.OneToOneField(
@@ -437,7 +462,13 @@ class BusinessGrowthExpert(models.Model):
     third_area = models.CharField(max_length=200, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default='active',
+        db_index=True,
+        help_text='Operational/Account status: Active, Temporarily Closed, Out of Business, Unavailable',
+    )
     deployment_objectives = models.TextField(
         blank=True,
         help_text='Shared objectives for this BGE across all their assigned MSMEs'

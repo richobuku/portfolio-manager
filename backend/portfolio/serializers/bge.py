@@ -8,6 +8,7 @@ class BusinessGrowthExpertSerializer(serializers.ModelSerializer):
     assigned_msmes_list = serializers.SerializerMethodField()
     group_names = serializers.SerializerMethodField()
     signature_url = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = BusinessGrowthExpert

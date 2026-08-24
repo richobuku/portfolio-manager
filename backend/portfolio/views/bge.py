@@ -299,17 +299,20 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         qs = BusinessGrowthExpert.objects.all()
         s = self.request.query_params.get('status')
         if s:
-            qs = qs.filter(status=s)
+            if s == 'active':
+                qs = qs.filter(status__in=['active', 'approved'])
+            else:
+                qs = qs.filter(status=s)
         group = self.request.query_params.get('group')
         if group:
             qs = qs.filter(bge_groups__id=group)
 
         # Slim queryset for MSME prefetch — only the fields needed by the
         # serializer's _msme_row helper, nothing else.
-        _msme_qs = MSME.objects.filter(is_active=True).only(
+        _msme_qs = MSME.objects.all().only(
             'id', 'business_name', 'msme_code', 'business_type',
             'sector', 'city', 'assignment_objectives', 'assignment_date',
-            'assigned_bge_id',
+            'assigned_bge_id', 'status',
         ).order_by('business_name')
 
         return (
@@ -358,10 +361,27 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
         self._check_can_write(request, kwargs.get('pk'))
         return super().partial_update(request, *args, **kwargs)
 
+    @action(detail=True, methods=['patch', 'post'], url_path='set-status')
+    def set_status(self, request, pk=None):
+        """Update status of a BGE Expert."""
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only admins can change expert status.")
+        expert = self.get_object()
+        new_status = request.data.get('status')
+        valid_statuses = [s[0] for s in BusinessGrowthExpert.STATUS_CHOICES]
+        if not new_status or new_status not in valid_statuses:
+            return Response(
+                {'error': f"Invalid status '{new_status}'. Allowed: {', '.join(valid_statuses)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        expert.status = new_status
+        expert.save(update_fields=['status', 'updated_at'])
+        return Response(BusinessGrowthExpertSerializer(expert, context={'request': request}).data)
+
     @action(detail=False, methods=['get'])
     def leaderboard(self, request):
         bges = (BusinessGrowthExpert.objects
-                .filter(status='approved')
+                .filter(status__in=['approved', 'active'])
                 .prefetch_related('assigned_msmes', 'bge_groups')
                 .annotate(support_count=Count('support_requests'))
                 .order_by('-support_count'))
@@ -1099,15 +1119,37 @@ class BGEGroupViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='assign-msmes')
     def assign_msmes(self, request, pk=None):
         """Bulk-assign MSMEs to this group.
-        Body: {msme_ids: [...], session_number?: int, objectives?: str}.
+        Body: {msme_ids: [...], session_number?: int, objectives?: str, confirm_inactive?: bool}.
         Every BGE in the group's `members` will then see these MSMEs in their dashboard.
         """
         if not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only admins can assign MSMEs to groups.")
         group = self.get_object()
         msme_ids = request.data.get('msme_ids', [])
+        if not isinstance(msme_ids, list):
+            if hasattr(request.data, 'getlist') and len(request.data.getlist('msme_ids')) > 0:
+                msme_ids = request.data.getlist('msme_ids')
+            elif isinstance(msme_ids, (int, str)) and str(msme_ids).strip():
+                msme_ids = [int(x.strip()) for x in str(msme_ids).split(',') if x.strip()]
+
         if not isinstance(msme_ids, list) or not msme_ids:
             return Response({'error': 'msme_ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        confirm_inactive = request.data.get('confirm_inactive') in [True, 'true', '1', 1]
+
+        # Inactive MSME guard: check if any assigned MSME is not active
+        inactive_msmes = list(
+            MSME.objects.filter(id__in=msme_ids)
+            .exclude(status='active')
+            .values('id', 'business_name', 'status')
+        )
+        if inactive_msmes and not confirm_inactive:
+            inactive_names = [f"{m['business_name']} ({m['status']})" for m in inactive_msmes]
+            return Response({
+                'error': f"The following {len(inactive_msmes)} MSME(s) are inactive: {', '.join(inactive_names)}. Please confirm to assign them.",
+                'requires_confirmation': True,
+                'inactive_msmes': inactive_msmes,
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         session_number = request.data.get('session_number')
         objectives     = request.data.get('objectives', '').strip()
@@ -1124,7 +1166,11 @@ class BGEGroupViewSet(viewsets.ModelViewSet):
         if effective_objectives:
             update_fields['assignment_objectives'] = effective_objectives
 
-        updated = MSME.objects.filter(id__in=msme_ids, is_active=True).update(**update_fields)
+        if confirm_inactive:
+            updated = MSME.objects.filter(id__in=msme_ids).update(**update_fields)
+        else:
+            updated = MSME.objects.filter(id__in=msme_ids, is_active=True).update(**update_fields)
+
         return Response({
             'group_id': group.id,
             'group_name': group.name,

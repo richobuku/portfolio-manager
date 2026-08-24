@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, FormControl, InputLabel, Select, MenuItem, Alert,
+  TextField, FormControl, InputLabel, Select, MenuItem, Menu, Alert,
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Tooltip, Checkbox, FormControlLabel, Card, CardContent, Grid, Drawer, List,
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import {
   Business, People, School, Assessment, ChevronRight,
-  Add, Upload, Visibility, Edit, Delete, DeleteForever, Search, CheckCircle,
+  Add, Upload, Visibility, Edit, Delete, DeleteForever, Search, CheckCircle, Check, Warning,
   TrendingUp, LocationOn, EventNote, Group,
   AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
@@ -58,6 +58,27 @@ const NAV_ITEMS = [
   { key: 'communications', label: 'Communications', icon: <Campaign /> },
   { key: 'tshirts',        label: 'T-Shirt Receipts', icon: <Checkroom /> },
 ];
+
+const STATUS_OPTIONS = [
+  { value: 'active',             label: 'Active',             color: 'success', icon: '🟢', bgcolor: '#E8F5E9', textColor: '#2E7D32', border: '#A5D6A7' },
+  { value: 'temporarily_closed', label: 'Temporarily Closed', color: 'warning', icon: '🟡', bgcolor: '#FFF3E0', textColor: '#E65100', border: '#FFE082' },
+  { value: 'out_of_business',    label: 'Out of Business',    color: 'error',   icon: '🔴', bgcolor: '#FFEBEE', textColor: '#C62828', border: '#EF9A9A' },
+  { value: 'unavailable',        label: 'Unavailable',        color: 'default', icon: '🟣', bgcolor: '#F3E5F5', textColor: '#6A1B9A', border: '#CE93D8' },
+];
+
+const getStatusInfo = (status) => {
+  const s = (status || 'active').toLowerCase();
+  if (s === 'approved') return STATUS_OPTIONS[0]; // Active
+  return STATUS_OPTIONS.find(o => o.value === s) || {
+    value: status,
+    label: (status || 'Active').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    color: 'default',
+    icon: '⚪',
+    bgcolor: '#F5F5F5',
+    textColor: '#616161',
+    border: '#E0E0E0',
+  };
+};
 
 const AttendeeRow = React.memo(function AttendeeRow({ att, idx, msmes, bgeParticipants, updateAttendee, removeAttendeeRow }) {
   const [name, setName] = React.useState(att.attendee_name);
@@ -276,8 +297,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [filterType, setFilterType] = useState('');
   const [filterSector, setFilterSector] = useState('');
   const [filterCohort, setFilterCohort] = useState('');
+  const [filterMsmeStatus, setFilterMsmeStatus] = useState('');
   const [msmeViewMode, setMsmeViewMode] = useState('table'); // 'table' | 'map'
   const [removingCoId, setRemovingCoId] = useState(null);
+
+  // ── status menu & inactive confirm ──────────────────────────────────────────
+  const [statusMenuAnchor, setStatusMenuAnchor] = useState(null);
+  const [statusMenuTarget, setStatusMenuTarget] = useState(null); // { item, type: 'msme' | 'expert' }
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [inactiveConfirmDialog, setInactiveConfirmDialog] = useState(false);
+  const [inactiveConfirmData, setInactiveConfirmData] = useState(null); // { msme, bgeId, actionType }
 
   // ── pagination ─────────────────────────────────────────────────────────────
   const [msmePage, setMsmePage] = useState(0);       // 0-indexed server page
@@ -450,6 +479,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (filterType) params.append('business_type', filterType);
       if (filterSector) params.append('sector', filterSector);
       if (filterCohort) params.append('cohort', filterCohort);
+      if (filterMsmeStatus) params.append('status', filterMsmeStatus);
       params.append('page', '1');
       params.append('page_size', '50');
 
@@ -637,6 +667,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (filterType) params.append('business_type', filterType);
       if (filterSector) params.append('sector', filterSector);
       if (filterCohort) params.append('cohort', filterCohort);
+      if (filterMsmeStatus) params.append('status', filterMsmeStatus);
       params.append('page', String(msmePage + 1));
       params.append('page_size', '50');
       try {
@@ -652,7 +683,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       }
     }, 300);
     return () => { clearTimeout(handle); controller.abort(); };
-  }, [token, msmeSearch, filterType, filterSector, filterCohort, msmePage]);
+  }, [token, msmeSearch, filterType, filterSector, filterCohort, filterMsmeStatus, msmePage]);
 
   // Same pattern for the Reports list — debounced + cancellable
   useEffect(() => {
@@ -796,7 +827,14 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   // ── edit/delete ────────────────────────────────────────────────────────────
-  const openEdit = (item, type) => { setEditItem(item); setEditType(type); setEditForm({ ...item }); };
+  const openEdit = (item, type) => {
+    setEditItem(item);
+    setEditType(type);
+    setEditForm({
+      ...item,
+      status: item.status || (item.is_active === false ? 'unavailable' : 'active'),
+    });
+  };
   const closeEdit = () => { setEditItem(null); setEditForm({}); };
 
   const saveEdit = async () => {
@@ -846,6 +884,41 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     finally { setDeleteLoading(false); }
   };
 
+  const openStatusMenu = (e, item, type) => {
+    e.stopPropagation();
+    setStatusMenuAnchor(e.currentTarget);
+    setStatusMenuTarget({ item, type });
+  };
+
+  const closeStatusMenu = () => {
+    setStatusMenuAnchor(null);
+    setStatusMenuTarget(null);
+  };
+
+  const updateItemStatus = async (newStatus) => {
+    if (!statusMenuTarget) return;
+    const { item, type } = statusMenuTarget;
+    setStatusUpdating(true);
+    try {
+      const url = type === 'expert'
+        ? `${API_ENDPOINTS.EXPERTS}${item.id}/set-status/`
+        : `${API_ENDPOINTS.MSMES}${item.id}/set-status/`;
+      const res = await axios.patch(url, { status: newStatus }, { headers });
+      notify(`${type === 'expert' ? 'Expert' : 'MSME'} status updated to ${getStatusInfo(newStatus).label}`);
+      if (type === 'expert') {
+        setExperts(prev => prev.map(e => e.id === item.id ? { ...e, ...res.data } : e));
+      } else {
+        setMsmes(prev => prev.map(m => m.id === item.id ? { ...m, ...res.data } : m));
+        setAllMsmes(prev => prev.map(m => m.id === item.id ? { ...m, ...res.data } : m));
+      }
+      closeStatusMenu();
+    } catch (err) {
+      notify(err.response?.data?.error || 'Failed to update status', 'error');
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   const openAssignDialog = (msme) => {
     setAssignTarget(msme);
     setAssignForm({
@@ -857,40 +930,87 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     setAssignDialog(true);
   };
 
-  const saveAssignment = async () => {
+  const saveAssignment = async (forceConfirm = false) => {
     if (!assignForm.bge_id) { notify('Please select a BGE Expert', 'error'); return; }
+    // If MSME is inactive and not explicitly confirmed, prompt confirmation
+    if (assignTarget && assignTarget.status && assignTarget.status !== 'active' && !forceConfirm) {
+      setInactiveConfirmData({
+        msme: assignTarget,
+        bgeId: assignForm.bge_id,
+        actionType: 'primary',
+      });
+      setInactiveConfirmDialog(true);
+      return;
+    }
+
     setAssignSaving(true);
     try {
       await axios.patch(
         `${API_ENDPOINTS.MSMES}${assignTarget.id}/assign_bge/`,
-        { bge_id: assignForm.bge_id, objectives: assignForm.objectives, assignment_date: assignForm.assignment_date || null },
+        {
+          bge_id: assignForm.bge_id,
+          objectives: assignForm.objectives,
+          assignment_date: assignForm.assignment_date || null,
+          confirm_inactive: forceConfirm,
+        },
         { headers }
       );
       notify('Assignment saved');
       setAssignDialog(false);
+      setInactiveConfirmDialog(false);
       fetchAll();
     } catch (err) {
-      notify(err.response?.data?.error || 'Failed to save assignment', 'error');
+      if (err.response?.data?.requires_confirmation) {
+        setInactiveConfirmData({
+          msme: assignTarget,
+          bgeId: assignForm.bge_id,
+          actionType: 'primary',
+        });
+        setInactiveConfirmDialog(true);
+      } else {
+        notify(err.response?.data?.error || 'Failed to save assignment', 'error');
+      }
     } finally {
       setAssignSaving(false);
     }
   };
 
-  const addCoAssignee = async (bgeId) => {
+  const addCoAssignee = async (bgeId, forceConfirm = false) => {
     if (!bgeId) return;
+    // If MSME is inactive and not explicitly confirmed, prompt confirmation
+    if (assignTarget && assignTarget.status && assignTarget.status !== 'active' && !forceConfirm) {
+      setInactiveConfirmData({
+        msme: assignTarget,
+        bgeId: bgeId,
+        actionType: 'co_assign',
+      });
+      setInactiveConfirmDialog(true);
+      return;
+    }
+
     setCoAssignSaving(true);
     try {
       const res = await axios.patch(
         `${API_ENDPOINTS.MSMES}${assignTarget.id}/add_co_assigned/`,
-        { bge_id: bgeId, is_co_assign: true },
+        { bge_id: bgeId, is_co_assign: true, confirm_inactive: forceConfirm },
         { headers }
       );
       setAssignTarget(res.data);
       setMsmes(prev => prev.map(m => m.id === assignTarget.id ? { ...m, ...res.data } : m));
       setCoAssignAdd('');
+      setInactiveConfirmDialog(false);
       notify('Co-assigned BGE added successfully');
     } catch (err) {
-      notify(err.response?.data?.error || 'Failed to add co-assignee', 'error');
+      if (err.response?.data?.requires_confirmation) {
+        setInactiveConfirmData({
+          msme: assignTarget,
+          bgeId: bgeId,
+          actionType: 'co_assign',
+        });
+        setInactiveConfirmDialog(true);
+      } else {
+        notify(err.response?.data?.error || 'Failed to add co-assignee', 'error');
+      }
     } finally {
       setCoAssignSaving(false);
     }
@@ -1801,10 +1921,20 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 {cohorts.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
               </Select>
             </FormControl>
+            <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: 0 }}>
+              <InputLabel>Status</InputLabel>
+              <Select value={filterMsmeStatus} onChange={e => { setFilterMsmeStatus(e.target.value); setMsmePage(0); }} label="Status">
+                <MenuItem value="">All Statuses</MenuItem>
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="temporarily_closed">Temporarily Closed</MenuItem>
+                <MenuItem value="out_of_business">Out of Business</MenuItem>
+                <MenuItem value="unavailable">Unavailable</MenuItem>
+              </Select>
+            </FormControl>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button variant="contained" size="small" onClick={fetchAll}>Search</Button>
-              {(msmeSearch || filterType || filterSector || filterCohort) &&
-                <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); setMsmePage(0); }}>Clear</Button>}
+              {(msmeSearch || filterType || filterSector || filterCohort || filterMsmeStatus) &&
+                <Button size="small" onClick={() => { setMsmeSearch(''); setFilterType(''); setFilterSector(''); setFilterCohort(''); setFilterMsmeStatus(''); setMsmePage(0); }}>Clear</Button>}
             </Box>
           </Paper>
 
@@ -1816,6 +1946,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <TableCell>Business</TableCell>
                   <TableCell>Owner</TableCell>
                   <TableCell>Type</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell>Cohort</TableCell>
                   <TableCell>Groups</TableCell>
                   <TableCell>Assigned BGE</TableCell>
@@ -1828,13 +1959,37 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               </TableHead>
               <TableBody>
                 {msmes.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={13} align="center" sx={{ py: 4, color: 'text.secondary' }}>No MSMEs found</TableCell></TableRow>
                 ) : msmes.map(m => (
                   <TableRow key={m.id} hover>
                     <TableCell><Chip label={m.msme_code} size="small" variant="outlined" /></TableCell>
                     <TableCell sx={{ fontWeight: 500 }}>{m.business_name}</TableCell>
                     <TableCell>{m.owner_name}</TableCell>
                     <TableCell><Chip label={m.business_type} size="small" color="primary" /></TableCell>
+                    <TableCell>
+                      {(() => {
+                        const sInfo = getStatusInfo(m.status);
+                        return (
+                          <Tooltip title={isAdmin ? "Click to change MSME status" : `Status: ${sInfo.label}`}>
+                            <Chip
+                              label={sInfo.label}
+                              size="small"
+                              onClick={isAdmin ? (ev) => openStatusMenu(ev, m, 'msme') : undefined}
+                              sx={{
+                                cursor: isAdmin ? 'pointer' : 'default',
+                                fontWeight: 600,
+                                fontSize: 11,
+                                bgcolor: sInfo.bgcolor,
+                                color: sInfo.textColor,
+                                border: `1px solid ${sInfo.border}`,
+                                '&:hover': isAdmin ? { opacity: 0.85, transform: 'scale(1.02)' } : {},
+                                transition: 'all 0.15s ease',
+                              }}
+                            />
+                          </Tooltip>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <Select
                         size="small" value={m.cohort || ''} displayEmpty variant="standard" disableUnderline
@@ -2289,7 +2444,30 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <Business fontSize="small" color="action" />
                   </Badge>
                 </TableCell>
-                <TableCell><Chip label={e.status} color={statusColor(e.status)} size="small" /></TableCell>
+                <TableCell>
+                  {(() => {
+                    const sInfo = getStatusInfo(e.status);
+                    return (
+                      <Tooltip title={isStaff ? "Click to change BGE status" : `Status: ${sInfo.label}`}>
+                        <Chip
+                          label={sInfo.label}
+                          size="small"
+                          onClick={isStaff ? (ev) => openStatusMenu(ev, e, 'expert') : undefined}
+                          sx={{
+                            cursor: isStaff ? 'pointer' : 'default',
+                            fontWeight: 600,
+                            fontSize: 11,
+                            bgcolor: sInfo.bgcolor,
+                            color: sInfo.textColor,
+                            border: `1px solid ${sInfo.border}`,
+                            '&:hover': isStaff ? { opacity: 0.85, transform: 'scale(1.02)' } : {},
+                            transition: 'all 0.15s ease',
+                          }}
+                        />
+                      </Tooltip>
+                    );
+                  })()}
+                </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', gap: 0.5 }}>
                     <Tooltip title={e.email ? `Preview & send MSME list to ${e.email}` : 'No email on record'}>
@@ -9560,6 +9738,17 @@ PRUDEV II BDS Team`
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth size="small"><InputLabel>Status</InputLabel>
+                  <Select value={editForm.status || 'active'} onChange={e => setEditForm({...editForm, status: e.target.value})} label="Status">
+                    {STATUS_OPTIONS.map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.icon} {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
               {[['annual_revenue','Annual Revenue'],['investment_needed','Investment Needed'],['employee_count','Employees']].map(([f,l]) => (
                 <Grid item xs={12} sm={4} key={f}>
                   <TextField fullWidth size="small" label={l} type="number" value={editForm[f] || ''} onChange={e => setEditForm({...editForm, [f]: e.target.value})} />
@@ -9649,8 +9838,15 @@ PRUDEV II BDS Team`
               </Grid>
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth size="small"><InputLabel>Status</InputLabel>
-                  <Select value={editForm.status || 'pending'} onChange={e => setEditForm({...editForm, status: e.target.value})} label="Status">
-                    {['pending','approved','rejected'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                  <Select value={editForm.status || 'active'} onChange={e => setEditForm({...editForm, status: e.target.value})} label="Status">
+                    {STATUS_OPTIONS.map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.icon} {opt.label}
+                      </MenuItem>
+                    ))}
+                    <MenuItem value="approved">🟢 Approved (Legacy)</MenuItem>
+                    <MenuItem value="pending">🟡 Pending (Legacy)</MenuItem>
+                    <MenuItem value="rejected">🔴 Rejected (Legacy)</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -10032,9 +10228,14 @@ PRUDEV II BDS Team`
               label="Status"
               onChange={e => setBgeForm(f => ({ ...f, status: e.target.value }))}
             >
-              <MenuItem value="approved">Approved</MenuItem>
-              <MenuItem value="pending">Pending</MenuItem>
-              <MenuItem value="rejected">Rejected</MenuItem>
+              {STATUS_OPTIONS.map(opt => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.icon} {opt.label}
+                </MenuItem>
+              ))}
+              <MenuItem value="approved">🟢 Approved (Legacy)</MenuItem>
+              <MenuItem value="pending">🟡 Pending (Legacy)</MenuItem>
+              <MenuItem value="rejected">🔴 Rejected (Legacy)</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>
@@ -10628,6 +10829,16 @@ PRUDEV II BDS Team`
               <Typography component="span" variant="caption" color="text.secondary">({assignTarget.msme_code})</Typography>
             </Alert>
           )}
+          {assignTarget && assignTarget.status && assignTarget.status !== 'active' && (
+            <Alert severity="warning" icon={<Warning fontSize="small" />} sx={{ mb: 2 }}>
+              <Typography variant="caption" fontWeight={700} display="block">
+                ⚠️ Inactive MSME Warning ({getStatusInfo(assignTarget.status).label})
+              </Typography>
+              <Typography variant="caption">
+                This business is currently marked as <strong>{getStatusInfo(assignTarget.status).label}</strong>. Deploying a BGE to a closed or unavailable MSME will require explicit confirmation.
+              </Typography>
+            </Alert>
+          )}
           {assignTarget && (
             <Accordion defaultExpanded={false} variant="outlined" sx={{ mb: 2 }}>
               <AccordionSummary expandIcon={<ExpandMore />}>
@@ -10676,9 +10887,24 @@ PRUDEV II BDS Team`
               onChange={e => setAssignForm({ ...assignForm, bge_id: e.target.value })}
             >
               <MenuItem value=""><em>None (unassigned)</em></MenuItem>
-              {experts.map(e => (
-                <MenuItem key={e.id} value={e.id}>{e.name}{e.bge_code ? ` · ${e.bge_code}` : ''}</MenuItem>
-              ))}
+              {experts.map(e => {
+                const eStatus = getStatusInfo(e.status);
+                const isInactiveBge = e.status && e.status !== 'active' && e.status !== 'approved';
+                return (
+                  <MenuItem key={e.id} value={e.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                      <span>{e.name}{e.bge_code ? ` · ${e.bge_code}` : ''}</span>
+                      {isInactiveBge && (
+                        <Chip
+                          label={eStatus.label}
+                          size="small"
+                          sx={{ height: 18, fontSize: 9, bgcolor: eStatus.bgcolor, color: eStatus.textColor, border: `1px solid ${eStatus.border}` }}
+                        />
+                      )}
+                    </Box>
+                  </MenuItem>
+                );
+              })}
             </Select>
           </FormControl>
 
@@ -10800,12 +11026,109 @@ PRUDEV II BDS Team`
             variant="contained"
             disabled={assignSaving}
             startIcon={assignSaving ? <CircularProgress size={16} color="inherit" /> : null}
-            onClick={saveAssignment}
+            onClick={() => saveAssignment(false)}
           >
             {assignSaving ? 'Saving…' : 'Save Assignment'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ── Inactive MSME Assignment Confirmation Dialog ── */}
+      <Dialog
+        open={inactiveConfirmDialog}
+        onClose={() => setInactiveConfirmDialog(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'warning.dark' }}>
+          <Warning color="warning" /> Inactive MSME Assignment Warning
+        </DialogTitle>
+        <DialogContent dividers>
+          {inactiveConfirmData && (
+            <Box>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {inactiveConfirmData.msme?.business_name} is currently {getStatusInfo(inactiveConfirmData.msme?.status).label}.
+                </Typography>
+              </Alert>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Assigning a Business Growth Expert to a closed or unavailable MSME may lead to unfulfilled visits and inaccurate workload metrics.
+              </Typography>
+              <Typography variant="body2" fontWeight={600}>
+                Are you sure you want to proceed with this assignment?
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInactiveConfirmDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={assignSaving || coAssignSaving}
+            onClick={() => {
+              if (inactiveConfirmData?.actionType === 'co_assign') {
+                addCoAssignee(inactiveConfirmData.bgeId, true);
+              } else {
+                saveAssignment(true);
+              }
+            }}
+          >
+            Assign Inactive MSME Anyway
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Status Change Menu Popover ── */}
+      <Menu
+        anchorEl={statusMenuAnchor}
+        open={Boolean(statusMenuAnchor)}
+        onClose={closeStatusMenu}
+        PaperProps={{
+          elevation: 4,
+          sx: { minWidth: 220, borderRadius: 2, p: 0.5 }
+        }}
+      >
+        <Box sx={{ px: 1.5, py: 1, borderBottom: '1px solid', borderColor: 'divider', mb: 0.5 }}>
+          <Typography variant="caption" fontWeight={700} color="text.secondary" textTransform="uppercase">
+            Set {statusMenuTarget?.type === 'expert' ? 'BGE Expert' : 'MSME'} Status
+          </Typography>
+          <Typography variant="body2" fontWeight={600} noWrap>
+            {statusMenuTarget?.item?.business_name || statusMenuTarget?.item?.name}
+          </Typography>
+        </Box>
+        {STATUS_OPTIONS.map((opt) => {
+          const currentStatus = (statusMenuTarget?.item?.status || 'active').toLowerCase();
+          const isSelected = currentStatus === opt.value || (currentStatus === 'approved' && opt.value === 'active');
+          return (
+            <MenuItem
+              key={opt.value}
+              onClick={() => updateItemStatus(opt.value)}
+              disabled={statusUpdating}
+              selected={isSelected}
+              sx={{
+                py: 0.8,
+                px: 1.5,
+                borderRadius: 1,
+                my: 0.2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                '&.Mui-selected': { bgcolor: opt.bgcolor, color: opt.textColor, fontWeight: 700 },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>{opt.icon}</span>
+                <Typography variant="body2" fontWeight={isSelected ? 700 : 500}>
+                  {opt.label}
+                </Typography>
+              </Box>
+              {isSelected && <Check fontSize="small" sx={{ color: opt.textColor }} />}
+            </MenuItem>
+          );
+        })}
+      </Menu>
 
       {/* ── Link BGE Profile ──────────────────────────────────────────────── */}
       <Dialog open={!!linkBgeUser} onClose={() => setLinkBgeUser(null)} maxWidth="xs" fullWidth>
