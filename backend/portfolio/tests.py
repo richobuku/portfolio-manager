@@ -400,5 +400,95 @@ class MSMEStatusAndAssignmentFlaggingTests(TestCase):
         self.assertEqual(self.active_msme.assigned_group, self.group)
 
 
+class MSMEStatusLocationAndAltContactTests(TestCase):
+    def setUp(self):
+        self.bge_user = User.objects.create_user('bge_expert', 'bge@test.com', 'pass123')
+        self.other_bge_user = User.objects.create_user('other_bge', 'other@test.com', 'pass123')
+
+        self.bge = BusinessGrowthExpert.objects.create(name='BGE Expert', user=self.bge_user)
+        self.other_bge = BusinessGrowthExpert.objects.create(name='Other BGE', user=self.other_bge_user)
+
+        self.msme = MSME.objects.create(
+            business_name='Arua Solar Solutions',
+            business_type='SMALL',
+            sector='TECHNOLOGY',
+            owner_name='Adrole Robert',
+            phone='0772000111',
+            email='arua.solar@example.com',
+            city='Arua City',
+            district='Arua',
+            state='Arua',
+            status='active',
+            is_active=True,
+            assigned_bge=self.bge,
+        )
+
+        self.client = APIClient()
+
+    def test_bge_updates_msme_status_and_is_active_sync(self):
+        self.client.force_authenticate(user=self.bge_user)
+
+        # Update to temporarily_closed
+        res = self.client.patch(f'/api/msmes/{self.msme.id}/', {
+            'status': 'temporarily_closed',
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.msme.refresh_from_db()
+        self.assertEqual(self.msme.status, 'temporarily_closed')
+        self.assertFalse(self.msme.is_active)
+
+        # Update back to active
+        res2 = self.client.patch(f'/api/msmes/{self.msme.id}/', {
+            'status': 'active',
+        }, format='json')
+        self.assertEqual(res2.status_code, 200)
+        self.msme.refresh_from_db()
+        self.assertEqual(self.msme.status, 'active')
+        self.assertTrue(self.msme.is_active)
+
+    def test_bge_updates_msme_location_and_district_sync(self):
+        self.client.force_authenticate(user=self.bge_user)
+
+        res = self.client.patch(f'/api/msmes/{self.msme.id}/', {
+            'district': 'Gulu',
+            'city': 'Gulu City',
+            'address': 'Plot 45 Gulu Main Road',
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.msme.refresh_from_db()
+        self.assertEqual(self.msme.district, 'Gulu')
+        self.assertEqual(self.msme.state, 'Gulu')
+        self.assertEqual(self.msme.city, 'Gulu City')
+        self.assertEqual(self.msme.address, 'Plot 45 Gulu Main Road')
+
+    def test_bge_updates_msme_alternative_contact(self):
+        self.client.force_authenticate(user=self.bge_user)
+
+        res = self.client.patch(f'/api/msmes/{self.msme.id}/', {
+            'alt_contact_name': 'Ayikoru Sarah',
+            'alt_phone': '0782334455',
+            'alt_email': 'sarah.manager@example.com',
+            'alt_contact_role': 'Manager',
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.msme.refresh_from_db()
+        self.assertEqual(self.msme.alt_contact_name, 'Ayikoru Sarah')
+        self.assertEqual(self.msme.alt_phone, '0782334455')
+        self.assertEqual(self.msme.alt_email, 'sarah.manager@example.com')
+        self.assertEqual(self.msme.alt_contact_role, 'Manager')
+
+    def test_non_assigned_bge_cannot_update_msme(self):
+        self.client.force_authenticate(user=self.other_bge_user)
+
+        res = self.client.patch(f'/api/msmes/{self.msme.id}/', {
+            'status': 'out_of_business',
+        }, format='json')
+        # Non-assigned BGEs are scoped out of queryset and get 404
+        self.assertEqual(res.status_code, 404)
+        self.msme.refresh_from_db()
+        self.assertEqual(self.msme.status, 'active')
+
+
+
 
 

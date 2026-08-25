@@ -942,7 +942,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         from django.db.models import Q
         from django.db.models.functions import TruncMonth
 
-        qs = MSME.objects.filter(is_active=True)
+        qs = MSME.objects.all()
 
         # Apply optional filters so the analytics page can drill down.
         cohort_id = request.query_params.get('cohort')
@@ -957,6 +957,14 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         bge_id = request.query_params.get('bge')
         if bge_id:
             qs = qs.filter(Q(assigned_bge_id=bge_id) | Q(assigned_group__members__id=bge_id)).distinct()
+        status_param = request.query_params.get('status')
+        if status_param:
+            if status_param == 'inactive':
+                qs = qs.exclude(status='active')
+            elif status_param != 'all':
+                qs = qs.filter(status=status_param)
+        elif request.query_params.get('active_only') == '1':
+            qs = qs.filter(is_active=True)
 
         agg = qs.aggregate(
             total_investment_needed=Sum('investment_needed'),
@@ -1004,11 +1012,10 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         # BGE workload (top 15 BGEs by direct + group-assigned MSMEs)
         # Annotate everything in 2 queries instead of (1 + 3*N) per BGE.
         bge_qs = (BusinessGrowthExpert.objects
-                  .filter(status='approved')
+                  .filter(status__in=['approved', 'active'])
                   .annotate(
                       direct=Count(
                           'assigned_msmes',
-                          filter=Q(assigned_msmes__is_active=True),
                           distinct=True,
                       ),
                       reports_count=Count('reports', distinct=True),
@@ -1016,7 +1023,7 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         # `via_group` = MSMEs reachable through any of the BGE's groups.
         # Cheaper as a single grouped query than per-BGE.
         via_group_counts = dict(
-            MSME.objects.filter(is_active=True, assigned_group__members__isnull=False)
+            MSME.objects.filter(assigned_group__members__isnull=False)
                         .values_list('assigned_group__members')
                         .annotate(c=Count('id', distinct=True))
                         .values_list('assigned_group__members', 'c')
@@ -1041,7 +1048,6 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                     .annotate(
                         msme_count=Count(
                             'assigned_msmes',
-                            filter=Q(assigned_msmes__is_active=True),
                             distinct=True,
                         ),
                         active_member_count=Count('members', distinct=True),

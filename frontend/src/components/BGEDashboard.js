@@ -63,6 +63,14 @@ const getMsmeStatusInfo = (status) => MSME_STATUS_CONFIG[status] || {
   border: '#E0E0E0',
 };
 
+const NORTHERN_UGANDA_DISTRICTS = [
+  'Gulu', 'Lira', 'Arua', 'Kitgum', 'Dokolo', 'Oyam', 'Apac', 'Nebbi',
+  'Koboko', 'Nwoya', 'Pader', 'Yumbe', 'Adjumani', 'Moyo', 'Moroto',
+  'Agago', 'Amolatar', 'Amuru', 'Alebtong', 'Kole', 'Otuke', 'Maracha',
+  'Madi-Okollo', 'Terego', 'Zombo', 'Pakwach', 'Lamwo', 'Obongi',
+  'Abim', 'Kotido', 'Kaabong', 'Karenga', 'Nakapiripirit', 'Nabilatuk', 'Amudat',
+];
+
 const EMPTY_GROUP_REPORT = {
   group: '',
   session_number: '',
@@ -396,6 +404,83 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       notify(err.response?.data?.detail || 'Failed to save visit data', 'error');
     } finally {
       setQuickUpdateSaving(false);
+    }
+  };
+
+  // ── Edit MSME Information (Status, Location, Alternative Contact) ────────
+  const [editMsmeDialog, setEditMsmeDialog] = useState(false);
+  const [editMsmeSaving, setEditMsmeSaving] = useState(false);
+  const [editMsmeError, setEditMsmeError] = useState('');
+  const [editMsmeForm, setEditMsmeForm] = useState({
+    id: '',
+    business_name: '',
+    status: 'active',
+    district: '',
+    city: '',
+    address: '',
+    owner_name: '',
+    phone: '',
+    email: '',
+    alt_contact_name: '',
+    alt_phone: '',
+    alt_email: '',
+    alt_contact_role: '',
+  });
+
+  const openEditMsme = (msme) => {
+    setEditMsmeForm({
+      id: msme.id,
+      business_name: msme.business_name || '',
+      status: msme.status || 'active',
+      district: msme.district || msme.state || msme.diag_district || '',
+      city: msme.city || '',
+      address: msme.address || '',
+      owner_name: msme.owner_name || '',
+      phone: msme.phone || '',
+      email: msme.email || msme.business_email || '',
+      alt_contact_name: msme.alt_contact_name || '',
+      alt_phone: msme.alt_phone || '',
+      alt_email: msme.alt_email || '',
+      alt_contact_role: msme.alt_contact_role || '',
+    });
+    setEditMsmeSaving(false);
+    setEditMsmeError('');
+    setEditMsmeDialog(true);
+  };
+
+  const saveEditMsme = async () => {
+    if (!editMsmeForm.id) return;
+    setEditMsmeSaving(true);
+    setEditMsmeError('');
+    try {
+      const payload = {
+        status: editMsmeForm.status,
+        district: (editMsmeForm.district || '').trim(),
+        state: (editMsmeForm.district || '').trim(),
+        city: (editMsmeForm.city || '').trim(),
+        address: (editMsmeForm.address || '').trim(),
+        owner_name: (editMsmeForm.owner_name || '').trim(),
+        phone: (editMsmeForm.phone || '').trim(),
+        email: (editMsmeForm.email || '').trim(),
+        alt_contact_name: (editMsmeForm.alt_contact_name || '').trim(),
+        alt_phone: (editMsmeForm.alt_phone || '').trim(),
+        alt_email: (editMsmeForm.alt_email || '').trim(),
+        alt_contact_role: (editMsmeForm.alt_contact_role || '').trim(),
+      };
+      const res = await axios.patch(`${API_ENDPOINTS.MSMES}${editMsmeForm.id}/`, payload, { headers });
+      const updated = res.data;
+      notify(`Updated ${updated.business_name || 'MSME'} successfully`, 'success');
+      setMsmes(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m));
+      setSelectedMsme(prev => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+      setEditMsmeDialog(false);
+      fetchMsmes();
+    } catch (err) {
+      const d = err.response?.data;
+      const msg = d?.detail || d?.error || (typeof d === 'object' ? Object.entries(d).map(([k, v]) => `${k}: ${v}`).join(', ') : 'Failed to update MSME');
+      setEditMsmeError(msg);
+      notify(msg, 'error');
+    } finally {
+      setEditMsmeSaving(false);
     }
   };
 
@@ -1904,6 +1989,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                         <Visibility fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
+                                    <Tooltip title="Edit MSME status, location & contacts">
+                                      <IconButton size="small" sx={{ color: '#0288D1' }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
+                                        <Edit fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
                                     <Tooltip title="New visit report">
                                       <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
                                         <Add fontSize="small" />
@@ -1936,10 +2026,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       <Typography variant="body2">{m.phone}</Typography>
                                     </Grid>
                                   )}
-                                  {(m.city || m.state) && (
+                                  {(m.city || m.district || m.state) && (
                                     <Grid item xs={6} sm={3}>
                                       <Typography variant="caption" color="text.secondary" display="block">Location</Typography>
-                                      <Typography variant="body2">{[m.city, m.state].filter(Boolean).join(', ')}</Typography>
+                                      <Typography variant="body2">{[m.city, m.district || m.state].filter(Boolean).join(', ')}</Typography>
                                     </Grid>
                                   )}
                                   {m.sector && (
@@ -1960,6 +2050,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       {totalSupports} total{lastSupportDate ? ` · last ${lastSupportDate}` : ''}
                                     </Typography>
                                   </Grid>
+                                  {(m.alt_contact_name || m.alt_phone) && (
+                                    <Grid item xs={12}>
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 11 }}>
+                                        Alt Contact: <strong style={{ color: '#37474F' }}>{[m.alt_contact_name, m.alt_contact_role ? `(${m.alt_contact_role})` : '', m.alt_phone].filter(Boolean).join(' · ')}</strong>
+                                      </Typography>
+                                    </Grid>
+                                  )}
                                 </Grid>
 
                                 {/* Monthly visit tracker */}
@@ -2042,6 +2139,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                         <Visibility fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
+                                    <Tooltip title="Edit MSME status, location & contacts">
+                                      <IconButton size="small" sx={{ color: '#0288D1' }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
+                                        <Edit fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
                                     <Tooltip title="New visit report">
                                       <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); openNewReport(m.id); }}>
                                         <Add fontSize="small" />
@@ -2073,10 +2175,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       <Typography variant="body2">{m.phone}</Typography>
                                     </Grid>
                                   )}
-                                  {(m.city || m.state) && (
+                                  {(m.city || m.district || m.state) && (
                                     <Grid item xs={6} sm={3}>
                                       <Typography variant="caption" color="text.secondary" display="block">Location</Typography>
-                                      <Typography variant="body2">{[m.city, m.state].filter(Boolean).join(', ')}</Typography>
+                                      <Typography variant="body2">{[m.city, m.district || m.state].filter(Boolean).join(', ')}</Typography>
                                     </Grid>
                                   )}
                                   {m.sector && (
@@ -2097,6 +2199,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       {totalSupports} total{lastSupportDate ? ` · last ${lastSupportDate}` : ''}
                                     </Typography>
                                   </Grid>
+                                  {(m.alt_contact_name || m.alt_phone) && (
+                                    <Grid item xs={12}>
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 11 }}>
+                                        Alt Contact: <strong style={{ color: '#37474F' }}>{[m.alt_contact_name, m.alt_contact_role ? `(${m.alt_contact_role})` : '', m.alt_phone].filter(Boolean).join(' · ')}</strong>
+                                      </Typography>
+                                    </Grid>
+                                  )}
                                 </Grid>
 
                                 {/* Monthly visit tracker */}
@@ -2317,6 +2426,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                   <Tooltip title="View details">
                                     <IconButton size="small" onClick={() => openMsmeDetail(m)}>
                                       <Visibility fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Edit MSME status, location & contacts">
+                                    <IconButton size="small" sx={{ color: '#0288D1' }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
+                                      <Edit fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
                                   <Tooltip title="New visit report">
@@ -3805,6 +3919,213 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         </Dialog>
       )}
 
+      {/* ── Edit MSME Status, Location & Alternative Contact Dialog ── */}
+      <Dialog open={editMsmeDialog} onClose={() => !editMsmeSaving && setEditMsmeDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography fontWeight={700} fontSize={17}>Edit MSME Information</Typography>
+            <Typography variant="caption" color="text.secondary">{editMsmeForm.business_name}</Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setEditMsmeDialog(false)} disabled={editMsmeSaving}>
+            <Close fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 2.5 }}>
+          {editMsmeError && (
+            <Alert severity="error" sx={{ mb: 2 }}>{editMsmeError}</Alert>
+          )}
+
+          {/* 1. Operational Status */}
+          <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+            Operational Status
+          </Typography>
+          <Grid container spacing={1} sx={{ mb: 2.5 }}>
+            {[
+              { key: 'active', label: 'Active', desc: 'Operating normally', cfg: MSME_STATUS_CONFIG.active },
+              { key: 'temporarily_closed', label: 'Temporarily Closed', desc: 'Seasonal/temporary shutdown', cfg: MSME_STATUS_CONFIG.temporarily_closed },
+              { key: 'out_of_business', label: 'Out of Business', desc: 'Permanently ceased operations', cfg: MSME_STATUS_CONFIG.out_of_business },
+              { key: 'unavailable', label: 'Unavailable', desc: 'Cannot be reached/relocated', cfg: MSME_STATUS_CONFIG.unavailable },
+            ].map(st => {
+              const isSelected = editMsmeForm.status === st.key;
+              return (
+                <Grid item xs={6} key={st.key}>
+                  <Box
+                    onClick={() => setEditMsmeForm(f => ({ ...f, status: st.key }))}
+                    sx={{
+                      p: 1.25,
+                      borderRadius: 1.5,
+                      border: `2px solid ${isSelected ? st.cfg.border : '#E0E0E0'}`,
+                      bgcolor: isSelected ? st.cfg.bgcolor : '#FAFAFA',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      '&:hover': { bgcolor: st.cfg.bgcolor, borderColor: st.cfg.border },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: st.cfg.textColor }} />
+                      <Typography fontSize={13} fontWeight={isSelected ? 700 : 600} color={isSelected ? st.cfg.textColor : 'text.primary'}>
+                        {st.label}
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" fontSize={11} display="block" sx={{ pl: 1.75 }}>
+                      {st.desc}
+                    </Typography>
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* 2. Location */}
+          <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+            Location
+          </Typography>
+          <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>District</InputLabel>
+                <Select
+                  value={editMsmeForm.district}
+                  label="District"
+                  onChange={e => setEditMsmeForm(f => ({ ...f, district: e.target.value }))}
+                >
+                  <MenuItem value=""><em>— Select District —</em></MenuItem>
+                  {NORTHERN_UGANDA_DISTRICTS.map(d => (
+                    <MenuItem key={d} value={d}>{d}</MenuItem>
+                  ))}
+                  {editMsmeForm.district && !NORTHERN_UGANDA_DISTRICTS.includes(editMsmeForm.district) && (
+                    <MenuItem value={editMsmeForm.district}>{editMsmeForm.district}</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth size="small" label="City / Town"
+                value={editMsmeForm.city}
+                onChange={e => setEditMsmeForm(f => ({ ...f, city: e.target.value }))}
+                placeholder="e.g. Gulu City, Lira Town, Layibi"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth size="small" label="Physical Address / Landmark"
+                value={editMsmeForm.address}
+                onChange={e => setEditMsmeForm(f => ({ ...f, address: e.target.value }))}
+                placeholder="e.g. Plot 14 Main Street, opposite Central Market"
+              />
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* 3. Primary Contact */}
+          <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+            Primary Contact
+          </Typography>
+          <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth size="small" label="Owner / Contact Person"
+                value={editMsmeForm.owner_name}
+                onChange={e => setEditMsmeForm(f => ({ ...f, owner_name: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth size="small" label="Primary Phone"
+                value={editMsmeForm.phone}
+                onChange={e => setEditMsmeForm(f => ({ ...f, phone: e.target.value }))}
+                placeholder="e.g. 0772123456"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth size="small" label="Primary Email"
+                value={editMsmeForm.email}
+                onChange={e => setEditMsmeForm(f => ({ ...f, email: e.target.value }))}
+              />
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* 4. Alternative Contact */}
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Alternative / Secondary Contact
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block">
+              Backup person to reach if the primary contact is unavailable
+            </Typography>
+          </Box>
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth size="small" label="Alternative Contact Name"
+                value={editMsmeForm.alt_contact_name}
+                onChange={e => setEditMsmeForm(f => ({ ...f, alt_contact_name: e.target.value }))}
+                placeholder="e.g. Okello David"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth size="small" label="Alternative Phone"
+                value={editMsmeForm.alt_phone}
+                onChange={e => setEditMsmeForm(f => ({ ...f, alt_phone: e.target.value }))}
+                placeholder="e.g. 0782987654"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth size="small" label="Relationship / Role"
+                value={editMsmeForm.alt_contact_role}
+                onChange={e => setEditMsmeForm(f => ({ ...f, alt_contact_role: e.target.value }))}
+                placeholder="e.g. Manager, Caretaker, Spouse, Accountant"
+              />
+              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+                {['Manager', 'Caretaker', 'Spouse', 'Accountant', 'Partner'].map(role => (
+                  <Chip
+                    key={role}
+                    size="small"
+                    label={role}
+                    variant={editMsmeForm.alt_contact_role === role ? 'filled' : 'outlined'}
+                    color={editMsmeForm.alt_contact_role === role ? 'primary' : 'default'}
+                    onClick={() => setEditMsmeForm(f => ({ ...f, alt_contact_role: role }))}
+                    sx={{ fontSize: 10, height: 20, cursor: 'pointer' }}
+                  />
+                ))}
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth size="small" label="Alternative Email"
+                value={editMsmeForm.alt_email}
+                onChange={e => setEditMsmeForm(f => ({ ...f, alt_email: e.target.value }))}
+                placeholder="e.g. manager@example.com"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 1.5 }}>
+          <Button onClick={() => setEditMsmeDialog(false)} disabled={editMsmeSaving}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={saveEditMsme}
+            disabled={editMsmeSaving}
+            sx={{ bgcolor: BRAND.primaryMain }}
+          >
+            {editMsmeSaving ? <CircularProgress size={18} /> : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* ── MSME detail dialog ── */}
       <Dialog open={msmeDetailDialog} onClose={() => setMsmeDetailDialog(false)} maxWidth="md" fullWidth>
         {selectedMsme && (() => {
@@ -3832,10 +4153,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       <Chip key={g.id} size="small" label={g.name} sx={{ ml: 0.5, fontSize: 10, bgcolor: g.color, color: '#fff' }} />
                     ))}
                   </Box>
-                  <Button variant="contained" size="small" startIcon={<Add />}
-                    onClick={() => { setMsmeDetailDialog(false); openNewReport(m.id); }}>
-                    New Report
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button variant="outlined" size="small" startIcon={<Edit />}
+                      onClick={() => openEditMsme(m)}>
+                      Edit Details
+                    </Button>
+                    <Button variant="contained" size="small" startIcon={<Add />}
+                      onClick={() => { setMsmeDetailDialog(false); openNewReport(m.id); }}>
+                      New Report
+                    </Button>
+                  </Box>
                 </Box>
               </DialogTitle>
 
@@ -3852,7 +4179,26 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 {msmeDetailTab === 0 && (
                   <>
                     <Box sx={{ p: 2, bgcolor: '#F8F9FA', borderBottom: '1px solid #E8EDF2' }}>
-                      <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Business Profile</Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10}>Business Profile</Typography>
+                        {(() => {
+                          const sInfo = getMsmeStatusInfo(m.status);
+                          return (
+                            <Chip
+                              label={sInfo.label}
+                              size="small"
+                              sx={{
+                                bgcolor: sInfo.bgcolor,
+                                color: sInfo.textColor,
+                                border: `1px solid ${sInfo.border}`,
+                                fontWeight: 700,
+                                fontSize: 11,
+                                height: 22,
+                              }}
+                            />
+                          );
+                        })()}
+                      </Box>
                       <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
                         <Field label="Owner"         value={m.owner_name} />
                         <Field label="Phone"          value={m.phone} />
@@ -3860,11 +4206,26 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         <Field label="Sector"         value={m.sector} />
                         <Field label="Business Type"  value={m.business_type} />
                         <Field label="Cohort"         value={m.cohort_name} />
-                        <Field label="District"       value={m.state || m.diag_district} />
+                        <Field label="District"       value={m.district || m.state || m.diag_district} />
                         <Field label="City / Town"    value={m.city} />
+                        <Field label="Address"        value={m.address} />
                         <Field label="Assigned BGE"   value={m.assigned_bge_name} />
                         <Field label="Registration #" value={m.registration_number} />
                       </Grid>
+
+                      {(m.alt_contact_name || m.alt_phone || m.alt_email) && (
+                        <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px dashed #CFD8DC' }}>
+                          <Typography variant="overline" color="text.secondary" fontWeight={700} fontSize={10} display="block" sx={{ mb: 0.5 }}>
+                            Alternative / Secondary Contact
+                          </Typography>
+                          <Grid container spacing={1.5}>
+                            <Field label="Contact Person" value={m.alt_contact_name} />
+                            <Field label="Role / Relationship" value={m.alt_contact_role} />
+                            <Field label="Phone" value={m.alt_phone} />
+                            <Field label="Email" value={m.alt_email} />
+                          </Grid>
+                        </Box>
+                      )}
                     </Box>
 
                     {hasDiag && (

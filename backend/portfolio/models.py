@@ -173,8 +173,25 @@ class MSME(models.Model):
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=100, blank=True)
     business_email = models.EmailField(blank=True)
+    alt_contact_name = models.CharField(
+        max_length=100, blank=True,
+        help_text='Alternative contact person name',
+    )
+    alt_phone = models.CharField(
+        max_length=100, blank=True,
+        help_text='Alternative contact phone number',
+    )
+    alt_email = models.EmailField(
+        blank=True,
+        help_text='Alternative contact email',
+    )
+    alt_contact_role = models.CharField(
+        max_length=100, blank=True,
+        help_text='Role/relationship of alternative contact (e.g. Manager, Caretaker, Spouse, Accountant)',
+    )
     address = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)
+    district = models.CharField(max_length=100, blank=True, help_text='District where the MSME is located')
     state = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, default='Nigeria')
     
@@ -309,6 +326,13 @@ class MSME(models.Model):
 
                 self.msme_code = f"PRUDEV2-GOPA-COHORT-{next_number:03d}"
                 try:
+                    # Sync state and district
+                    # Sync state and district (district is canonical, state is legacy mirror)
+                    if self.district:
+                        self.state = self.district
+                    elif self.state:
+                        self.district = self.state
+
                     # Sync is_active and status
                     if self.status:
                         self.is_active = (self.status == 'active')
@@ -319,6 +343,12 @@ class MSME(models.Model):
                     continue
             # Fall through (extremely unlikely): let the last attempt raise.
             self.msme_code = f"PRUDEV2-GOPA-COHORT-{next_number:03d}"
+
+        # Sync state and district (district is canonical, state is legacy mirror)
+        if self.district:
+            self.state = self.district
+        elif self.state:
+            self.district = self.state
 
         # Sync is_active and status
         if self.status:

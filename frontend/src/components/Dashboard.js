@@ -2152,7 +2152,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderOverview = () => {
     const A = analytics || {};
 
-    const totalMsmes     = A.total_msmes  || msmes.length;
+    const totalMsmes     = A.total_msmes  || (allMsmes.length > 0 ? allMsmes.length : (msmeTotalCount || msmes.length));
     const totalBges      = A.total_bges   || experts.length;
     const totalSessions  = trainingSessions.length;
     const totalReports   = (A.total_reports || 0) + (A.total_group_reports || 0);
@@ -2565,7 +2565,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <Chip size="small" icon={<People sx={{ fontSize: 14 }} />}
                         label={`${group.member_count} member${group.member_count !== 1 ? 's' : ''}`} />
                   <Chip size="small" icon={<Business sx={{ fontSize: 14 }} />}
-                        label={`${msmes.filter(m => m.assigned_group === group.id).length} MSMEs`}
+                        label={`${group.msme_count != null ? group.msme_count : (allMsmes.length > 0 ? allMsmes : msmes).filter(m => m.assigned_group === group.id).length} MSMEs`}
                         color="primary" variant="outlined" />
                   {group.team_lead_name && (
                     <Chip size="small" icon={<Star sx={{ fontSize: 14 }} />}
@@ -3011,7 +3011,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               const zeroComp = allLatest.filter(s =>
                 !s.has_tin && !s.has_ursb && !s.has_business_bank && !s.has_mobile_money && !s.has_sacco
               );
-              const noUpdate = msmes.filter(m => !latB[m.id]);
+              const msmePool = allMsmes.length > 0 ? allMsmes : msmes;
+              const noUpdate = msmePool.filter(m => !latB[m.id]);
               const attentionItems = [
                 { count: stale90.length,   label: 'No update in 90+ days',   sub: 'BGE visit overdue',         color: '#E65100', severity: 'warning' },
                 { count: noUpdate.length,  label: 'Never updated',           sub: 'no growth data at all',     color: '#C8102E', severity: 'error' },
@@ -3566,7 +3567,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 const aPT = (s.employees_pt_male||0)+(s.employees_pt_female||0);
                 const revPct = (f.annual_turnover && s.annual_turnover)
                   ? ((Number(s.annual_turnover)/Number(f.annual_turnover)-1)*100).toFixed(1)+'%' : '';
-                const m = msmes.find(m => m.id === s.msme);
+                const m = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === s.msme);
                 return [
                   `"${s.msme_name||''}"`, m?.msme_code||'', `"${m?.assigned_bge_name||''}"`,
                   f.snapshot_date||'', s.snapshot_date,
@@ -3588,6 +3589,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             a.href = url; a.download = `prudev2-growth-report-${new Date().toISOString().slice(0,10)}.csv`;
             a.click(); URL.revokeObjectURL(url);
           };
+
+          const msmePoolTab1 = allMsmes.length > 0 ? allMsmes : msmes;
+          const totalEnrolledTab1 = A.total_msmes || (msmePoolTab1.length > 0 ? msmePoolTab1.length : (msmeTotalCount || msmes.length));
 
           return (
             <Box>
@@ -3699,7 +3703,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <SectionLabel>Programme Summary</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
-                  { val: msmeIds.length,                                    label: 'MSMEs with Data',    sub: `of ${msmes.length} total`,   color: BRAND.primaryMain },
+                  { val: msmeIds.length,                                    label: 'MSMEs with Data',    sub: `of ${totalEnrolledTab1} total`,   color: BRAND.primaryMain },
                   { val: paired.length,                                     label: 'Paired (Before/After)', sub: '≥2 snapshots',            color: '#0288D1' },
                   { val: `UGX ${(avgRevLatest/1000).toFixed(0)}K`,         label: 'Avg Annual Revenue', sub: 'latest snapshot',            color: '#2E7D32' },
                   { val: pctRevGrowth != null ? `+${pctRevGrowth}%` : '—', label: 'Avg Revenue Growth', sub: 'first → latest',            color: Number(pctRevGrowth) > 0 ? '#2E7D32' : '#C8102E' },
@@ -4209,7 +4213,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   <TableBody>
                     {latestList.map(s => {
                       const f = s._first || {};
-                      const m = msmes.find(x => x.id === s.msme);
+                      const m = (allMsmes.length > 0 ? allMsmes : msmes).find(x => x.id === s.msme);
                       const hasPair = f.id && f.id !== s.id;
                       const bFT = (f.employees_ft_male||0)+(f.employees_ft_female||0);
                       const bPT = (f.employees_pt_male||0)+(f.employees_pt_female||0);
@@ -4302,11 +4306,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           adminSnapshots.forEach(s => { updCounts[s.msme] = (updCounts[s.msme] || 0) + 1; });
 
           // Freshness buckets
+          const msmePoolTab4 = allMsmes.length > 0 ? allMsmes : msmes;
+          const totalEnrolledTab4 = A.total_msmes || (msmePoolTab4.length > 0 ? msmePoolTab4.length : (msmeTotalCount || msmes.length));
           const fresh30    = updatedSnaps.filter(s => daysSince(s) <= 30);
           const stale3090  = updatedSnaps.filter(s => daysSince(s) > 30 && daysSince(s) <= 90);
           const stale90180 = updatedSnaps.filter(s => daysSince(s) > 90 && daysSince(s) <= 180);
           const stale180p  = updatedSnaps.filter(s => daysSince(s) > 180);
-          const neverUpdatedMsmes = msmes.filter(m => !latB3[m.id]);
+          const neverUpdatedMsmes = msmePoolTab4.filter(m => !latB3[m.id]);
 
           const freshnessData = [
             { label: '≤ 30 days',   count: fresh30.length,            fill: '#2E7D32' },
@@ -4330,7 +4336,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           // For snapshots submitted before BGE accounts were linked (collected_by=null), fall back
           // to the assigned BGE of that MSME so pre-linking submissions are not lost in "Unassigned".
           const msmeBgeFallback = {};
-          msmes.forEach(m => {
+          msmePoolTab4.forEach(m => {
             if (m.assigned_bge_name) msmeBgeFallback[m.id] = m.assigned_bge_name;
           });
           // Also build fallback from bge_workload assignment data for group-assigned MSMEs.
@@ -4372,7 +4378,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             ...updatedSnaps
               .filter(s => daysSince(s) > 60)
               .map(s => {
-                const m = msmes.find(x => x.id === s.msme);
+                const m = msmePoolTab4.find(x => x.id === s.msme);
                 return {
                   name: s.msme_name || `MSME ${s.msme}`,
                   bgeName: m?.assigned_bge_name || '—',
@@ -4382,7 +4388,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               }),
           ].sort((a, b) => b.days - a.days);
 
-          const coveragePct = msmes.length ? Math.round(updatedSnaps.length / msmes.length * 100) : 0;
+          const coveragePct = totalEnrolledTab4 ? Math.round(updatedSnaps.length / totalEnrolledTab4 * 100) : 0;
           const avgUpd = updatedSnaps.length ? (adminSnapshots.length / updatedSnaps.length).toFixed(1) : '—';
 
           return (
@@ -4391,7 +4397,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <SectionLabel>Data Coverage</SectionLabel>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
-                  { val: `${updatedSnaps.length} / ${msmes.length}`, label: 'MSMEs Updated',      sub: 'have at least one growth update',    color: BRAND.primaryMain, pct: coveragePct },
+                  { val: `${updatedSnaps.length} / ${totalEnrolledTab4}`, label: 'MSMEs Updated',      sub: 'have at least one growth update',    color: BRAND.primaryMain, pct: coveragePct },
                   { val: fresh30.length,                             label: 'Fresh (≤ 30 days)',  sub: 'updated in the last month',          color: '#2E7D32' },
                   { val: neverUpdatedMsmes.length,                  label: 'Never Updated',       sub: 'no growth data at all',              color: '#C8102E' },
                   { val: stale90180.length + stale180p.length,      label: 'Overdue (90+ days)',  sub: 'last update was 3+ months ago',      color: '#E65100' },
@@ -4445,7 +4451,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         sx={{ height: 8, borderRadius: 4, bgcolor: '#E8EDF2',
                           '& .MuiLinearProgress-bar': { bgcolor: coveragePct >= 80 ? '#2E7D32' : coveragePct >= 50 ? '#F9A825' : '#C8102E' } }}/>
                       <Typography variant="caption" color="text.secondary">
-                        {updatedSnaps.length} of {msmes.length} MSMEs
+                        {updatedSnaps.length} of {totalEnrolledTab4} MSMEs
                       </Typography>
                     </CardContent>
                   </Card>
@@ -5339,7 +5345,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     </TableCell>
                   </TableRow>
                 ) : paginate(filteredReports, reportPage).map(r => {
-                  const msme = msmes.find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
+                  const msme = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
                   const bge  = experts.find(e => e.id === r.bge)  || { name: r.bge_name };
                   return (
                     <TableRow key={r.id} hover>
@@ -6136,7 +6142,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   const renderAssignments = () => {
-    const unassigned = msmes.filter(m => !m.assigned_bge);
+    const msmePool = allMsmes.length > 0 ? allMsmes : msmes;
+    const unassigned = msmePool.filter(m => !m.assigned_bge);
 
     // Sort BGEs: those with assignments first (desc by count), then without.
     // Use assigned_msme_count from the serializer — it includes direct, co-assigned
@@ -6149,7 +6156,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Box>
         <SectionHeader
           title="BGE Assignments"
-          subtitle={`${msmes.filter(m => m.assigned_bge).length} assigned · ${unassigned.length} unassigned`}
+          subtitle={`${msmePool.filter(m => m.assigned_bge).length} assigned · ${unassigned.length} unassigned`}
         />
 
         {/* Unassigned MSMEs summary */}
@@ -6198,8 +6205,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               // and group-assigned MSMEs are all counted. Enrich with full MSME data
               // where available (for the assign dialog), falling back to the list row.
               const bgeMsmes = e.assigned_msmes_list?.length
-                ? e.assigned_msmes_list.map(am => msmes.find(m => m.id === am.id) || am)
-                : msmes.filter(m => m.assigned_bge === e.id);
+                ? e.assigned_msmes_list.map(am => msmePool.find(m => m.id === am.id) || am)
+                : msmePool.filter(m => m.assigned_bge === e.id);
               // Initialize bgeObjectives from expert data if not already in state
               const objValue = e.id in bgeObjectives ? bgeObjectives[e.id] : (e.deployment_objectives || '');
 
@@ -6341,7 +6348,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <DialogTitle>Add MSME to {addMsmeDialog?.name}</DialogTitle>
           <DialogContent>
             {(() => {
-              const sortedMsmes = [...msmes].sort((a, b) => {
+              const msmePool = allMsmes.length > 0 ? allMsmes : msmes;
+              const sortedMsmes = [...msmePool].sort((a, b) => {
                 const aOwn = a.assigned_bge === addMsmeDialog?.id;
                 const bOwn = b.assigned_bge === addMsmeDialog?.id;
                 if (aOwn !== bOwn) return aOwn ? -1 : 1;
@@ -6353,7 +6361,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 !addMsmeSearch || (m.business_name || '').toLowerCase().includes(addMsmeSearch.toLowerCase())
               );
               const alreadyElsewhere = addMsmePick
-                ? msmes.find(m => m.id === addMsmePick && m.assigned_bge && m.assigned_bge !== addMsmeDialog?.id)
+                ? msmePool.find(m => m.id === addMsmePick && m.assigned_bge && m.assigned_bge !== addMsmeDialog?.id)
                 : null;
               return (
                 <>
@@ -6419,7 +6427,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               variant="contained"
               disabled={!addMsmePick}
               onClick={() => {
-                const msme = msmes.find(m => m.id === addMsmePick);
+                const msmePool = allMsmes.length > 0 ? allMsmes : msmes;
+                const msme = msmePool.find(m => m.id === addMsmePick);
                 if (msme) {
                   setAddMsmeDialog(null);
                   setAssignTarget(msme);
@@ -8180,7 +8189,7 @@ PRUDEV II BDS Team`
 
   const commRecipients = commTab === 0
     ? experts.filter(e => e.email)
-    : msmes.filter(m => m.email);
+    : (allMsmes.length > 0 ? allMsmes : msmes).filter(m => m.email);
 
   const commFiltered = commRecipients.filter(r => {
     const name = commTab === 0
@@ -8313,7 +8322,7 @@ PRUDEV II BDS Team`
 
   const smsRecipients = smsTab === 0
     ? experts.filter(e => e.phone)
-    : msmes.filter(m => m.phone);
+    : (allMsmes.length > 0 ? allMsmes : msmes).filter(m => m.phone);
 
   const smsFiltered = smsRecipients.filter(r => {
     const name = smsTab === 0 ? (r.name || '') : (r.business_name || r.owner_name || '');
@@ -8496,7 +8505,7 @@ PRUDEV II BDS Team`
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
               <Tabs value={smsTab} onChange={(_, v) => { setSmsTab(v); setSmsSelected(new Set()); setSmsSearch(''); }}>
                 <Tab label={`BGE Experts (${experts.filter(e => e.phone).length})`} />
-                <Tab label={`MSMEs (${msmes.filter(m => m.phone).length})`} />
+                <Tab label={`MSMEs (${(allMsmes.length > 0 ? allMsmes : msmes).filter(m => m.phone).length})`} />
               </Tabs>
               {smsSelected.size > 0 && (
                 <Chip label={`${smsSelected.size} selected`} color="success" size="small" onDelete={() => setSmsSelected(new Set())} />
@@ -8679,7 +8688,7 @@ PRUDEV II BDS Team`
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
           <Tabs value={commTab} onChange={(_, v) => { setCommTab(v); setCommSelected(new Set()); setCommSearch(''); }}>
             <Tab label={`BGE Experts (${experts.filter(e => e.email).length})`} />
-            <Tab label={`MSMEs (${msmes.filter(m => m.email).length})`} />
+            <Tab label={`MSMEs (${(allMsmes.length > 0 ? allMsmes : msmes).filter(m => m.email).length})`} />
           </Tabs>
           {commSelected.size > 0 && (
             <Chip
@@ -9719,8 +9728,8 @@ PRUDEV II BDS Team`
         <DialogContent dividers>
           {editType === 'msme' && (
             <Grid container spacing={2}>
-              {[['business_name','Business Name'],['owner_name','Owner Name'],['email','Email'],['phone','Phone'],['city','City'],['state','State']].map(([f,l]) => (
-                <Grid item xs={12} sm={6} key={f}>
+              {[['business_name','Business Name'],['owner_name','Owner Name'],['email','Email'],['phone','Phone'],['district','District'],['city','City / Town'],['address','Address / Location']].map(([f,l]) => (
+                <Grid item xs={12} sm={f === 'address' ? 12 : 6} key={f}>
                   <TextField fullWidth size="small" label={l} value={editForm[f] || ''} onChange={e => setEditForm({...editForm, [f]: e.target.value})} />
                 </Grid>
               ))}
@@ -9754,6 +9763,20 @@ PRUDEV II BDS Team`
                   <TextField fullWidth size="small" label={l} type="number" value={editForm[f] || ''} onChange={e => setEditForm({...editForm, [f]: e.target.value})} />
                 </Grid>
               ))}
+
+              {/* ── Alternative Contact ── */}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 0.5 }} />
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+                  Alternative / Secondary Contact
+                </Typography>
+              </Grid>
+              {[['alt_contact_name','Alt Contact Name'],['alt_phone','Alt Phone'],['alt_contact_role','Alt Role (Manager, Spouse, etc.)'],['alt_email','Alt Email']].map(([f,l]) => (
+                <Grid item xs={12} sm={6} key={f}>
+                  <TextField fullWidth size="small" label={l} value={editForm[f] || ''} onChange={e => setEditForm({...editForm, [f]: e.target.value})} />
+                </Grid>
+              ))}
+
               <Grid item xs={12}>
                 <TextField fullWidth size="small" multiline rows={2} label="Description" value={editForm.business_description || ''} onChange={e => setEditForm({...editForm, business_description: e.target.value})} />
               </Grid>
@@ -10295,7 +10318,7 @@ PRUDEV II BDS Team`
       <AssignMsmesDialog
         assignMsmeGroup={assignMsmeGroup}
         setAssignMsmeGroup={setAssignMsmeGroup}
-        msmes={msmes}
+        msmes={allMsmes.length > 0 ? allMsmes : msmes}
         headers={headers}
         notify={notify}
         fetchAll={fetchAll}
@@ -10579,7 +10602,7 @@ PRUDEV II BDS Team`
                 </TableHead>
                 <TableBody>
                   {dayAttendees.map((att, idx) => (
-                    <AttendeeRow key={att._key} att={att} idx={idx} msmes={msmes}
+                    <AttendeeRow key={att._key} att={att} idx={idx} msmes={allMsmes.length > 0 ? allMsmes : msmes}
                       bgeParticipants={experts}
                       updateAttendee={updateAttendee} removeAttendeeRow={removeAttendeeRow} />
                   ))}
