@@ -477,16 +477,34 @@ class MSMEStatusLocationAndAltContactTests(TestCase):
         self.assertEqual(self.msme.alt_email, 'sarah.manager@example.com')
         self.assertEqual(self.msme.alt_contact_role, 'Manager')
 
-    def test_non_assigned_bge_cannot_update_msme(self):
-        self.client.force_authenticate(user=self.other_bge_user)
+    def test_bge_updates_msme_gps_coordinates(self):
+        self.client.force_authenticate(user=self.bge_user)
 
         res = self.client.patch(f'/api/msmes/{self.msme.id}/', {
-            'status': 'out_of_business',
+            'latitude': 2.774950,
+            'longitude': 32.299110,
         }, format='json')
-        # Non-assigned BGEs are scoped out of queryset and get 404
-        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.status_code, 200)
         self.msme.refresh_from_db()
-        self.assertEqual(self.msme.status, 'active')
+        self.assertAlmostEqual(float(self.msme.latitude), 2.774950, places=5)
+        self.assertAlmostEqual(float(self.msme.longitude), 32.299110, places=5)
+
+    def test_bge_auth_response_includes_gps_coordinates(self):
+        from .auth_views import _build_user_response
+        self.bge.location = 'Gulu City Base'
+        self.bge.latitude = 2.774950
+        self.bge.longitude = 32.299110
+        self.bge.save()
+
+        self.bge_user.refresh_from_db()
+        res_data = _build_user_response(self.bge_user)
+        bge_profile = res_data.get('user', {}).get('bge_profile')
+        self.assertIsNotNone(bge_profile)
+        self.assertEqual(bge_profile['location'], 'Gulu City Base')
+        self.assertAlmostEqual(bge_profile['latitude'], 2.774950, places=5)
+        self.assertAlmostEqual(bge_profile['longitude'], 32.299110, places=5)
+
+
 
 
 

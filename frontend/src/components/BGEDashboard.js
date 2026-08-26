@@ -15,7 +15,7 @@ import {
   Group as GroupIcon, Star, Description, Print, Download,
   Delete, School, People, CloudUpload,
   HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined, MyLocation,
-  Place,
+  Place, GpsFixed, GpsNotFixed,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -392,14 +392,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
       // Also update the MSME's own GPS pin if we captured a location
       if (quickUpdateForm.gpsStatus === 'ok') {
+        const newLat = parseFloat(quickUpdateForm.latitude);
+        const newLng = parseFloat(quickUpdateForm.longitude);
         await axios.patch(`${API_ENDPOINTS.MSMES}${quickUpdateMsme.id}/`, {
-          latitude:  parseFloat(quickUpdateForm.latitude),
-          longitude: parseFloat(quickUpdateForm.longitude),
+          latitude:  newLat,
+          longitude: newLng,
         }, { headers: h });
+        setMsmes(prev => prev.map(m => m.id === quickUpdateMsme.id ? { ...m, latitude: newLat, longitude: newLng } : m));
       }
 
       notify('Visit data saved ✓');
       setQuickUpdateDialog(false);
+      fetchMsmes();
     } catch (err) {
       notify(err.response?.data?.detail || 'Failed to save visit data', 'error');
     } finally {
@@ -418,6 +422,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     district: '',
     city: '',
     address: '',
+    latitude: '',
+    longitude: '',
+    _gpsLoading: false,
     owner_name: '',
     phone: '',
     email: '',
@@ -435,6 +442,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       district: msme.district || msme.state || msme.diag_district || '',
       city: msme.city || '',
       address: msme.address || '',
+      latitude: msme.latitude != null && msme.latitude !== '' ? String(msme.latitude) : '',
+      longitude: msme.longitude != null && msme.longitude !== '' ? String(msme.longitude) : '',
+      _gpsLoading: false,
       owner_name: msme.owner_name || '',
       phone: msme.phone || '',
       email: msme.email || msme.business_email || '',
@@ -459,6 +469,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         state: (editMsmeForm.district || '').trim(),
         city: (editMsmeForm.city || '').trim(),
         address: (editMsmeForm.address || '').trim(),
+        latitude: editMsmeForm.latitude !== '' && editMsmeForm.latitude !== null ? parseFloat(editMsmeForm.latitude) : null,
+        longitude: editMsmeForm.longitude !== '' && editMsmeForm.longitude !== null ? parseFloat(editMsmeForm.longitude) : null,
         owner_name: (editMsmeForm.owner_name || '').trim(),
         phone: (editMsmeForm.phone || '').trim(),
         email: (editMsmeForm.email || '').trim(),
@@ -660,7 +672,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     const h = { Authorization: `Bearer ${token}` };
     setLoading(true);
     try {
-      const res = await axios.get(API_ENDPOINTS.MSMES, { headers: h });
+      const res = await axios.get(`${API_ENDPOINTS.MSMES}?all=1`, { headers: h });
       setMsmes(Array.isArray(res.data) ? res.data : res.data.results || []);
     } catch {
       notify('Failed to load MSMEs', 'error');
@@ -1017,9 +1029,29 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     } catch { notify('Failed to render PDF', 'error'); }
   };
 
+  const fetchMyProfile = useCallback(async () => {
+    if (!myBgeId) return;
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.EXPERTS}${myBgeId}/`, { headers: h });
+      if (res.data) {
+        setMyBgeProfile(res.data);
+        if (res.data.signature_url) setSigUrl(res.data.signature_url);
+        try {
+          const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+          if (storedUser && storedUser.bge_profile) {
+            storedUser.bge_profile = { ...storedUser.bge_profile, ...res.data };
+            localStorage.setItem('user', JSON.stringify(storedUser));
+          }
+        } catch {}
+      }
+    } catch {}
+  }, [myBgeId, token]);
+
   const pushAttempted = useRef(false);
 
   useEffect(() => {
+    fetchMyProfile();
     fetchMsmes();
     fetchReports();
     fetchGroups();
@@ -1035,7 +1067,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, fetchPtReports, token]);
+  }, [fetchMyProfile, fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, fetchPtReports, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -1390,6 +1422,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMyBgeProfile(prev => ({ ...prev, ...res.data }));
+      try {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (storedUser && storedUser.bge_profile) {
+          storedUser.bge_profile = { ...storedUser.bge_profile, ...res.data };
+          localStorage.setItem('user', JSON.stringify(storedUser));
+        }
+      } catch {}
       setBgeLocationDialog(false);
       notify('Base GPS location updated successfully ✓');
     } catch (err) {
@@ -4017,6 +4056,78 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 onChange={e => setEditMsmeForm(f => ({ ...f, address: e.target.value }))}
                 placeholder="e.g. Plot 14 Main Street, opposite Central Market"
               />
+            </Grid>
+            <Grid item xs={12}>
+              <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', mt: 0.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    GPS COORDINATES (LATITUDE / LONGITUDE)
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color={editMsmeForm.latitude ? 'success' : 'primary'}
+                    startIcon={editMsmeForm._gpsLoading ? <CircularProgress size={12} /> : (editMsmeForm.latitude ? <GpsFixed sx={{ fontSize: 14 }} /> : <GpsNotFixed sx={{ fontSize: 14 }} />)}
+                    disabled={editMsmeForm._gpsLoading}
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        notify('Geolocation is not supported by this device/browser.', 'error');
+                        return;
+                      }
+                      setEditMsmeForm(f => ({ ...f, _gpsLoading: true }));
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setEditMsmeForm(f => ({
+                            ...f,
+                            latitude:  pos.coords.latitude.toFixed(6),
+                            longitude: pos.coords.longitude.toFixed(6),
+                            _gpsLoading: false,
+                          }));
+                          notify('Captured live location coordinates ✓', 'success');
+                        },
+                        (err) => {
+                          setEditMsmeForm(f => ({ ...f, _gpsLoading: false }));
+                          notify(err.code === 1 ? 'Location permission denied' : 'GPS location unavailable', 'error');
+                        },
+                        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+                      );
+                    }}
+                    sx={{ fontSize: 11, py: 0.25, textTransform: 'none' }}
+                  >
+                    {editMsmeForm._gpsLoading ? 'Capturing GPS…' : editMsmeForm.latitude ? 'Recapture Live Location' : 'Capture Live Location'}
+                  </Button>
+                </Box>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={6}>
+                    <TextField fullWidth size="small" label="Latitude" type="number"
+                      value={editMsmeForm.latitude || ''}
+                      onChange={e => setEditMsmeForm(f => ({ ...f, latitude: e.target.value }))}
+                      inputProps={{ step: 'any' }}
+                      helperText="e.g. 2.774950"
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField fullWidth size="small" label="Longitude" type="number"
+                      value={editMsmeForm.longitude || ''}
+                      onChange={e => setEditMsmeForm(f => ({ ...f, longitude: e.target.value }))}
+                      inputProps={{ step: 'any' }}
+                      helperText="e.g. 32.299110"
+                    />
+                  </Grid>
+                </Grid>
+                {editMsmeForm.latitude && editMsmeForm.longitude && (
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 600 }}>
+                      📍 {Number(editMsmeForm.latitude).toFixed(6)}, {Number(editMsmeForm.longitude).toFixed(6)}
+                    </Typography>
+                    <a href={`https://maps.google.com/?q=${editMsmeForm.latitude},${editMsmeForm.longitude}`}
+                      target="_blank" rel="noreferrer"
+                      style={{ fontSize: 11, color: BRAND.primaryMain, textDecoration: 'none', fontWeight: 600 }}>
+                      View on Google Maps ↗
+                    </a>
+                  </Box>
+                )}
+              </Box>
             </Grid>
           </Grid>
 

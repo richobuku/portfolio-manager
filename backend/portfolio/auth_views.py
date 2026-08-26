@@ -61,7 +61,14 @@ def _build_user_response(user):
 
     try:
         profile = user.bge_profile
-        bge_profile = {'id': profile.id, 'name': profile.name, 'status': profile.status}
+        bge_profile = {
+            'id': profile.id,
+            'name': profile.name,
+            'status': profile.status,
+            'location': profile.location or '',
+            'latitude': float(profile.latitude) if profile.latitude is not None else None,
+            'longitude': float(profile.longitude) if profile.longitude is not None else None,
+        }
         if role == 'viewer':
             role = 'bge'
     except Exception:

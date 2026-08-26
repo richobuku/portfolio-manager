@@ -997,6 +997,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       );
       setAssignTarget(res.data);
       setMsmes(prev => prev.map(m => m.id === assignTarget.id ? { ...m, ...res.data } : m));
+      setAllMsmes(prev => prev.map(m => m.id === assignTarget.id ? { ...m, ...res.data } : m));
       setCoAssignAdd('');
       setInactiveConfirmDialog(false);
       notify('Co-assigned BGE added successfully');
@@ -1026,6 +1027,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       );
       setAssignTarget(res.data);
       setMsmes(prev => prev.map(m => m.id === assignTarget.id ? { ...m, ...res.data } : m));
+      setAllMsmes(prev => prev.map(m => m.id === assignTarget.id ? { ...m, ...res.data } : m));
       notify('Co-assigned BGE removed successfully');
     } catch (err) {
       notify(err.response?.data?.error || 'Failed to remove co-assignee', 'error');
@@ -1051,6 +1053,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     try {
       const res = await axios.patch(MSME_SET_GROUPS_URL(msme.id), { group_ids: next }, { headers });
       setMsmes(prev => prev.map(m => m.id === msme.id ? res.data : m));
+      setAllMsmes(prev => prev.map(m => m.id === msme.id ? res.data : m));
     } catch { notify('Failed to update programme group', 'error'); }
   };
 
