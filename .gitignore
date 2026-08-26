@@ -190,3 +190,5 @@ backend/oauth_client.json
 .claude/
 .claire/
 
+# Flutter Mobile App (Separate Repository/Project)
+prudev_bge_mobile/
