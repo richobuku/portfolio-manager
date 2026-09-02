@@ -21,7 +21,7 @@ import {
   Campaign, Send as SendIcon, Schedule as ScheduleIcon, Checkroom, DrawOutlined,
   RotateLeft, RotateRight, Dashboard as DashboardIcon,
   ArrowForward, TaskAlt, Payments, Description,
-  FormatBold, FormatListBulleted, CalendarToday,
+  FormatBold, FormatListBulleted, CalendarToday, CalendarMonth,
   GpsFixed, GpsNotFixed, MyLocation,
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -35,6 +35,7 @@ import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
 import SectionHeader from './SectionHeader';
 import MSMEMap from './MSMEMap';
+import CalendarPlanner from './CalendarPlanner';
 import { Place } from '@mui/icons-material';
 
 const ROWS_PER_PAGE = 15;
@@ -42,6 +43,7 @@ const DRAWER_WIDTH = 220;
 
 const NAV_ITEMS = [
   { key: 'overview',    label: 'Overview',        icon: <DashboardIcon /> },
+  { key: 'calendar',    label: 'Calendar Planner', icon: <CalendarMonth /> },
   { key: 'msmes',       label: 'MSMEs',          icon: <Business /> },
   { key: 'maps',        label: 'MSME Maps',      icon: <Place /> },
   { key: 'experts',     label: 'BGE Experts',    icon: <People /> },
@@ -9359,6 +9361,15 @@ PRUDEV II BDS Team`
 
   const sectionMap = {
     overview: renderOverview,
+    calendar: () => (
+      <CalendarPlanner
+        token={token}
+        currentUser={currentUser}
+        msmes={allMsmes.length > 0 ? allMsmes : msmes}
+        experts={experts}
+        onViewMsme={(m) => { setViewItem(m); setViewType('msme'); }}
+      />
+    ),
     msmes: renderMSMEs,
     maps: renderMaps,
     experts: renderExperts,
@@ -9426,7 +9437,7 @@ PRUDEV II BDS Team`
       </Box>
 
       {/* ── View dialog ──────────────────────────────────────────────────── */}
-      <Dialog open={!!viewItem} onClose={() => { setViewItem(null); setMsmeDetailTab(0); setBgeTrReports([]); setBgeMrReports([]); }} maxWidth="sm" fullWidth>
+      <Dialog open={!!viewItem} onClose={() => { setViewItem(null); setMsmeDetailTab(0); setBgeTrReports([]); setBgeMrReports([]); }} maxWidth={viewItem && viewType === 'msme' && msmeDetailTab === 2 ? "md" : "sm"} fullWidth>
         <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 0 }}>
           <Typography variant="subtitle1" fontWeight={700}>{viewItem?.business_name || viewItem?.name} — Details</Typography>
           {viewItem && viewType === 'msme' && (
@@ -9434,6 +9445,7 @@ PRUDEV II BDS Team`
               textColor="primary" indicatorColor="primary" sx={{ mt: 0.5 }}>
               <Tab label="Profile" sx={{ fontSize: 12 }} />
               <Tab label={`Growth History (${adminSnapshots.filter(s => s.msme === viewItem.id).length})`} sx={{ fontSize: 12 }} />
+              <Tab label="Calendar & Planned Visits" sx={{ fontSize: 12 }} />
             </Tabs>
           )}
         </DialogTitle>
@@ -9720,6 +9732,18 @@ PRUDEV II BDS Team`
                 </Box>
               );
             })()
+          ) : viewItem && viewType === 'msme' && msmeDetailTab === 2 ? (
+            /* ── MSME Calendar & Planned Visits tab ── */
+            <Box sx={{ pt: 1 }}>
+              <CalendarPlanner
+                token={token}
+                currentUser={currentUser}
+                msmes={allMsmes.length > 0 ? allMsmes : msmes}
+                experts={experts}
+                initialMsmeId={viewItem.id}
+                isEmbedded={true}
+              />
+            </Box>
           ) : null}
         </DialogContent>
         <DialogActions><Button onClick={() => { setViewItem(null); setMsmeDetailTab(0); }}>Close</Button></DialogActions>

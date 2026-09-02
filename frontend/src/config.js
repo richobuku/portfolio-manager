@@ -40,6 +40,7 @@ export const API_ENDPOINTS = {
   WORK_ORDER_SUBMISSIONS:    `${API_BASE_URL}/api/work-order-submissions/`,
   WORK_ORDER_PAYMENTS:       `${API_BASE_URL}/api/work-order-payments/`,
   WORK_ORDER_ATTACHMENTS:    `${API_BASE_URL}/api/work-order-attachments/`,
+  PLANNED_VISITS:            `${API_BASE_URL}/api/planned-visits/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
@@ -97,4 +98,19 @@ export const REPORT_CONFIRM_PAYMENT_URL = (id) => `${API_BASE_URL}/api/reports/$
 export const GROUP_REPORTS_SUBMIT_PAYMENT_URL = `${API_BASE_URL}/api/group-reports/submit-for-payment/`;
 export const GROUP_REPORT_CONFIRM_PAYMENT_URL = (id) => `${API_BASE_URL}/api/group-reports/${id}/confirm-payment/`;
 
+// Planned Visits & Calendar Planner Endpoints
+export const PLANNED_VISIT_MARK_MISSED_URL    = (id) => `${API_BASE_URL}/api/planned-visits/${id}/mark-missed/`;
+export const PLANNED_VISIT_MARK_COMPLETED_URL = (id) => `${API_BASE_URL}/api/planned-visits/${id}/mark-completed/`;
+export const PLANNED_VISIT_RESCHEDULE_URL     = (id) => `${API_BASE_URL}/api/planned-visits/${id}/reschedule/`;
+export const PLANNED_VISIT_ICS_URL            = (id) => `${API_BASE_URL}/api/planned-visits/${id}/ics/`;
+export const PLANNED_VISITS_EXPORT_ICS_URL    = (params = '') => `${API_BASE_URL}/api/planned-visits/export-ics/${params ? `?${params}` : ''}`;
+export const PLANNED_VISITS_SUMMARY_URL       = (params = '') => `${API_BASE_URL}/api/planned-visits/summary/${params ? `?${params}` : ''}`;
+
+// Google Calendar OAuth & Sync Endpoints
+export const GOOGLE_CALENDAR_CONNECT_URL    = `${API_BASE_URL}/api/auth/google-calendar/connect/`;
+export const GOOGLE_CALENDAR_STATUS_URL     = `${API_BASE_URL}/api/auth/google-calendar/status/`;
+export const GOOGLE_CALENDAR_DISCONNECT_URL = `${API_BASE_URL}/api/auth/google-calendar/disconnect/`;
+export const GOOGLE_CALENDAR_SYNC_NOW_URL   = `${API_BASE_URL}/api/auth/google-calendar/sync-now/`;
+
 export default API_BASE_URL;
+

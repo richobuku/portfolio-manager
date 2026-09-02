@@ -1,7 +1,7 @@
 import logging
 import io
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
@@ -1282,3 +1282,30 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 pass
 
         return Response({'detail': output or 'Import complete.'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_data_updates_excel(request):
+    """
+    Export all raw data for the Data Update Exercise as a styled multi-sheet Excel workbook.
+    GET /api/data-updates/export/
+    """
+    import io
+    from datetime import datetime
+    from django.http import HttpResponse
+    from ..management.commands.export_data_update_excel import build_data_update_workbook
+
+    wb = build_data_update_workbook()
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"PRUDEV_Data_Update_Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    response = HttpResponse(
+        output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+

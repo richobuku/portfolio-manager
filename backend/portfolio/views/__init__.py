@@ -21,3 +21,11 @@ from .communications import (
 )
 from .tshirt import TshirtReceiptViewSet, TshirtReceiptEntryViewSet
 from .push import push_subscribe, push_unsubscribe, push_vapid_key
+from .planned_visits import PlannedVisitViewSet
+from .google_calendar import (
+    google_calendar_connect_view,
+    google_calendar_callback_view,
+    google_calendar_status_view,
+    google_calendar_disconnect_view,
+    google_calendar_sync_now_view,
+)

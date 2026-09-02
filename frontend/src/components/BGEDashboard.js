@@ -15,7 +15,7 @@ import {
   Group as GroupIcon, Star, Description, Print, Download,
   Delete, School, People, CloudUpload,
   HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined, MyLocation,
-  Place, GpsFixed, GpsNotFixed,
+  Place, GpsFixed, GpsNotFixed, CalendarMonth,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -30,6 +30,7 @@ import { BRAND } from '../theme';
 import { subscribePush } from '../index';
 import VisitReportForm from './VisitReportForm';
 import MSMEMap from './MSMEMap';
+import CalendarPlanner from './CalendarPlanner';
 
 const DRAWER_WIDTH = 220;
 const ROWS_PER_PAGE = 15;
@@ -1689,6 +1690,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // ── sidebar ─────────────────────────────────────────────────────────────────
   const navItems = [
     { key: 'msmes',       label: 'My MSMEs',      icon: <Business /> },
+    { key: 'calendar',    label: 'Visit Planner', icon: <CalendarMonth /> },
     { key: 'maps',        label: 'MSME Maps',     icon: <Place /> },
     { key: 'groups',      label: 'My Groups',      icon: <GroupIcon /> },
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
@@ -1832,6 +1834,24 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       {/* main */}
       <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, mt: { xs: 7, md: 0 }, minWidth: 0, overflowX: 'hidden', pb: { xs: 10, md: 4 } }}>
         {loading && <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 4 }} />}
+
+        {/* ── Visit Planner / Calendar ── */}
+        {section === 'calendar' && (
+          <CalendarPlanner
+            token={token}
+            currentUser={currentUser}
+            currentBge={currentUser?.bge_profile}
+            msmes={msmes.filter(m => m.assigned_bge === myBgeId || (m.co_assigned_bge_names || []).some(b => b.id === myBgeId))}
+            experts={currentUser?.bge_profile ? [currentUser.bge_profile] : []}
+            onViewMsme={(mId) => {
+              const target = msmes.find(m => m.id === mId);
+              if (target) { setSelectedMsme(target); setMsmeDetailDialog(true); }
+            }}
+            onOpenNewReport={(msmeId, type) => {
+              openNewReport(msmeId, type);
+            }}
+          />
+        )}
 
         {/* ── My MSMEs (direct + co-assigned) ── */}
         {section === 'msmes' && !loading && (() => {
@@ -4284,6 +4304,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   <Tab label="Profile" sx={{ fontSize: 12, minHeight: 40, py: 0 }} />
                   <Tab label={`Reports (${msmeReports.length})`} sx={{ fontSize: 12, minHeight: 40, py: 0 }} />
                   <Tab label={`Growth History (${msmeDetailSnapshots.length})`} sx={{ fontSize: 12, minHeight: 40, py: 0 }} />
+                  <Tab label="Planned Visits" sx={{ fontSize: 12, minHeight: 40, py: 0 }} />
                 </Tabs>
 
                 {/* ── Tab 0: Profile ── */}
@@ -4515,6 +4536,24 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         );
                       })
                     )}
+                  </Box>
+                )}
+
+                {/* ── Tab 3: Planned Visits ── */}
+                {msmeDetailTab === 3 && (
+                  <Box sx={{ p: 2 }}>
+                    <CalendarPlanner
+                      token={token}
+                      currentUser={currentUser}
+                      currentBge={currentUser?.bge_profile}
+                      msmes={msmes}
+                      initialMsmeId={m.id}
+                      isEmbedded={true}
+                      onOpenNewReport={(msmeId, type) => {
+                        setMsmeDetailDialog(false);
+                        openNewReport(msmeId, type);
+                      }}
+                    />
                   </Box>
                 )}
               </DialogContent>

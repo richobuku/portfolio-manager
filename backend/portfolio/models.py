@@ -1668,3 +1668,154 @@ class WorkOrderPayment(models.Model):
 
     def __str__(self):
         return f"{self.work_order.work_order_number} — UGX {self.amount:,.0f} on {self.payment_date}"
+
+
+# ── Planned Visits / Calendar Planner ─────────────────────────────────────────
+
+class PlannedVisit(models.Model):
+    """
+    A scheduled/planned visit by a Business Growth Expert (BGE) to an MSME.
+    Tracks the full lifecycle: planned, completed, missed (with required reasons),
+    rescheduled, or cancelled.
+    """
+    VISIT_TYPES = MSMEReport.VISIT_TYPES
+
+    STATUS_CHOICES = [
+        ('planned',     'Planned Meeting'),
+        ('completed',   'Completed'),
+        ('missed',      'Missed'),
+        ('rescheduled', 'Rescheduled'),
+        ('cancelled',   'Cancelled'),
+    ]
+
+    MISSED_REASON_CHOICES = [
+        ('msme_unavailable',    'MSME Owner / Contact Unavailable'),
+        ('msme_closed',         'Business Premises Closed / Relocated'),
+        ('bge_emergency',       'BGE Illness / Personal Emergency'),
+        ('transport_logistics', 'Transport / Road Impassable / Breakdown'),
+        ('weather',             'Adverse Weather / Heavy Rain / Floods'),
+        ('rescheduled_msme',    'Rescheduled at MSME Request'),
+        ('rescheduled_bge',     'Rescheduled by BGE'),
+        ('security',            'Safety / Security Concern in Area'),
+        ('other',               'Other Reason (see notes)'),
+    ]
+
+    VENUE_CHOICES = [
+        ('msme_premises', 'MSME Business Premises'),
+        ('farm_site',     'Farm / Field / Production Site'),
+        ('bge_base',      'BGE Field Base / District Office'),
+        ('trading_center','Trading Centre / Neutral Venue'),
+        ('virtual',       'Phone Call / Virtual Meeting'),
+        ('other',         'Other Venue'),
+    ]
+
+    msme = models.ForeignKey(
+        'MSME', on_delete=models.CASCADE, related_name='planned_visits'
+    )
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.CASCADE, related_name='planned_visits'
+    )
+    scheduled_date = models.DateField(db_index=True)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    visit_type = models.CharField(max_length=30, choices=VISIT_TYPES, default='one_on_one')
+    title = models.CharField(max_length=255, blank=True, help_text='Meeting title or focus area')
+    objectives = models.TextField(blank=True, help_text='Specific goals/outcomes planned for this session')
+    agenda = models.TextField(blank=True, help_text='Discussion points or BDS topics')
+    meeting_venue = models.CharField(max_length=50, choices=VENUE_CHOICES, default='msme_premises')
+    meeting_venue_notes = models.CharField(max_length=255, blank=True, help_text='Specific venue address or landmark')
+    contact_person = models.CharField(max_length=100, blank=True)
+    contact_phone = models.CharField(max_length=50, blank=True)
+    notes = models.TextField(blank=True, help_text='General or preparation notes')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned', db_index=True)
+
+    # ── Missed meeting tracking ───────────────────────────────────────────────
+    missed_reason = models.CharField(
+        max_length=50, choices=MISSED_REASON_CHOICES, blank=True, default='',
+        help_text='Standardized reason why the visit could not take place'
+    )
+    missed_reason_notes = models.TextField(
+        blank=True, default='',
+        help_text='Detailed narrative notes explaining the missed meeting circumstances'
+    )
+    missed_at = models.DateTimeField(null=True, blank=True)
+    missed_recorded_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='recorded_missed_visits'
+    )
+
+    # ── Completion tracking ───────────────────────────────────────────────────
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completion_notes = models.TextField(blank=True, default='')
+    completed_report = models.ForeignKey(
+        'MSMEReport', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='planned_visits',
+        help_text='Linked visit report filed on site'
+    )
+
+    # ── Rescheduling link ─────────────────────────────────────────────────────
+    rescheduled_to = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='rescheduled_from'
+    )
+    original_date = models.DateField(null=True, blank=True)
+
+    # ── Google Calendar Sync ───────────────────────────────────────────────────
+    GOOGLE_SYNC_STATUSES = [
+        ('pending',  'Pending Sync'),
+        ('synced',   'Synced with Google Calendar'),
+        ('failed',   'Sync Failed'),
+        ('disabled', 'Sync Disabled'),
+    ]
+    google_event_id = models.CharField(max_length=255, blank=True, default='')
+    google_sync_status = models.CharField(
+        max_length=20, choices=GOOGLE_SYNC_STATUSES, default='pending'
+    )
+    google_last_synced_at = models.DateTimeField(null=True, blank=True)
+
+    # ── Reminders & audit ─────────────────────────────────────────────────────
+    reminder_sent = models.BooleanField(default=False)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='created_planned_visits'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['scheduled_date', 'start_time', 'id']
+        verbose_name = "Planned Visit"
+        verbose_name_plural = "Planned Visits"
+
+    def __str__(self):
+        return f"[{self.status.upper()}] {self.bge.name} → {self.msme.business_name} ({self.scheduled_date})"
+
+
+class GoogleCalendarCredential(models.Model):
+    """
+    Stores Google OAuth 2.0 credentials for a User (BGE, Admin, Manager),
+    enabling automatic 2-way background synchronization with Google Calendar.
+    """
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='google_calendar_credential'
+    )
+    google_email = models.EmailField(blank=True)
+    access_token = models.TextField()
+    refresh_token = models.TextField(blank=True)
+    token_expiry = models.DateTimeField(null=True, blank=True)
+    calendar_id = models.CharField(max_length=255, default='primary')
+    sync_enabled = models.BooleanField(default=True)
+    last_sync_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Google Calendar Credential"
+        verbose_name_plural = "Google Calendar Credentials"
+
+    def __str__(self):
+        return f"Google Calendar ({self.google_email or self.user.username}) - {'Active' if self.sync_enabled else 'Disabled'}"
+
+
