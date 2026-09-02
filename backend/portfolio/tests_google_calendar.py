@@ -109,6 +109,21 @@ class GoogleCalendarSyncTests(TestCase):
         self.assertEqual(body['start']['timeZone'], 'Africa/Kampala')
         self.assertEqual(body['colorId'], '9') # Blue for planned
 
+    def test_format_event_body_includes_msme_attendee(self):
+        """When MSME has an email, they are included as a calendar attendee."""
+        self.msme.email = 'grace.achan@acholigrain.com'
+        self.msme.save(update_fields=['email'])
+        visit = PlannedVisit.objects.create(
+            msme=self.msme,
+            bge=self.bge,
+            scheduled_date=datetime.date(2026, 9, 15),
+            start_time=datetime.time(10, 0),
+            created_by=self.user,
+        )
+        body = format_event_body(visit)
+        self.assertIn('attendees', body)
+        self.assertEqual(body['attendees'][0]['email'], 'grace.achan@acholigrain.com')
+
     @patch('portfolio.google_calendar_service.get_calendar_service_for_user')
     def test_sync_visit_creates_google_event(self, mock_get_service):
         """When user is connected, sync_visit_to_google calls events.insert and stores event ID."""

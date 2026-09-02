@@ -293,7 +293,7 @@ def format_event_body(planned_visit):
     }
     color_id = color_map.get(planned_visit.status, '9')
 
-    return {
+    payload = {
         'summary': title,
         'description': description,
         'location': location,
@@ -308,6 +308,19 @@ def format_event_body(planned_visit):
             ],
         },
     }
+
+    # If the MSME has an email on file, add them as a calendar attendee
+    # so the session automatically appears in their Google / personal calendar.
+    msme_email = (getattr(msme, 'email', '') or getattr(msme, 'business_email', '')).strip()
+    if msme_email and '@' in msme_email:
+        payload['attendees'] = [
+            {
+                'email': msme_email,
+                'displayName': planned_visit.contact_person or msme.owner_name or msme.business_name,
+            }
+        ]
+
+    return payload
 
 def sync_visit_to_google(planned_visit):
     """
@@ -341,12 +354,17 @@ def sync_visit_to_google(planned_visit):
         return False
 
     body = format_event_body(planned_visit)
+    send_updates = 'all' if body.get('attendees') else 'none'
 
     try:
         if planned_visit.status == 'cancelled':
             if planned_visit.google_event_id:
                 try:
-                    service.events().delete(calendarId='primary', eventId=planned_visit.google_event_id).execute()
+                    service.events().delete(
+                        calendarId='primary',
+                        eventId=planned_visit.google_event_id,
+                        sendUpdates=send_updates,
+                    ).execute()
                 except Exception as del_err:
                     logger.warning(f"Error deleting Google Calendar event: {del_err}")
                 planned_visit.google_event_id = ''
@@ -361,12 +379,14 @@ def sync_visit_to_google(planned_visit):
                 calendarId='primary',
                 eventId=planned_visit.google_event_id,
                 body=body,
+                sendUpdates=send_updates,
             ).execute()
         else:
             # Create new event
             event = service.events().insert(
                 calendarId='primary',
                 body=body,
+                sendUpdates=send_updates,
             ).execute()
             planned_visit.google_event_id = event.get('id', '')
 
