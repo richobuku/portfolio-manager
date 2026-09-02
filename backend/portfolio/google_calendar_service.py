@@ -82,6 +82,13 @@ def get_authorization_url(user, request=None, custom_redirect_uri=None):
     redirect_uri = custom_redirect_uri or cfg['redirect_uri']
     if not redirect_uri and request:
         redirect_uri = request.build_absolute_uri('/api/auth/google-calendar/callback/')
+    if not redirect_uri:
+        redirect_uri = 'https://bds.glowi.africa/api/auth/google-calendar/callback/'
+
+    # Ensure production redirect URI is always https://
+    if redirect_uri and not ('localhost' in redirect_uri or '127.0.0.1' in redirect_uri):
+        if redirect_uri.startswith('http://'):
+            redirect_uri = 'https://' + redirect_uri[7:]
 
     client_config = {
         "web": {
@@ -127,6 +134,13 @@ def exchange_code_for_credentials(code, state, request=None, custom_redirect_uri
     redirect_uri = custom_redirect_uri or cfg['redirect_uri']
     if not redirect_uri and request:
         redirect_uri = request.build_absolute_uri('/api/auth/google-calendar/callback/')
+    if not redirect_uri:
+        redirect_uri = 'https://bds.glowi.africa/api/auth/google-calendar/callback/'
+
+    # Ensure production redirect URI is always https://
+    if redirect_uri and not ('localhost' in redirect_uri or '127.0.0.1' in redirect_uri):
+        if redirect_uri.startswith('http://'):
+            redirect_uri = 'https://' + redirect_uri[7:]
 
     client_config = {
         "web": {

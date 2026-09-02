@@ -259,6 +259,9 @@ CORS_ALLOWED_ORIGINS = [
 # Expose as a proper settings attribute so auth_views can use it
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://bds.glowi.africa')
 
+# Honour X-Forwarded-Proto header from reverse proxy (Nginx / SSL termination)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # ── Google sign-in domain allowlist ──────────────────────────────────────────
 # Comma-separated list of email domains (e.g. "gopa.eu,giz.de") that are
 # automatically granted read-only 'viewer' access on first Google sign-in.
