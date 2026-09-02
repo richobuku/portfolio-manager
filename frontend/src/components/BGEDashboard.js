@@ -31,6 +31,7 @@ import { subscribePush } from '../index';
 import VisitReportForm from './VisitReportForm';
 import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
+import MSMEVisitSchedule from './MSMEVisitSchedule';
 
 const DRAWER_WIDTH = 220;
 const ROWS_PER_PAGE = 15;
@@ -4539,16 +4540,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   </Box>
                 )}
 
-                {/* ── Tab 3: Planned Visits ── */}
+                {/* ── Tab 3: Visit Schedule ── */}
                 {msmeDetailTab === 3 && (
                   <Box sx={{ p: 2 }}>
-                    <CalendarPlanner
+                    <MSMEVisitSchedule
                       token={token}
+                      msme={m}
                       currentUser={currentUser}
                       currentBge={currentUser?.bge_profile}
-                      msmes={msmes}
-                      initialMsmeId={m.id}
-                      isEmbedded={true}
                       onOpenNewReport={(msmeId, type) => {
                         setMsmeDetailDialog(false);
                         openNewReport(msmeId, type);

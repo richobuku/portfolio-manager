@@ -36,6 +36,7 @@ import WorkOrderDialog from './WorkOrderDialog';
 import SectionHeader from './SectionHeader';
 import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
+import MSMEVisitSchedule from './MSMEVisitSchedule';
 import { Place } from '@mui/icons-material';
 
 const ROWS_PER_PAGE = 15;
@@ -9445,7 +9446,7 @@ PRUDEV II BDS Team`
               textColor="primary" indicatorColor="primary" sx={{ mt: 0.5 }}>
               <Tab label="Profile" sx={{ fontSize: 12 }} />
               <Tab label={`Growth History (${adminSnapshots.filter(s => s.msme === viewItem.id).length})`} sx={{ fontSize: 12 }} />
-              <Tab label="Calendar & Planned Visits" sx={{ fontSize: 12 }} />
+              <Tab label="Visit Schedule" sx={{ fontSize: 12 }} />
             </Tabs>
           )}
         </DialogTitle>
@@ -9733,15 +9734,12 @@ PRUDEV II BDS Team`
               );
             })()
           ) : viewItem && viewType === 'msme' && msmeDetailTab === 2 ? (
-            /* ── MSME Calendar & Planned Visits tab ── */
-            <Box sx={{ pt: 1 }}>
-              <CalendarPlanner
+            /* ── MSME Visit Schedule tab ── */
+            <Box sx={{ p: 2 }}>
+              <MSMEVisitSchedule
                 token={token}
+                msme={viewItem}
                 currentUser={currentUser}
-                msmes={allMsmes.length > 0 ? allMsmes : msmes}
-                experts={experts}
-                initialMsmeId={viewItem.id}
-                isEmbedded={true}
               />
             </Box>
           ) : null}
