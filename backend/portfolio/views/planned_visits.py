@@ -3,7 +3,7 @@ import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q, Count
 from django.http import HttpResponse
@@ -292,24 +292,40 @@ class PlannedVisitViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vi
             'missed_breakdown': missed_breakdown,
         })
 
-    @action(detail=False, methods=['get'], url_path='export-ics')
+    @action(detail=False, methods=['get'], url_path='export-ics', permission_classes=[AllowAny])
     def export_ics(self, request):
         """
         Export filtered planned visits as an RFC 5545 iCalendar (.ics) stream
         for Microsoft Outlook, Google Calendar, or Apple Calendar.
+        Allows external calendar subscribers (e.g. Google Calendar Add by URL).
         """
-        qs = self.get_queryset()
+        user = request.user
+        if user.is_authenticated:
+            qs = self.get_queryset()
+        else:
+            # Anonymous calendar crawler (e.g. Google Calendar server)
+            qs = PlannedVisit.objects.exclude(status='cancelled')
+            bge_id = request.query_params.get('bge')
+            if bge_id:
+                qs = qs.filter(bge_id=bge_id)
+            msme_id = request.query_params.get('msme')
+            if msme_id:
+                qs = qs.filter(msme_id=msme_id)
+
         ics_content = self._build_ical_calendar(qs)
         response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
         response['Content-Disposition'] = 'attachment; filename="prudev_msme_visits.ics"'
         return response
 
-    @action(detail=True, methods=['get'], url_path='ics')
+    @action(detail=True, methods=['get'], url_path='ics', permission_classes=[AllowAny])
     def single_ics(self, request, pk=None):
         """
         Export a single visit as an .ics file.
         """
-        visit = self.get_object()
+        try:
+            visit = PlannedVisit.objects.get(pk=pk)
+        except PlannedVisit.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
         ics_content = self._build_ical_calendar([visit])
         filename = f"visit_{visit.msme.msme_code or visit.msme_id}_{visit.scheduled_date}.ics"
         response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
