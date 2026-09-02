@@ -61,7 +61,6 @@ export default function MSMEVisitSchedule({
   currentUser,
   currentBge,
   onOpenNewReport,
-  isCompact = false,
 }) {
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -125,13 +124,15 @@ export default function MSMEVisitSchedule({
     fetchVisits();
   }, [fetchVisits]);
 
-  // Identify next upcoming planned visit
+  // Identify next upcoming planned visit (earliest planned visit on or after today)
   const today = new Date().toISOString().split('T')[0];
   const plannedVisits = visits.filter((v) => v.status === 'planned');
+  const futurePlanned = plannedVisits
+    .filter((v) => v.scheduled_date >= today)
+    .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
   const upcomingVisit =
-    plannedVisits.find((v) => v.scheduled_date >= today) ||
-    plannedVisits[plannedVisits.length - 1] ||
-    null;
+    futurePlanned[0] ||
+    (plannedVisits.length > 0 ? plannedVisits[0] : null);
   const pastVisits = visits.filter((v) => v.id !== upcomingVisit?.id);
 
   // ── Handle Schedule New Visit ──────────────────────────────────────────────
@@ -180,7 +181,7 @@ export default function MSMEVisitSchedule({
     try {
       await axios.post(
         PLANNED_VISIT_MARK_MISSED_URL(targetVisit.id),
-        { missed_reason: missedReason, notes: missedNotes.trim() },
+        { missed_reason: missedReason, missed_reason_notes: missedNotes.trim(), notes: missedNotes.trim() },
         h(token)
       );
       setFeedback({ type: 'info', text: 'Visit marked as missed with reason recorded.' });
@@ -256,8 +257,8 @@ export default function MSMEVisitSchedule({
     let dates;
     if (v.start_time) {
       const d = v.scheduled_date.replace(/-/g, '');
-      const s = v.start_time.replace(/:/g, '').slice(0, 6);
-      const e = v.end_time ? v.end_time.replace(/:/g, '').slice(0, 6) : s;
+      const s = v.start_time.replace(/:/g, '').padEnd(6, '0').slice(0, 6);
+      const e = v.end_time ? v.end_time.replace(/:/g, '').padEnd(6, '0').slice(0, 6) : s;
       dates = `${d}T${s}/${d}T${e}`;
     } else {
       const d = v.scheduled_date.replace(/-/g, '');
@@ -521,6 +522,19 @@ export default function MSMEVisitSchedule({
               >
                 Mark Missed
               </Button>
+
+              {onOpenNewReport && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<Description />}
+                  onClick={() => onOpenNewReport(msme.id, upcomingVisit.visit_type)}
+                  sx={{ fontSize: 12, fontWeight: 700 }}
+                >
+                  File Report
+                </Button>
+              )}
 
               <Button
                 size="small"

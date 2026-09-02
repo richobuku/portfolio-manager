@@ -125,7 +125,11 @@ class PlannedVisitViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vi
         """
         visit = self.get_object()
         reason = request.data.get('missed_reason', '').strip()
-        notes = request.data.get('missed_reason_notes', '').strip()
+        notes = (
+            request.data.get('missed_reason_notes')
+            or request.data.get('notes')
+            or ''
+        ).strip()
 
         if not reason:
             return Response(
@@ -163,7 +167,11 @@ class PlannedVisitViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vi
         Mark a scheduled visit as completed, optionally linking an MSMEReport.
         """
         visit = self.get_object()
-        completion_notes = request.data.get('completion_notes', '').strip()
+        completion_notes = (
+            request.data.get('completion_notes')
+            or request.data.get('notes')
+            or ''
+        ).strip()
         report_id = request.data.get('report_id')
 
         visit.status = 'completed'
