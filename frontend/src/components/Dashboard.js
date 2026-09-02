@@ -204,7 +204,24 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [navOrder, setNavOrder] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('dashNavOrder') || 'null');
-      if (Array.isArray(saved) && saved.every(k => NAV_ITEMS.some(n => n.key === k))) return saved;
+      if (Array.isArray(saved) && saved.every(k => NAV_ITEMS.some(n => n.key === k))) {
+        // Automatically inject any newly introduced items (like 'calendar') into the saved order
+        const missing = NAV_ITEMS.map(n => n.key).filter(k => !saved.includes(k));
+        if (missing.length > 0) {
+          const updated = [...saved];
+          missing.forEach(k => {
+            const defaultIdx = NAV_ITEMS.findIndex(n => n.key === k);
+            if (defaultIdx !== -1 && defaultIdx <= updated.length) {
+              updated.splice(defaultIdx, 0, k);
+            } else {
+              updated.push(k);
+            }
+          });
+          try { localStorage.setItem('dashNavOrder', JSON.stringify(updated)); } catch {}
+          return updated;
+        }
+        return saved;
+      }
     } catch {}
     return NAV_ITEMS.map(n => n.key);
   });
