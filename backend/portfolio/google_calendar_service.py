@@ -176,17 +176,20 @@ def exchange_code_for_credentials(code, state, request=None, custom_redirect_uri
     if creds.expiry:
         token_expiry = creds.expiry if timezone.is_aware(creds.expiry) else timezone.make_aware(creds.expiry)
 
-    # Persist or update
+    # Persist or update (preserve existing refresh_token if Google does not re-issue one)
+    defaults = {
+        'google_email': google_email,
+        'access_token': creds.token,
+        'token_expiry': token_expiry,
+        'sync_enabled': True,
+        'last_sync_at': timezone.now(),
+    }
+    if creds.refresh_token:
+        defaults['refresh_token'] = creds.refresh_token
+
     cred_obj, _ = GoogleCalendarCredential.objects.update_or_create(
         user=user,
-        defaults={
-            'google_email': google_email,
-            'access_token': creds.token,
-            'refresh_token': creds.refresh_token or '',
-            'token_expiry': token_expiry,
-            'sync_enabled': True,
-            'last_sync_at': timezone.now(),
-        }
+        defaults=defaults,
     )
     return cred_obj
 

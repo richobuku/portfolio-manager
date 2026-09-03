@@ -69,10 +69,10 @@ def google_calendar_callback_view(request):
         # Trigger background sync of upcoming visits
         sync_count = sync_all_visits_for_user(cred.user)
         logger.info(f"Successfully connected Google Calendar for {cred.user.username} ({cred.google_email}). Synced {sync_count} visits.")
-        return redirect(f"{frontend_origin}/?google_sync=success&email={cred.google_email}")
+        return redirect(f"{frontend_origin}/?google_sync=success&email={cred.google_email}&section=calendar")
     except Exception as e:
         logger.error(f"Error exchanging Google OAuth code: {e}")
-        return redirect(f"{frontend_origin}/?google_sync=error&error=exchange_failed")
+        return redirect(f"{frontend_origin}/?google_sync=error&error=exchange_failed&section=calendar")
 
 
 @api_view(['GET'])

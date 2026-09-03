@@ -231,11 +231,17 @@ export default function CalendarPlanner({
   }, [fetchVisits]);
 
   // Google Calendar OAuth & Sync State
-  const [googleStatus, setGoogleStatus] = useState({
-    connected: false,
-    google_email: '',
-    is_configured: false,
-    sync_enabled: false,
+  const [googleStatus, setGoogleStatus] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('googleCalendarStatus') || 'null');
+      if (cached && typeof cached.connected === 'boolean') return cached;
+    } catch {}
+    return {
+      connected: false,
+      google_email: '',
+      is_configured: false,
+      sync_enabled: false,
+    };
   });
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
@@ -247,8 +253,12 @@ export default function CalendarPlanner({
     try {
       const res = await axios.get(GOOGLE_CALENDAR_STATUS_URL, { headers: h(token) });
       setGoogleStatus(res.data);
+      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(res.data)); } catch {}
     } catch (e) {
-      // Gracefully ignore if unauthenticated or error
+      if (e.response?.status === 401) {
+        setGoogleStatus(prev => ({ ...prev, connected: false }));
+        try { localStorage.removeItem('googleCalendarStatus'); } catch {}
+      }
     }
   }, [token]);
 
@@ -262,6 +272,9 @@ export default function CalendarPlanner({
     const googleSync = params.get('google_sync');
     if (googleSync === 'success') {
       const email = params.get('email');
+      const updated = { connected: true, google_email: email || '', sync_enabled: true };
+      setGoogleStatus(prev => ({ ...prev, ...updated }));
+      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(updated)); } catch {}
       setFeedback({
         type: 'success',
         text: `Google Calendar connected successfully${email ? ` (${email})` : ''}! Visits now auto-sync in real time.`,
@@ -306,7 +319,9 @@ export default function CalendarPlanner({
   const handleDisconnectGoogle = async () => {
     try {
       await axios.post(GOOGLE_CALENDAR_DISCONNECT_URL, {}, { headers: h(token) });
-      setGoogleStatus({ connected: false, google_email: '', sync_enabled: false });
+      const disconnectedState = { connected: false, google_email: '', sync_enabled: false };
+      setGoogleStatus(disconnectedState);
+      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(disconnectedState)); } catch {}
       setFeedback({ type: 'info', text: 'Google Calendar disconnected.' });
       setGoogleMenuAnchor(null);
     } catch (e) {
@@ -583,24 +598,24 @@ export default function CalendarPlanner({
           {/* Google Calendar OAuth 2.0 Button / Status */}
           {googleStatus.connected ? (
             <>
-              <Tooltip title={`Connected as ${googleStatus.google_email}. Planned visits auto-sync directly to your Google Calendar in real-time.`}>
-                <Button
-                  id="btn-google-calendar-status"
-                  variant="outlined"
-                  size="small"
-                  startIcon={<CloudDone sx={{ color: '#2E7D32', fontSize: 16 }} />}
+              <Tooltip title={`Connected as ${googleStatus.google_email || 'your Google account'}. Planned visits automatically sync in real-time. Click to manage or disconnect.`}>
+                <Chip
+                  id="chip-google-calendar-connected"
+                  icon={<CloudDone sx={{ color: '#2E7D32 !important', fontSize: '16px !important' }} />}
+                  label={`Google Calendar: Connected${googleStatus.google_email ? ` (${googleStatus.google_email})` : ''}`}
                   onClick={(e) => setGoogleMenuAnchor(e.currentTarget)}
+                  clickable
                   sx={{
-                    borderColor: '#A5D6A7',
                     bgcolor: '#E8F5E9',
-                    color: '#2E7D32',
-                    fontWeight: 600,
-                    textTransform: 'none',
+                    border: '1.5px solid #A5D6A7',
+                    color: '#1B5E20',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    height: 32,
+                    cursor: 'pointer',
                     '&:hover': { bgcolor: '#C8E6C9', borderColor: '#81C784' },
                   }}
-                >
-                  Google Calendar: Synced
-                </Button>
+                />
               </Tooltip>
               <Menu
                 anchorEl={googleMenuAnchor}
