@@ -31,10 +31,12 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 # SECURITY WARNING: keep the secret key used in production secret!
 _secret_key = os.environ.get('SECRET_KEY')
 if not _secret_key:
-    if not DEBUG:
+    import sys
+    is_server = any('gunicorn' in arg or 'runserver' in arg or 'wsgi' in arg for arg in sys.argv)
+    if not DEBUG and is_server:
         raise RuntimeError("SECRET_KEY environment variable must be set when DEBUG is False.")
-    # Development-only fallback — never committed to production
-    _secret_key = 'django-insecure-dev-only-do-not-use-in-production'
+    # Fallback for CLI management commands, cron jobs, and dev
+    _secret_key = 'django-insecure-cli-fallback-do-not-use-in-production'
 SECRET_KEY = _secret_key
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
