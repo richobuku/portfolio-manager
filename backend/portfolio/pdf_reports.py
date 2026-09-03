@@ -268,8 +268,10 @@ def render_msme_report(report):
 
     story.append(Spacer(1, 8))
 
-    # 1. Objectives
-    if getattr(report, 'visit_objectives', None):
+    # 1. Objectives & Stated Purpose
+    if getattr(report, 'stated_purpose', None):
+        story.extend(_section(s, 'Stated Purpose (Opening Alignment)', report.stated_purpose))
+    elif getattr(report, 'visit_objectives', None):
         story.extend(_section(s, 'Objectives of this visit', report.visit_objectives))
 
     # 2. Context / business status
@@ -302,15 +304,21 @@ def render_msme_report(report):
 
     # 4. Support delivered & tools (not for annual_review)
     if not is_annual:
+        if getattr(report, 'advice_delivered', None):
+            story.extend(_section(s, 'Immediate Advice Delivered on the Spot', report.advice_delivered))
         story.extend(_section(s, 'Support provided', report.support_provided))
         if getattr(report, 'tools_provided', None):
             story.extend(_section(s, 'Tools & materials provided', report.tools_provided))
 
-    # 5. Outcomes / key findings
+    # 5. Outcomes / key findings & Concrete Takeaway
+    if getattr(report, 'concrete_takeaway', None):
+        story.extend(_section(s, 'One Concrete Change (What MSME Does Differently)', report.concrete_takeaway))
     story.extend(_section(s, 'Key findings & outcomes', report.key_achievement))
     story.extend(_section(s, 'Challenges identified',   report.challenges_identified))
 
-    # 6. Next steps
+    # 6. Next steps & Visible Agreement
+    if getattr(report, 'msme_visible_next_step', None):
+        story.extend(_section(s, 'Visible Next Step Agreed with Owner', report.msme_visible_next_step))
     story.extend(_section(s, 'Business owner actions',  report.action_plan))
     story.extend(_section(s, 'BGE follow-up actions',   report.recommendations))
     story.extend(_section(s, 'Additional notes',         report.additional_notes))

@@ -890,18 +890,39 @@ class MSMEReport(models.Model):
 
     # ── Qualitative narrative ─────────────────────────────────────────────────
     visit_objectives      = models.TextField(blank=True, help_text='What this visit aimed to achieve')
+    stated_purpose        = models.TextField(
+        blank=True,
+        help_text='Stated purpose agreed with MSME owner upon opening the visit (Why we are here today)',
+    )
     business_overview     = models.TextField(blank=True, help_text='Context observed / topics covered / what was discussed')
     support_provided      = models.TextField(blank=True, help_text='Support, coaching, or training content delivered')
+    advice_delivered      = models.TextField(
+        blank=True,
+        help_text='Immediate practical advice, demonstration, or coaching delivered on the spot (Diagnose & Advise)',
+    )
     tools_provided        = models.TextField(blank=True, help_text='Comma-separated tools, templates or materials given')
     delivery_method       = models.CharField(max_length=60, blank=True, help_text='Training delivery method (training visits)')
     participant_count     = models.PositiveSmallIntegerField(null=True, blank=True, help_text='Number of participants (training visits)')
     coaching_focus_area   = models.CharField(max_length=100, blank=True, help_text='Focus area for coaching visits')
     key_achievement       = models.TextField(blank=True, help_text='Key outcomes, takeaways or owner insights')
+    concrete_takeaway     = models.TextField(
+        blank=True,
+        help_text='One concrete thing the MSME now knows to do differently starting today (The Acid Test)',
+    )
     challenges_identified = models.TextField(blank=True, help_text='Challenges encountered or observed')
     action_plan           = models.TextField(blank=True, help_text='MSME agreed actions / assignments given')
     recommendations       = models.TextField(blank=True, help_text='BGE follow-up actions / next session plan')
+    msme_visible_next_step = models.TextField(
+        blank=True,
+        help_text='Visible next step agreed with the MSME before departure (Mutual commitment)',
+    )
     next_steps            = models.TextField(blank=True)
     additional_notes      = models.TextField(blank=True)
+    sms_summary_sent      = models.BooleanField(
+        default=False,
+        help_text='Whether an SMS summary of the agreed action was sent to the MSME owner',
+    )
+    sms_summary_sent_at   = models.DateTimeField(null=True, blank=True)
 
     # ── GPS location captured at time of visit ───────────────────────────────
     visit_latitude  = models.DecimalField(

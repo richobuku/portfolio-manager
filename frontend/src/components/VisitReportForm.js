@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Grid, Typography, Button, TextField, FormControl,
   InputLabel, Select, MenuItem, Chip, Alert, CircularProgress,
-  Divider, IconButton,
+  Divider, IconButton, Switch, FormControlLabel,
 } from '@mui/material';
 import {
   Close, Save, Send, Person, School, Psychology, Assessment,
@@ -57,20 +57,21 @@ const VISIT_TYPES = [
 /* ── Per-type field labels ───────────────────────────────────────────────── */
 const TYPE_CONFIG = {
   one_on_one: {
-    context_label:    'Business Situation Observed',
-    context_hint:     'What is the current state of the business? What did you observe, hear, or assess during the visit?',
-    delivered_label:  'Support Delivered',
-    delivered_hint:   'What support, advice or assistance did you provide to the business owner during this visit?',
-    outcomes_label:   'Key Observations & Outcomes',
-    outcomes_hint:    'What progress, concerns or findings did you note? What changed compared to the last visit?',
-    msme_label:       'MSME Agreed Actions',
-    msme_hint:        'What did the business owner commit to doing before the next visit?',
-    bge_label:        'BGE Follow-up Actions',
-    bge_hint:         'What will you do as the BGE to support this MSME before the next visit?',
+    context_label:    'Business Reality Observed',
+    context_hint:     'What is the current operational reality of the business? What did you observe upon arrival?',
+    delivered_label:  'General Support & Coaching Delivered',
+    delivered_hint:   'What coaching frameworks, analysis, or assistance did you deliver to the business owner?',
+    outcomes_label:   'Key Observations & Changes Noted',
+    outcomes_hint:    'What operational progress, concerns, or findings did you note? What changed since the last visit?',
+    msme_label:       'MSME Agreed Commitments',
+    msme_hint:        'What specific tasks did the business owner commit to completing before the next visit?',
+    bge_label:        'BGE Preparation for Next Visit',
+    bge_hint:         'What will you research, prepare, or bring as BGE before returning?',
     tools_label:      'Tools & Materials Provided',
     show_participants: false,
     show_delivery:     false,
     show_focus:        false,
+    show_reflections:  true,
   },
   training: {
     context_label:    'Topics Covered',
@@ -196,16 +197,20 @@ const EMPTY_FORM = {
   status:              'draft',
   // structured sections
   visit_objectives:    '',
+  stated_purpose:      '',
   business_overview:   '',
   delivery_method:     '',
   participant_count:   '',
   coaching_focus_area: '',
   support_provided:    '',
+  advice_delivered:    '',
   tools_provided:      '',   // comma-separated
   key_achievement:     '',
+  concrete_takeaway:   '',
   challenges_identified: '',
   action_plan:         '',
   recommendations:     '',
+  msme_visible_next_step: '',
   next_steps:          '',
   additional_notes:    '',
   // data quality (annual_review visits)
@@ -217,6 +222,9 @@ const EMPTY_FORM = {
   visit_latitude:      null,
   visit_longitude:     null,
   visit_gps_accuracy:  null,
+  // Instant SMS Action Handout to MSME
+  send_sms:            true,
+  sms_custom_message:  '',
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -469,18 +477,25 @@ export default function VisitReportForm({
       visit_date:          form.visit_date,
       status:              submitNow ? 'submitted' : 'draft',
       visit_objectives:    form.visit_objectives,
+      stated_purpose:      form.stated_purpose,
       business_overview:   form.business_overview,
       delivery_method:     form.delivery_method,
       participant_count:   form.participant_count !== '' ? Number(form.participant_count) : null,
       coaching_focus_area: form.coaching_focus_area,
       support_provided:    form.support_provided,
+      advice_delivered:    form.advice_delivered,
       tools_provided:      serializeTools(allTools),
       key_achievement:     form.key_achievement,
+      concrete_takeaway:   form.concrete_takeaway,
       challenges_identified: form.challenges_identified,
       action_plan:         form.action_plan,
       recommendations:     form.recommendations,
+      msme_visible_next_step: form.msme_visible_next_step,
       next_steps:          form.next_steps,
       additional_notes:    form.additional_notes,
+      // SMS Action Handout to MSME
+      send_sms:            submitNow && Boolean(form.send_sms),
+      sms_custom_message:  form.sms_custom_message || undefined,
       // data quality
       data_confidence_level:       form.data_confidence_level,
       records_sighted:             form.records_sighted,
@@ -706,17 +721,33 @@ export default function VisitReportForm({
           }}>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            {/* ── 1. OBJECTIVES ── */}
-            <SectionBlock icon={<Flag />} title="Objectives of This Visit" color={typeInfo.color}>
-              <TextField fullWidth multiline rows={3} size="small"
-                label="What did you aim to achieve in this visit?"
-                placeholder={`e.g. ${form.visit_type === 'training'
-                  ? 'Introduce financial record-keeping to participants and demonstrate the tracking spreadsheet.'
-                  : form.visit_type === 'coaching'
-                  ? 'Help the owner build a 3-month sales action plan and address pricing challenges.'
-                  : 'Assess current business status, resolve challenges identified in the previous visit.'}`}
-                value={form.visit_objectives}
-                onChange={e => set('visit_objectives', e.target.value)} />
+            {/* ── 1. OBJECTIVES & STATED PURPOSE ── */}
+            <SectionBlock icon={<Flag />} title="1. Objectives & Stated Purpose (Opening Alignment)" color={typeInfo.color}>
+              {cfg.show_reflections && (
+                <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #BAE6FD', bgcolor: '#F0F9FF' }}>
+                  <strong>Reflection 1 — Opening Purpose:</strong> Open every visit by agreeing on a clear, single focus with the entrepreneur. Avoid project jargon like <em>"I am here for Visit #3"</em>.
+                </Alert>
+              )}
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={2} size="small"
+                    label="Stated Purpose Agreed with Owner Upon Arrival *"
+                    placeholder="Why we are here today: What mutual focus did you agree with the owner before starting? (e.g. 'Align on why cash does not match sales at closing and set up a daily cashbook together')"
+                    value={form.stated_purpose}
+                    onChange={e => set('stated_purpose', e.target.value)} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth multiline rows={2} size="small"
+                    label="Broader Visit Objectives"
+                    placeholder={`e.g. ${form.visit_type === 'training'
+                      ? 'Introduce financial record-keeping to participants and demonstrate the tracking spreadsheet.'
+                      : form.visit_type === 'coaching'
+                      ? 'Help the owner build a 3-month sales action plan and address pricing challenges.'
+                      : 'Assess current business status, verify operations, and address previous action items.'}`}
+                    value={form.visit_objectives}
+                    onChange={e => set('visit_objectives', e.target.value)} />
+                </Grid>
+              </Grid>
             </SectionBlock>
 
             <Divider sx={{ my: 3 }} />
@@ -826,54 +857,84 @@ export default function VisitReportForm({
               </>
             )}
 
-            {/* ── 4/5. DELIVERED & TOOLS (hidden for annual_review) ── */}
-            {cfg.show_delivered !== false && <SectionBlock icon={<Build />} title="What Was Delivered & Tools Used" color={typeInfo.color}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField fullWidth multiline rows={4} size="small"
-                    label={cfg.delivered_label}
-                    placeholder={cfg.delivered_hint}
-                    value={form.support_provided}
-                    onChange={e => set('support_provided', e.target.value)} />
-                </Grid>
+            {/* ── 2. DELIVERED & TOOLS (hidden for annual_review) ── */}
+            {cfg.show_delivered !== false && (
+              <SectionBlock icon={<Build />} title="2. Diagnose AND Advise — Immediate Support Delivered" color={typeInfo.color}>
+                {cfg.show_reflections && (
+                  <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #BAE6FD', bgcolor: '#F0F9FF' }}>
+                    <strong>Reflection 2 — Diagnose AND Advise:</strong> Never leave a diagnosis hanging. If you identify a gap (e.g. mixed personal/business cash, unrecorded credit, pricing issues), immediately demonstrate or calculate the solution on the spot.
+                  </Alert>
+                )}
+                <Grid container spacing={2}>
+                  {cfg.show_reflections && (
+                    <Grid item xs={12}>
+                      <TextField fullWidth multiline rows={3} size="small"
+                        label="Immediate Practical Advice & Demonstration Delivered on the Spot *"
+                        placeholder="What concrete advice, calculation, or coaching did you demonstrate? (e.g. 'Demonstrated the 2-envelope cash separation rule; showed how to record customer credit before goods leave counter')"
+                        value={form.advice_delivered}
+                        onChange={e => set('advice_delivered', e.target.value)} />
+                    </Grid>
+                  )}
+                  <Grid item xs={12}>
+                    <TextField fullWidth multiline rows={3} size="small"
+                      label={cfg.delivered_label}
+                      placeholder={cfg.delivered_hint}
+                      value={form.support_provided}
+                      onChange={e => set('support_provided', e.target.value)} />
+                  </Grid>
 
-                {/* Tools multi-select */}
-                <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}
-                    display="block" sx={{ mb: 1 }}>
-                    {cfg.tools_label} — select all that apply
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
-                    {TOOLS_OPTIONS.map(tool => {
-                      const checked = selectedTools.includes(tool);
-                      return (
-                        <Chip key={tool} label={tool} size="small" clickable
-                          variant={checked ? 'filled' : 'outlined'}
-                          color={checked ? 'primary' : 'default'}
-                          onClick={() => toggleTool(tool)}
-                          sx={{ fontSize: 11 }} />
-                      );
-                    })}
-                  </Box>
-                  <TextField fullWidth size="small"
-                    label="Other tools or materials (free text)"
-                    placeholder="e.g. Custom pricing calculator, loan application template…"
-                    value={toolsOther}
-                    onChange={e => {
-                      setToolsOther(e.target.value);
-                      scheduleDraftSave(form, selectedTools, e.target.value);
-                    }} />
+                  {/* Tools multi-select */}
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}
+                      display="block" sx={{ mb: 1 }}>
+                      {cfg.tools_label} — select all that apply
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
+                      {TOOLS_OPTIONS.map(tool => {
+                        const checked = selectedTools.includes(tool);
+                        return (
+                          <Chip key={tool} label={tool} size="small" clickable
+                            variant={checked ? 'filled' : 'outlined'}
+                            color={checked ? 'primary' : 'default'}
+                            onClick={() => toggleTool(tool)}
+                            sx={{ fontSize: 11 }} />
+                        );
+                      })}
+                    </Box>
+                    <TextField fullWidth size="small"
+                      label="Other tools or materials (free text)"
+                      placeholder="e.g. Custom pricing calculator, loan application template…"
+                      value={toolsOther}
+                      onChange={e => {
+                        setToolsOther(e.target.value);
+                        scheduleDraftSave(form, selectedTools, e.target.value);
+                      }} />
+                  </Grid>
                 </Grid>
-              </Grid>
-            </SectionBlock>}
+              </SectionBlock>
+            )}
 
             {cfg.show_delivered !== false && <Divider sx={{ my: 3 }} />}
 
-            {/* ── 5/6. OUTCOMES ── */}
-            <SectionBlock icon={<EmojiEvents />} title={cfg.outcomes_label} color={typeInfo.color}>
+            {/* ── 3. OUTCOMES & THE ACID TEST ── */}
+            <SectionBlock icon={<EmojiEvents />} title="3. Outcomes & The Acid Test" color={typeInfo.color}>
+              {cfg.show_reflections && (
+                <Alert severity="success" sx={{ mb: 2, fontSize: 12, border: '1px solid #BBF7D0', bgcolor: '#F0FDF4' }}>
+                  <strong>Reflection 3 — The Acid Test:</strong> When you leave the business, can the owner name ONE concrete thing they now know to do differently? If not, what did the visit actually deliver?
+                </Alert>
+              )}
               <Grid container spacing={2}>
+                {cfg.show_reflections && (
+                  <Grid item xs={12}>
+                    <TextField fullWidth multiline rows={2} size="small"
+                      label="The One Concrete Change the MSME Will Do Differently Starting Today *"
+                      placeholder="In the owner's own words: e.g. 'I will record every credit sale in the black book before the customer walks away with goods'"
+                      value={form.concrete_takeaway}
+                      onChange={e => set('concrete_takeaway', e.target.value)} />
+                  </Grid>
+                )}
                 <Grid item xs={12}>
-                  <TextField fullWidth multiline rows={3} size="small"
+                  <TextField fullWidth multiline rows={2} size="small"
                     label={cfg.outcomes_label}
                     placeholder={cfg.outcomes_hint}
                     value={form.key_achievement}
@@ -891,18 +952,32 @@ export default function VisitReportForm({
 
             <Divider sx={{ my: 3 }} />
 
-            {/* ── 5. NEXT STEPS ── */}
-            <SectionBlock icon={<ArrowForward />} title="Next Steps" color={typeInfo.color}>
+            {/* ── 4. CLOSING & VISIBLE NEXT STEPS ── */}
+            <SectionBlock icon={<ArrowForward />} title="4. Closing & Visible Mutual Next Steps" color={typeInfo.color}>
+              {cfg.show_reflections && (
+                <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #BAE6FD', bgcolor: '#F0F9FF' }}>
+                  <strong>Reflection 4 — Visible Next Step:</strong> Every visit must close with a stated next step visible and confirmed with the MSME, not just stored invisibly in our system.
+                </Alert>
+              )}
               <Grid container spacing={2}>
+                {cfg.show_reflections && (
+                  <Grid item xs={12}>
+                    <TextField fullWidth multiline rows={2} size="small"
+                      label="Visible Next Step Agreed with the Owner Before Departure *"
+                      placeholder="e.g. 'Owner will balance cashbook every evening for 7 days. BGE will return Sept 15 to review and introduce stock register.'"
+                      value={form.msme_visible_next_step}
+                      onChange={e => set('msme_visible_next_step', e.target.value)} />
+                  </Grid>
+                )}
                 <Grid item xs={12} sm={6}>
-                  <TextField fullWidth multiline rows={3} size="small"
+                  <TextField fullWidth multiline rows={2} size="small"
                     label={cfg.msme_label}
                     placeholder={cfg.msme_hint}
                     value={form.action_plan}
                     onChange={e => set('action_plan', e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField fullWidth multiline rows={3} size="small"
+                  <TextField fullWidth multiline rows={2} size="small"
                     label={cfg.bge_label}
                     placeholder={cfg.bge_hint}
                     value={form.recommendations}
@@ -916,6 +991,50 @@ export default function VisitReportForm({
                 </Grid>
               </Grid>
             </SectionBlock>
+
+            {/* ── 5. INSTANT SMS ACTION HANDOUT TO MSME ── */}
+            {selectedMsme && (
+              <Box sx={{
+                mt: 3, p: 2, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD',
+                borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 1.5,
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={700} color="#0369A1">
+                      📱 Send Instant SMS Action Summary to Entrepreneur
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={selectedMsme.phone || 'No phone recorded'}
+                      color={selectedMsme.phone ? 'primary' : 'default'}
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: 11 }}
+                    />
+                  </Box>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={Boolean(form.send_sms)}
+                        disabled={!selectedMsme.phone}
+                        onChange={e => set('send_sms', e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label={<Typography variant="caption" fontWeight={600}>{form.send_sms && selectedMsme.phone ? 'SMS Active' : 'Off'}</Typography>}
+                  />
+                </Box>
+                {form.send_sms && selectedMsme.phone && (
+                  <Box sx={{ p: 1.5, bgcolor: '#FFFFFF', borderRadius: 1.5, border: '1px solid #E0F2FE' }}>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5, fontWeight: 600 }}>
+                      SMS Takeaway Preview (Dispatched to owner upon report submission):
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12, color: '#1E293B', bgcolor: '#F8FAFC', p: 1, borderRadius: 1 }}>
+                      {`Hello ${(selectedMsme.contact_person || selectedMsme.business_name || '').split(' ')[0] || 'Partner'}, thank you for your PRUDEV II coaching visit today with ${bgeProfile?.name?.split(' ')[0] || 'your BGE'}. Agreed Action: ${form.concrete_takeaway || form.action_plan || '[Agreed Action]'}. Next Step: ${form.msme_visible_next_step || form.recommendations || '[Next Step]'}. Together we grow ${selectedMsme.business_name}! — PRUDEV II / GOPA AFC`}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
           </Box>
         </Box>
       </DialogContent>

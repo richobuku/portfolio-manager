@@ -105,9 +105,13 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
 
             report = serializer.save(bge=bge)
             self._update_msme_gps(report)
+            if report.status == 'submitted':
+                self._maybe_send_visit_sms(report)
             return
         report = serializer.save()
         self._update_msme_gps(report)
+        if report.status == 'submitted':
+            self._maybe_send_visit_sms(report)
 
     @staticmethod
     def _update_msme_gps(report):
@@ -121,6 +125,17 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
                     msme.save(update_fields=['latitude', 'longitude'])
             except Exception as e:
                 logger.warning('Failed to sync MSME GPS from visit report %s: %s', report.id, e)
+
+    def _maybe_send_visit_sms(self, report):
+        """Send action summary SMS to MSME if requested in payload."""
+        send_sms_flag = self.request.data.get('send_sms')
+        if send_sms_flag in (True, 'true', '1', 1):
+            try:
+                from ..sms_service import send_msme_visit_summary_sms
+                custom_msg = self.request.data.get('sms_custom_message')
+                send_msme_visit_summary_sms(report, custom_message=custom_msg)
+            except Exception as sms_err:
+                logger.warning('Failed to send auto-SMS for visit report %s: %s', report.id, sms_err)
 
     def perform_update(self, serializer):
         instance = serializer.instance
@@ -144,6 +159,23 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
 
             # Auto-create a growth snapshot from the quantitative fields
             self._create_snapshot_from_report(report)
+
+            # Check if SMS summary should be sent
+            self._maybe_send_visit_sms(report)
+
+    @action(detail=True, methods=['post'], url_path='send-summary-sms')
+    def send_summary_sms(self, request, pk=None):
+        """Manually trigger or resend the visit action takeaway SMS to the MSME owner."""
+        report = self.get_object()
+        custom_message = request.data.get('message')
+        from ..sms_service import send_msme_visit_summary_sms
+        success, detail = send_msme_visit_summary_sms(report, custom_message=custom_message)
+        return Response({
+            'success': success,
+            'message': detail,
+            'sms_summary_sent': report.sms_summary_sent,
+            'sms_summary_sent_at': report.sms_summary_sent_at,
+        }, status=status.HTTP_200_OK if success else status.HTTP_400_BAD_REQUEST)
 
     @staticmethod
     def _create_snapshot_from_report(report):
