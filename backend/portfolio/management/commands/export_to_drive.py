@@ -98,12 +98,16 @@ def _drive_service():
 
 
 def _find_folder(service, name, parent_id=None):
-    q = f"name='{name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    safe_name = name.replace('\\', '\\\\').replace("'", "\\'")
+    q = f"name='{safe_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     if parent_id:
         q += f" and '{parent_id}' in parents"
-    results = service.files().list(q=q, fields='files(id, name)', pageSize=10).execute()
-    files = results.get('files', [])
-    return files[0]['id'] if files else None
+    try:
+        results = service.files().list(q=q, fields='files(id, name)', pageSize=10).execute()
+        files = results.get('files', [])
+        return files[0]['id'] if files else None
+    except Exception:
+        return None
 
 
 def _ensure_folder(service, name, parent_id=None):
@@ -118,17 +122,25 @@ def _ensure_folder(service, name, parent_id=None):
 
 
 def _file_exists(service, name, parent_id, mimetype=None):
+    safe_name = name.replace('\\', '\\\\').replace("'", "\\'")
     mime_clause = f" and mimeType='{mimetype}'" if mimetype else ''
-    q = f"name='{name}' and '{parent_id}' in parents{mime_clause} and trashed=false"
-    results = service.files().list(q=q, fields='files(id)', pageSize=5).execute()
-    return bool(results.get('files'))
+    q = f"name='{safe_name}' and '{parent_id}' in parents{mime_clause} and trashed=false"
+    try:
+        results = service.files().list(q=q, fields='files(id)', pageSize=5).execute()
+        return bool(results.get('files'))
+    except Exception:
+        return False
 
 
 def _upload_bytes(service, name, data_bytes, mimetype, parent_id, force=False):
     from googleapiclient.http import MediaIoBaseUpload
 
-    if not force and _file_exists(service, name, parent_id):
-        return 'skipped'
+    if not force:
+        try:
+            if _file_exists(service, name, parent_id):
+                return 'skipped'
+        except Exception:
+            pass
 
     media = MediaIoBaseUpload(io.BytesIO(data_bytes), mimetype=mimetype, resumable=False)
     meta = {'name': name, 'parents': [parent_id]}
