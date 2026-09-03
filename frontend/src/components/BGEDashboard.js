@@ -3052,10 +3052,21 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
                         {/* ── Supporting Documents ── */}
                         <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                            <Typography variant="caption" fontWeight={700} color="text.secondary">
-                              SUPPORTING DOCUMENTS &amp; PHOTOS
-                            </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                                SUPPORTING DOCUMENTS &amp; PHOTOS
+                              </Typography>
+                              <Tooltip title="Photos uploaded here automatically sync in real time to your dedicated Google Drive folder ('PRUDEV II - BGE Photos')">
+                                <Chip
+                                  size="small"
+                                  label="Auto-Syncs to Google Drive"
+                                  color="success"
+                                  variant="outlined"
+                                  sx={{ height: 18, fontSize: 10, fontWeight: 700 }}
+                                />
+                              </Tooltip>
+                            </Box>
                             <Button size="small" startIcon={<CloudUpload />}
                               onClick={() => {
                                 setActiveAttachWoId(prev => prev === wo.id ? null : wo.id);

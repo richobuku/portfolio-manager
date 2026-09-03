@@ -1060,6 +1060,22 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         )
         instance.file.save(f.name, ContentFile(data), save=True)
 
+        # Real-time background upload to Google Drive ('PRUDEV II - BGE Photos/{BGE}/')
+        fname_lower = (f.name or '').lower()
+        is_image = any(fname_lower.endswith(ext) for ext in ('.jpg', '.jpeg', '.png', '.webp', '.gif'))
+        if is_image and work_order.bge:
+            try:
+                from ..google_drive_service import async_upload_bge_photo
+                prefix = f"WO_{work_order.work_order_number}"
+                async_upload_bge_photo(
+                    bge=work_order.bge,
+                    filename=f.name,
+                    data_bytes=data,
+                    prefix=prefix,
+                )
+            except Exception as drive_err:
+                logger.warning(f"Could not queue Google Drive photo upload: {drive_err}")
+
     def destroy(self, request, *args, **kwargs):
         if not self._is_admin():
             raise PermissionDenied("Only admins can delete attachments.")

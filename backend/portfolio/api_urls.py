@@ -20,6 +20,7 @@ from .views import (
     google_calendar_connect_view, google_calendar_callback_view,
     google_calendar_status_view, google_calendar_disconnect_view,
     google_calendar_sync_now_view,
+    upload_bge_photo_view, list_bge_photos_view, download_bge_photo_view,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
 from .views.smart_assign import smart_assign, smart_assign_export
@@ -95,4 +96,7 @@ urlpatterns = [
     path('api/scheduled-messages/', scheduled_messages_view, name='scheduled_messages'),
     path('api/scheduled-messages/<int:pk>/cancel/', scheduled_message_cancel_view, name='scheduled_message_cancel'),
     path('api/scheduled-messages/process/', scheduled_messages_process_view, name='scheduled_messages_process'),
+    path('api/bges/upload-photo/', upload_bge_photo_view, name='bge_upload_photo'),
+    path('api/bges/photos/', list_bge_photos_view, name='bge_list_photos'),
+    path('api/bges/photos/<int:photo_id>/download/', download_bge_photo_view, name='bge_download_photo'),
 ]

@@ -1819,3 +1819,49 @@ class GoogleCalendarCredential(models.Model):
         return f"Google Calendar ({self.google_email or self.user.username}) - {'Active' if self.sync_enabled else 'Disabled'}"
 
 
+class BGEFieldPhoto(models.Model):
+    """
+    Field photos submitted by Business Growth Experts (BGEs).
+    Automatically synced in real time to Google Drive:
+      'PRUDEV II - BGE Photos / {BGE Name} ({BGE Code}) /'
+    """
+    CATEGORY_CHOICES = [
+        ('premises', 'MSME Premises / Shop / Facility'),
+        ('products', 'Products / Produce / Inventory'),
+        ('training', 'Training / Workshop Activity'),
+        ('coaching', 'One-on-One Coaching Session'),
+        ('attendance', 'Attendance Sheet / Physical Sign-in'),
+        ('general', 'General Field Documentation'),
+    ]
+
+    bge = models.ForeignKey(
+        BusinessGrowthExpert, on_delete=models.CASCADE, related_name='field_photos'
+    )
+    msme = models.ForeignKey(
+        'MSME', on_delete=models.SET_NULL, null=True, blank=True, related_name='field_photos'
+    )
+    work_order = models.ForeignKey(
+        'WorkOrder', on_delete=models.SET_NULL, null=True, blank=True, related_name='field_photos'
+    )
+    photo = models.FileField(upload_to='bge_photos/', null=True, blank=True)
+    photo_data = models.BinaryField(null=True, blank=True)
+    filename = models.CharField(max_length=255, blank=True)
+    caption = models.CharField(max_length=255, blank=True)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default='general')
+    drive_file_id = models.CharField(max_length=255, blank=True)
+    drive_web_link = models.URLField(max_length=500, blank=True)
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='uploaded_bge_photos'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "BGE Field Photo"
+        verbose_name_plural = "BGE Field Photos"
+
+    def __str__(self):
+        return f"{self.bge.name} — {self.filename} ({self.created_at:%Y-%m-%d})"
+
+
+

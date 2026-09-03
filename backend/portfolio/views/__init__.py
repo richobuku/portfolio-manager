@@ -29,3 +29,9 @@ from .google_calendar import (
     google_calendar_disconnect_view,
     google_calendar_sync_now_view,
 )
+from .bge_photos import (
+    upload_bge_photo_view,
+    list_bge_photos_view,
+    download_bge_photo_view,
+)
+

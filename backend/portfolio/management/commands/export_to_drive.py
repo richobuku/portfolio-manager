@@ -29,6 +29,7 @@ SERVICE_ACCOUNT_PATH = os.path.join(
     os.path.dirname(settings.BASE_DIR), 'backend', 'drive_service_account.json'
 )
 ROOT_FOLDER_NAME = 'PRUDEV II - BGE Reports'
+PHOTOS_ROOT_FOLDER_NAME = 'PRUDEV II - BGE Photos'
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 
@@ -172,6 +173,7 @@ class Command(BaseCommand):
         from portfolio.models import (
             BusinessGrowthExpert, WorkOrder, MSMEReport,
             TrainingReport, MentorTrainingReport, WorkOrderSubmission,
+            WorkOrderAttachment, BGEFieldPhoto,
         )
         from portfolio.pdf_reports import render_work_order, render_training_report, render_mentor_report, render_msme_report
 
@@ -190,10 +192,15 @@ class Command(BaseCommand):
                     f'Root folder "{ROOT_FOLDER_NAME}" not found in Drive. '
                     'Create it and share it with the service account.'
                 )
-            self.stdout.write(f'Root folder found: {ROOT_FOLDER_NAME} ({root_id})\n')
+            self.stdout.write(f'Reports root folder found: {ROOT_FOLDER_NAME} ({root_id})\n')
+
+            # Ensure or create top-level 'PRUDEV II - BGE Photos' folder
+            photos_root_id = _ensure_folder(service, PHOTOS_ROOT_FOLDER_NAME)
+            self.stdout.write(f'Photos root folder: {PHOTOS_ROOT_FOLDER_NAME} ({photos_root_id})\n')
         else:
             service = None
             root_id = None
+            photos_root_id = None
 
         # ── Select BGEs ───────────────────────────────────────────────────────
         qs = BusinessGrowthExpert.objects.all().order_by('name')
@@ -217,9 +224,10 @@ class Command(BaseCommand):
                 rep_folder   = _ensure_folder(service, 'Reports', bge_folder)
                 lead_folder  = _ensure_folder(service, 'Lead Training Reports', rep_folder)
                 ment_folder  = _ensure_folder(service, 'Mentor Reports', rep_folder)
+                bge_photo_folder = _ensure_folder(service, bge_label, photos_root_id) if photos_root_id else None
             else:
                 bge_folder = wo_folder = vr_folder = ts_folder = inv_folder = None
-                rep_folder = lead_folder = ment_folder = None
+                rep_folder = lead_folder = ment_folder = bge_photo_folder = None
 
             # ── Work Orders ───────────────────────────────────────────────────
             work_orders = WorkOrder.objects.filter(bge=bge).order_by('issue_date')
@@ -336,6 +344,64 @@ class Command(BaseCommand):
                 except Exception as exc:
                     totals['errors'] += 1
                     self.stderr.write(f'     ✗ {fname}: {exc}')
+
+            # ── Photos & Supporting Images (WorkOrderAttachment & BGEFieldPhoto) ──
+            wo_attachments = WorkOrderAttachment.objects.filter(
+                work_order__bge=bge
+            ).select_related('work_order').order_by('created_at')
+            field_photos = BGEFieldPhoto.objects.filter(bge=bge).select_related('msme', 'work_order').order_by('created_at')
+            total_photos = wo_attachments.count() + field_photos.count()
+            self.stdout.write(f'   Photos & Images: {total_photos}')
+
+            for att in wo_attachments:
+                data = att.file_data
+                if not data and att.file:
+                    try:
+                        with open(att.file.path, 'rb') as f:
+                            data = f.read()
+                    except Exception:
+                        data = None
+                if not data:
+                    continue
+
+                wo_num = _safe_name(att.work_order.work_order_number)
+                clean_fname = _safe_name(f'WO_{wo_num}_{att.filename}')
+                if dry_run:
+                    self.stdout.write(f'     [dry] Photos/{clean_fname}')
+                    continue
+                try:
+                    mime = _ext_to_mime(clean_fname)
+                    result = _upload_bytes(service, clean_fname, bytes(data), mime, bge_photo_folder, force)
+                    totals[result] += 1
+                    self.stdout.write(f'     {"✓" if result == "uploaded" else "–"} Photos/{clean_fname} [{result}]')
+                except Exception as exc:
+                    totals['errors'] += 1
+                    self.stderr.write(f'     ✗ Photos/{clean_fname}: {exc}')
+
+            for fp in field_photos:
+                data = fp.photo_data
+                if not data and fp.photo:
+                    try:
+                        with open(fp.photo.path, 'rb') as f:
+                            data = f.read()
+                    except Exception:
+                        data = None
+                if not data:
+                    continue
+
+                date_str = fp.created_at.strftime('%Y-%m-%d')
+                clean_fname = _safe_name(f'Photo_{date_str}_{fp.filename}')
+                if dry_run:
+                    self.stdout.write(f'     [dry] Photos/{clean_fname}')
+                    continue
+                try:
+                    mime = _ext_to_mime(clean_fname)
+                    result = _upload_bytes(service, clean_fname, bytes(data), mime, bge_photo_folder, force)
+                    totals[result] += 1
+                    self.stdout.write(f'     {"✓" if result == "uploaded" else "–"} Photos/{clean_fname} [{result}]')
+                except Exception as exc:
+                    totals['errors'] += 1
+                    self.stderr.write(f'     ✗ Photos/{clean_fname}: {exc}')
 
         # ── Summary ───────────────────────────────────────────────────────────
         self.stdout.write('\n' + '─' * 50)
