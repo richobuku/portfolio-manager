@@ -7705,7 +7705,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
               {/* Alert explaining the thematic requirements */}
               <Alert severity="info" sx={{ mb: 2 }}>
-                <strong>Cohort 1 &amp; Thematic Coaching Framework:</strong> Mandates minimum 3 on-site coaching visits/month per MSME, applies the 4 Reflection Standards (opening stated purpose, diagnose &amp; advise, Acid Test 1 concrete change, visible closing with SMS Action Handout), strictly bans meeting off-premise in town solely for signatures, and drives October graduation (URSB, TIN, ISM/POS, BCP).
+                <strong>Thematic Enterprise Coaching Framework:</strong> Mandates minimum 3 on-site coaching visits/month per MSME, applies the 4 Reflection Standards (opening stated purpose, diagnose &amp; advise, Acid Test 1 concrete change, visible closing with SMS Action Handout), strictly bans meeting off-premise in town solely for signatures, and drives core enterprise growth themes (formalization via URSB &amp; TIN, digital bookkeeping via ISM / One Tap POS, and operational revenue coaching).
               </Alert>
 
               {/* Config fields */}

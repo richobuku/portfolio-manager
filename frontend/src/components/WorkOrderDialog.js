@@ -78,16 +78,16 @@ const OutcomeCard = React.memo(function OutcomeCard({ d, i, onUpdate }) {
 // ── Work Order Dialog (memoised to prevent full-Dashboard re-renders on keystrokes) ──
 const WO_DEFAULTS = {
   permanent_assignee_support: {
-    objective: `To deliver structured, high-touch thematic business development support to permanently assigned MSMEs through a minimum of three (3) on-site coaching visits per MSME per month. The assignment focuses on transforming every visit into measurable business growth by passing "The Acid Test" (ensuring the enterprise owner can name and execute at least one concrete operational change per visit), delivering practical on-the-spot advisory rather than mere diagnosis, driving Cohort 1 graduation readiness by October 2026 (formal registration with URSB, TIN acquisition, digital/bookkeeping tool adoption via ISM or One Tap POS, and BCP completion), and anchoring field engagements with professional visit planning and GPS mapping.`,
+    objective: `To deliver structured, high-touch thematic business development support to permanently assigned MSMEs through a minimum of three (3) on-site coaching visits per MSME per month. The assignment focuses on transforming every visit into measurable business growth by passing "The Acid Test" (ensuring the enterprise owner can name and execute at least one concrete operational change per visit), delivering practical on-the-spot advisory rather than mere diagnosis, driving enterprise formalization (URSB registration and TIN acquisition), establishing transparent daily financial management and record-keeping (ISM Standard/Pro, One Tap POS, or structured cashbooks), unlocking revenue opportunities, and anchoring field engagements with professional visit planning and GPS mapping.`,
     key_tasks: `1. Schedule all monthly visits in advance using the PRUDEV II Visit Planner and synchronize dates with Google Calendar, avoiding scheduling conflicts and unscheduled retrospective logging.
 2. Conduct a minimum of three (3) physical, on-site coaching visits per calendar month to each permanently assigned MSME. Engagements must strictly take place at the MSME business premises; meeting in town solely to sign timesheets is strictly prohibited.
 3. Open every visit with a mutually stated purpose agreed with the MSME owner, setting clear, non-administrative expectations for the session.
 4. Execute structured "Diagnose AND Advise" coaching during every visit: immediately pair every gap or challenge identified with on-the-spot practical guidance, financial calculation, or operational demonstration.
 5. Apply "The Acid Test" at the conclusion of each visit, verifying that the MSME owner can articulate in their own words at least one concrete action they will execute differently starting immediately.
 6. Close every visit with an agreed, visible next step, ensuring the automated SMS Action Handout is dispatched to the MSME owner's mobile phone upon visit report submission.
-7. Accelerate Cohort 1 graduation milestones by end of October 2026: guide and facilitate URSB business registration and URA Tax Identification Number (TIN) acquisition for the entity and proprietor.
+7. Support enterprise formalization and regulatory compliance: guide and facilitate URSB business registration and URA Tax Identification Number (TIN) acquisition for the entity and proprietor.
 8. Onboard and entrench daily usage of digital bookkeeping and inventory tools (ISM Standard/Pro, One Tap POS, Zoho, or physical structured cashbooks) to establish transparent business records.
-9. Finalize, upload, and obtain system sign-off for the enterprise Business Continuity Plan (BCP), establishing emergency risk mitigation protocols.
+9. Drive revenue enhancement, cost control, and operational efficiency: work directly with the proprietor to assess sales channels, customer retention, and expense management.
 10. Record the enterprise base GPS coordinates ("set my GPS pin") and keep MSME operational statuses (Active, Inactive, Closed, Unreachable) updated in the system for GIZ and Ministry of Trade mapping.
 11. Proactively discuss the commercial value of advisory services with MSME owners and document any client service fees or cost-sharing contributions generated.
 12. Submit an individual detailed visit report for every single session in the PRUDEV II portal within 48 hours, alongside client-signed timesheets and photo documentation.`,
@@ -114,21 +114,21 @@ const WO_DEFAULTS = {
       },
       {
         task_num: 3,
-        description: 'Cohort 1 Graduation Milestones — Compliance & Digital Adoption (October 2026 Target) — Formalization and digitalization milestone tracking: URSB registration certificates, TIN registration slips, and active daily usage of bookkeeping/POS systems (ISM Standard/Pro, One Tap POS).',
-        due_date: 'Mid-month / rolling towards Oct 31 graduation',
-        quantitative_result: 'Formalization & digital onboarding records submitted for assigned Cohort 1 MSMEs.',
-        qualitative_result: 'Businesses possess valid URSB certificates, TINs, and maintain structured digital or physical daily sales and expense records.',
-        means_of_verification: 'Uploaded URSB certificates, TIN registration documents, and ISM/POS account verification.',
+        description: 'Enterprise Formalization & Compliance Support — Assisting assigned MSMEs with formal business registration applications/certificates (URSB) and Tax Identification Number (TIN) acquisition for the business and proprietors.',
+        due_date: 'Rolling across work order period',
+        quantitative_result: 'Formalization and compliance progress records submitted for assigned MSMEs.',
+        qualitative_result: 'Businesses supported to secure valid URSB certificates, TINs, or formal operating status.',
+        means_of_verification: 'Uploaded URSB certificates, TIN registration slips, or formal application documentation.',
         unit_rate: '',
-        payment_condition: 'Required for milestone sign-off.',
+        payment_condition: 'Required milestone deliverable.',
       },
       {
         task_num: 4,
-        description: 'Business Continuity Plan (BCP) Execution & System Sign-off — Completed and verified Business Continuity Plan (BCP) documents uploaded and signed off in the platform for each assigned MSME.',
-        due_date: 'By end of work order period',
-        quantitative_result: '100% of assigned MSMEs have a completed BCP document in the system.',
-        qualitative_result: 'BCPs contain specific operational risk matrices, emergency cash flow contingencies, and succession plans tailored to the business.',
-        means_of_verification: 'System-verified BCP submissions and client sign-off.',
+        description: 'Digital Tool Adoption & Financial Management — Guiding assigned MSMEs on active daily usage of bookkeeping and sales management tools (ISM Standard/Pro, One Tap POS, Zoho, or structured cashbooks) to establish transparent business records.',
+        due_date: 'Rolling across work order period',
+        quantitative_result: 'Verified digital or structured record-keeping established for 100% of active assigned MSMEs.',
+        qualitative_result: 'Enterprises actively record daily transactions, monitor cash flow, and track sales revenue accurately.',
+        means_of_verification: 'System logs of ISM/POS accounts or photo verification of active structured cashbooks.',
         unit_rate: '',
         payment_condition: 'Included in monthly deliverable approval.',
       },
@@ -1223,7 +1223,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
               <InputLabel>Work Order Type</InputLabel>
               <Select value={woForm.work_order_type} label="Work Order Type"
                 onChange={e => applyWoDefaults(e.target.value)}>
-                <MenuItem value="permanent_assignee_support">Permanent Assignee Support (3x/Month) — Cohort 1 &amp; Thematic Coaching</MenuItem>
+                <MenuItem value="permanent_assignee_support">Permanent Assignee Support (3x/Month) — Thematic Enterprise Coaching</MenuItem>
                 <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
                 <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
                 <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>

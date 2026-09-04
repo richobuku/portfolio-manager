@@ -773,7 +773,7 @@ def render_work_order(work_order):
         story.append(Paragraph('EXPECTED OUTCOMES — THEMATIC COACHING & ENTERPRISE GROWTH', s['sectiontitle']))
         story.append(Paragraph(
             'This thematic assignment is designed to deliver demonstrable business growth for permanently assigned MSMEs, '
-            'ensuring all visits translate into practical capacity, compliance, and graduation milestones:',
+            'ensuring all visits translate into practical capacity, compliance, and enterprise growth milestones across core thematic areas:',
             ParagraphStyle('pa_intro', parent=s['body'], fontSize=9, spaceBefore=4, spaceAfter=4),
         ))
         pa_outcome_groups = [
@@ -783,11 +783,11 @@ def render_work_order(work_order):
                 'Every visit opens with a stated mutual purpose and concludes with an agreed next step confirmed via automated SMS Action Handout on the owner\'s phone.',
                 'Elimination of off-site form signing; 100% of engagements take place at the MSME business premises with operations observed.',
             ]),
-            ('Cohort 1 Graduation & Compliance Outcomes (October 2026)', [
-                'Assigned Cohort 1 MSMEs complete formal registration with the Uganda Registration Services Bureau (URSB).',
-                'Acquisition of Tax Identification Numbers (TIN) for both the business entity and individual proprietors.',
+            ('Thematic Enterprise Growth, Compliance & Digital Outcomes', [
+                'Assigned MSMEs supported to complete formal registration with the Uganda Registration Services Bureau (URSB).',
+                'Acquisition and verification of Tax Identification Numbers (TIN) for both the business entity and individual proprietors.',
                 'Active daily adoption of offline/online bookkeeping and sales management tools (ISM Standard/Pro, One Tap POS, Zoho, or structured cashbooks).',
-                'Finalization, upload, and system sign-off of the Business Continuity Plan (BCP) for each assigned enterprise.',
+                'Identification and unlocking of enterprise revenue opportunities, customer tracking, and operational cost controls.',
             ]),
             ('Commercial & Institutional Outcomes', [
                 'MSMEs validate the consulting value of BDS support by paying service fees / client contributions recorded in the platform.',
@@ -913,7 +913,7 @@ def render_work_order(work_order):
             'The BGE shall conduct a minimum of three (3) on-site coaching visits per calendar month for each permanently assigned MSME, providing hands-on business growth advisory and implementation support.',
             'Engagement Integrity & Venue: All visits must take place at the MSME business premises during operational hours. Meeting MSMEs in town or off-site solely to collect signatures on timesheets or administrative forms is strictly prohibited and constitutes grounds for non-payment and contract review.',
             'The 4 Field Reflection Standards: Every visit must (i) open with a stated mutual purpose, (ii) bridge business diagnosis with on-the-spot practical guidance and demonstrations ("diagnose AND advise"), (iii) pass "The Acid Test" by ensuring the MSME owner can name at least one concrete practice they will execute differently, and (iv) conclude with an agreed next step visible to the owner and confirmed via the automated SMS Action Handout.',
-            'Cohort 1 Graduation Targets: The BGE is responsible for actively driving assigned Cohort 1 MSMEs towards full graduation readiness by end of October 2026, comprising formal business registration (URSB), Tax Identification Numbers (TIN), operationalization of digital/bookkeeping tools (ISM Standard/Pro, One Tap POS, Zoho, or cashbooks), and finalization of the Business Continuity Plan (BCP).',
+            'Thematic Support & Formalization Milestones: The BGE is responsible for actively guiding assigned MSMEs across key enterprise growth themes, specifically driving formal business registration (URSB), Tax Identification Numbers (TIN), and operationalization of digital/bookkeeping tools (ISM Standard/Pro, One Tap POS, Zoho, or cashbooks) to build formal, bankable business records.',
             'Visit Planning & Calendar Sync: BGEs must schedule all planned visits in the PRUDEV II Visit Planner and maintain active synchronization with Google Calendar. Unscheduled or retrospective visit reporting without prior calendar planning is subject to verification.',
             'GPS Verification & MSME Status Mapping: The BGE shall record the enterprise base GPS location ("set my GPS pin") and keep MSME operational statuses (Active, Inactive, Closed, Unreachable) updated in the system to support GIZ and Ministry of Trade BDS mapping.',
             'Individual Visit Reporting: A separate, comprehensive visit report must be submitted in the PRUDEV II portal for every individual MSME visit within 48 hours of completion. Consolidating or bundling multiple visits into a single report is strictly prohibited.',
