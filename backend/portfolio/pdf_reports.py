@@ -766,6 +766,42 @@ def render_work_order(work_order):
             ))
         story.append(Spacer(1, 8))
 
+    # Expected Outcomes — rendered for Permanent Assignee Thematic Coaching
+    if work_order.work_order_type == 'permanent_assignee_support':
+        _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('EXPECTED OUTCOMES — THEMATIC COACHING & ENTERPRISE GROWTH', s['sectiontitle']))
+        story.append(Paragraph(
+            'This thematic assignment is designed to deliver demonstrable business growth for permanently assigned MSMEs, '
+            'ensuring all visits translate into practical capacity, compliance, and graduation milestones:',
+            ParagraphStyle('pa_intro', parent=s['body'], fontSize=9, spaceBefore=4, spaceAfter=4),
+        ))
+        pa_outcome_groups = [
+            ('Immediate Behavioral & Operational Outcomes', [
+                'Every visit delivers at least one concrete operational practice the owner can name and execute immediately (The Acid Test).',
+                'Consulting interactions bridge diagnosis and on-the-spot advisory, eliminating the perception of visits as extractive administrative audits.',
+                'Every visit opens with a stated mutual purpose and concludes with an agreed next step confirmed via automated SMS Action Handout on the owner\'s phone.',
+                'Elimination of off-site form signing; 100% of engagements take place at the MSME business premises with operations observed.',
+            ]),
+            ('Cohort 1 Graduation & Compliance Outcomes (October 2026)', [
+                'Assigned Cohort 1 MSMEs complete formal registration with the Uganda Registration Services Bureau (URSB).',
+                'Acquisition of Tax Identification Numbers (TIN) for both the business entity and individual proprietors.',
+                'Active daily adoption of offline/online bookkeeping and sales management tools (ISM Standard/Pro, One Tap POS, Zoho, or structured cashbooks).',
+                'Finalization, upload, and system sign-off of the Business Continuity Plan (BCP) for each assigned enterprise.',
+            ]),
+            ('Commercial & Institutional Outcomes', [
+                'MSMEs validate the consulting value of BDS support by paying service fees / client contributions recorded in the platform.',
+                'All visit activities are synchronized in the Visit Planner and Google Calendar, improving BGE availability and preventing scheduling conflicts.',
+                'Comprehensive BDS mapping data achieved for GIZ and Ministry of Trade through accurate GPS base pins and verified SME operational statuses.',
+            ]),
+        ]
+        pa_item_style = ParagraphStyle('pa_item', parent=s['body'], fontSize=9, leftIndent=14, spaceBefore=2)
+        for heading, items in pa_outcome_groups:
+            story.append(Paragraph(f'<b>{heading}</b>', ParagraphStyle('pa_hd', parent=s['body'], fontSize=10, spaceBefore=6, spaceAfter=2)))
+            for i, item in enumerate(items):
+                story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', pa_item_style))
+        story.append(Spacer(1, 8))
+
     story.append(Paragraph('SCHEDULE 2 — PAYMENT TERMS', s['sectiontitle']))
     gross = work_order.rate_per_day * work_order.max_days
     wht   = int(gross * 0.06)
@@ -871,6 +907,21 @@ def render_work_order(work_order):
             'Transport costs will be refunded based on public transport rates upon attendance and submission of valid original receipts.',
             'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
             'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA AFC GmbH.',
+        ]
+    elif work_order.work_order_type == 'permanent_assignee_support':
+        CONDITIONS = [
+            'The BGE shall conduct a minimum of three (3) on-site coaching visits per calendar month for each permanently assigned MSME, providing hands-on business growth advisory and implementation support.',
+            'Engagement Integrity & Venue: All visits must take place at the MSME business premises during operational hours. Meeting MSMEs in town or off-site solely to collect signatures on timesheets or administrative forms is strictly prohibited and constitutes grounds for non-payment and contract review.',
+            'The 4 Field Reflection Standards: Every visit must (i) open with a stated mutual purpose, (ii) bridge business diagnosis with on-the-spot practical guidance and demonstrations ("diagnose AND advise"), (iii) pass "The Acid Test" by ensuring the MSME owner can name at least one concrete practice they will execute differently, and (iv) conclude with an agreed next step visible to the owner and confirmed via the automated SMS Action Handout.',
+            'Cohort 1 Graduation Targets: The BGE is responsible for actively driving assigned Cohort 1 MSMEs towards full graduation readiness by end of October 2026, comprising formal business registration (URSB), Tax Identification Numbers (TIN), operationalization of digital/bookkeeping tools (ISM Standard/Pro, One Tap POS, Zoho, or cashbooks), and finalization of the Business Continuity Plan (BCP).',
+            'Visit Planning & Calendar Sync: BGEs must schedule all planned visits in the PRUDEV II Visit Planner and maintain active synchronization with Google Calendar. Unscheduled or retrospective visit reporting without prior calendar planning is subject to verification.',
+            'GPS Verification & MSME Status Mapping: The BGE shall record the enterprise base GPS location ("set my GPS pin") and keep MSME operational statuses (Active, Inactive, Closed, Unreachable) updated in the system to support GIZ and Ministry of Trade BDS mapping.',
+            'Individual Visit Reporting: A separate, comprehensive visit report must be submitted in the PRUDEV II portal for every individual MSME visit within 48 hours of completion. Consolidating or bundling multiple visits into a single report is strictly prohibited.',
+            'BDS Value Validation & Client Contributions: The BGE shall actively discuss the commercial value of advisory services with MSME owners and record any BDS client service fees or cost-sharing contributions generated in the platform.',
+            'Confidentiality & Data Protection: All MSME financial statements, business records, and personal proprietor data must be treated with strict professional confidentiality.',
+            'Deliverables & Timesheets: Payment of professional fees is strictly contingent upon submission and approval of detailed individual visit reports, an end-of-month milestone summary report, client-signed timesheets verifying physical on-site visits, and photographic proof of engagement.',
+            'Transport Reimbursement: Verified travel expenses will be reimbursed in accordance with PRUDEV II public transport rates upon submission of valid receipts or travel logs.',
+            'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA AFC GmbH.',
         ]
     elif work_order.work_order_type == 'bds_manual_module':
         CONDITIONS = [

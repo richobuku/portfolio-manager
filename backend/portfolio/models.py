@@ -1193,6 +1193,7 @@ class GroupReportAttendance(models.Model):
 
 class WorkOrder(models.Model):
     TYPE_CHOICES = [
+        ('permanent_assignee_support', 'Permanent Assignee Support (3x/Month) — Cohort 1 & Thematic Coaching'),
         ('msme_support',          'MSME CRM & Business Support'),
         ('msme_data_update',      'MSME Data Update & Verification'),
         ('msme_finance_survey',   'MSME Finance Survey (Google Forms)'),

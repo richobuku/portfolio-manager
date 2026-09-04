@@ -303,6 +303,21 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [duUpdateAssign, setDuUpdateAssign] = useState(true);
   const [duResult, setDuResult]         = useState(null);
 
+  // ── Permanent-assignee bulk work order distributor (3x/month) ──────────────
+  const [paDialog, setPaDialog]         = useState(false);
+  const [paPreview, setPaPreview]       = useState(null);
+  const [paLoading, setPaLoading]       = useState(false);
+  const [paCreating, setPaCreating]     = useState(false);
+  const [paStartDate, setPaStartDate]   = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`);
+  const [paEndDate, setPaEndDate]       = useState(() => {
+    const d = new Date(today.getFullYear(), today.getMonth()+1, 0);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+  const [paMaxDays, setPaMaxDays]       = useState(12);
+  const [paRatePerDay, setPaRatePerDay] = useState(60000);
+  const [paAllowEmpty, setPaAllowEmpty] = useState(false);
+  const [paResult, setPaResult]         = useState(null);
+
   // ── Smart BGE Assignment ─────────────────────────────────────────────────
   const [saLoading, setSaLoading]   = useState(false);
   const [saApplying, setSaApplying] = useState(false);
@@ -6512,6 +6527,42 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  // ── Permanent-assignee distributor handlers (3x/month) ─────────────────────
+  const openPaDialog = async () => {
+    setPaDialog(true);
+    setPaPreview(null);
+    setPaResult(null);
+    setPaLoading(true);
+    try {
+      const res = await axios.get(`${API_ENDPOINTS.WORK_ORDERS}auto-create-permanent-assignee-wos/`, { headers });
+      setPaPreview(res.data);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Could not load preview.');
+    } finally {
+      setPaLoading(false);
+    }
+  };
+  const createPaWorkOrders = async () => {
+    setPaCreating(true);
+    try {
+      const res = await axios.post(`${API_ENDPOINTS.WORK_ORDERS}auto-create-permanent-assignee-wos/`, {
+        start_date: paStartDate,
+        end_date: paEndDate,
+        max_days: paMaxDays,
+        rate_per_day: paRatePerDay,
+        allow_empty: paAllowEmpty,
+      }, { headers });
+      setPaResult(res.data);
+      setSuccess(`Created ${res.data.created} permanent assignee support work orders.`);
+      const wo = await axios.get(API_ENDPOINTS.WORK_ORDERS, { headers });
+      setWorkOrders(wo.data.results || wo.data);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to create work orders.');
+    } finally {
+      setPaCreating(false);
+    }
+  };
+
   // ── Smart assignment handlers ─────────────────────────────────────────────
   const loadSmartAssign = async (applyTo = saApplyTo, excludeList = saExclude) => {
     setSaLoading(true);
@@ -7046,6 +7097,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     return (
     <Box>
       <SectionHeader title="Work Orders" subtitle={`${workOrders.length} work orders`}>
+        <Button variant="outlined" color="primary" size="small" onClick={openPaDialog} sx={{ mr: 1 }}>🤝 Bulk Issue Permanent Assignee WOs (3x/Mo)</Button>
         <Button variant="outlined" size="small" onClick={openDuDialog} sx={{ mr: 1 }}>📊 Distribute Data Updates</Button>
         <Button variant="contained" startIcon={<Add />} size="small" onClick={openWoCreate}>New Work Order</Button>
       </SectionHeader>
@@ -7117,6 +7169,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <InputLabel>Type</InputLabel>
           <Select value={woFilterType || ''} label="Type" onChange={e => { const v = e.target.value; startTransition(() => setWoFilterType(v)); }}>
             <MenuItem value="">All Types</MenuItem>
+            <MenuItem value="permanent_assignee_support">Permanent Assignee Support (3x/Mo)</MenuItem>
             <MenuItem value="msme_support">MSME CRM &amp; Business Support</MenuItem>
             <MenuItem value="msme_data_update">MSME Data Update &amp; Verification</MenuItem>
             <MenuItem value="msme_finance_survey">MSME Finance Survey (Google Forms)</MenuItem>
@@ -7630,6 +7683,124 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           {!duResult && duPreview && (
             <Button variant="contained" onClick={createDuWorkOrders} disabled={duCreating}>
               {duCreating ? 'Creating…' : `Create ${duPreview.total_bges} Work Orders`}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Permanent Assignee (3x/Mo) Bulk Work Order Distribution Dialog ── */}
+      <Dialog open={paDialog} onClose={() => { setPaDialog(false); setPaResult(null); }} maxWidth="md" fullWidth>
+        <DialogTitle>🤝 Bulk Issue Permanent Assignee Work Orders (3x/Month)</DialogTitle>
+        <DialogContent dividers>
+          {paLoading && <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress /></Box>}
+
+          {!paLoading && paPreview && !paResult && (
+            <>
+              {/* Summary chips */}
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <Chip label={`${paPreview.total_assigned_msmes} assigned MSMEs`} color="primary" />
+                <Chip label={`${paPreview.total_bges} active/approved BGEs`} color="secondary" />
+                <Chip label={`${paPreview.bges_with_assignees} BGEs with assignees`} color="success" />
+              </Box>
+
+              {/* Alert explaining the thematic requirements */}
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <strong>Cohort 1 &amp; Thematic Coaching Framework:</strong> Mandates minimum 3 on-site coaching visits/month per MSME, applies the 4 Reflection Standards (opening stated purpose, diagnose &amp; advise, Acid Test 1 concrete change, visible closing with SMS Action Handout), strictly bans meeting off-premise in town solely for signatures, and drives October graduation (URSB, TIN, ISM/POS, BCP).
+              </Alert>
+
+              {/* Config fields */}
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <TextField label="Start Date" type="date" size="small" value={paStartDate}
+                  onChange={e => setPaStartDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 140px' }} />
+                <TextField label="End Date" type="date" size="small" value={paEndDate}
+                  onChange={e => setPaEndDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ flex: '1 1 140px' }} />
+                <TextField label="Max Days" type="number" size="small" value={paMaxDays}
+                  onChange={e => setPaMaxDays(Number(e.target.value))} sx={{ flex: '1 1 100px' }} />
+                <TextField label="Rate/Day (UGX)" type="number" size="small" value={paRatePerDay}
+                  onChange={e => setPaRatePerDay(Number(e.target.value))} sx={{ flex: '1 1 140px' }} />
+              </Box>
+              <FormControlLabel
+                control={<Checkbox checked={paAllowEmpty} onChange={e => setPaAllowEmpty(e.target.checked)} size="small" />}
+                label="Also create work orders for BGEs with 0 assigned MSMEs"
+                sx={{ mb: 2 }}
+              />
+
+              {/* Distribution preview table */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Permanent Assignees per BGE</Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 340, overflow: 'auto' }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>BGE</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Assigned MSMEs</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>MSME Names &amp; Districts</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {paPreview.distribution.map(row => (
+                      <TableRow key={row.bge_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>{row.bge_name}</Typography>
+                          {row.bge_code && <Typography variant="caption" color="text.secondary">{row.bge_code}</Typography>}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip label={row.count} size="small" color={row.count > 0 ? 'primary' : 'default'} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary">
+                            {row.msmes.length === 0
+                              ? <em>No assigned MSMEs</em>
+                              : row.msmes.slice(0, 6).map(m => `${m.business_name} (${m.district})`).join(', ')}
+                            {row.msmes.length > 6 && ` +${row.msmes.length - 6} more`}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
+
+          {/* Result after creation */}
+          {paResult && (
+            <Box>
+              <Typography variant="h6" color="success.main" sx={{ mb: 1 }}>
+                ✅ {paResult.created} work orders created
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>Work Order #</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>BGE</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Assigned MSMEs</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(paResult.work_orders || []).map(w => (
+                      <TableRow key={w.work_order_id}>
+                        <TableCell><Typography variant="body2" fontWeight={600}>{w.work_order_number}</Typography></TableCell>
+                        <TableCell>{w.bge_name} {w.bge_code ? `(${w.bge_code})` : ''}</TableCell>
+                        <TableCell align="center"><Chip label={w.msme_count} size="small" color="primary" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {paResult.errors?.length > 0 && (
+                <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                  {paResult.errors.map(e => `${e.bge}: ${e.error}`).join('; ')}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setPaDialog(false); setPaResult(null); }}>Close</Button>
+          {!paResult && paPreview && (
+            <Button variant="contained" onClick={createPaWorkOrders} disabled={paCreating}>
+              {paCreating ? 'Creating…' : `Create Work Orders (${paAllowEmpty ? paPreview.total_bges : paPreview.bges_with_assignees} BGEs)`}
             </Button>
           )}
         </DialogActions>
