@@ -852,6 +852,69 @@ PHASE 2 — CO-FACILITATION OF TRAINING (5 days, 1st Week of September 2026)
       },
     ],
   },
+  bge_technical_co_assignment: {
+    objective: `To deliver high-impact, specialized technical advisory and cross-coaching support to the designated Primary BGE and their assigned MSMEs within the specialist's area of greatest technical capacity. The assignment focuses on resolving critical operational and technical bottlenecks, conducting structured on-site demonstrations, embedding practical business tools and quality standards, mentoring the Primary BGE for long-term advisory sustainability, and ensuring each intervention passes "The Acid Test" with tangible operational changes executed by enterprise proprietors.`,
+    key_tasks: `1. Conduct a joint technical pre-deployment briefing with the supported Primary BGE to review enterprise diagnostics, define priority technical bottlenecks, and agree on target MSMEs.
+2. Synchronize all technical coaching dates in the PRUDEV II Visit Planner and Google Calendar in full coordination with the Primary BGE to avoid scheduling overlaps.
+3. Deliver hands-on, on-site technical advisory sessions at the business premises of designated MSMEs strictly in the specialist's greatest technical capacity area.
+4. Execute structured "Diagnose AND Advise" coaching: pair every identified technical challenge with an immediate operational calculation, workflow adjustment, or tool demonstration.
+5. Provide active cross-mentoring to the supported Primary BGE during joint engagements, building their technical capacity to sustain advisory support post-intervention.
+6. Apply "The Acid Test" at each session, confirming the enterprise proprietor can articulate and independently execute at least one concrete technical improvement.
+7. Support the adoption of practical tools (e.g. structured bookkeeping, POS tools, quality assurance checklists, production logs, or formal registration filings).
+8. Conduct a post-intervention technical debrief with the Primary BGE and submit individual visit reports along with a comprehensive Technical Handover Note within 48 hours.`,
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Joint Technical Support Plan & Calendar Synchronization — Coordinated work plan agreed with supported Primary BGE, target MSMEs identified, and visit dates synchronized in Visit Planner and Google Calendar.',
+        due_date: 'Within first 3 days of work order',
+        quantitative_result: '100% of targeted technical support visits scheduled in Visit Planner alongside Primary BGE.',
+        qualitative_result: 'Technical focus areas clearly articulated; scheduling conflicts eliminated.',
+        means_of_verification: 'Synchronized Visit Planner records and Google Calendar confirmation.',
+        unit_rate: '',
+        payment_condition: 'Prerequisite milestone for field deployment.',
+      },
+      {
+        task_num: 2,
+        description: 'On-Site Specialist Technical Coaching Visits & Field Reports — Structured on-site advisory sessions delivered to target MSMEs in the specialist technical capacity area, with verified individual visit reports submitted in PRUDEV II portal.',
+        due_date: 'Rolling — within 48 hours of each visit',
+        quantitative_result: '100% of planned technical visits completed with approved individual portal reports.',
+        qualitative_result: 'Reports reflect hands-on demonstrations, Primary BGE cross-participation, and passing The Acid Test with concrete action items.',
+        means_of_verification: 'Approved PRUDEV II visit reports with GPS base pins and automated SMS Action Handout delivery logs.',
+        unit_rate: '',
+        payment_condition: 'Payable upon approval of verified visit reports.',
+      },
+      {
+        task_num: 3,
+        description: 'Practical Tool & Operational Standard Adoption — Guiding and embedding tangible technical tools (bookkeeping cashbooks, POS software, quality checklists, or formalization records) into daily MSME operations.',
+        due_date: 'Rolling across work order period',
+        quantitative_result: '100% of supported MSMEs adopt or operationalize at least one practical technical tool or checklist.',
+        qualitative_result: 'Proprietors independently navigate and utilize the introduced tool or record-keeping framework.',
+        means_of_verification: 'Photographic documentation, uploaded tool records, or software activity logs.',
+        unit_rate: '',
+        payment_condition: 'Required technical deliverable.',
+      },
+      {
+        task_num: 4,
+        description: 'Cross-BGE Mentorship & Technical Handover Note — Documented debrief note detailing skills transferred to the Primary BGE, ongoing technical gaps, and recommended follow-up actions.',
+        due_date: 'End of assignment',
+        quantitative_result: '1 comprehensive Technical Handover Note submitted and acknowledged by the Primary BGE.',
+        qualitative_result: 'Primary BGE demonstrates enhanced capability to advise on this technical theme independently.',
+        means_of_verification: 'Submitted and signed Technical Handover Note in PRUDEV II portal.',
+        unit_rate: '',
+        payment_condition: 'Required for final deliverable sign-off.',
+      },
+      {
+        task_num: 5,
+        description: 'Consolidated Performance Summary, Signed Timesheets & Invoice — Final co-assignment report, client-countersigned timesheets verifying physical on-premise technical delivery, and approved invoice.',
+        due_date: 'Last working day of assignment',
+        quantitative_result: '1 consolidated summary report, 1 fully countersigned timesheet covering all technical visits, and 1 invoice.',
+        qualitative_result: 'Timesheets verified on-premise by MSME proprietors; report clearly highlights technical transformation.',
+        means_of_verification: 'Countersigned timesheet, submitted summary report, and approved invoice.',
+        unit_rate: '',
+        payment_condition: 'Final payment released upon BDS Expert and Team Leader approval.',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -873,6 +936,9 @@ const WO_EMPTY = {
   team_leader_name: 'Stephen Maxi Opwonya',
   team_leader_position: 'Team Leader',
   participant_bges: [],
+  supported_bge: '',
+  technical_area: '',
+  msme_ids_snapshot: [],
 };
 
 const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woEditing, experts, headers, onSaved, fetchWorkOrders }) {
@@ -934,6 +1000,9 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         team_leader_name: woEditing.team_leader_name,
         team_leader_position: woEditing.team_leader_position,
         participant_bges: woEditing.participant_bges || [],
+        supported_bge: woEditing.supported_bge || '',
+        technical_area: woEditing.technical_area || '',
+        msme_ids_snapshot: woEditing.msme_ids_snapshot || [],
       });
     } else {
       setWoForm({ ...WO_EMPTY });
@@ -941,9 +1010,60 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
     setWoErrors('');
   }, [open, woEditing]);
 
+  const [supportedMsmes, setSupportedMsmes] = React.useState([]);
+  const [loadingSupportedMsmes, setLoadingSupportedMsmes] = React.useState(false);
+
+  // Auto-fill technical_area from specialist BGE's top_skills when selected
+  React.useEffect(() => {
+    if (woForm.work_order_type === 'bge_technical_co_assignment') {
+      const currentBgeId = woEditing ? woForm.bge : selectedBges[0];
+      const specBge = experts.find(e => e.id === currentBgeId);
+      if (specBge?.top_skills && !woForm.technical_area) {
+        setWoForm(f => ({ ...f, technical_area: specBge.top_skills }));
+      }
+    }
+  }, [woForm.work_order_type, woForm.bge, selectedBges, experts, woEditing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load MSMEs assigned to the supported BGE
+  React.useEffect(() => {
+    if (woForm.work_order_type !== 'bge_technical_co_assignment' || !woForm.supported_bge) {
+      setSupportedMsmes([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingSupportedMsmes(true);
+    axios.get(API_ENDPOINTS.MSMES, {
+      headers,
+      params: { assigned_bge: woForm.supported_bge, is_active: true }
+    }).then(res => {
+      if (cancelled) return;
+      const data = res.data?.results ?? res.data ?? [];
+      setSupportedMsmes(data);
+    }).catch(() => {
+      if (!cancelled) setSupportedMsmes([]);
+    }).finally(() => {
+      if (!cancelled) setLoadingSupportedMsmes(false);
+    });
+    return () => { cancelled = true; };
+  }, [woForm.work_order_type, woForm.supported_bge, headers]);
+
   const applyWoDefaults = React.useCallback((type) => {
     const d = WO_DEFAULTS[type] || WO_DEFAULTS.other;
     const extra = {};
+    if (type === 'bge_technical_co_assignment') {
+      extra.duration             = '1 Month (Targeted Technical Support)';
+      extra.max_days             = 6;
+      extra.rate_per_day         = 60000;
+      extra.transport_reimbursed = true;
+      extra.location             = 'Northern Uganda (Gulu, Lira, Kitgum, Oyam, Omoro, Amuru, Adjumani)';
+      extra.project_name         = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      const specBge = experts.find(e => e.id === (woEditing ? woForm.bge : selectedBges[0]));
+      if (specBge?.top_skills) {
+        extra.technical_area = specBge.top_skills;
+      }
+    }
     if (type === 'permanent_assignee_support') {
       extra.duration             = '1 Month (Min 3 visits/MSME)';
       extra.max_days             = 12;
@@ -1042,7 +1162,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.end_date     = '2026-08-21';
     }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
-  }, []);
+  }, [experts, selectedBges, woEditing, woForm.bge]);
 
   // ── Stable deliverable callbacks ──────────────────────────────────────────
   // These use the functional updater form of setWoForm so they never close
@@ -1092,14 +1212,25 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
     setWoSaving(true); setWoErrors('');
     try {
       if (woEditing) {
-        const payload = { ...woForm, group: woForm.group || null, allow_overlap: woAllowOverlap || false };
+        const payload = {
+          ...woForm,
+          group: woForm.group || null,
+          supported_bge: woForm.supported_bge || null,
+          allow_overlap: woAllowOverlap || false,
+        };
         await axios.put(`${API_ENDPOINTS.WORK_ORDERS}${woEditing.id}/`, payload, { headers });
         fetchWorkOrders();
         onSaved('Work order updated.');
       } else if (selectedBges.length > 1) {
         // Bulk create — identical content, one WO per selected BGE
         const { bge: _unused, ...rest } = woForm; // eslint-disable-line no-unused-vars
-        const payload = { ...rest, bge_ids: selectedBges, group: woForm.group || null, allow_overlap: woAllowOverlap || false };
+        const payload = {
+          ...rest,
+          bge_ids: selectedBges,
+          group: woForm.group || null,
+          supported_bge: woForm.supported_bge || null,
+          allow_overlap: woAllowOverlap || false,
+        };
         const res = await axios.post(`${API_ENDPOINTS.WORK_ORDERS}bulk-create/`, payload, { headers });
         fetchWorkOrders();
         const d = res.data;
@@ -1110,7 +1241,13 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
           onSaved(`${d.created} work orders created successfully.`);
         }
       } else {
-        const payload = { ...woForm, bge: selectedBges[0], group: woForm.group || null, allow_overlap: woAllowOverlap || false };
+        const payload = {
+          ...woForm,
+          bge: selectedBges[0],
+          group: woForm.group || null,
+          supported_bge: woForm.supported_bge || null,
+          allow_overlap: woAllowOverlap || false,
+        };
         await axios.post(API_ENDPOINTS.WORK_ORDERS, payload, { headers });
         fetchWorkOrders();
         onSaved('Work order created.');
@@ -1240,10 +1377,153 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework — Training &amp; Field Implementation</MenuItem>
                 <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
                 <MenuItem value="bds_manual_module">BDS Manual — Additional Module</MenuItem>
+                <MenuItem value="bge_technical_co_assignment">BGE Technical Co-Assignment Support (Specialist Technical Capacity)</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
           </Grid>
+
+          {/* ── SECTION: Technical Co-Assignment Details ── */}
+          {woForm.work_order_type === 'bge_technical_co_assignment' && (
+            <Grid item xs={12}>
+              <Box sx={{
+                p: 2,
+                borderRadius: 2,
+                border: '1.5px solid #0288D1',
+                bgcolor: '#F0F9FF',
+                mb: 1,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#01579B' }}>
+                    🤝 Technical Co-Assignment Configuration
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#0288D1', bgcolor: '#E1F5FE', px: 1, py: 0.25, borderRadius: 1, fontWeight: 600 }}>
+                    Specialist Area of Greatest Technical Capacity
+                  </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth size="small" required>
+                      <InputLabel>Supported Primary BGE</InputLabel>
+                      <Select
+                        value={woForm.supported_bge || ''}
+                        label="Supported Primary BGE"
+                        onChange={e => {
+                          const suppId = e.target.value;
+                          setWoForm(f => ({ ...f, supported_bge: suppId, msme_ids_snapshot: [] }));
+                        }}
+                      >
+                        {experts
+                          .filter(ex => {
+                            const curId = woEditing ? woForm.bge : (selectedBges[0] || null);
+                            return ex.id !== curId;
+                          })
+                          .map(ex => (
+                            <MenuItem key={ex.id} value={ex.id}>
+                              {ex.name} ({ex.bge_code || 'No code'}) — {ex.top_skills || 'General BDS'}
+                            </MenuItem>
+                          ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Area of Greatest Technical Capacity"
+                      placeholder="e.g. Financial Management & Bookkeeping, POS Onboarding, UNBS Quality Standards"
+                      value={woForm.technical_area || ''}
+                      onChange={e => setWoForm(f => ({ ...f, technical_area: e.target.value }))}
+                      helperText="Pre-filled from specialist BGE top skills; editable."
+                    />
+                  </Grid>
+
+                  {woForm.supported_bge && (
+                    <Grid item xs={12}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#0277BD' }}>
+                          Target MSMEs for Technical Coaching ({woForm.msme_ids_snapshot?.length || 0} selected)
+                        </Typography>
+                        {supportedMsmes.length > 0 && (
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              size="small"
+                              sx={{ textTransform: 'none', py: 0, px: 1, fontSize: 11 }}
+                              onClick={() => setWoForm(f => ({ ...f, msme_ids_snapshot: supportedMsmes.map(m => m.id) }))}
+                            >
+                              Select All ({supportedMsmes.length})
+                            </Button>
+                            <Button
+                              size="small"
+                              sx={{ textTransform: 'none', py: 0, px: 1, fontSize: 11, color: 'text.secondary' }}
+                              onClick={() => setWoForm(f => ({ ...f, msme_ids_snapshot: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          </Box>
+                        )}
+                      </Box>
+                      {loadingSupportedMsmes ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+                          <CircularProgress size={16} />
+                          <Typography variant="caption">Loading assigned MSMEs...</Typography>
+                        </Box>
+                      ) : supportedMsmes.length === 0 ? (
+                        <Typography variant="caption" color="text.secondary">
+                          No active assigned MSMEs found for this BGE.
+                        </Typography>
+                      ) : (
+                        <Box sx={{
+                          maxHeight: 160,
+                          overflowY: 'auto',
+                          border: '1px solid #B3E5FC',
+                          borderRadius: 1,
+                          bgcolor: '#ffffff',
+                          p: 1,
+                        }}>
+                          <Grid container spacing={0.5}>
+                            {supportedMsmes.map(m => {
+                              const checked = (woForm.msme_ids_snapshot || []).includes(m.id);
+                              return (
+                                <Grid item xs={12} sm={6} key={m.id}>
+                                  <Box
+                                    onClick={() => {
+                                      const current = woForm.msme_ids_snapshot || [];
+                                      const next = checked ? current.filter(id => id !== m.id) : [...current, m.id];
+                                      setWoForm(f => ({ ...f, msme_ids_snapshot: next }));
+                                    }}
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      p: 0.5,
+                                      borderRadius: 1,
+                                      cursor: 'pointer',
+                                      bgcolor: checked ? '#E1F5FE' : 'transparent',
+                                      '&:hover': { bgcolor: '#F0F9FF' },
+                                    }}
+                                  >
+                                    <Checkbox size="small" checked={checked} sx={{ p: 0.5, mr: 0.5 }} />
+                                    <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      <Typography variant="body2" sx={{ fontSize: 12, fontWeight: checked ? 600 : 400 }}>
+                                        {m.business_name}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ fontSize: 10, color: 'text.secondary' }}>
+                                        {m.msme_code || m.district || m.sector}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Grid>
+                              );
+                            })}
+                          </Grid>
+                        </Box>
+                      )}
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+            </Grid>
+          )}
           <Grid item xs={12} sm={4}>
             <TextField fullWidth size="small" label="Issue Date" type="date" InputLabelProps={{ shrink: true }}
               value={woForm.issue_date} onChange={e => setWoForm(f => ({ ...f, issue_date: e.target.value }))} />

@@ -460,19 +460,26 @@ def render_work_order(work_order):
         s['sub'],
     ))
 
-    story.append(_kv_table([
+    meta_rows = [
         ['Work Order #',    work_order.work_order_number or '—'],
         ['Project',         work_order.project_name or '—'],
         ['Type',            work_order.get_work_order_type_display()],
         ['Issue Date',      str(work_order.issue_date)],
         ['BGE',             bge.name],
         ['BGE Code',        bge.bge_code or '—'],
+    ]
+    if work_order.supported_bge:
+        meta_rows.append(['Supported Primary BGE', f"{work_order.supported_bge.name} ({work_order.supported_bge.bge_code or 'No code'})"])
+    if work_order.technical_area or work_order.work_order_type == 'bge_technical_co_assignment':
+        meta_rows.append(['Technical Capacity Area', work_order.technical_area or bge.top_skills or 'Specialist Advisory'])
+    meta_rows.extend([
         ['Email',           bge.email or '—'],
         ['Location',        work_order.location or '—'],
         ['Duration',        work_order.duration or '—'],
         ['Start Date',      str(work_order.start_date) if work_order.start_date else '—'],
         ['End Date',        str(work_order.end_date) if work_order.end_date else '—'],
-    ]))
+    ])
+    story.append(_kv_table(meta_rows))
 
     story.append(Spacer(1, 8))
 
@@ -802,6 +809,42 @@ def render_work_order(work_order):
                 story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', pa_item_style))
         story.append(Spacer(1, 8))
 
+    # Expected Outcomes — rendered for BGE Technical Co-Assignment Support
+    if work_order.work_order_type == 'bge_technical_co_assignment':
+        _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('EXPECTED OUTCOMES — SPECIALIST TECHNICAL CO-ASSIGNMENT & CROSS-COACHING', s['sectiontitle']))
+        supported_name = work_order.supported_bge.name if work_order.supported_bge else "the primary BGE"
+        tech_title = work_order.technical_area or bge.top_skills or "Specialist Technical Capacity"
+        story.append(Paragraph(
+            f'This technical co-assignment is deployed to leverage the specialist BGE\'s area of greatest technical capacity '
+            f'({_safe_html(tech_title)}) to support {supported_name} and designated MSMEs:',
+            ParagraphStyle('tc_intro', parent=s['body'], fontSize=9, spaceBefore=4, spaceAfter=4),
+        ))
+        tc_outcome_groups = [
+            ('Specialized Technical Problem-Solving & Operational Improvements', [
+                'Targeted MSMEs receive hands-on diagnostics and concrete technical resolutions addressing critical operational bottlenecks.',
+                'Every technical visit translates into immediate capability enhancement passing The Acid Test with measurable operational adjustments.',
+                'Implementation and active adoption of practical technical templates, production workflows, compliance checklists, or digital financial tools.',
+            ]),
+            ('Cross-BGE Knowledge Transfer & Mentorship', [
+                f'Structured cross-coaching provided to {supported_name}, equipping them with core advisory frameworks in this technical capacity area.',
+                'Primary BGE actively observes and participates in technical demonstrations to ensure post-assignment advisory continuity.',
+                'Completion and submission of a Technical Debrief & Handover Note highlighting findings, ongoing gaps, and follow-up recommendations.',
+            ]),
+            ('Field Governance & Delivery Integrity', [
+                'All technical visits synchronized in advance with the primary BGE in the PRUDEV II Visit Planner and Google Calendar.',
+                '100% of engagements take place on-site at enterprise business premises with verified GPS pinning and photo documentation.',
+                'Submission of verified individual technical visit reports and client-signed timesheets within 48 hours of engagement.',
+            ]),
+        ]
+        tc_item_style = ParagraphStyle('tc_item', parent=s['body'], fontSize=9, leftIndent=14, spaceBefore=2)
+        for heading, items in tc_outcome_groups:
+            story.append(Paragraph(f'<b>{heading}</b>', ParagraphStyle('tc_hd', parent=s['body'], fontSize=10, spaceBefore=6, spaceAfter=2)))
+            for i, item in enumerate(items):
+                story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', tc_item_style))
+        story.append(Spacer(1, 8))
+
     story.append(Paragraph('SCHEDULE 2 — PAYMENT TERMS', s['sectiontitle']))
     gross = work_order.rate_per_day * work_order.max_days
     wht   = int(gross * 0.06)
@@ -921,6 +964,19 @@ def render_work_order(work_order):
             'Confidentiality & Data Protection: All MSME financial statements, business records, and personal proprietor data must be treated with strict professional confidentiality.',
             'Deliverables & Timesheets: Payment of professional fees is strictly contingent upon submission and approval of detailed individual visit reports, an end-of-month milestone summary report, client-signed timesheets verifying physical on-site visits, and photographic proof of engagement.',
             'Transport Reimbursement: Verified travel expenses will be reimbursed in accordance with PRUDEV II public transport rates upon submission of valid receipts or travel logs.',
+            'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA AFC GmbH.',
+        ]
+    elif work_order.work_order_type == 'bge_technical_co_assignment':
+        CONDITIONS = [
+            'Specialist Technical Scope: The Specialist BGE shall deliver targeted technical coaching exclusively within their designated area of greatest technical capacity, providing hands-on advisory, calculations, and operational demonstrations to designated MSMEs.',
+            'Collaborative Cross-Deployment: The Specialist BGE shall work in active partnership with the supported primary BGE, harmonizing visit dates in the PRUDEV II Visit Planner and ensuring the primary BGE participates in sessions for skills transfer and continuity.',
+            'Engagement Integrity & On-Site Delivery: All technical advisory sessions must take place at the MSME business premises during operational hours. Off-site meetings or administrative form-signing without on-site technical value delivery is strictly prohibited.',
+            'The Acid Test & Tangible Actions: Every technical visit must pass "The Acid Test", verifying that the MSME proprietor can articulate and independently execute at least one concrete operational improvement resulting from the session.',
+            'Tool & Framework Adoption: The Specialist BGE is responsible for embedding practical technical tools (e.g. cashbooks, digital POS, quality control templates, production logs, or formal registration documents) into the daily operations of supported MSMEs.',
+            'Technical Debrief & Handover Note: At the conclusion of the co-assignment, the Specialist BGE shall submit a structured Technical Handover Note detailing enterprise progress, remaining gaps, and mentoring cues for the primary BGE.',
+            'Visit Reporting & Verification: An individual comprehensive visit report must be submitted in the PRUDEV II portal for each enterprise session within 48 hours, supported by GPS base pinning and photo documentation.',
+            'Timesheets & Invoicing: Release of professional fees is strictly contingent upon submission and approval of detailed visit reports, the Technical Handover Note, countersigned client timesheets, and an approved invoice.',
+            'Transport Reimbursement: Travel expenses will be reimbursed in accordance with PRUDEV II public transport rates upon submission of valid travel receipts or logs.',
             'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA AFC GmbH.',
         ]
     elif work_order.work_order_type == 'bds_manual_module':

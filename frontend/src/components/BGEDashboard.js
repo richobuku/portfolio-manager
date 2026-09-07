@@ -752,8 +752,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     try {
       const res = await axios.get(API_ENDPOINTS.WORK_ORDER_ATTACHMENTS, { headers: h });
       setAttachments(Array.isArray(res.data) ? res.data : res.data.results || []);
-    } catch {
-      // silent
+    } catch (err) {
+      console.warn('Failed to fetch work order attachments:', err);
     }
   }, [token]);
 
@@ -1627,15 +1627,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       form.append('work_order', woId);
       form.append('file_upload', attachFile);
       if (attachCaption.trim()) form.append('caption', attachCaption.trim());
-      await axios.post(API_ENDPOINTS.WORK_ORDER_ATTACHMENTS, form, {
+      const res = await axios.post(API_ENDPOINTS.WORK_ORDER_ATTACHMENTS, form, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
       });
       notify('Document attached successfully');
+      if (res.data) {
+        setAttachments(prev => [res.data, ...prev.filter(a => a.id !== res.data.id)]);
+      }
       setAttachFile(null);
       setAttachCaption('');
       setActiveAttachWoId(null);
       if (attachInputRef.current) attachInputRef.current.value = '';
-      fetchAttachments();
+      await fetchAttachments();
     } catch (err) {
       const errData = err.response?.data;
       const msg = errData?.detail || (typeof errData === 'object' ? Object.values(errData).flat()[0] : null) || 'Failed to upload attachment';
@@ -2803,25 +2806,54 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   onChange={e => setReplaceTimesheetFile(e.target.files[0] || null)} />
                 <input type="file" accept=".xlsx,.xls" ref={replaceInvoiceRef} style={{ display: 'none' }}
                   onChange={e => setReplaceInvoiceFile(e.target.files[0] || null)} />
-                <input type="file" accept="image/*,.pdf" ref={attachInputRef} style={{ display: 'none' }}
+                <input type="file" accept="image/*,.pdf,application/pdf" ref={attachInputRef} style={{ display: 'none' }}
                   onChange={e => setAttachFile(e.target.files[0] || null)} />
 
                 {workOrders.map(wo => {
                   const woSubs = submissions.filter(s => s.work_order === wo.id);
                   const woPays = payments.filter(p => p.work_order === wo.id);
-                  const woAttachments = attachments.filter(a => a.work_order === wo.id);
+                  const woAttachments = attachments.filter(a => {
+                    const aWoId = typeof a.work_order === 'object' ? a.work_order?.id : a.work_order;
+                    return String(aWoId) === String(wo.id);
+                  });
                   return (
-                    <Card variant="outlined" key={wo.id}>
+                    <Card variant="outlined" key={wo.id}
+                      sx={wo.work_order_type === 'bge_technical_co_assignment' ? { borderLeft: '4px solid #0288D1' } : {}}>
                       <CardContent>
                         {/* Header row */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
                           <Box>
-                            <Typography fontWeight={700}>{wo.work_order_number}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3, flexWrap: 'wrap' }}>
+                              <Typography fontWeight={700}>{wo.work_order_number}</Typography>
+                              {wo.work_order_type === 'bge_technical_co_assignment' && (
+                                <Chip label="Specialist Co-Assignment" size="small"
+                                  sx={{ bgcolor: '#0288D1', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                              )}
+                            </Box>
                             <Typography variant="caption" color="text.secondary">
                               {wo.work_order_type_display} · Issued: {wo.issue_date}
                               {wo.start_date && ` · ${wo.start_date}`}
                               {wo.end_date && ` – ${wo.end_date}`}
                             </Typography>
+                            {wo.work_order_type === 'bge_technical_co_assignment' && (
+                              <Box sx={{ mt: 0.5, mb: 0.5, p: 0.8, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                {wo.supported_bge_name && (
+                                  <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: 'info.main' }}>
+                                    Supporting Primary BGE: {wo.supported_bge_name} {wo.supported_bge_code ? `(${wo.supported_bge_code})` : ''}
+                                  </Typography>
+                                )}
+                                {(wo.technical_area || wo.bge_top_skills) && (
+                                  <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                    Technical Specialty: {wo.technical_area || wo.bge_top_skills}
+                                  </Typography>
+                                )}
+                                {wo.target_msmes_detail && wo.target_msmes_detail.length > 0 && (
+                                  <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                    Target MSMEs ({wo.target_msmes_detail.length}): {wo.target_msmes_detail.map(m => m.name).slice(0, 3).join(', ')}{wo.target_msmes_detail.length > 3 ? ` +${wo.target_msmes_detail.length - 3} more` : ''}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
                             {wo.status === 'signed' && wo.bge_signed_date && (
                               <Typography variant="caption" color="success.main" display="block" fontWeight={600}>
                                 Signed: {wo.bge_signed_date}
@@ -5840,6 +5872,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   ['Completion Date', workOrderPreview.end_date || '—'],
                   ['Location', workOrderPreview.location],
                   ['Duration', workOrderPreview.duration],
+                  ...(workOrderPreview.work_order_type === 'bge_technical_co_assignment' ? [
+                    ['Supported Primary BGE', `${workOrderPreview.supported_bge_name || '—'} ${workOrderPreview.supported_bge_code ? `(${workOrderPreview.supported_bge_code})` : ''}`],
+                    ['Technical Specialty Area', workOrderPreview.technical_area || workOrderPreview.bge_top_skills || '—'],
+                  ] : []),
                 ].map(([label, val]) => (
                   <React.Fragment key={label}>
                     <Grid item xs={4}>
@@ -5851,6 +5887,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   </React.Fragment>
                 ))}
               </Grid>
+              {workOrderPreview.work_order_type === 'bge_technical_co_assignment' && workOrderPreview.target_msmes_detail?.length > 0 && (
+                <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F0F9FF', borderRadius: 1, border: '1px solid #BAE6FD' }}>
+                  <Typography variant="caption" fontWeight={700} color="#0369A1" display="block" sx={{ mb: 0.5 }}>
+                    Target MSMEs for Technical Support ({workOrderPreview.target_msmes_detail.length}):
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {workOrderPreview.target_msmes_detail.map(m => `${m.name}${m.sector ? ` (${m.sector})` : ''}`).join(' • ')}
+                  </Typography>
+                </Box>
+              )}
               <Divider sx={{ mb: 2 }} />
 
               {/* Sections */}

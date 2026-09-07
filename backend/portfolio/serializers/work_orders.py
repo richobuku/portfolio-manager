@@ -9,6 +9,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     work_order_type_display = serializers.CharField(source='get_work_order_type_display', read_only=True)
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
     payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
+    supported_bge_name        = serializers.CharField(source='supported_bge.name', read_only=True, allow_null=True)
+    supported_bge_code        = serializers.CharField(source='supported_bge.bge_code', read_only=True, allow_null=True)
+    supported_bge_top_skills  = serializers.CharField(source='supported_bge.top_skills', read_only=True, allow_null=True)
+    bge_top_skills            = serializers.CharField(source='bge.top_skills', read_only=True, allow_null=True)
+    target_msmes_detail       = serializers.SerializerMethodField()
     created_by_name  = serializers.SerializerMethodField()
     payment_submitted_by_name = serializers.SerializerMethodField()
     amount_due       = serializers.SerializerMethodField()
@@ -38,6 +43,15 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
     def get_outstanding(self, obj):
         return self.get_amount_due(obj) - float(self.get_total_paid(obj))
+
+    def get_target_msmes_detail(self, obj):
+        if not obj.msme_ids_snapshot:
+            return []
+        from ..models import MSME
+        return list(
+            MSME.objects.filter(id__in=obj.msme_ids_snapshot)
+            .values('id', 'business_name', 'msme_code', 'district', 'city', 'owner_name')
+        )
 
     class Meta:
         model = WorkOrder

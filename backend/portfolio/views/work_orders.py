@@ -106,6 +106,55 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 "BGEs cannot be assigned overlapping work orders."
             )
 
+    def _handle_technical_co_assignment(self, wo):
+        """When a BGE is co-assigned to support another BGE in their area of greatest technical capacity:
+        1. Link the supported_bge to co_bges for joint collaboration visibility.
+        2. If msme_ids_snapshot is provided, ensure the specialist BGE is added to msme.co_assigned_bges.
+        3. Dispatch push and email notifications to both the supported BGE and specialist BGE.
+        """
+        if wo.work_order_type != 'bge_technical_co_assignment':
+            return
+        from ..models import MSME
+        from .bge import _notify_bge, _send_co_assignment_alert
+
+        specialist = wo.bge
+        supported = wo.supported_bge
+
+        # 1. Link supported_bge into co_bges
+        if supported:
+            wo.co_bges.add(supported)
+
+        # 2. Co-assign specialist BGE to the designated MSMEs
+        target_msme_ids = wo.msme_ids_snapshot or []
+        if target_msme_ids:
+            target_msmes = list(MSME.objects.filter(id__in=target_msme_ids))
+            for msme in target_msmes:
+                msme.co_assigned_bges.add(specialist)
+                if supported:
+                    try:
+                        _send_co_assignment_alert(supported, specialist, msme)
+                    except Exception as e:
+                        logger.warning("Could not send co-assignment email alert: %s", e)
+
+        # 3. In-app Push notifications
+        tech_area = wo.technical_area or specialist.top_skills or 'Specialist Technical Capacity'
+        try:
+            _notify_bge(
+                specialist,
+                title='Technical Co-Assignment Work Order',
+                body=f"You have been co-assigned to support {supported.name if supported else 'another BGE'} in {tech_area}.",
+                url='/bge'
+            )
+            if supported:
+                _notify_bge(
+                    supported,
+                    title='Technical Specialist Support Assigned',
+                    body=f"{specialist.name} has been co-assigned to support your portfolio in {tech_area}.",
+                    url='/bge'
+                )
+        except Exception as e:
+            logger.warning("Could not dispatch push notification: %s", e)
+
     def perform_create(self, serializer):
         self._require_admin_or_pm()
         data = serializer.validated_data
@@ -115,7 +164,8 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 start_date=data.get('start_date'),
                 end_date=data.get('end_date'),
             )
-        serializer.save(created_by=self.request.user)
+        wo = serializer.save(created_by=self.request.user)
+        self._handle_technical_co_assignment(wo)
 
     def perform_update(self, serializer):
         self._require_admin_or_pm()
@@ -129,7 +179,8 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 end_date=data.get('end_date', instance.end_date),
                 exclude_id=instance.pk,
             )
-        serializer.save()
+        wo = serializer.save()
+        self._handle_technical_co_assignment(wo)
 
     def destroy(self, request, *args, **kwargs):
         self._require_admin()
@@ -280,10 +331,13 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         work_order.status = 'issued'
         # Snapshot the BGE's current MSME assignments so co-deployment overlap
         # can be detected even after MSMEs are later re-assigned to other BGEs.
-        bge_msme_ids = list(
-            work_order.bge.assigned_msmes.values_list('id', flat=True)
-        )
-        work_order.msme_ids_snapshot = bge_msme_ids
+        if not work_order.msme_ids_snapshot:
+            bge_msme_ids = list(
+                work_order.bge.assigned_msmes.values_list('id', flat=True)
+            )
+            work_order.msme_ids_snapshot = bge_msme_ids
+        else:
+            bge_msme_ids = work_order.msme_ids_snapshot
         work_order.save(update_fields=['status', 'msme_ids_snapshot'])
 
         # Generate PDF
@@ -336,6 +390,17 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                         + "\n\n".join(aa_lines)
                     )
 
+            tech_note = ''
+            if work_order.work_order_type == 'bge_technical_co_assignment' and work_order.supported_bge:
+                tech_note = (
+                    f"\n\nTECHNICAL CO-ASSIGNMENT DETAILS\n"
+                    f"─" * 40 + "\n"
+                    f"  Supported Primary BGE:   {work_order.supported_bge.name} ({work_order.supported_bge.bge_code or 'No code'})\n"
+                    f"  Technical Capacity Area: {work_order.technical_area or work_order.bge.top_skills or 'Specialist Advisory'}\n"
+                    f"  Target MSMEs:            {len(work_order.msme_ids_snapshot or [])} enterprise(s)\n"
+                    f"  Please coordinate directly with {work_order.supported_bge.name} to harmonize coaching dates in the Visit Planner."
+                )
+
             subject = f'Work Order Issued — {work_order.work_order_number}'
             body = (
                 f'Dear {bge.name},\n\n'
@@ -345,6 +410,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'Issue Date: {work_order.issue_date}\n'
                 f'Period: {work_order.start_date or "TBD"} to {work_order.end_date or "TBD"}\n'
                 f'Net Payable: UGX {work_order.rate_per_day * work_order.max_days - int(work_order.rate_per_day * work_order.max_days * 0.06):,}\n'
+                f'{tech_note}'
                 f'{co_text}\n\n'
                 f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
             )
@@ -1239,7 +1305,7 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         user = self.request.user
         qs = WorkOrderAttachment.objects.select_related(
             'work_order', 'work_order__bge', 'uploaded_by'
-        )
+        ).defer('file_data')
         wo_id = self.request.query_params.get('work_order')
         if self._is_admin() or _is_viewer(user):
             if wo_id:
@@ -1249,7 +1315,13 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             bge = user.bge_profile
         except Exception:
             return qs.none()
-        qs = qs.filter(work_order__bge=bge)
+        from django.db.models import Q
+        qs = qs.filter(
+            Q(work_order__bge=bge) |
+            Q(work_order__co_bges=bge) |
+            Q(work_order__supported_bge=bge) |
+            Q(uploaded_by=user)
+        ).distinct()
         if wo_id:
             qs = qs.filter(work_order_id=wo_id)
         return qs
@@ -1268,7 +1340,12 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             bge = self.request.user.bge_profile
         except Exception:
             raise PermissionDenied("Only BGEs or admins can upload attachments.")
-        if bge.id != work_order.bge_id and not work_order.co_bges.filter(id=bge.id).exists():
+        is_assigned = (
+            bge.id == work_order.bge_id
+            or work_order.co_bges.filter(id=bge.id).exists()
+            or getattr(work_order, 'supported_bge_id', None) == bge.id
+        )
+        if not is_assigned:
             raise PermissionDenied("You can only upload attachments for your own work orders.")
 
     def perform_create(self, serializer):
@@ -1288,12 +1365,13 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         # Real-time background upload to Google Drive ('PRUDEV II - BGE Photos/{BGE}/')
         fname_lower = (f.name or '').lower()
         is_image = any(fname_lower.endswith(ext) for ext in ('.jpg', '.jpeg', '.png', '.webp', '.gif'))
-        if is_image and work_order.bge:
+        target_bge = work_order.bge or getattr(self.request.user, 'bge_profile', None)
+        if is_image and target_bge:
             try:
                 from ..google_drive_service import async_upload_bge_photo
                 prefix = f"WO_{work_order.work_order_number}"
                 async_upload_bge_photo(
-                    bge=work_order.bge,
+                    bge=target_bge,
                     filename=f.name,
                     data_bytes=data,
                     prefix=prefix,
@@ -1309,7 +1387,16 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='download')
     def download(self, request, pk=None):
         instance = self.get_object()
-        if not instance.file_data:
+        file_bytes = None
+        if instance.file_data:
+            file_bytes = bytes(instance.file_data)
+        elif instance.file:
+            try:
+                instance.file.open('rb')
+                file_bytes = instance.file.read()
+            except Exception:
+                pass
+        if not file_bytes:
             return Response({'error': 'File not found.'}, status=status.HTTP_404_NOT_FOUND)
         name = (instance.filename or '').lower()
         if name.endswith(('.jpg', '.jpeg')):
@@ -1325,7 +1412,7 @@ class WorkOrderAttachmentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         else:
             ct = 'application/octet-stream'
         fname = _safe_filename(instance.filename or 'attachment')
-        resp = HttpResponse(bytes(instance.file_data), content_type=ct)
+        resp = HttpResponse(file_bytes, content_type=ct)
         disp = 'attachment' if request.query_params.get('dl') else 'inline'
         resp['Content-Disposition'] = f'{disp}; filename="{fname}"'
         return resp

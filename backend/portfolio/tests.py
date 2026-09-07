@@ -17,6 +17,77 @@ class WorkOrderTypeChoicesTests(TestCase):
             'Outcome Assessment Tool Delivery',
         )
 
+    def test_bge_technical_co_assignment_choice_exists(self):
+        choice_values = dict(WorkOrder.TYPE_CHOICES)
+
+        self.assertIn('bge_technical_co_assignment', choice_values)
+        self.assertEqual(
+            choice_values['bge_technical_co_assignment'],
+            'BGE Technical Co-Assignment Support (Specialist Technical Capacity)',
+        )
+
+
+class WorkOrderTechnicalCoAssignmentTests(TestCase):
+    def setUp(self):
+        self.specialist = BusinessGrowthExpert.objects.create(
+            name='Specialist BGE',
+            bge_code='PRUDEV-SPEC-01',
+            top_skills='Financial Management & Bookkeeping',
+        )
+        self.primary_bge = BusinessGrowthExpert.objects.create(
+            name='Primary BGE',
+            bge_code='PRUDEV-PRIM-02',
+            top_skills='Agribusiness Development',
+        )
+        self.msme = MSME.objects.create(
+            business_name='Northern Grains Ltd',
+            assigned_bge=self.primary_bge,
+            district='Gulu',
+        )
+
+    def test_technical_co_assignment_work_order_creation_and_serialization(self):
+        from .serializers import WorkOrderSerializer
+        from datetime import date
+
+        wo = WorkOrder.objects.create(
+            bge=self.specialist,
+            supported_bge=self.primary_bge,
+            technical_area='Financial Management & Bookkeeping',
+            work_order_type='bge_technical_co_assignment',
+            issue_date=date.today(),
+            msme_ids_snapshot=[self.msme.id],
+        )
+
+        serializer = WorkOrderSerializer(wo)
+        data = serializer.data
+
+        self.assertEqual(data['supported_bge'], self.primary_bge.id)
+        self.assertEqual(data['supported_bge_name'], 'Primary BGE')
+        self.assertEqual(data['supported_bge_code'], 'PRUDEV-PRIM-02')
+        self.assertEqual(data['bge_top_skills'], 'Financial Management & Bookkeeping')
+        self.assertEqual(data['technical_area'], 'Financial Management & Bookkeeping')
+        self.assertEqual(len(data['target_msmes_detail']), 1)
+        self.assertEqual(data['target_msmes_detail'][0]['business_name'], 'Northern Grains Ltd')
+
+    def test_handle_technical_co_assignment_links_co_bge_and_msmes(self):
+        from .views.work_orders import WorkOrderViewSet
+        from datetime import date
+
+        wo = WorkOrder.objects.create(
+            bge=self.specialist,
+            supported_bge=self.primary_bge,
+            technical_area='Financial Management & Bookkeeping',
+            work_order_type='bge_technical_co_assignment',
+            issue_date=date.today(),
+            msme_ids_snapshot=[self.msme.id],
+        )
+
+        viewset = WorkOrderViewSet()
+        viewset._handle_technical_co_assignment(wo)
+
+        self.assertIn(self.primary_bge, wo.co_bges.all())
+        self.assertIn(self.specialist, self.msme.co_assigned_bges.all())
+
 
 class BGEAssignmentVisibilityTests(TestCase):
     def setUp(self):
@@ -503,6 +574,74 @@ class MSMEStatusLocationAndAltContactTests(TestCase):
         self.assertEqual(bge_profile['location'], 'Gulu City Base')
         self.assertAlmostEqual(bge_profile['latitude'], 2.774950, places=5)
         self.assertAlmostEqual(bge_profile['longitude'], 32.299110, places=5)
+
+
+class WorkOrderAttachmentAccessTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import BusinessGrowthExpert, WorkOrder, WorkOrderAttachment
+
+        self.user_primary = User.objects.create_user(username='bge_primary', password='password123')
+        self.bge_primary = BusinessGrowthExpert.objects.create(
+            user=self.user_primary, name='Primary Expert', bge_code='PRUDEV-001'
+        )
+
+        self.user_co = User.objects.create_user(username='bge_co', password='password123')
+        self.bge_co = BusinessGrowthExpert.objects.create(
+            user=self.user_co, name='Co Assigned Expert', bge_code='PRUDEV-002'
+        )
+
+        self.user_supported = User.objects.create_user(username='bge_sup', password='password123')
+        self.bge_supported = BusinessGrowthExpert.objects.create(
+            user=self.user_supported, name='Supported Expert', bge_code='PRUDEV-003'
+        )
+
+        self.work_order = WorkOrder.objects.create(
+            bge=self.bge_primary,
+            supported_bge=self.bge_supported,
+            work_order_type='bge_technical_co_assignment',
+            work_order_number='WO-ATTACH-TEST',
+            status='issued',
+        )
+        self.work_order.co_bges.add(self.bge_co)
+
+        self.pdf_file = SimpleUploadedFile("evidence.pdf", b"%PDF-1.4 dummy pdf content", content_type="application/pdf")
+        self.client = APIClient()
+
+    def test_primary_bge_and_co_assigned_bge_visibility(self):
+        from .models import WorkOrderAttachment
+        # Primary BGE creates an attachment
+        att = WorkOrderAttachment.objects.create(
+            work_order=self.work_order,
+            filename='field_report.pdf',
+            file_data=b"%PDF-1.4 test",
+            uploaded_by=self.user_primary,
+        )
+
+        # Primary BGE lists attachments
+        self.client.force_authenticate(user=self.user_primary)
+        res_primary = self.client.get('/api/work-order-attachments/')
+        self.assertEqual(res_primary.status_code, 200)
+        items = res_primary.data if isinstance(res_primary.data, list) else res_primary.data.get('results', [])
+        att_ids = [item['id'] for item in items]
+        self.assertIn(att.id, att_ids)
+
+        # Co-assigned BGE lists attachments
+        self.client.force_authenticate(user=self.user_co)
+        res_co = self.client.get('/api/work-order-attachments/')
+        self.assertEqual(res_co.status_code, 200)
+        items_co = res_co.data if isinstance(res_co.data, list) else res_co.data.get('results', [])
+        att_ids_co = [item['id'] for item in items_co]
+        self.assertIn(att.id, att_ids_co)
+
+        # Supported BGE lists attachments
+        self.client.force_authenticate(user=self.user_supported)
+        res_sup = self.client.get('/api/work-order-attachments/')
+        self.assertEqual(res_sup.status_code, 200)
+        items_sup = res_sup.data if isinstance(res_sup.data, list) else res_sup.data.get('results', [])
+        att_ids_sup = [item['id'] for item in items_sup]
+        self.assertIn(att.id, att_ids_sup)
 
 
 

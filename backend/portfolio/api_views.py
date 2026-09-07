@@ -3697,6 +3697,44 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
                 "BGEs cannot be assigned overlapping work orders."
             )
 
+    def _handle_technical_co_assignment(self, wo):
+        if wo.work_order_type != 'bge_technical_co_assignment':
+            return
+        from ..models import MSME
+        from .views.bge import _notify_bge, _send_co_assignment_alert
+
+        specialist = wo.bge
+        supported = wo.supported_bge
+        if supported:
+            wo.co_bges.add(supported)
+        target_msme_ids = wo.msme_ids_snapshot or []
+        if target_msme_ids:
+            target_msmes = list(MSME.objects.filter(id__in=target_msme_ids))
+            for msme in target_msmes:
+                msme.co_assigned_bges.add(specialist)
+                if supported:
+                    try:
+                        _send_co_assignment_alert(supported, specialist, msme)
+                    except Exception:
+                        pass
+        tech_area = wo.technical_area or specialist.top_skills or 'Specialist Technical Capacity'
+        try:
+            _notify_bge(
+                specialist,
+                title='Technical Co-Assignment Work Order',
+                body=f"You have been co-assigned to support {supported.name if supported else 'another BGE'} in {tech_area}.",
+                url='/bge'
+            )
+            if supported:
+                _notify_bge(
+                    supported,
+                    title='Technical Specialist Support Assigned',
+                    body=f"{specialist.name} has been co-assigned to support your portfolio in {tech_area}.",
+                    url='/bge'
+                )
+        except Exception:
+            pass
+
     def perform_create(self, serializer):
         self._require_admin()
         data = serializer.validated_data
@@ -3706,7 +3744,8 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
                 start_date=data.get('start_date'),
                 end_date=data.get('end_date'),
             )
-        serializer.save(created_by=self.request.user)
+        wo = serializer.save(created_by=self.request.user)
+        self._handle_technical_co_assignment(wo)
 
     def perform_update(self, serializer):
         self._require_admin()
@@ -3720,7 +3759,8 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
                 end_date=data.get('end_date', instance.end_date),
                 exclude_id=instance.pk,
             )
-        serializer.save()
+        wo = serializer.save()
+        self._handle_technical_co_assignment(wo)
 
     def destroy(self, request, *args, **kwargs):
         self._require_admin()

@@ -7180,6 +7180,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="mobilisation">Mobilisation / Outreach</MenuItem>
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
+            <MenuItem value="bge_technical_co_assignment">BGE Technical Co-Assignment Support</MenuItem>
             <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
             <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework</MenuItem>
             <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
@@ -7197,20 +7198,49 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {filteredWorkOrders.map(wo => (
             <Card variant="outlined" key={wo.id}
-              sx={wo.work_order_type === 'training_facilitation' ? { borderLeft: '4px solid #7B1FA2' } : {}}>
+              sx={
+                wo.work_order_type === 'training_facilitation'
+                  ? { borderLeft: '4px solid #7B1FA2' }
+                  : wo.work_order_type === 'bge_technical_co_assignment'
+                  ? { borderLeft: '4px solid #0288D1' }
+                  : {}
+              }>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
                   <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3, flexWrap: 'wrap' }}>
                       <Typography fontWeight={700}>{wo.work_order_number}</Typography>
                       {wo.work_order_type === 'training_facilitation' && (
                         <Chip label="Senior BGE" size="small"
                           sx={{ bgcolor: '#7B1FA2', color: '#fff', fontSize: 10, fontWeight: 700 }} />
                       )}
+                      {wo.work_order_type === 'bge_technical_co_assignment' && (
+                        <Chip label="Specialist Co-Assignment" size="small"
+                          sx={{ bgcolor: '#0288D1', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                      )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">
                       {wo.work_order_type_display} · {wo.bge_name} ({wo.bge_code_display})
                     </Typography>
+                    {wo.work_order_type === 'bge_technical_co_assignment' && (
+                      <Box sx={{ mt: 0.5, mb: 0.5, p: 0.8, bgcolor: 'action.hover', borderRadius: 1 }}>
+                        {wo.supported_bge_name && (
+                          <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: 'info.main' }}>
+                            Supporting Primary BGE: {wo.supported_bge_name} {wo.supported_bge_code ? `(${wo.supported_bge_code})` : ''}
+                          </Typography>
+                        )}
+                        {(wo.technical_area || wo.bge_top_skills) && (
+                          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                            Technical Specialty: {wo.technical_area || wo.bge_top_skills}
+                          </Typography>
+                        )}
+                        {wo.target_msmes_detail && wo.target_msmes_detail.length > 0 && (
+                          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                            Target MSMEs ({wo.target_msmes_detail.length}): {wo.target_msmes_detail.map(m => m.name).slice(0, 3).join(', ')}{wo.target_msmes_detail.length > 3 ? ` +${wo.target_msmes_detail.length - 3} more` : ''}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
                     <Typography variant="caption" color="text.secondary" display="block">
                       Issued: {wo.issue_date}{wo.start_date ? ` · Start: ${wo.start_date}` : ''}{wo.end_date ? ` – ${wo.end_date}` : ''}
                     </Typography>
@@ -7338,7 +7368,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 {(() => {
                   const subs = woSubmissions.filter(s => s.work_order === wo.id);
                   const payments = woPayments.filter(p => p.work_order === wo.id);
-                  const atts = woAttachments.filter(a => a.work_order === wo.id);
+                  const atts = woAttachments.filter(a => {
+                    const aWoId = typeof a.work_order === 'object' ? a.work_order?.id : a.work_order;
+                    return String(aWoId) === String(wo.id);
+                  });
                   const amountDue = Number(wo.amount_due || 0);
                   const totalPaid = Number(wo.total_paid || 0);
                   const outstanding = Number(wo.outstanding ?? (amountDue - totalPaid));

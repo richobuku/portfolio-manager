@@ -1210,6 +1210,7 @@ class WorkOrder(models.Model):
         ('carbon_emissions_training', 'Carbon Emissions Measurement Framework — Training & Field Implementation'),
         ('csa_rapid_assessment',  'CSA Rapid Assessment — Resilience Activity'),
         ('bds_manual_module',     'BDS Manual — Additional Module'),
+        ('bge_technical_co_assignment', 'BGE Technical Co-Assignment Support (Specialist Technical Capacity)'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [
@@ -1221,12 +1222,21 @@ class WorkOrder(models.Model):
     bge = models.ForeignKey(
         'BusinessGrowthExpert', on_delete=models.CASCADE, related_name='work_orders'
     )
+    supported_bge = models.ForeignKey(
+        'BusinessGrowthExpert', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='supported_by_work_orders',
+        help_text='Primary BGE being supported in this technical co-assignment',
+    )
+    technical_area = models.CharField(
+        max_length=200, blank=True,
+        help_text='Area of greatest technical capacity for this co-assignment',
+    )
     group = models.ForeignKey(
         'BGEGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='work_orders'
     )
 
     work_order_number = models.CharField(max_length=100, unique=True, blank=True)
-    work_order_type   = models.CharField(max_length=30, choices=TYPE_CHOICES, default='msme_support')
+    work_order_type   = models.CharField(max_length=40, choices=TYPE_CHOICES, default='msme_support')
     project_name      = models.CharField(max_length=200, default='Promoting Rural Development II (PRUDEV II)')
     issue_date        = models.DateField()
     start_date        = models.DateField(null=True, blank=True)
