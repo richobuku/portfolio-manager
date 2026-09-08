@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
+import { getErrorMessage } from '../utils/error';
 
 const h = (token) => ({ Authorization: `Bearer ${token}` });
 
@@ -518,8 +519,7 @@ export default function VisitReportForm({
       onSaved?.();
       onClose();
     } catch (e) {
-      const data = e.response?.data;
-      setError(typeof data === 'object' ? JSON.stringify(data) : String(data || 'Save failed.'));
+      setError(getErrorMessage(e, 'Save failed.'));
     } finally { setSaving(false); }
   };
 

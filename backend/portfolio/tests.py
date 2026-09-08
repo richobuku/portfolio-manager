@@ -88,6 +88,53 @@ class WorkOrderTechnicalCoAssignmentTests(TestCase):
         self.assertIn(self.primary_bge, wo.co_bges.all())
         self.assertIn(self.specialist, self.msme.co_assigned_bges.all())
 
+    def test_work_order_serialization_with_null_supported_bge(self):
+        from .serializers import WorkOrderSerializer
+        from datetime import date
+
+        wo = WorkOrder.objects.create(
+            bge=self.specialist,
+            supported_bge=None,
+            technical_area='',
+            work_order_type='msme_support',
+            issue_date=date.today(),
+            msme_ids_snapshot=[],
+        )
+
+        serializer = WorkOrderSerializer(wo)
+        data = serializer.data
+        self.assertIsNone(data['supported_bge'])
+        self.assertIsNone(data['supported_bge_name'])
+        self.assertIsNone(data['supported_bge_code'])
+        self.assertIsNone(data['supported_bge_top_skills'])
+        self.assertEqual(data['bge_top_skills'], 'Financial Management & Bookkeeping')
+        self.assertEqual(data['target_msmes_detail'], [])
+
+    def test_msme_viewset_assigned_bge_filtering(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from django.contrib.auth.models import User
+        from .views.msme import MSMEViewSet
+
+        admin = User.objects.create_superuser('testadmin_bge_filter', 'admin@example.com', 'pass')
+        factory = APIRequestFactory()
+
+        # Query assigned_bge for primary_bge
+        req = factory.get(f'/api/msmes/?assigned_bge={self.primary_bge.id}&all=1')
+        force_authenticate(req, user=admin)
+        view = MSMEViewSet.as_view({'get': 'list'})
+        resp = view(req)
+        self.assertEqual(resp.status_code, 200)
+        msme_ids = [m['id'] for m in resp.data]
+        self.assertIn(self.msme.id, msme_ids)
+
+        # Query assigned_bge for specialist (who is not primary)
+        req2 = factory.get(f'/api/msmes/?assigned_bge={self.specialist.id}&primary_only=1&all=1')
+        force_authenticate(req2, user=admin)
+        resp2 = view(req2)
+        self.assertEqual(resp2.status_code, 200)
+        msme_ids_2 = [m['id'] for m in resp2.data]
+        self.assertNotIn(self.msme.id, msme_ids_2)
+
 
 class BGEAssignmentVisibilityTests(TestCase):
     def setUp(self):

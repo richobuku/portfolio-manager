@@ -261,6 +261,26 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         if city:
             qs = qs.filter(city__iexact=city)
 
+        # BGE filter (admin / explicit query): filter MSMEs assigned to this BGE (primary or co-assigned)
+        bge_filter = self.request.query_params.get('assigned_bge') or self.request.query_params.get('bge')
+        if bge_filter:
+            from django.db.models import Q
+            primary_only = self.request.query_params.get('primary_only') in ('1', 'true', 'True')
+            if primary_only:
+                qs = qs.filter(assigned_bge_id=bge_filter)
+            else:
+                qs = qs.filter(
+                    Q(assigned_bge_id=bge_filter) |
+                    Q(co_assigned_bges__id=bge_filter)
+                ).distinct()
+
+        # Handle is_active parameter
+        is_active_param = self.request.query_params.get('is_active')
+        if is_active_param in ('true', 'True', '1', 1):
+            qs = qs.filter(is_active=True)
+        elif is_active_param in ('false', 'False', '0', 0):
+            qs = qs.filter(is_active=False)
+
         return (
             qs.select_related('cohort', 'assigned_bge', 'assigned_group')
             .prefetch_related('programme_groups', 'co_assigned_bges')

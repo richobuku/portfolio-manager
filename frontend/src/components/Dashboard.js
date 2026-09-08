@@ -38,6 +38,7 @@ import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
 import MSMEVisitSchedule from './MSMEVisitSchedule';
 import { Place } from '@mui/icons-material';
+import { getErrorMessage } from '../utils/error';
 
 const ROWS_PER_PAGE = 15;
 const DRAWER_WIDTH = 220;
@@ -250,6 +251,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── work orders ───────────────────────────────────────────────────────────
   const [workOrders, setWorkOrders] = useState([]);
   const deferredWorkOrders = React.useDeferredValue(workOrders);
+  const [woLoading, setWoLoading] = useState(false);
+  const [woError, setWoError] = useState('');
   const [woFilterBge, setWoFilterBge] = useState('');
   const [woFilterStatus, setWoFilterStatus] = useState('');
   const [woFilterType, setWoFilterType] = useState('');
@@ -599,11 +602,17 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     if (woFilterBge) params.append('bge', woFilterBge);
     if (woFilterStatus) params.append('status', woFilterStatus);
     if (woFilterType) params.append('work_order_type', woFilterType);
+    setWoLoading(true);
+    setWoError('');
     try {
       const res = await axios.get(`${API_ENDPOINTS.WORK_ORDERS}?${params}`, { headers: h });
       setWorkOrders(Array.isArray(res.data) ? res.data : res.data.results || []);
-    } catch {
+    } catch (err) {
       setWorkOrders([]);
+      const msg = getErrorMessage(err, 'Failed to load work orders.');
+      setWoError(msg);
+    } finally {
+      setWoLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, woFilterBge, woFilterStatus, woFilterType]);
@@ -642,11 +651,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   useEffect(() => {
     if (section === 'workorders') {
+      fetchWorkOrders();
       fetchWoSubmissions();
       fetchWoPayments();
       fetchWoAttachments();
     }
-  }, [section, fetchWoSubmissions, fetchWoPayments, fetchWoAttachments]);
+  }, [section, fetchWorkOrders, fetchWoSubmissions, fetchWoPayments, fetchWoAttachments]);
 
   const fetchConfirmedPayments = useCallback(async () => {
     if (!token) return;
@@ -896,7 +906,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       closeEdit();
       fetchAll();
     } catch (err) {
-      notify(err.response?.data ? JSON.stringify(err.response.data) : 'Failed to save', 'error');
+      notify(getErrorMessage(err, 'Failed to save'), 'error');
     }
     finally { setEditLoading(false); }
   };
@@ -2840,8 +2850,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         { headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'multipart/form-data' } })
         .then(r => { setResult(r.data.detail); setLoading(false); onImported(); })
         .catch(e => {
-          const data = e.response?.data;
-          setError(data?.error || data?.detail || JSON.stringify(data) || `HTTP ${e.response?.status}: Import failed`);
+          setError(getErrorMessage(e, `HTTP ${e.response?.status || '500'}: Import failed`));
           setLoading(false);
         });
     };
@@ -7189,7 +7198,21 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         </FormControl>
       </Paper>
 
-      {filteredWorkOrders.length === 0 ? (
+      {woLoading ? (
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <CircularProgress size={32} sx={{ mb: 1.5 }} />
+          <Typography color="text.secondary">Loading work orders…</Typography>
+        </Paper>
+      ) : woError && filteredWorkOrders.length === 0 ? (
+        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', bgcolor: '#FFF5F5', borderColor: '#FFCDD2' }}>
+          <Typography color="error.main" fontWeight={600} sx={{ mb: 1.5 }}>
+            {woError}
+          </Typography>
+          <Button variant="outlined" color="primary" size="small" onClick={fetchWorkOrders}>
+            Retry Loading Work Orders
+          </Button>
+        </Paper>
+      ) : filteredWorkOrders.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Assignment sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
           <Typography color="text.secondary">No work orders match the selected filters.</Typography>

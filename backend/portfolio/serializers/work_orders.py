@@ -9,16 +9,28 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     work_order_type_display = serializers.CharField(source='get_work_order_type_display', read_only=True)
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
     payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
-    supported_bge_name        = serializers.CharField(source='supported_bge.name', read_only=True, allow_null=True)
-    supported_bge_code        = serializers.CharField(source='supported_bge.bge_code', read_only=True, allow_null=True)
-    supported_bge_top_skills  = serializers.CharField(source='supported_bge.top_skills', read_only=True, allow_null=True)
-    bge_top_skills            = serializers.CharField(source='bge.top_skills', read_only=True, allow_null=True)
+    supported_bge_name        = serializers.SerializerMethodField()
+    supported_bge_code        = serializers.SerializerMethodField()
+    supported_bge_top_skills  = serializers.SerializerMethodField()
+    bge_top_skills            = serializers.SerializerMethodField()
     target_msmes_detail       = serializers.SerializerMethodField()
     created_by_name  = serializers.SerializerMethodField()
     payment_submitted_by_name = serializers.SerializerMethodField()
     amount_due       = serializers.SerializerMethodField()
     total_paid       = serializers.SerializerMethodField()
     outstanding      = serializers.SerializerMethodField()
+
+    def get_supported_bge_name(self, obj):
+        return obj.supported_bge.name if getattr(obj, 'supported_bge', None) else None
+
+    def get_supported_bge_code(self, obj):
+        return obj.supported_bge.bge_code if getattr(obj, 'supported_bge', None) else None
+
+    def get_supported_bge_top_skills(self, obj):
+        return obj.supported_bge.top_skills if getattr(obj, 'supported_bge', None) else None
+
+    def get_bge_top_skills(self, obj):
+        return obj.bge.top_skills if getattr(obj, 'bge', None) else None
 
     def get_created_by_name(self, obj):
         if not obj.created_by:
@@ -33,13 +45,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         return name or obj.payment_submitted_by.username
 
     def get_amount_due(self, obj):
-        gross = obj.rate_per_day * obj.max_days
+        rate = getattr(obj, 'rate_per_day', 0) or 0
+        days = getattr(obj, 'max_days', 0) or 0
+        gross = rate * days
         return gross - int(gross * 0.06)
 
     def get_total_paid(self, obj):
         from django.db.models import Sum
-        total = obj.payments.aggregate(total=Sum('amount'))['total']
-        return total or 0
+        try:
+            total = obj.payments.aggregate(total=Sum('amount'))['total']
+            return total or 0
+        except Exception:
+            return 0
 
     def get_outstanding(self, obj):
         return self.get_amount_due(obj) - float(self.get_total_paid(obj))
@@ -48,10 +65,25 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         if not obj.msme_ids_snapshot:
             return []
         from ..models import MSME
-        return list(
-            MSME.objects.filter(id__in=obj.msme_ids_snapshot)
-            .values('id', 'business_name', 'msme_code', 'district', 'city', 'owner_name')
-        )
+        try:
+            clean_ids = [int(x) for x in obj.msme_ids_snapshot if str(x).isdigit()]
+            if not clean_ids:
+                return []
+            return [
+                {
+                    'id': m['id'],
+                    'name': m['business_name'],
+                    'business_name': m['business_name'],
+                    'msme_code': m['msme_code'],
+                    'district': m['district'],
+                    'city': m['city'],
+                    'owner_name': m['owner_name'],
+                }
+                for m in MSME.objects.filter(id__in=clean_ids)
+                .values('id', 'business_name', 'msme_code', 'district', 'city', 'owner_name')
+            ]
+        except Exception:
+            return []
 
     class Meta:
         model = WorkOrder

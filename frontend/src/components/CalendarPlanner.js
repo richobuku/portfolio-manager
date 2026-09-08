@@ -28,6 +28,7 @@ import {
   GOOGLE_CALENDAR_SYNC_NOW_URL,
 } from '../config';
 import { BRAND } from '../theme';
+import { getErrorMessage } from '../utils/error';
 
 const h = (token) => ({ Authorization: `Bearer ${token}` });
 
@@ -376,7 +377,7 @@ export default function CalendarPlanner({
       setPlanDialogOpen(false);
       fetchVisits();
     } catch (err) {
-      const msg = err.response?.data ? JSON.stringify(err.response.data) : 'Failed to schedule visit.';
+      const msg = getErrorMessage(err, 'Failed to schedule visit.');
       setFeedback({ type: 'error', text: msg });
     }
   };

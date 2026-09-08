@@ -32,6 +32,7 @@ import VisitReportForm from './VisitReportForm';
 import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
 import MSMEVisitSchedule from './MSMEVisitSchedule';
+import { getErrorMessage } from '../utils/error';
 
 const DRAWER_WIDTH = 220;
 const ROWS_PER_PAGE = 15;
@@ -1246,11 +1247,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       setGroupReportDialog(false);
       fetchGroupReports();
     } catch (err) {
-      setGroupReportErrors(
-        err.response?.data?.detail
-        || JSON.stringify(err.response?.data || {})
-        || 'Failed to save group report.'
-      );
+      setGroupReportErrors(getErrorMessage(err, 'Failed to save group report.'));
     } finally {
       setGroupReportSaving(false);
     }
@@ -1310,10 +1307,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       setContributionDialog(false);
       fetchGroupReports();
     } catch (err) {
-      setContributionErrors(
-        err.response?.data?.detail || JSON.stringify(err.response?.data || {})
-        || 'Failed to save contribution.'
-      );
+      setContributionErrors(getErrorMessage(err, 'Failed to save contribution.'));
     } finally {
       setContributionSaving(false);
     }

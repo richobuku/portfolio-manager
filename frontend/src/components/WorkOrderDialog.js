@@ -7,6 +7,7 @@ import {
 import { Add, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
+import { getErrorMessage } from '../utils/error';
 
 // ── Memoised sub-components ────────────────────────────────────────────────────
 // Defined at module level (outside WorkOrderDialog) so their identities are
@@ -1034,7 +1035,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
     setLoadingSupportedMsmes(true);
     axios.get(API_ENDPOINTS.MSMES, {
       headers,
-      params: { assigned_bge: woForm.supported_bge, is_active: true }
+      params: { assigned_bge: woForm.supported_bge, is_active: true, all: 1 }
     }).then(res => {
       if (cancelled) return;
       const data = res.data?.results ?? res.data ?? [];
@@ -1253,7 +1254,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         onSaved('Work order created.');
       }
     } catch (err) {
-      setWoErrors(err.response?.data?.detail || JSON.stringify(err.response?.data || {}) || 'Save failed.');
+      setWoErrors(getErrorMessage(err, 'Failed to save work order.'));
     } finally {
       setWoSaving(false);
     }
