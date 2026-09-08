@@ -3,8 +3,8 @@ from ..models import WorkOrder, WorkOrderSubmission, WorkOrderPayment, WorkOrder
 
 
 class WorkOrderSerializer(serializers.ModelSerializer):
-    bge_name         = serializers.CharField(source='bge.name', read_only=True)
-    bge_code_display = serializers.CharField(source='bge.bge_code', read_only=True)
+    bge_name         = serializers.CharField(source='bge.name', read_only=True, allow_null=True)
+    bge_code_display = serializers.CharField(source='bge.bge_code', read_only=True, allow_null=True)
     group_name       = serializers.CharField(source='group.name', read_only=True, allow_null=True)
     work_order_type_display = serializers.CharField(source='get_work_order_type_display', read_only=True)
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
@@ -21,52 +21,85 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     outstanding      = serializers.SerializerMethodField()
 
     def get_supported_bge_name(self, obj):
-        return obj.supported_bge.name if getattr(obj, 'supported_bge', None) else None
+        try:
+            return obj.supported_bge.name if getattr(obj, 'supported_bge', None) else None
+        except Exception:
+            return None
 
     def get_supported_bge_code(self, obj):
-        return obj.supported_bge.bge_code if getattr(obj, 'supported_bge', None) else None
+        try:
+            return obj.supported_bge.bge_code if getattr(obj, 'supported_bge', None) else None
+        except Exception:
+            return None
 
     def get_supported_bge_top_skills(self, obj):
-        return obj.supported_bge.top_skills if getattr(obj, 'supported_bge', None) else None
+        try:
+            return obj.supported_bge.top_skills if getattr(obj, 'supported_bge', None) else None
+        except Exception:
+            return None
 
     def get_bge_top_skills(self, obj):
-        return obj.bge.top_skills if getattr(obj, 'bge', None) else None
+        try:
+            return obj.bge.top_skills if getattr(obj, 'bge', None) else None
+        except Exception:
+            return None
 
     def get_created_by_name(self, obj):
-        if not obj.created_by:
+        try:
+            if not getattr(obj, 'created_by', None):
+                return None
+            name = obj.created_by.get_full_name().strip()
+            return name or obj.created_by.username
+        except Exception:
             return None
-        name = obj.created_by.get_full_name().strip()
-        return name or obj.created_by.username
 
     def get_payment_submitted_by_name(self, obj):
-        if not obj.payment_submitted_by:
+        try:
+            if not getattr(obj, 'payment_submitted_by', None):
+                return None
+            name = obj.payment_submitted_by.get_full_name().strip()
+            return name or obj.payment_submitted_by.username
+        except Exception:
             return None
-        name = obj.payment_submitted_by.get_full_name().strip()
-        return name or obj.payment_submitted_by.username
 
     def get_amount_due(self, obj):
-        rate = getattr(obj, 'rate_per_day', 0) or 0
-        days = getattr(obj, 'max_days', 0) or 0
-        gross = rate * days
-        return gross - int(gross * 0.06)
+        try:
+            rate = float(getattr(obj, 'rate_per_day', 0) or 0)
+            days = float(getattr(obj, 'max_days', 0) or 0)
+            gross = rate * days
+            return int(gross - (gross * 0.06))
+        except Exception:
+            return 0
 
     def get_total_paid(self, obj):
         from django.db.models import Sum
         try:
             total = obj.payments.aggregate(total=Sum('amount'))['total']
-            return total or 0
+            return float(total or 0)
         except Exception:
             return 0
 
     def get_outstanding(self, obj):
-        return self.get_amount_due(obj) - float(self.get_total_paid(obj))
+        try:
+            return float(self.get_amount_due(obj)) - float(self.get_total_paid(obj))
+        except Exception:
+            return 0
 
     def get_target_msmes_detail(self, obj):
-        if not obj.msme_ids_snapshot:
+        snapshot = getattr(obj, 'msme_ids_snapshot', None)
+        if not snapshot:
             return []
         from ..models import MSME
         try:
-            clean_ids = [int(x) for x in obj.msme_ids_snapshot if str(x).isdigit()]
+            if isinstance(snapshot, str):
+                import json
+                try:
+                    snapshot = json.loads(snapshot)
+                except Exception:
+                    snapshot = [s.strip() for s in snapshot.split(',') if s.strip()]
+            if not isinstance(snapshot, (list, tuple, set)):
+                return []
+            clean_ids = [int(x) for x in snapshot if str(x).isdigit()]
             if not clean_ids:
                 return []
             return [

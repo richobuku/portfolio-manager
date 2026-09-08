@@ -597,15 +597,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   }, [section, trReportsLoaded, token]);
 
   const fetchWorkOrders = useCallback(async () => {
+    if (!token) return;
     const h = { Authorization: `Bearer ${token}` };
-    const params = new URLSearchParams();
-    if (woFilterBge) params.append('bge', woFilterBge);
-    if (woFilterStatus) params.append('status', woFilterStatus);
-    if (woFilterType) params.append('work_order_type', woFilterType);
+    const params = {};
+    if (woFilterBge) params.bge = woFilterBge;
+    if (woFilterStatus) params.status = woFilterStatus;
+    if (woFilterType) params.work_order_type = woFilterType;
     setWoLoading(true);
     setWoError('');
     try {
-      const res = await axios.get(`${API_ENDPOINTS.WORK_ORDERS}?${params}`, { headers: h });
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDERS, { headers: h, params });
       setWorkOrders(Array.isArray(res.data) ? res.data : res.data.results || []);
     } catch (err) {
       setWorkOrders([]);
@@ -616,8 +617,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, woFilterBge, woFilterStatus, woFilterType]);
-
-  useEffect(() => { fetchWorkOrders(); }, [fetchWorkOrders]);
 
   const fetchWoSubmissions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -652,11 +651,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   useEffect(() => {
     if (section === 'workorders') {
       fetchWorkOrders();
+    }
+  }, [section, fetchWorkOrders]);
+
+  useEffect(() => {
+    if (section === 'workorders') {
       fetchWoSubmissions();
       fetchWoPayments();
       fetchWoAttachments();
     }
-  }, [section, fetchWorkOrders, fetchWoSubmissions, fetchWoPayments, fetchWoAttachments]);
+  }, [section, fetchWoSubmissions, fetchWoPayments, fetchWoAttachments]);
 
   const fetchConfirmedPayments = useCallback(async () => {
     if (!token) return;
@@ -7190,6 +7194,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="group_session">Peer-to-Peer Group Session</MenuItem>
             <MenuItem value="training_facilitation">Training Facilitation — Senior BGE</MenuItem>
             <MenuItem value="bge_technical_co_assignment">BGE Technical Co-Assignment Support</MenuItem>
+            <MenuItem value="bds_manual_module">BDS Manual — Additional Module</MenuItem>
             <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
             <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework</MenuItem>
             <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
@@ -7226,6 +7231,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   ? { borderLeft: '4px solid #7B1FA2' }
                   : wo.work_order_type === 'bge_technical_co_assignment'
                   ? { borderLeft: '4px solid #0288D1' }
+                  : wo.work_order_type === 'bds_manual_module'
+                  ? { borderLeft: '4px solid #E65100' }
                   : {}
               }>
               <CardContent>
@@ -7240,6 +7247,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       {wo.work_order_type === 'bge_technical_co_assignment' && (
                         <Chip label="Specialist Co-Assignment" size="small"
                           sx={{ bgcolor: '#0288D1', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      {wo.work_order_type === 'bds_manual_module' && (
+                        <Chip label="BDS Manual Module" size="small"
+                          sx={{ bgcolor: '#E65100', color: '#fff', fontSize: 10, fontWeight: 700 }} />
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">

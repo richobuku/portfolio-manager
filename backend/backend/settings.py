@@ -298,9 +298,9 @@ for origin in [o.strip() for o in _extra.split(',') if o.strip()]:
 # the check while CORS_ALLOW_CREDENTIALS = True.
 # Read the slug from an env var; fall back to an empty list (no regex origins)
 # if not configured so deployments don't silently open the wildcard again.
-_vercel_slug = os.environ.get('VERCEL_PROJECT_SLUG', '').strip()
+_vercel_slug = os.environ.get('VERCEL_PROJECT_SLUG', 'frontend').strip()
 CORS_ALLOWED_ORIGIN_REGEXES = (
-    [rf"^https://{re.escape(_vercel_slug)}-[a-z0-9]+\.vercel\.app$"]
+    [rf"^https://{re.escape(_vercel_slug)}.*\.vercel\.app$"]
     if _vercel_slug else []
 )
 

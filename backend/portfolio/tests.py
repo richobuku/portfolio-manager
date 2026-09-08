@@ -771,6 +771,69 @@ class WorkOrderAttachmentAccessTests(TestCase):
         self.assertIn(att.id, att_ids_sup)
 
 
+class WorkOrderSerializerRobustnessTests(TestCase):
+    def setUp(self):
+        from decimal import Decimal
+        self.admin = User.objects.create_superuser(username='admin_test', email='admin@test.com', password='pass')
+        self.bge_user = User.objects.create_user(username='bge_test', password='pass')
+        self.bge = BusinessGrowthExpert.objects.create(user=self.bge_user, name='Test BGE', bge_code='PRUDEV-999')
+        self.client = APIClient()
+
+    def test_serializer_safe_with_payments_and_decimals(self):
+        from .models import WorkOrder, WorkOrderPayment
+        from .serializers import WorkOrderSerializer
+        from decimal import Decimal
+
+        wo = WorkOrder.objects.create(
+            bge=self.bge,
+            work_order_type='bds_manual_module',
+            work_order_number='WO-ROBUST-01',
+            issue_date='2026-08-04',
+            rate_per_day=80000,
+            max_days=40,
+            status='issued',
+            msme_ids_snapshot='[1, 2, 3]',
+        )
+        WorkOrderPayment.objects.create(
+            work_order=wo,
+            amount=Decimal('800000.00'),
+            payment_date='2026-08-15',
+        )
+
+        serializer = WorkOrderSerializer(wo)
+        data = serializer.data
+        self.assertEqual(data['bge_name'], 'Test BGE')
+        self.assertEqual(data['bge_code_display'], 'PRUDEV-999')
+        self.assertEqual(data['amount_due'], 3008000)
+        self.assertEqual(data['total_paid'], 800000.0)
+        self.assertEqual(data['outstanding'], 2208000.0)
+
+    def test_viewset_query_param_sanitization(self):
+        from .models import WorkOrder
+        WorkOrder.objects.create(
+            bge=self.bge,
+            work_order_type='msme_support',
+            work_order_number='WO-ROBUST-02',
+            issue_date='2026-08-04',
+            status='issued',
+        )
+        self.client.force_authenticate(user=self.admin)
+        # Trailing question mark / empty params
+        res1 = self.client.get('/api/work-orders/?')
+        self.assertEqual(res1.status_code, 200)
+
+        # Invalid bge id (e.g. 'undefined' or 'null')
+        res2 = self.client.get('/api/work-orders/?bge=undefined')
+        self.assertEqual(res2.status_code, 200)
+
+        # Valid numeric bge id
+        res3 = self.client.get(f'/api/work-orders/?bge={self.bge.id}')
+        self.assertEqual(res3.status_code, 200)
+        items = res3.data if isinstance(res3.data, list) else res3.data.get('results', [])
+        self.assertTrue(len(items) >= 1)
+
+
+
 
 
 

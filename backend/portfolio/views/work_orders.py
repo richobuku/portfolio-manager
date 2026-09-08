@@ -63,14 +63,14 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         # Common filters regardless of role
         status_filter = self.request.query_params.get('status')
         type_filter   = self.request.query_params.get('work_order_type')
-        if status_filter:
+        if status_filter and status_filter != 'undefined':
             qs = qs.filter(status=status_filter)
-        if type_filter:
+        if type_filter and type_filter != 'undefined':
             qs = qs.filter(work_order_type=type_filter)
         if user.is_staff or user.is_superuser:
             bge_id = self.request.query_params.get('bge')
-            if bge_id:
-                qs = qs.filter(bge_id=bge_id)
+            if bge_id and str(bge_id).isdigit():
+                qs = qs.filter(bge_id=int(bge_id))
             return qs
         # Programme managers and viewers see all work orders
         if _managed_groups(user) is not None or _is_viewer(user):
