@@ -180,6 +180,16 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 exclude_id=instance.pk,
             )
         wo = serializer.save()
+        # If work order terms changed on update, invalidate any stored frozen signed PDF
+        # so subsequent PDF downloads reflect the updated terms.
+        if wo.signed_pdf_data or wo.signed_pdf:
+            wo.signed_pdf_data = None
+            if wo.signed_pdf:
+                try:
+                    wo.signed_pdf.delete(save=False)
+                except Exception:
+                    pass
+            wo.save(update_fields=['signed_pdf_data'])
         self._handle_technical_co_assignment(wo)
 
     def destroy(self, request, *args, **kwargs):
@@ -293,7 +303,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         Signed work orders return the stored signed copy; others are rendered on demand."""
         work_order = self.get_object()
         user = request.user
-        is_admin = user.is_staff or user.is_superuser
+        is_admin = user.is_staff or user.is_superuser or _managed_groups(user) is not None or _is_viewer(user)
         is_owner = hasattr(user, 'bge_profile') and user.bge_profile == work_order.bge
         if not (is_admin or is_owner):
             raise PermissionDenied("You can only download your own work orders.")

@@ -135,6 +135,86 @@ class WorkOrderTechnicalCoAssignmentTests(TestCase):
         msme_ids_2 = [m['id'] for m in resp2.data]
         self.assertNotIn(self.msme.id, msme_ids_2)
 
+    def test_admin_can_update_issued_work_order_and_clear_pdf_cache(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from django.contrib.auth.models import User
+        from .views.work_orders import WorkOrderViewSet
+        from datetime import date
+
+        admin = User.objects.create_superuser('testadmin_wo_update', 'admin_update@example.com', 'pass')
+        wo = WorkOrder.objects.create(
+            bge=self.specialist,
+            work_order_type='bds_manual_module',
+            issue_date=date(2026, 8, 1),
+            status='issued',
+            signed_pdf_data=b'%PDF-fake-cached-bytes',
+            rate_per_day=80000,
+            max_days=40,
+        )
+
+        factory = APIRequestFactory()
+        # Test PUT updating issued work order with empty string dates normalized to None
+        update_data = {
+            'bge': self.specialist.id,
+            'work_order_type': 'bds_manual_module',
+            'issue_date': '2026-08-01',
+            'start_date': '',
+            'end_date': '',
+            'rate_per_day': 85000,
+            'max_days': 40,
+            'payment_notes': 'Updated payment terms',
+        }
+        req = factory.put(f'/api/work-orders/{wo.id}/', update_data, format='json')
+        force_authenticate(req, user=admin)
+        view = WorkOrderViewSet.as_view({'put': 'update'})
+        resp = view(req, pk=wo.id)
+        self.assertEqual(resp.status_code, 200)
+
+        wo.refresh_from_db()
+        self.assertEqual(wo.rate_per_day, 85000)
+        self.assertIsNone(wo.start_date)
+        self.assertIsNone(wo.end_date)
+        self.assertEqual(wo.payment_notes, 'Updated payment terms')
+        self.assertIsNone(wo.signed_pdf_data)
+
+    def test_pm_and_viewer_can_download_work_order_pdf(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from django.contrib.auth.models import User, Group
+        from .views.work_orders import WorkOrderViewSet
+        from datetime import date
+
+        pm_user = User.objects.create_user('pm_user_test', 'pm@example.com', 'pass')
+        viewer_user = User.objects.create_user('viewer_user_test', 'viewer@example.com', 'pass')
+        viewer_group, _ = Group.objects.get_or_create(name='Viewer')
+        viewer_user.groups.add(viewer_group)
+
+        from .models import CohortAdmin
+        CohortAdmin.objects.create(user=pm_user)
+
+        wo = WorkOrder.objects.create(
+            bge=self.specialist,
+            work_order_type='bds_manual_module',
+            issue_date=date(2026, 8, 1),
+            status='issued',
+            rate_per_day=80000,
+            max_days=40,
+        )
+
+        factory = APIRequestFactory()
+        view = WorkOrderViewSet.as_view({'get': 'pdf'})
+
+        # PM download
+        req_pm = factory.get(f'/api/work-orders/{wo.id}/pdf/')
+        force_authenticate(req_pm, user=pm_user)
+        resp_pm = view(req_pm, pk=wo.id)
+        self.assertEqual(resp_pm.status_code, 200)
+
+        # Viewer download
+        req_v = factory.get(f'/api/work-orders/{wo.id}/pdf/')
+        force_authenticate(req_v, user=viewer_user)
+        resp_v = view(req_v, pk=wo.id)
+        self.assertEqual(resp_v.status_code, 200)
+
 
 class BGEAssignmentVisibilityTests(TestCase):
     def setUp(self):

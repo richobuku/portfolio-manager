@@ -85,6 +85,15 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         except Exception:
             return []
 
+    def to_internal_value(self, data):
+        # Normalize empty string dates to None so DateField does not error with "Date has wrong format"
+        if hasattr(data, 'copy'):
+            data = data.copy()
+            for date_field in ('start_date', 'end_date', 'bge_signed_date'):
+                if data.get(date_field) == '':
+                    data[date_field] = None
+        return super().to_internal_value(data)
+
     class Meta:
         model = WorkOrder
         fields = '__all__'

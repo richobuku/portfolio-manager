@@ -7356,15 +7356,23 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         </IconButton>
                       </Tooltip>
                     )}
-                    <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openWoEdit(wo)} disabled={wo.status !== 'draft'}>
-                        <Edit fontSize="small" />
-                      </IconButton>
+                    <Tooltip title="Edit work order">
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={() => openWoEdit(wo)}
+                          disabled={!isStaff && wo.status !== 'draft'}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                     <Tooltip title="Delete">
-                      <IconButton size="small" color="error" onClick={() => deleteWo(wo)} disabled={wo.status !== 'draft'}>
-                        <Delete fontSize="small" />
-                      </IconButton>
+                      <span>
+                        <IconButton size="small" color="error" onClick={() => deleteWo(wo)} disabled={wo.status !== 'draft'}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                   </Box>
                 </Box>

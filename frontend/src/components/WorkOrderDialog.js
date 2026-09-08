@@ -25,11 +25,11 @@ const DeliverableRow = React.memo(function DeliverableRow({ d, i, onUpdate, onRe
     }}>
       <Typography variant="caption" sx={{ pt: 1.2, fontWeight: 700 }}>{d.task_num}.</Typography>
       <TextField size="small" fullWidth multiline minRows={1} label="Deliverable / Task"
-        value={d.description}
+        value={d.description || ''}
         onChange={e => onUpdate(i, 'description', e.target.value)} />
       <TextField size="small" fullWidth label="Due date"
         sx={{ gridColumn: { xs: '2 / 3', sm: 'auto' } }}
-        value={d.due_date}
+        value={d.due_date || ''}
         onChange={e => onUpdate(i, 'due_date', e.target.value)} />
       <IconButton size="small" color="error" sx={{ mt: 0.5, gridColumn: { xs: '3 / 4', sm: 'auto' } }}
         onClick={() => onRemove(i)}>
@@ -982,8 +982,8 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
     setSelectedBges([]);
     if (woEditing) {
       setWoForm({
-        bge: woEditing.bge,
-        group: woEditing.group || '',
+        bge: (typeof woEditing.bge === 'object' ? woEditing.bge?.id : woEditing.bge) || '',
+        group: (typeof woEditing.group === 'object' ? woEditing.group?.id : woEditing.group) || '',
         work_order_type: woEditing.work_order_type,
         project_name: woEditing.project_name,
         issue_date: woEditing.issue_date,
@@ -1001,7 +1001,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         team_leader_name: woEditing.team_leader_name,
         team_leader_position: woEditing.team_leader_position,
         participant_bges: woEditing.participant_bges || [],
-        supported_bge: woEditing.supported_bge || '',
+        supported_bge: (typeof woEditing.supported_bge === 'object' ? woEditing.supported_bge?.id : woEditing.supported_bge) || '',
         technical_area: woEditing.technical_area || '',
         msme_ids_snapshot: woEditing.msme_ids_snapshot || [],
       });
@@ -1162,6 +1162,19 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.start_date   = '2026-08-10';
       extra.end_date     = '2026-08-21';
     }
+    if (type === 'bds_manual_module') {
+      extra.duration             = '4 Aug – 26 Sep 2026';
+      extra.max_days             = 40;
+      extra.rate_per_day         = 80000;
+      extra.transport_reimbursed = false;
+      extra.location             = 'Northern Uganda (Gulu & Lira)';
+      extra.project_name         = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      extra.start_date           = '2026-08-04';
+      extra.end_date             = '2026-09-26';
+      extra.payment_notes        = `Phase 1 payment (30 days × UGX 80,000 = UGX 2,400,000): upon submission and acceptance of both final BDS Manual modules and all associated training content.\nPhase 2 payment (10 days × UGX 80,000 = UGX 800,000): upon completion of 5-day BGE/DCO training co-facilitation, confirmed by Team Leader sign-off.\nTotal contract value: UGX 3,200,000 (40 days × UGX 80,000/day).\n10% Withholding Tax (WHT) will be deducted at source per applicable tax regulations.`;
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, [experts, selectedBges, woEditing, woForm.bge]);
 
@@ -1215,6 +1228,8 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       if (woEditing) {
         const payload = {
           ...woForm,
+          start_date: woForm.start_date || null,
+          end_date: woForm.end_date || null,
           group: woForm.group || null,
           supported_bge: woForm.supported_bge || null,
           allow_overlap: woAllowOverlap || false,
@@ -1227,6 +1242,8 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         const { bge: _unused, ...rest } = woForm; // eslint-disable-line no-unused-vars
         const payload = {
           ...rest,
+          start_date: woForm.start_date || null,
+          end_date: woForm.end_date || null,
           bge_ids: selectedBges,
           group: woForm.group || null,
           supported_bge: woForm.supported_bge || null,
@@ -1244,6 +1261,8 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       } else {
         const payload = {
           ...woForm,
+          start_date: woForm.start_date || null,
+          end_date: woForm.end_date || null,
           bge: selectedBges[0],
           group: woForm.group || null,
           supported_bge: woForm.supported_bge || null,
