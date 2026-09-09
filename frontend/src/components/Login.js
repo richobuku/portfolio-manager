@@ -65,7 +65,7 @@ export default function Login({ onLogin, sessionExpired }) {
     <Box sx={{
       minHeight: '100vh',
       display: 'flex',
-      background: `linear-gradient(150deg, #243B55 0%, ${BRAND.sidebarBg} 35%, #0F1F2E 70%, #080E17 100%)`,
+      background: `linear-gradient(150deg, #1E293B 0%, ${BRAND.sidebarBg} 35%, #0F1F2E 70%, #080E17 100%)`,
     }}>
       {/* Left panel — branding only, no logos */}
       <Box sx={{
@@ -79,7 +79,10 @@ export default function Login({ onLogin, sessionExpired }) {
         <Typography variant="h5" sx={{ opacity: 0.85, fontWeight: 400, mb: 2 }}>
           MSME Portfolio Management
         </Typography>
-        <Box sx={{ width: 50, height: 4, bgcolor: BRAND.gizRed, borderRadius: 2, mb: 3 }} />
+        <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+          <Box sx={{ width: 36, height: 4, bgcolor: BRAND.gopaGold, borderRadius: 2 }} />
+          <Box sx={{ width: 24, height: 4, bgcolor: BRAND.gizRed, borderRadius: 2 }} />
+        </Box>
         <Typography variant="body1" sx={{ opacity: 0.65, maxWidth: 380, lineHeight: 1.7 }}>
           Supporting the growth of Micro, Small and Medium Enterprises across Uganda through targeted business development services.
         </Typography>
@@ -90,7 +93,7 @@ export default function Login({ onLogin, sessionExpired }) {
         width: { xs: '100%', md: 440 },
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         bgcolor: '#FFFFFF', p: 3,
-        borderLeft: `4px solid ${BRAND.gizRed}`,
+        borderLeft: `4px solid ${BRAND.gopaGold}`,
       }}>
         <Box sx={{ width: '100%', maxWidth: 380 }}>
           {/* Mobile title (shown only on small screens) */}
@@ -99,8 +102,13 @@ export default function Login({ onLogin, sessionExpired }) {
             <Typography variant="caption" color="text.secondary">MSME Portfolio System</Typography>
           </Box>
 
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #E0E7F0' }}>
-            <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>Sign in</Typography>
+          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #E0E7F0', position: 'relative', overflow: 'hidden' }}>
+            {/* Top dual-brand accent stripe */}
+            <Box sx={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+              background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+            }} />
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5, mt: 0.5 }}>Sign in</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Use your programme credentials to sign in
             </Typography>

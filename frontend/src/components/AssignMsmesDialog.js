@@ -7,12 +7,13 @@ import {
 import { Search, Assignment, Warning } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
+import { BRAND } from '../theme';
 
 const STATUS_CONFIG = {
-  active:             { label: 'Active',             color: 'success', bgcolor: '#E8F5E9', textColor: '#2E7D32', border: '#A5D6A7' },
-  temporarily_closed: { label: 'Temporarily Closed', color: 'warning', bgcolor: '#FFF3E0', textColor: '#E65100', border: '#FFE082' },
-  out_of_business:    { label: 'Out of Business',    color: 'error',   bgcolor: '#FFEBEE', textColor: '#C62828', border: '#EF9A9A' },
-  unavailable:        { label: 'Unavailable',        color: 'default', bgcolor: '#F3E5F5', textColor: '#6A1B9A', border: '#CE93D8' },
+  active:             { label: 'Active',             color: 'success', bgcolor: '#ECFDF5', textColor: BRAND.programmeGreen, border: '#A7F3D0' },
+  temporarily_closed: { label: 'Temporarily Closed', color: 'warning', bgcolor: BRAND.gopaGoldLight, textColor: BRAND.gopaGoldDark, border: '#FDE68A' },
+  out_of_business:    { label: 'Out of Business',    color: 'error',   bgcolor: BRAND.gizLightRed, textColor: BRAND.gizRed, border: '#FECDD3' },
+  unavailable:        { label: 'Unavailable',        color: 'default', bgcolor: '#F1F5F9', textColor: BRAND.proSlate, border: '#CBD5E1' },
 };
 
 const getStatusInfo = (status) => STATUS_CONFIG[status] || {
@@ -216,7 +217,12 @@ const AssignMsmesDialog = React.memo(function AssignMsmesDialog({
   return (
     <>
       <Dialog open={!!assignMsmeGroup} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle>
+        {/* GOPA Pro & GIZ dual brand accent stripe */}
+        <Box sx={{
+          height: 3, flexShrink: 0,
+          background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+        }} />
+        <DialogTitle sx={{ fontWeight: 700 }}>
           Assign MSMEs — {assignMsmeGroup?.name}
           <Typography variant="caption" display="block" color="text.secondary">
             Select MSMEs to assign to this BGE group. Every group member will see them in their dashboard.

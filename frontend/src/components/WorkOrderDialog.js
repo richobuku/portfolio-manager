@@ -8,6 +8,7 @@ import { Add, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
 import { getErrorMessage } from '../utils/error';
+import { BRAND } from '../theme';
 
 // ── Memoised sub-components ────────────────────────────────────────────────────
 // Defined at module level (outside WorkOrderDialog) so their identities are
@@ -1297,6 +1298,11 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
         },
       }}
     >
+      {/* GOPA Pro & GIZ dual brand accent stripe */}
+      <Box sx={{
+        height: 3, flexShrink: 0,
+        background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+      }} />
       <DialogTitle fontWeight={700} sx={{ flexShrink: 0 }}>
         {woEditing ? 'Edit Work Order' : 'New Work Order'}
       </DialogTitle>

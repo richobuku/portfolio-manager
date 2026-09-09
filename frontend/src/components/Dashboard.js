@@ -1779,15 +1779,32 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── sidebar ────────────────────────────────────────────────────────────────
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh', minHeight: 0, bgcolor: BRAND.sidebarBg }}>
+      {/* GOPA Pro & GIZ dual brand accent stripe */}
+      <Box sx={{
+        height: 3, flexShrink: 0,
+        background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+      }} />
       <Box sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.2 }}>
-              PRUDEV II
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-              Portfolio Manager
-            </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.25 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box sx={{
+              bgcolor: BRAND.gopaGold,
+              color: '#1A2E42',
+              px: 0.8, py: 0.3, borderRadius: 1,
+              fontWeight: 900, fontSize: 8.5, letterSpacing: 0.5,
+              lineHeight: 1.1, textAlign: 'center',
+            }}>
+              GOPA<br/><span style={{ fontSize: 7, fontWeight: 800 }}>Pro</span>
+            </Box>
+            <Box sx={{
+              bgcolor: BRAND.gizRed,
+              color: '#fff',
+              px: 0.8, py: 0.3, borderRadius: 1,
+              fontWeight: 800, fontSize: 8.5, letterSpacing: 0.5,
+              lineHeight: 1.1, textAlign: 'center',
+            }}>
+              GIZ
+            </Box>
           </Box>
           <Tooltip title={navLocked ? 'Unlock to reorder tabs' : 'Lock tab order'}>
             <IconButton size="small" onClick={() => setNavLocked(!navLocked)}
@@ -1796,6 +1813,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </IconButton>
           </Tooltip>
         </Box>
+        <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.2 }}>
+          PRUDEV II
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+          Portfolio Manager
+        </Typography>
       </Box>
       <List sx={{
         flex: 1,
@@ -1828,9 +1851,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             onDragEnd={!navLocked ? () => setDragKey(null) : undefined}
             sx={{
               mx: 1, mb: 0.5, borderRadius: 2,
-              color: 'rgba(255,255,255,0.7)',
-              '&.Mui-selected': { bgcolor: 'rgba(255,255,255,0.15)', color: '#fff' },
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: '#fff' },
+              color: 'rgba(255,255,255,0.75)',
+              transition: 'all 0.15s ease',
+              '&.Mui-selected': {
+                bgcolor: BRAND.sidebarSelected,
+                color: '#FFFFFF',
+                borderLeft: `3px solid ${BRAND.gopaGold}`,
+                '& .MuiListItemIcon-root': { color: BRAND.gopaGold },
+                fontWeight: 600,
+              },
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', color: '#fff' },
               opacity: dragKey === key ? 0.4 : 1,
               cursor: navLocked ? 'pointer' : 'grab',
             }}
@@ -1856,7 +1886,15 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               {currentUser?.username}
             </Typography>
             {isAdmin && (
-              <Typography variant="caption" sx={{ color: '#ffd54f', fontWeight: 600 }}>Admin</Typography>
+              <Typography variant="caption" sx={{
+                color: BRAND.gopaGold,
+                bgcolor: 'rgba(243,187,54,0.16)',
+                border: '1px solid rgba(243,187,54,0.3)',
+                px: 0.8, py: 0.1, borderRadius: 1,
+                fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+              }}>
+                ADMIN
+              </Typography>
             )}
           </Box>
         </Box>
@@ -2223,12 +2261,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       : 'from latest data updates';
 
     const kpiCards = [
-      { val: totalMsmes,    label: 'MSMEs Enrolled',   sub: 'programme participants', color: BRAND.primaryMain, key: 'msmes' },
-      { val: totalBges,     label: 'BGE Experts',      sub: 'coaches in field',       color: BRAND.gizRed,      key: 'experts' },
-      { val: totalSessions, label: 'Training Sessions',sub: 'conducted to date',      color: '#0288D1',         key: 'training' },
-      { val: totalReports,  label: 'Reports Filed',    sub: 'MSME + group visits',    color: '#2E7D32',         key: 'reports' },
-      { val: totalGroups,   label: 'BGE Groups',       sub: 'active teams',           color: '#E65100',         key: 'bgegroups' },
-      { val: totalEmployees,label: 'Total Employees',  sub: empSub,                   color: '#5D4037',         key: 'analytics' },
+      { val: totalMsmes,    label: 'MSMEs Enrolled',   sub: 'programme participants', color: BRAND.primaryMain,   key: 'msmes' },
+      { val: totalBges,     label: 'BGE Experts',      sub: 'coaches in field',       color: BRAND.gizRed,        key: 'experts' },
+      { val: totalSessions, label: 'Training Sessions',sub: 'conducted to date',      color: BRAND.gopaGoldDark,  key: 'training' },
+      { val: totalReports,  label: 'Reports Filed',    sub: 'MSME + group visits',    color: BRAND.programmeGreen,key: 'reports' },
+      { val: totalGroups,   label: 'BGE Groups',       sub: 'active teams',           color: BRAND.proSlate,      key: 'bgegroups' },
+      { val: totalEmployees,label: 'Total Employees',  sub: empSub,                   color: '#1E293B',           key: 'analytics' },
     ];
 
     const quickLinks = [
@@ -2257,7 +2295,21 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     return (
       <Box>
         {/* ── Welcome bar ── */}
-        <Box sx={{ mb: 3, p: 2.5, borderRadius: 2, background: `linear-gradient(135deg, ${BRAND.sidebarBg} 0%, #1a3a5c 100%)`, color: '#fff' }}>
+        <Box sx={{
+          mb: 3, p: 2.5, borderRadius: 2,
+          background: `linear-gradient(135deg, ${BRAND.sidebarBg} 0%, #20354B 60%, #152538 100%)`,
+          color: '#fff',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 4px 16px rgba(26,46,66,0.12)',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            bottom: 0, left: 0, right: 0,
+            height: 3,
+            background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+          },
+        }}>
           <Typography variant="h5" fontWeight={800} gutterBottom>
             PRUDEV II Programme Dashboard
           </Typography>
@@ -9653,9 +9705,13 @@ PRUDEV II BDS Team`
 
   // ── main render ────────────────────────────────────────────────────────────
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#fafafa' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       {/* mobile top bar */}
-      <AppBar position="fixed" sx={{ display: { md: 'none' }, bgcolor: BRAND.sidebarBg, zIndex: (t) => t.zIndex.drawer + 1 }}>
+      <AppBar position="fixed" sx={{
+        display: { md: 'none' }, bgcolor: BRAND.sidebarBg,
+        zIndex: (t) => t.zIndex.drawer + 1,
+        borderBottom: `2px solid ${BRAND.gopaGold}`,
+      }}>
         <Toolbar variant="dense">
           <IconButton
             color="inherit" edge="start"

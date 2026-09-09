@@ -36,8 +36,18 @@ code {
     align-items: center;
     justify-content: space-between;
     border-bottom: 3px solid #C8102E;
+    position: relative;
     padding: 8px 12px 12px 12px;
     margin-bottom: 12px;
+  }
+  .print-letterhead::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    width: 45%;
+    height: 3px;
+    background-color: #F3BB36;
   }
   .print-letterhead img.gopa { height: 44px; max-width: 220px; width: auto; object-fit: contain; }
   .print-letterhead img.giz  { height: 64px; width: auto; }

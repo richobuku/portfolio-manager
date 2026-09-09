@@ -13,6 +13,7 @@ import {
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
 import { getErrorMessage } from '../utils/error';
+import { BRAND } from '../theme';
 
 const h = (token) => ({ Authorization: `Bearer ${token}` });
 
@@ -23,35 +24,35 @@ const VISIT_TYPES = [
     label: 'Data Collection Visit',
     icon: <Assessment />,
     desc: 'Collect and record MSME metrics',
-    color: '#E65100',
+    color: BRAND.gopaGoldDark,
   },
   {
     value: 'one_on_one',
     label: 'One-on-One Visit',
     icon: <Person />,
     desc: 'Direct visit to one MSME',
-    color: '#1A2F4B',
+    color: BRAND.primaryMain,
   },
   {
     value: 'training',
     label: 'Training Visit',
     icon: <School />,
     desc: 'Group or individual training session',
-    color: '#2E7D32',
+    color: BRAND.programmeGreen,
   },
   {
     value: 'coaching',
     label: 'Business Coaching',
     icon: <Psychology />,
     desc: 'Structured coaching session',
-    color: '#7B1FA2',
+    color: BRAND.proSlate,
   },
   {
     value: 'annual_review',
     label: 'Annual Review',
     icon: <QueryStats />,
     desc: 'In-depth qualitative review of MSME data',
-    color: '#00695C',
+    color: BRAND.gizRed,
   },
 ];
 
@@ -589,6 +590,12 @@ export default function VisitReportForm({
         },
       }}>
 
+      {/* GOPA Pro & GIZ dual brand accent stripe */}
+      <Box sx={{
+        height: 3, flexShrink: 0,
+        background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+      }} />
+
       {/* Header */}
       <DialogTitle sx={{ pb: 1, bgcolor: typeInfo.color, color: '#fff' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -993,7 +1000,13 @@ export default function VisitReportForm({
             {/* ── 3. OUTCOMES & THE ACID TEST ── */}
             <SectionBlock icon={<EmojiEvents />} title="3. Outcomes & The Acid Test" color={typeInfo.color}>
               {cfg.show_reflections && (
-                <Alert severity="success" sx={{ mb: 2, fontSize: 12, border: '1px solid #BBF7D0', bgcolor: '#F0FDF4' }}>
+                <Alert severity="warning" sx={{
+                  mb: 2, fontSize: 12,
+                  border: '1px solid #FDE68A',
+                  bgcolor: '#FEF3C7',
+                  color: '#92400E',
+                  '& .MuiAlert-icon': { color: '#D97706' },
+                }}>
                   <strong>Reflection 3 — The Acid Test:</strong> When you leave the business, can the owner name ONE concrete thing they now know to do differently? If not, what did the visit actually deliver?
                 </Alert>
               )}
@@ -1069,18 +1082,18 @@ export default function VisitReportForm({
             {/* ── 5. INSTANT SMS ACTION HANDOUT TO MSME ── */}
             {selectedMsme && (
               <Box sx={{
-                mt: 3, p: 2, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD',
+                mt: 3, p: 2, bgcolor: '#FEF9EE', border: '1px solid #FDE68A',
                 borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 1.5,
               }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="subtitle2" fontWeight={700} color="#0369A1">
+                    <Typography variant="subtitle2" fontWeight={700} color="#92400E">
                       📱 Send Instant SMS Action Summary to Entrepreneur
                     </Typography>
                     <Chip
                       size="small"
                       label={selectedMsme.phone || 'No phone recorded'}
-                      color={selectedMsme.phone ? 'primary' : 'default'}
+                      color={selectedMsme.phone ? 'warning' : 'default'}
                       variant="outlined"
                       sx={{ height: 20, fontSize: 11 }}
                     />
@@ -1098,7 +1111,7 @@ export default function VisitReportForm({
                   />
                 </Box>
                 {form.send_sms && selectedMsme.phone && (
-                  <Box sx={{ p: 1.5, bgcolor: '#FFFFFF', borderRadius: 1.5, border: '1px solid #E0F2FE' }}>
+                  <Box sx={{ p: 1.5, bgcolor: '#FFFFFF', borderRadius: 1.5, border: '1px solid #FDE68A' }}>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5, fontWeight: 600 }}>
                       SMS Takeaway Preview (Dispatched to owner upon report submission):
                     </Typography>

@@ -272,13 +272,13 @@ export default function MSMEVisitSchedule({
   const getStatusChip = (status, missedReason) => {
     switch (status) {
       case 'planned':
-        return <Chip size="small" icon={<CalendarMonth sx={{ fontSize: '14px !important' }} />} label="Planned" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 700, fontSize: 11 }} />;
+        return <Chip size="small" icon={<CalendarMonth sx={{ fontSize: '14px !important' }} />} label="Planned" sx={{ bgcolor: '#F1F5F9', color: BRAND.primaryMain, border: '1px solid #CBD5E1', fontWeight: 700, fontSize: 11 }} />;
       case 'completed':
-        return <Chip size="small" icon={<CheckCircle sx={{ fontSize: '14px !important' }} />} label="Completed" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 700, fontSize: 11 }} />;
+        return <Chip size="small" icon={<CheckCircle sx={{ fontSize: '14px !important' }} />} label="Completed" sx={{ bgcolor: BRAND.programmeGreenLight || '#ECFDF5', color: BRAND.programmeGreen, border: '1px solid #A7F3D0', fontWeight: 700, fontSize: 11 }} />;
       case 'missed':
-        return <Chip size="small" icon={<Cancel sx={{ fontSize: '14px !important' }} />} label={`Missed: ${MISSED_REASON_LABELS[missedReason] || 'Unspecified'}`} sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 700, fontSize: 11 }} />;
+        return <Chip size="small" icon={<Cancel sx={{ fontSize: '14px !important' }} />} label={`Missed: ${MISSED_REASON_LABELS[missedReason] || 'Unspecified'}`} sx={{ bgcolor: BRAND.gizLightRed || '#FFF1F2', color: BRAND.gizRed, border: '1px solid #FECDD3', fontWeight: 700, fontSize: 11 }} />;
       case 'rescheduled':
-        return <Chip size="small" icon={<Autorenew sx={{ fontSize: '14px !important' }} />} label="Rescheduled" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 700, fontSize: 11 }} />;
+        return <Chip size="small" icon={<Autorenew sx={{ fontSize: '14px !important' }} />} label="Rescheduled" sx={{ bgcolor: BRAND.gopaGoldLight, color: BRAND.gopaGoldDark, border: '1px solid #FDE68A', fontWeight: 700, fontSize: 11 }} />;
       default:
         return <Chip size="small" label={status} />;
     }
@@ -709,8 +709,13 @@ export default function MSMEVisitSchedule({
         onClose={() => setScheduleModalOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
       >
+        {/* GOPA Pro & GIZ dual brand accent stripe */}
+        <Box sx={{
+          height: 3, flexShrink: 0,
+          background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+        }} />
         <DialogTitle sx={{ bgcolor: BRAND.primaryMain, color: '#fff', pb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CalendarMonth />
@@ -858,7 +863,7 @@ export default function MSMEVisitSchedule({
 
       {/* ── MARK MISSED DIALOG ────────────────────────────────────────────── */}
       <Dialog open={missedDialogOpen} onClose={() => setMissedDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ bgcolor: '#FFEBEE', color: '#C62828', pb: 1.5 }}>
+        <DialogTitle sx={{ bgcolor: BRAND.gizLightRed || '#FFF1F2', color: BRAND.gizRed, pb: 1.5 }}>
           Record Missed Visit
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2.5 }}>
@@ -906,7 +911,7 @@ export default function MSMEVisitSchedule({
 
       {/* ── RESCHEDULE DIALOG ──────────────────────────────────────────────── */}
       <Dialog open={rescheduleDialogOpen} onClose={() => setRescheduleDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ bgcolor: '#FFF3E0', color: '#E65100', pb: 1.5 }}>
+        <DialogTitle sx={{ bgcolor: BRAND.gopaGoldLight, color: BRAND.gopaGoldDark, pb: 1.5 }}>
           Reschedule Session
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2.5 }}>
@@ -972,7 +977,7 @@ export default function MSMEVisitSchedule({
 
       {/* ── COMPLETE DIALOG ────────────────────────────────────────────────── */}
       <Dialog open={completeDialogOpen} onClose={() => setCompleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', pb: 1.5 }}>
+        <DialogTitle sx={{ bgcolor: BRAND.programmeGreenLight || '#ECFDF5', color: BRAND.programmeGreen, pb: 1.5 }}>
           Complete Visit Session
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2.5 }}>

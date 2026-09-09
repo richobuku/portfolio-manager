@@ -122,11 +122,11 @@ const createBgeMarkerIcon = (expert) => {
   const html = `
     <div style="position: relative; width: 38px; height: 46px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
       <svg viewBox="0 0 24 32" width="38" height="46" style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));">
-        <path d="M12 0 C5.37 0 0 5.37 0 12 C0 21 12 32 12 32 C12 32 24 21 24 12 C24 5.37 18.63 0 12 0 Z" fill="#0D47A1"/>
-        <circle cx="12" cy="12" r="8" fill="#FFD54F"/>
-        <circle cx="12" cy="12" r="5" fill="#0D47A1"/>
+        <path d="M12 0 C5.37 0 0 5.37 0 12 C0 21 12 32 12 32 C12 32 24 21 24 12 C24 5.37 18.63 0 12 0 Z" fill="#1A2E42"/>
+        <circle cx="12" cy="12" r="8" fill="#F3BB36"/>
+        <circle cx="12" cy="12" r="5" fill="#1A2E42"/>
       </svg>
-      <div style="position: absolute; top: 7px; color: #FFFFFF; font-size: 9px; font-weight: 900; pointer-events: none;">
+      <div style="position: absolute; top: 7px; color: #F3BB36; font-size: 9px; font-weight: 900; pointer-events: none;">
         ★
       </div>
     </div>
@@ -424,14 +424,14 @@ export default function MSMEMap({
       const popupHtml = `
         <div style="font-family: inherit; font-size: 13px; line-height: 1.4; min-width: 240px; max-width: 300px;">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
-            <strong style="font-size: 14px; color: #0D47A1;">${expert.name || 'BGE Expert'}</strong>
-            <span style="font-size: 10px; font-weight: 700; background: #FFF8E1; color: #F57F17; border: 1px solid #FFE082; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
+            <strong style="font-size: 14px; color: #1A2E42;">${expert.name || 'BGE Expert'}</strong>
+            <span style="font-size: 10px; font-weight: 700; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
               ${expert.bge_code || 'BGE'}
             </span>
           </div>
 
           <div style="margin-bottom: 8px;">
-            <span style="display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: #0D47A1; padding: 2px 8px; border-radius: 12px; margin-right: 4px;">
+            <span style="display: inline-block; font-size: 11px; font-weight: 700; color: #F3BB36; background: #1A2E42; padding: 2px 8px; border-radius: 12px; margin-right: 4px;">
               ★ BGE Expert
             </span>
             ${expert.location ? `<span style="display: inline-block; font-size: 11px; color: #475569; background: #F8FAFC; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 12px;">${expert.location}</span>` : ''}
@@ -445,7 +445,7 @@ export default function MSMEMap({
           </div>
 
           <div style="text-align: right; border-top: 1px solid #F1F5F9; padding-top: 6px;">
-            <button id="btn-expert-${expert.id}" style="background: #0D47A1; color: #ffffff; border: none; padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <button id="btn-expert-${expert.id}" style="background: #1A2E42; color: #ffffff; border: none; padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
               View Expert Profile →
             </button>
           </div>
@@ -553,7 +553,7 @@ export default function MSMEMap({
                 MSMEs ({plottedMsmes.length})
               </ToggleButton>
               <ToggleButton value="experts" sx={{ fontSize: 11, py: 0.3, px: 1.2, textTransform: 'none' }}>
-                <People sx={{ fontSize: 14, mr: 0.5, color: '#0D47A1' }} />
+                <People sx={{ fontSize: 14, mr: 0.5, color: '#1A2E42' }} />
                 BGE Experts ({plottedExperts.length})
               </ToggleButton>
             </ToggleButtonGroup>
@@ -712,8 +712,8 @@ export default function MSMEMap({
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
-              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#0D47A1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFD54F', fontSize: 8, fontWeight: 900 }}>★</Box>
-              <strong style={{ color: '#0D47A1' }}>BGE Expert Pin (Field Base)</strong>
+              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#1A2E42', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F3BB36', fontSize: 8, fontWeight: 900 }}>★</Box>
+              <strong style={{ color: '#1A2E42' }}>BGE Expert Pin (Field Base)</strong>
             </Box>
             <Divider sx={{ my: 0.5 }} />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>

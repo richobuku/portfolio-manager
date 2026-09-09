@@ -74,9 +74,13 @@ export default function ResetPassword() {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f5f5' }}>
-      <Card sx={{ width: 420, p: 2, boxShadow: 4, borderRadius: 3 }}>
-        <CardContent>
-          <Typography variant="h5" fontWeight={700} color={BRAND.dark} gutterBottom>
+      <Card sx={{ width: 420, p: 2, boxShadow: 4, borderRadius: 3, position: 'relative', overflow: 'hidden' }}>
+        <Box sx={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+          background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+        }} />
+        <CardContent sx={{ pt: 2.5 }}>
+          <Typography variant="h5" fontWeight={700} color={BRAND.primaryMain} gutterBottom>
             Set New Password
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -120,13 +124,13 @@ export default function ResetPassword() {
                 variant="contained"
                 fullWidth
                 disabled={loading}
-                sx={{ py: 1.5, bgcolor: BRAND.gizRed, '&:hover': { bgcolor: '#a00d24' }, fontWeight: 700, borderRadius: 2 }}
+                sx={{ py: 1.5, bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark }, fontWeight: 700, borderRadius: 2 }}
               >
                 {loading ? <CircularProgress size={22} color="inherit" /> : 'Reset Password'}
               </Button>
               <Button
                 fullWidth
-                sx={{ mt: 1, color: BRAND.dark }}
+                sx={{ mt: 1, color: BRAND.primaryMain }}
                 onClick={() => navigate('/login')}
               >
                 Back to Sign In

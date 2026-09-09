@@ -1703,6 +1703,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
   const SidebarContent = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, bgcolor: BRAND.sidebarBg }}>
+      {/* GOPA Pro & GIZ dual brand accent stripe */}
+      <Box sx={{
+        height: 3, flexShrink: 0,
+        background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+      }} />
       {/* Close button — mobile only */}
       <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'flex-end', px: 1, pt: 1 }}>
         <IconButton size="small" onClick={() => setMobileOpen(false)}
@@ -1711,18 +1716,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         </IconButton>
       </Box>
       <Box sx={{ px: 2.5, py: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 0.5 }}>
           <Box sx={{
-            width: 32, height: 32, borderRadius: 1, bgcolor: BRAND.programmeGreen,
+            width: 32, height: 32, borderRadius: 1.5, bgcolor: BRAND.gizRed,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(200,16,46,0.3)',
           }}>
             <Typography sx={{ fontWeight: 900, fontSize: 10, color: '#fff', lineHeight: 1 }}>GIZ</Typography>
           </Box>
           <Box sx={{
-            width: 32, height: 32, borderRadius: 1, bgcolor: '#fff',
+            width: 44, height: 32, borderRadius: 1.5, bgcolor: BRAND.gopaGold,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(243,187,54,0.3)',
           }}>
-            <Typography sx={{ fontWeight: 900, fontSize: 7, color: BRAND.primaryMain, lineHeight: 1.1, textAlign: 'center' }}>GOPA{'\n'}AFC</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: 8.5, color: '#1A2E42', lineHeight: 1.05, textAlign: 'center' }}>
+              GOPA<br/><span style={{ fontSize: 7.5, fontWeight: 800 }}>Pro</span>
+            </Typography>
           </Box>
         </Box>
         <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: 13, mt: 1 }}>PRUDEV II</Typography>
@@ -1748,7 +1757,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             onClick={() => { startTransition(() => setSection(key)); setMobileOpen(false); }}
             sx={{
               borderRadius: 2, mb: 0.5, color: 'rgba(255,255,255,0.75)',
-              '&.Mui-selected': { bgcolor: BRAND.sidebarSelected, color: '#fff' },
+              transition: 'all 0.15s ease',
+              '&.Mui-selected': {
+                bgcolor: BRAND.sidebarSelected,
+                color: '#fff',
+                borderLeft: `3px solid ${BRAND.gopaGold}`,
+                '& .MuiListItemIcon-root': { color: BRAND.gopaGold },
+                fontWeight: 600,
+              },
               '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
             }}
           >
@@ -1802,7 +1818,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default', overflowX: 'hidden' }}>
       {/* mobile appbar */}
-      <AppBar position="fixed" sx={{ display: { md: 'none' }, bgcolor: BRAND.sidebarBg, zIndex: (t) => t.zIndex.drawer + 1, boxShadow: 'none' }}>
+      <AppBar position="fixed" sx={{
+        display: { md: 'none' }, bgcolor: BRAND.sidebarBg,
+        zIndex: (t) => t.zIndex.drawer + 1, boxShadow: 'none',
+        borderBottom: `2px solid ${BRAND.gopaGold}`,
+      }}>
         <Toolbar>
           <IconButton color="inherit" onClick={() => setMobileOpen(o => !o)}
             sx={{ mr: 1, p: 1.25, touchAction: 'manipulation' }} aria-label="Open navigation menu">

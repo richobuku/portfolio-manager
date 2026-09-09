@@ -36,37 +36,37 @@ const h = (token) => ({ Authorization: `Bearer ${token}` });
 const STATUS_CONFIG = {
   planned: {
     label: 'Planned Meeting',
-    color: '#1976D2',
-    bg: '#E3F2FD',
-    border: '#90CAF9',
+    color: BRAND.primaryMain,
+    bg: '#F1F5F9',
+    border: '#CBD5E1',
     icon: <Schedule sx={{ fontSize: 16 }} />,
   },
   completed: {
     label: 'Completed',
-    color: '#2E7D32',
-    bg: '#E8F5E9',
-    border: '#A5D6A7',
+    color: BRAND.programmeGreen,
+    bg: BRAND.programmeGreenLight || '#ECFDF5',
+    border: '#A7F3D0',
     icon: <CheckCircle sx={{ fontSize: 16 }} />,
   },
   missed: {
     label: 'Missed',
-    color: '#C62828',
-    bg: '#FFEBEE',
-    border: '#EF9A9A',
+    color: BRAND.gizRed,
+    bg: BRAND.gizLightRed || '#FFF1F2',
+    border: '#FECDD3',
     icon: <EventBusy sx={{ fontSize: 16 }} />,
   },
   rescheduled: {
     label: 'Rescheduled',
-    color: '#E65100',
-    bg: '#FFF3E0',
-    border: '#FFE082',
+    color: BRAND.gopaGoldDark,
+    bg: BRAND.gopaGoldLight,
+    border: '#FDE68A',
     icon: <EditCalendar sx={{ fontSize: 16 }} />,
   },
   cancelled: {
     label: 'Cancelled',
-    color: '#616161',
-    bg: '#F5F5F5',
-    border: '#E0E0E0',
+    color: BRAND.proSlate,
+    bg: '#F8FAFC',
+    border: '#E2E8F0',
     icon: <Cancel sx={{ fontSize: 16 }} />,
   },
 };
@@ -1043,22 +1043,22 @@ export default function CalendarPlanner({
             <Card
               sx={{
                 borderRadius: 2.5,
-                border: '1px solid #BBDEFB',
-                boxShadow: '0 2px 8px rgba(25,118,210,0.06)',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #EBF5FF 100%)',
+                border: '1px solid #CBD5E1',
+                boxShadow: '0 2px 8px rgba(26,46,66,0.06)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
               }}
             >
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" fontWeight={600} color="#1565C0">
+                  <Typography variant="caption" fontWeight={600} sx={{ color: BRAND.primaryMain }}>
                     Planned Meetings
                   </Typography>
-                  <Schedule sx={{ fontSize: 18, color: '#1976D2' }} />
+                  <Schedule sx={{ fontSize: 18, color: BRAND.primaryMain }} />
                 </Box>
-                <Typography variant="h5" fontWeight={800} sx={{ color: '#1565C0' }}>
+                <Typography variant="h5" fontWeight={800} sx={{ color: BRAND.primaryMain }}>
                   {summary.planned || 0}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#1976D2' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   {summary.upcoming_7_days || 0} in next 7 days
                 </Typography>
               </CardContent>
@@ -1069,22 +1069,22 @@ export default function CalendarPlanner({
             <Card
               sx={{
                 borderRadius: 2.5,
-                border: '1px solid #C8E6C9',
-                boxShadow: '0 2px 8px rgba(46,125,50,0.06)',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #EBF7EE 100%)',
+                border: '1px solid #A7F3D0',
+                boxShadow: '0 2px 8px rgba(0,155,98,0.06)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #ECFDF5 100%)',
               }}
             >
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" fontWeight={600} color="#2E7D32">
+                  <Typography variant="caption" fontWeight={600} sx={{ color: BRAND.programmeGreen }}>
                     Completed
                   </Typography>
-                  <CheckCircle sx={{ fontSize: 18, color: '#2E7D32' }} />
+                  <CheckCircle sx={{ fontSize: 18, color: BRAND.programmeGreen }} />
                 </Box>
-                <Typography variant="h5" fontWeight={800} sx={{ color: '#2E7D32' }}>
+                <Typography variant="h5" fontWeight={800} sx={{ color: BRAND.programmeGreen }}>
                   {summary.completed || 0}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#388E3C' }}>
+                <Typography variant="caption" sx={{ color: '#047857' }}>
                   {summary.completion_rate}% completion rate
                 </Typography>
               </CardContent>
@@ -1095,22 +1095,22 @@ export default function CalendarPlanner({
             <Card
               sx={{
                 borderRadius: 2.5,
-                border: '1px solid #FFCDD2',
-                boxShadow: '0 2px 8px rgba(198,40,40,0.06)',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF2F2 100%)',
+                border: '1px solid #FECDD3',
+                boxShadow: '0 2px 8px rgba(200,16,46,0.06)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF1F2 100%)',
               }}
             >
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" fontWeight={600} color="#C62828">
+                  <Typography variant="caption" fontWeight={600} sx={{ color: BRAND.gizRed }}>
                     Missed Visits
                   </Typography>
-                  <EventBusy sx={{ fontSize: 18, color: '#C62828' }} />
+                  <EventBusy sx={{ fontSize: 18, color: BRAND.gizRed }} />
                 </Box>
-                <Typography variant="h5" fontWeight={800} sx={{ color: '#C62828' }}>
+                <Typography variant="h5" fontWeight={800} sx={{ color: BRAND.gizRed }}>
                   {summary.missed || 0}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#D32F2F' }}>
+                <Typography variant="caption" sx={{ color: BRAND.gizDarkRed }}>
                   {summary.missed_breakdown?.length > 0
                     ? `Top: ${summary.missed_breakdown[0].label.slice(0, 18)}…`
                     : 'All meetings attended'}
@@ -1123,22 +1123,22 @@ export default function CalendarPlanner({
             <Card
               sx={{
                 borderRadius: 2.5,
-                border: '1px solid #FFE082',
-                boxShadow: '0 2px 8px rgba(230,81,0,0.06)',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF9EB 100%)',
+                border: '1px solid #FDE68A',
+                boxShadow: '0 2px 8px rgba(217,119,6,0.06)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #FFFBEB 100%)',
               }}
             >
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" fontWeight={600} color="#E65100">
+                  <Typography variant="caption" fontWeight={600} sx={{ color: BRAND.gopaGoldDark }}>
                     Rescheduled
                   </Typography>
-                  <EditCalendar sx={{ fontSize: 18, color: '#E65100' }} />
+                  <EditCalendar sx={{ fontSize: 18, color: BRAND.gopaGoldDark }} />
                 </Box>
-                <Typography variant="h5" fontWeight={800} sx={{ color: '#E65100' }}>
+                <Typography variant="h5" fontWeight={800} sx={{ color: BRAND.gopaGoldDark }}>
                   {summary.rescheduled || 0}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#F57C00' }}>
+                <Typography variant="caption" sx={{ color: '#B45309' }}>
                   Dates updated
                 </Typography>
               </CardContent>
@@ -2787,6 +2787,11 @@ export default function CalendarPlanner({
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
         <form onSubmit={handleCreateVisit}>
+          {/* GOPA Pro & GIZ dual brand accent stripe */}
+          <Box sx={{
+            height: 3, flexShrink: 0,
+            background: `linear-gradient(90deg, ${BRAND.gopaGold} 0%, ${BRAND.gopaGold} 52%, ${BRAND.gizRed} 52%, ${BRAND.gizRed} 100%)`,
+          }} />
           <DialogTitle sx={{ bgcolor: BRAND.primaryMain, color: '#fff', pb: 2 }}>
             <Typography variant="h6" fontWeight={800} color="#fff">
               📅 Plan New MSME Field Visit
@@ -3006,14 +3011,14 @@ export default function CalendarPlanner({
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ bgcolor: '#FFEBEE', color: '#C62828', pb: 1.5 }}>
+        <DialogTitle sx={{ bgcolor: BRAND.gizLightRed || '#FFF1F2', color: BRAND.gizRed, pb: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <EventBusy />
-            <Typography variant="h6" fontWeight={800} color="#C62828">
+            <Typography variant="h6" fontWeight={800} color={BRAND.gizRed}>
               Record Missed Field Meeting
             </Typography>
           </Box>
-          <Typography variant="caption" sx={{ color: '#821C1C' }}>
+          <Typography variant="caption" sx={{ color: BRAND.gizDarkRed }}>
             Please document the specific reason why this scheduled meeting could not take place.
           </Typography>
         </DialogTitle>
@@ -3083,10 +3088,10 @@ export default function CalendarPlanner({
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', pb: 1.5 }}>
+        <DialogTitle sx={{ bgcolor: BRAND.programmeGreenLight || '#ECFDF5', color: BRAND.programmeGreen, pb: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CheckCircle />
-            <Typography variant="h6" fontWeight={800} color="#2E7D32">
+            <Typography variant="h6" fontWeight={800} color={BRAND.programmeGreen}>
               Mark Visit as Completed
             </Typography>
           </Box>
@@ -3158,10 +3163,10 @@ export default function CalendarPlanner({
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ bgcolor: '#FFF3E0', color: '#E65100', pb: 1.5 }}>
+        <DialogTitle sx={{ bgcolor: BRAND.gopaGoldLight, color: BRAND.gopaGoldDark, pb: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <EditCalendar />
-            <Typography variant="h6" fontWeight={800} color="#E65100">
+            <Typography variant="h6" fontWeight={800} color={BRAND.gopaGoldDark}>
               Reschedule Visit
             </Typography>
           </Box>
