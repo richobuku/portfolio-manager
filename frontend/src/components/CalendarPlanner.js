@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, Paper, Chip, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, FormControl, InputLabel, Select,
   MenuItem, Grid, Card, CardContent, Tooltip, CircularProgress, Alert,
-  Autocomplete, Divider, Menu, Fade,
+  Autocomplete, Divider, Menu, Fade, Popover,
 } from '@mui/material';
 import {
   CalendarMonth, Add, ChevronLeft, ChevronRight, Today,
@@ -11,7 +11,8 @@ import {
   LocationOn, Phone, Person, FileDownload,
   Link as LinkIcon, EditCalendar, EventBusy, Assessment,
   School, Psychology, QueryStats, WarningAmber, ViewAgenda,
-  CalendarViewMonth, CloudDone, CloudOff, Sync as SyncIcon,
+  CalendarViewMonth, CalendarViewWeek, CalendarViewDay, CloudDone, CloudOff, Sync as SyncIcon,
+  Close, ArrowForward,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -129,6 +130,44 @@ const getGoogleCalendarUrl = (visit) => {
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${dates}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
 };
 
+// ── Time Parsing & Conflict Detection Helpers ───────────────────────────────
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr) return null;
+  const parts = String(timeStr).split(':').map(Number);
+  if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return parts[0] * 60 + parts[1];
+  }
+  return null;
+};
+
+const getConflictingVisitIds = (dayVisits) => {
+  const conflictIds = new Set();
+  if (!dayVisits || dayVisits.length < 2) return conflictIds;
+
+  const validVisits = dayVisits
+    .filter((v) => v.status !== 'cancelled' && v.start_time)
+    .map((v) => {
+      const startMin = parseTimeToMinutes(v.start_time);
+      let endMin = parseTimeToMinutes(v.end_time);
+      if (endMin === null || endMin <= startMin) {
+        endMin = startMin + 60; // default 1 hour duration
+      }
+      return { id: v.id, startMin, endMin };
+    });
+
+  for (let i = 0; i < validVisits.length; i++) {
+    for (let j = i + 1; j < validVisits.length; j++) {
+      const a = validVisits[i];
+      const b = validVisits[j];
+      if (Math.max(a.startMin, b.startMin) < Math.min(a.endMin, b.endMin)) {
+        conflictIds.add(a.id);
+        conflictIds.add(b.id);
+      }
+    }
+  }
+  return conflictIds;
+};
+
 export default function CalendarPlanner({
   token,
   currentUser,
@@ -150,7 +189,9 @@ export default function CalendarPlanner({
 
   // View state
   const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [viewMode, setViewMode] = useState(isEmbedded ? 'agenda' : 'month'); // 'month' | 'agenda'
+  const [viewMode, setViewMode] = useState(isEmbedded ? 'agenda' : 'month'); // 'month' | 'week' | 'day' | 'agenda'
+  const [dayDetailModal, setDayDetailModal] = useState({ open: false, date: null, isoDate: '', visits: [] });
+  const [popoverAnchor, setPopoverAnchor] = useState({ anchorEl: null, date: null, isoDate: '', visits: [] });
 
   // Filters
   const [selectedBge, setSelectedBge] = useState(currentBge ? String(currentBge.id) : '');
@@ -209,9 +250,24 @@ export default function CalendarPlanner({
         if (selectedBge) params.set('bge', selectedBge);
         if (selectedDistrict) params.set('district', selectedDistrict);
         if (statusFilter !== 'all') params.set('status', statusFilter);
-        // Load visits for the active month plus adjacent buffer
-        params.set('year', currentDate.getFullYear());
-        params.set('month', currentDate.getMonth() + 1);
+        
+        if (viewMode === 'week') {
+          // Compute start (Mon) and end (Sun) of active week
+          const d = new Date(currentDate);
+          const day = d.getDay();
+          const diffToMon = (day + 6) % 7;
+          const mon = new Date(d);
+          mon.setDate(d.getDate() - diffToMon);
+          const sun = new Date(mon);
+          sun.setDate(mon.getDate() + 6);
+          const toIso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+          params.set('start_date', toIso(mon));
+          params.set('end_date', toIso(sun));
+        } else {
+          // Load visits for active month
+          params.set('year', currentDate.getFullYear());
+          params.set('month', currentDate.getMonth() + 1);
+        }
       }
 
       const res = await axios.get(`${API_ENDPOINTS.PLANNED_VISITS}?${params.toString()}`, { headers: h(token) });
@@ -225,7 +281,7 @@ export default function CalendarPlanner({
     } finally {
       setLoading(false);
     }
-  }, [token, initialMsmeId, selectedBge, selectedDistrict, statusFilter, currentDate]);
+  }, [token, initialMsmeId, selectedBge, selectedDistrict, statusFilter, currentDate, viewMode]);
 
   useEffect(() => {
     fetchVisits();
@@ -503,7 +559,7 @@ export default function CalendarPlanner({
     return cells;
   }, [currentDate]);
 
-  // Group visits by date string YYYY-MM-DD
+  // Group visits by date string YYYY-MM-DD and sort chronologically by start_time
   const visitsByDate = useMemo(() => {
     const map = {};
     filteredVisits.forEach((v) => {
@@ -511,8 +567,34 @@ export default function CalendarPlanner({
       if (!map[d]) map[d] = [];
       map[d].push(v);
     });
+    // Sort visits within each date chronologically by start_time
+    Object.keys(map).forEach((dateKey) => {
+      map[dateKey].sort((a, b) => {
+        const timeA = a.start_time || '99:99';
+        const timeB = b.start_time || '99:99';
+        return timeA.localeCompare(timeB);
+      });
+    });
     return map;
   }, [filteredVisits]);
+
+  // Current week days (Monday - Sunday) for Week View
+  const currentWeekDays = useMemo(() => {
+    const d = new Date(currentDate);
+    const day = d.getDay();
+    const diffToMonday = (day + 6) % 7;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + i);
+      days.push(dayDate);
+    }
+    return days;
+  }, [currentDate]);
 
   // Districts list from msmes
   const districts = useMemo(() => {
@@ -523,10 +605,67 @@ export default function CalendarPlanner({
     return Array.from(set).sort();
   }, [msmes]);
 
-  const monthYearLabel = currentDate.toLocaleDateString('en-GB', {
-    month: 'long',
-    year: 'numeric',
-  });
+  const periodLabel = useMemo(() => {
+    if (viewMode === 'day') {
+      return currentDate.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    }
+    if (viewMode === 'week' && currentWeekDays.length === 7) {
+      const start = currentWeekDays[0];
+      const end = currentWeekDays[6];
+      if (start.getMonth() === end.getMonth()) {
+        return `${start.getDate()} – ${end.getDate()} ${start.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`;
+      } else if (start.getFullYear() === end.getFullYear()) {
+        return `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      } else {
+        return `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} – ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      }
+    }
+    return currentDate.toLocaleDateString('en-GB', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [viewMode, currentDate, currentWeekDays]);
+
+  const handlePrevPeriod = () => {
+    if (viewMode === 'day') {
+      setCurrentDate((prev) => {
+        const d = new Date(prev);
+        d.setDate(d.getDate() - 1);
+        return d;
+      });
+    } else if (viewMode === 'week') {
+      setCurrentDate((prev) => {
+        const d = new Date(prev);
+        d.setDate(d.getDate() - 7);
+        return d;
+      });
+    } else {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    }
+  };
+
+  const handleNextPeriod = () => {
+    if (viewMode === 'day') {
+      setCurrentDate((prev) => {
+        const d = new Date(prev);
+        d.setDate(d.getDate() + 1);
+        return d;
+      });
+    } else if (viewMode === 'week') {
+      setCurrentDate((prev) => {
+        const d = new Date(prev);
+        d.setDate(d.getDate() + 7);
+        return d;
+      });
+    } else {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    }
+  };
 
   const isToday = (d) => {
     const today = new Date();
@@ -1025,29 +1164,23 @@ export default function CalendarPlanner({
           <Grid item xs={12} sm={6} md={4}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <IconButton
-                id="btn-prev-month"
+                id="btn-prev-period"
                 size="small"
-                onClick={() =>
-                  setCurrentDate(
-                    new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
-                  )
-                }
+                onClick={handlePrevPeriod}
                 sx={{ border: '1px solid #E0E0E0' }}
+                title={viewMode === 'week' ? 'Previous week' : 'Previous month'}
               >
                 <ChevronLeft />
               </IconButton>
-              <Typography variant="h6" fontWeight={700} sx={{ minWidth: 160, textAlign: 'center', color: BRAND.primaryMain }}>
-                {monthYearLabel}
+              <Typography variant="h6" fontWeight={700} sx={{ minWidth: 170, textAlign: 'center', color: BRAND.primaryMain, fontSize: { xs: 14, sm: 16 } }}>
+                {periodLabel}
               </Typography>
               <IconButton
-                id="btn-next-month"
+                id="btn-next-period"
                 size="small"
-                onClick={() =>
-                  setCurrentDate(
-                    new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
-                  )
-                }
+                onClick={handleNextPeriod}
                 sx={{ border: '1px solid #E0E0E0' }}
+                title={viewMode === 'week' ? 'Next week' : 'Next month'}
               >
                 <ChevronRight />
               </IconButton>
@@ -1175,7 +1308,39 @@ export default function CalendarPlanner({
                 boxShadow: viewMode === 'month' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
               }}
             >
-              Month View
+              Month
+            </Button>
+            <Button
+              id="btn-view-week"
+              size="small"
+              startIcon={<CalendarViewWeek />}
+              onClick={() => setViewMode('week')}
+              sx={{
+                fontSize: 12,
+                fontWeight: 600,
+                textTransform: 'none',
+                bgcolor: viewMode === 'week' ? '#fff' : 'transparent',
+                color: viewMode === 'week' ? BRAND.primaryMain : 'text.secondary',
+                boxShadow: viewMode === 'week' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              Week
+            </Button>
+            <Button
+              id="btn-view-day"
+              size="small"
+              startIcon={<CalendarViewDay />}
+              onClick={() => setViewMode('day')}
+              sx={{
+                fontSize: 12,
+                fontWeight: 600,
+                textTransform: 'none',
+                bgcolor: viewMode === 'day' ? '#fff' : 'transparent',
+                color: viewMode === 'day' ? BRAND.primaryMain : 'text.secondary',
+                boxShadow: viewMode === 'day' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              Day
             </Button>
             <Button
               id="btn-view-agenda"
@@ -1191,7 +1356,7 @@ export default function CalendarPlanner({
                 boxShadow: viewMode === 'agenda' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
               }}
             >
-              Agenda Timeline
+              Agenda
             </Button>
           </Box>
         </Box>
@@ -1225,11 +1390,16 @@ export default function CalendarPlanner({
           </Grid>
 
           {/* Calendar Day Cells */}
-          <Grid container sx={{ minHeight: 600 }}>
+          <Grid container sx={{ minHeight: 620 }}>
             {calendarGrid.map((cell, index) => {
               const iso = toIsoDate(cell.date);
               const dayVisits = visitsByDate[iso] || [];
               const today = isToday(cell.date);
+              const conflictIds = getConflictingVisitIds(dayVisits);
+              const hasConflict = conflictIds.size > 0;
+              const maxVisiblePills = 2;
+              const visibleVisits = dayVisits.slice(0, maxVisiblePills);
+              const hiddenCount = dayVisits.length - maxVisiblePills;
 
               return (
                 <Grid
@@ -1237,7 +1407,7 @@ export default function CalendarPlanner({
                   xs={12 / 7}
                   key={index}
                   sx={{
-                    minHeight: 110,
+                    minHeight: 122,
                     p: 1,
                     borderRight: (index + 1) % 7 !== 0 ? '1px solid #F0F3F6' : 'none',
                     borderBottom: '1px solid #F0F3F6',
@@ -1246,30 +1416,79 @@ export default function CalendarPlanner({
                         ? '#F0F9FF'
                         : '#FFFFFF'
                       : '#FAFAFA',
-                    transition: 'background-color 0.2s',
+                    transition: 'all 0.18s ease',
                     position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
                     '&:hover': {
                       bgcolor: today ? '#E6F4FE' : '#F8FAFC',
                       '& .add-visit-btn': { opacity: 1 },
+                      '& .cell-more-btn': { borderColor: BRAND.primaryMain },
                     },
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Box
-                      sx={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        bgcolor: today ? BRAND.primaryMain : 'transparent',
-                        color: today ? '#fff' : cell.isCurrentMonth ? '#333' : '#A0AEC0',
-                        fontWeight: today ? 800 : cell.isCurrentMonth ? 600 : 400,
-                        fontSize: 12,
-                      }}
-                    >
-                      {cell.date.getDate()}
+                  {/* Day Header Row */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box
+                        onClick={() => {
+                          setCurrentDate(cell.date);
+                          setViewMode('day');
+                        }}
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          bgcolor: today ? BRAND.primaryMain : 'transparent',
+                          color: today ? '#fff' : cell.isCurrentMonth ? '#333' : '#A0AEC0',
+                          fontWeight: today ? 800 : cell.isCurrentMonth ? 600 : 400,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          transition: 'transform 0.15s, background-color 0.15s',
+                          '&:hover': {
+                            transform: 'scale(1.15)',
+                            bgcolor: today ? BRAND.primaryMain : '#EDF2F7',
+                          },
+                        }}
+                        title={dayVisits.length > 0 ? `Click to open Day View (${dayVisits.length} appointments)` : 'Click to open Day View'}
+                      >
+                        {cell.date.getDate()}
+                      </Box>
+
+                      {/* Conflict Indicator */}
+                      {hasConflict && (
+                        <Tooltip title="Scheduling Conflict: 2 or more appointments overlap in time on this day">
+                          <WarningAmber sx={{ fontSize: 15, color: '#D97706' }} />
+                        </Tooltip>
+                      )}
+
+                      {/* Total Count Badge on busy days (Click to open Day View) */}
+                      {dayVisits.length >= 3 && (
+                        <Box
+                          onClick={() => {
+                            setCurrentDate(cell.date);
+                            setViewMode('day');
+                          }}
+                          sx={{
+                            px: 0.6,
+                            py: 0.1,
+                            borderRadius: '10px',
+                            bgcolor: hasConflict ? '#FEF3C7' : '#EFF6FF',
+                            color: hasConflict ? '#92400E' : '#1D4ED8',
+                            border: `1px solid ${hasConflict ? '#FDE68A' : '#BFDBFE'}`,
+                            fontSize: 9.5,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            '&:hover': { filter: 'brightness(0.95)' },
+                          }}
+                          title="Click to open full Day View"
+                        >
+                          {dayVisits.length}
+                        </Box>
+                      )}
                     </Box>
 
                     {/* Hover "+" button to plan on this day */}
@@ -1292,9 +1511,11 @@ export default function CalendarPlanner({
                   </Box>
 
                   {/* Visit Pills on this day */}
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, overflowY: 'auto', maxHeight: 85 }}>
-                    {dayVisits.map((v) => {
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
+                    {visibleVisits.map((v) => {
                       const cfg = STATUS_CONFIG[v.status] || STATUS_CONFIG.planned;
+                      const isConflict = conflictIds.has(v.id);
+
                       return (
                         <Box
                           key={v.id}
@@ -1307,11 +1528,15 @@ export default function CalendarPlanner({
                             display: 'flex',
                             alignItems: 'center',
                             gap: 0.5,
-                            p: '2px 6px',
+                            py: '3px',
+                            px: '6px',
                             borderRadius: 1,
-                            bgcolor: cfg.bg,
-                            borderLeft: `3px solid ${cfg.color}`,
-                            color: cfg.color,
+                            bgcolor: isConflict ? '#FFFBEB' : cfg.bg,
+                            borderLeft: `3px solid ${isConflict ? '#D97706' : cfg.color}`,
+                            borderTop: isConflict ? '1px solid #FDE68A' : 'none',
+                            borderRight: isConflict ? '1px solid #FDE68A' : 'none',
+                            borderBottom: isConflict ? '1px solid #FDE68A' : 'none',
+                            color: isConflict ? '#92400E' : cfg.color,
                             fontSize: 11,
                             fontWeight: 600,
                             cursor: 'pointer',
@@ -1322,24 +1547,714 @@ export default function CalendarPlanner({
                             '&:hover': {
                               boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
                               filter: 'brightness(0.96)',
+                              transform: 'translateY(-1px)',
                             },
                           }}
-                          title={`[${cfg.label}] ${v.msme_name} (${v.bge_name})${v.status === 'missed' ? ` - Reason: ${v.missed_reason_display}` : ''}`}
+                          title={`[${cfg.label}] ${v.start_time ? v.start_time.slice(0, 5) : ''} · ${v.msme_name} (${v.bge_name || 'BGE'})${isConflict ? ' [⚠️ Time Conflict]' : ''}`}
                         >
-                          <Box sx={{ display: 'inline-flex', flexShrink: 0 }}>{cfg.icon}</Box>
-                          <Typography variant="inherit" noWrap sx={{ flex: 1 }}>
-                            {v.start_time ? `${v.start_time.slice(0, 5)} · ` : ''}
+                          <Typography
+                            variant="inherit"
+                            sx={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: isConflict ? '#B45309' : cfg.color,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {v.start_time ? v.start_time.slice(0, 5) : '—'}
+                          </Typography>
+                          <Typography variant="inherit" noWrap sx={{ flex: 1, color: '#1E293B', fontSize: 11, fontWeight: 600 }}>
                             {v.msme_name}
                           </Typography>
+                          {isConflict && (
+                            <WarningAmber sx={{ fontSize: 13, color: '#D97706', flexShrink: 0 }} />
+                          )}
                         </Box>
                       );
                     })}
+
+                    {/* "+N more" Button (Google Calendar style floating popover) */}
+                    {hiddenCount > 0 && (
+                      <Box
+                        className="cell-more-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPopoverAnchor({
+                            anchorEl: e.currentTarget,
+                            date: cell.date,
+                            isoDate: iso,
+                            visits: dayVisits,
+                          });
+                        }}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 0.5,
+                          py: '2px',
+                          px: 1,
+                          mt: 'auto',
+                          borderRadius: 1,
+                          bgcolor: '#F1F5F9',
+                          border: '1px solid #E2E8F0',
+                          color: BRAND.primaryMain,
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          '&:hover': {
+                            bgcolor: '#E2E8F0',
+                            borderColor: BRAND.primaryMain,
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                        title={`Click to view all ${dayVisits.length} appointments on this day`}
+                      >
+                        +{hiddenCount} more
+                      </Box>
+                    )}
                   </Box>
                 </Grid>
               );
             })}
           </Grid>
         </Paper>
+      ) : viewMode === 'week' ? (
+        /* ── WEEK GRID VIEW (ANTI-SQUISH PROTECTED) ────────────────────────── */
+        <Box sx={{ overflowX: 'auto', width: '100%', pb: 0.5 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              minWidth: 840,
+              borderRadius: 2.5,
+              border: '1px solid #E8EDF2',
+              overflow: 'hidden',
+              bgcolor: '#fff',
+            }}
+          >
+            {/* Week Day Headers */}
+            <Grid container sx={{ bgcolor: '#F8FAFC', borderBottom: '1px solid #E8EDF2' }}>
+              {currentWeekDays.map((d, index) => {
+                const isDateToday = isToday(d);
+                const iso = toIsoDate(d);
+                const dayVisits = visitsByDate[iso] || [];
+                const dayConflictIds = getConflictingVisitIds(dayVisits);
+                const hasConflict = dayConflictIds.size > 0;
+
+                return (
+                  <Grid
+                    item
+                    xs={12 / 7}
+                    key={index}
+                    sx={{
+                      py: 1.5,
+                      px: 1,
+                      textAlign: 'center',
+                      borderRight: index < 6 ? '1px solid #E8EDF2' : 'none',
+                      bgcolor: isDateToday ? '#EFF6FF' : 'transparent',
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      fontWeight={700}
+                      onClick={() => {
+                        setCurrentDate(d);
+                        setViewMode('day');
+                      }}
+                      sx={{
+                        color: isDateToday ? BRAND.primaryMain : '#64748B',
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                        display: 'block',
+                        cursor: 'pointer',
+                        '&:hover': { color: BRAND.primaryMain, textDecoration: 'underline' },
+                      }}
+                      title="Click to open Day View"
+                    >
+                      {d.toLocaleDateString('en-GB', { weekday: 'short' })}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, mt: 0.5 }}>
+                      <Box
+                        onClick={() => {
+                          setCurrentDate(d);
+                          setViewMode('day');
+                        }}
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          bgcolor: isDateToday ? BRAND.primaryMain : 'transparent',
+                          color: isDateToday ? '#fff' : '#1E293B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 800,
+                          fontSize: 14,
+                          cursor: 'pointer',
+                          transition: 'transform 0.15s',
+                          '&:hover': {
+                            transform: 'scale(1.15)',
+                            bgcolor: isDateToday ? BRAND.primaryMain : '#EDF2F7',
+                          },
+                        }}
+                        title="Click to open Day View"
+                      >
+                        {d.getDate()}
+                      </Box>
+                      {dayVisits.length > 0 && (
+                        <Chip
+                          size="small"
+                          label={`${dayVisits.length}`}
+                          onClick={() => {
+                            setCurrentDate(d);
+                            setViewMode('day');
+                          }}
+                          sx={{
+                            height: 18,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            bgcolor: hasConflict ? '#FEF3C7' : '#E0E7FF',
+                            color: hasConflict ? '#B45309' : '#3730A3',
+                            cursor: 'pointer',
+                          }}
+                          title="Click to open Day View"
+                        />
+                      )}
+                    </Box>
+                  </Grid>
+                );
+              })}
+            </Grid>
+
+            {/* Week Columns Body */}
+            <Grid container sx={{ minHeight: 520, alignItems: 'stretch' }}>
+              {currentWeekDays.map((d, index) => {
+                const iso = toIsoDate(d);
+                const dayVisits = visitsByDate[iso] || [];
+                const isDateToday = isToday(d);
+                const dayConflictIds = getConflictingVisitIds(dayVisits);
+                const hasConflict = dayConflictIds.size > 0;
+
+                return (
+                  <Grid
+                    item
+                    xs={12 / 7}
+                    key={index}
+                    sx={{
+                      p: 1.25,
+                      borderRight: index < 6 ? '1px solid #F0F3F6' : 'none',
+                      bgcolor: isDateToday ? '#F8FBFF' : '#FFFFFF',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      minWidth: 120,
+                    }}
+                  >
+                    {/* Conflict banner in column */}
+                    {hasConflict && (
+                      <Box
+                        sx={{
+                          p: 0.75,
+                          borderRadius: 1.5,
+                          bgcolor: '#FFFBEB',
+                          border: '1px solid #FDE68A',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          color: '#92400E',
+                          fontSize: 10.5,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <WarningAmber sx={{ fontSize: 14, color: '#D97706' }} />
+                        <span>Time overlap</span>
+                      </Box>
+                    )}
+
+                    {/* Visit cards */}
+                    {dayVisits.length === 0 ? (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          py: 4,
+                          color: '#94A3B8',
+                          gap: 1,
+                          opacity: 0.6,
+                          height: '100%',
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ fontStyle: 'italic', fontSize: 11 }}>
+                          No visits
+                        </Typography>
+                        <Button
+                          size="small"
+                          startIcon={<Add />}
+                          onClick={() => openPlanForDate(d)}
+                          sx={{ fontSize: 11, textTransform: 'none', color: '#64748B' }}
+                        >
+                          Plan
+                        </Button>
+                      </Box>
+                    ) : (
+                      <>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1, overflowY: 'auto', maxHeight: 560, pr: 0.5 }}>
+                          {dayVisits.map((v) => {
+                            const cfg = STATUS_CONFIG[v.status] || STATUS_CONFIG.planned;
+                            const isConflict = dayConflictIds.has(v.id);
+
+                            return (
+                              <Paper
+                                key={v.id}
+                                elevation={0}
+                                onClick={() => {
+                                  setSelectedVisit(v);
+                                  setDetailDialogOpen(true);
+                                }}
+                                sx={{
+                                  p: 1.25,
+                                  borderRadius: 2,
+                                  bgcolor: isConflict ? '#FFFBEB' : cfg.bg,
+                                  border: `1px solid ${isConflict ? '#FCD34D' : cfg.border}`,
+                                  borderLeft: `4px solid ${isConflict ? '#D97706' : cfg.color}`,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  '&:hover': {
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                                    transform: 'translateY(-1px)',
+                                  },
+                                }}
+                              >
+                                {/* Time & Status */}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Schedule sx={{ fontSize: 12, color: isConflict ? '#B45309' : cfg.color }} />
+                                    <Typography
+                                      variant="caption"
+                                      fontWeight={800}
+                                      sx={{ color: isConflict ? '#B45309' : cfg.color, fontSize: 10.5 }}
+                                    >
+                                      {v.start_time ? v.start_time.slice(0, 5) : '—'}
+                                      {v.end_time ? ` - ${v.end_time.slice(0, 5)}` : ''}
+                                    </Typography>
+                                  </Box>
+                                  <Chip
+                                    size="small"
+                                    label={cfg.label}
+                                    sx={{
+                                      height: 16,
+                                      fontSize: 9,
+                                      fontWeight: 700,
+                                      bgcolor: cfg.color,
+                                      color: '#fff',
+                                    }}
+                                  />
+                                </Box>
+
+                                {/* MSME Name */}
+                                <Typography
+                                  variant="subtitle2"
+                                  fontWeight={700}
+                                  sx={{
+                                    color: '#0F172A',
+                                    fontSize: 12,
+                                    lineHeight: 1.2,
+                                    mb: 0.5,
+                                  }}
+                                >
+                                  {v.msme_name}
+                                </Typography>
+
+                                {/* BGE & Venue */}
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    fontSize: 10.5,
+                                    display: 'block',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  👤 {v.bge_name || 'BGE'}
+                                </Typography>
+                                {v.meeting_venue_display && (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    noWrap
+                                    sx={{
+                                      fontSize: 10.5,
+                                      display: 'block',
+                                      mt: 0.25,
+                                    }}
+                                  >
+                                    📍 {v.meeting_venue_display}
+                                  </Typography>
+                                )}
+
+                                {isConflict && (
+                                  <Box sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 0.5, color: '#B45309', fontSize: 10, fontWeight: 700 }}>
+                                    <WarningAmber sx={{ fontSize: 13 }} /> Overlaps with another visit
+                                  </Box>
+                                )}
+                              </Paper>
+                            );
+                          })}
+                        </Box>
+
+                        <Button
+                          size="small"
+                          startIcon={<Add />}
+                          onClick={() => openPlanForDate(d)}
+                          sx={{
+                            fontSize: 11,
+                            textTransform: 'none',
+                            color: BRAND.primaryMain,
+                            mt: 'auto',
+                            py: 0.25,
+                          }}
+                        >
+                          Add visit
+                        </Button>
+                      </>
+                    )}
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </Paper>
+        </Box>
+      ) : viewMode === 'day' ? (
+        /* ── DAY VIEW (GOOGLE CALENDAR FULL-WIDTH TIMELINE) ───────────────────── */
+        (() => {
+          const iso = toIsoDate(currentDate);
+          const dayVisits = visitsByDate[iso] || [];
+          const conflictIds = getConflictingVisitIds(dayVisits);
+          const hasConflict = conflictIds.size > 0;
+          const formattedFullDate = currentDate.toLocaleDateString('en-GB', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+
+          return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              {/* Day Header Card */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2.5,
+                  border: isToday(currentDate) ? `2px solid ${BRAND.primaryMain}` : '1px solid #E8EDF2',
+                  bgcolor: '#fff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Box
+                      sx={{
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 2,
+                        bgcolor: isToday(currentDate) ? BRAND.primaryMain : '#F0F4F8',
+                        color: isToday(currentDate) ? '#fff' : BRAND.primaryMain,
+                        fontWeight: 800,
+                        fontSize: 13,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {isToday(currentDate) ? 'TODAY' : currentDate.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase()}
+                    </Box>
+                    <Typography variant="h5" fontWeight={800} sx={{ color: BRAND.primaryMain }}>
+                      {formattedFullDate}
+                    </Typography>
+                    <Chip
+                      label={`${dayVisits.length} ${dayVisits.length === 1 ? 'Appointment' : 'Appointments'}`}
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: 12,
+                        bgcolor: dayVisits.length > 0 ? '#E0F2FE' : '#F1F5F9',
+                        color: dayVisits.length > 0 ? '#0369A1' : '#64748B',
+                      }}
+                    />
+                  </Box>
+
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<Add />}
+                    onClick={() => openPlanForDate(currentDate)}
+                    sx={{ bgcolor: BRAND.primaryMain, fontWeight: 700, textTransform: 'none', px: 2 }}
+                  >
+                    Schedule Visit for this Day
+                  </Button>
+                </Box>
+
+                {/* Conflict Alert Banner */}
+                {hasConflict && (
+                  <Alert
+                    severity="warning"
+                    icon={<WarningAmber sx={{ color: '#D97706' }} />}
+                    sx={{
+                      mt: 1.5,
+                      borderRadius: 2,
+                      bgcolor: '#FFFBEB',
+                      border: '1px solid #FDE68A',
+                      color: '#92400E',
+                    }}
+                  >
+                    <strong>Scheduling Conflict Detected:</strong> Two or more appointments on this date have overlapping or conflicting time slots. Please adjust their scheduled hours.
+                  </Alert>
+                )}
+
+                {/* Status Breakdown Chips */}
+                {dayVisits.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2, pt: 1.5, borderTop: '1px solid #F1F5F9' }}>
+                    {['planned', 'completed', 'missed', 'rescheduled'].map((stKey) => {
+                      const count = dayVisits.filter((v) => v.status === stKey).length;
+                      if (count === 0) return null;
+                      const cfg = STATUS_CONFIG[stKey];
+                      return (
+                        <Chip
+                          key={stKey}
+                          size="small"
+                          icon={cfg.icon}
+                          label={`${cfg.label}: ${count}`}
+                          sx={{
+                            bgcolor: cfg.bg,
+                            color: cfg.color,
+                            border: `1px solid ${cfg.border}`,
+                            fontWeight: 700,
+                            fontSize: 11.5,
+                          }}
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
+              </Paper>
+
+              {/* Day Visits Chronological List */}
+              {dayVisits.length === 0 ? (
+                <Paper sx={{ p: 8, textAlign: 'center', borderRadius: 2.5, border: '1px dashed #CBD5E1', bgcolor: '#F8FAFC' }}>
+                  <CalendarMonth sx={{ fontSize: 56, color: '#94A3B8', mb: 1 }} />
+                  <Typography variant="h6" fontWeight={700} color="text.secondary">
+                    No Appointments Scheduled for this Day
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 460, mx: 'auto' }}>
+                    There are currently no MSME field coaching or diagnostic sessions planned for {formattedFullDate}.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="medium"
+                    startIcon={<Add />}
+                    onClick={() => openPlanForDate(currentDate)}
+                    sx={{ bgcolor: BRAND.primaryMain, fontWeight: 700, textTransform: 'none' }}
+                  >
+                    Schedule a Visit Now
+                  </Button>
+                </Paper>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {dayVisits.map((v) => {
+                    const cfg = STATUS_CONFIG[v.status] || STATUS_CONFIG.planned;
+                    const isConflict = conflictIds.has(v.id);
+
+                    return (
+                      <Paper
+                        key={v.id}
+                        elevation={0}
+                        sx={{
+                          p: 2.5,
+                          borderRadius: 2.5,
+                          border: `1px solid ${isConflict ? '#FCD34D' : '#E2E8F0'}`,
+                          borderLeft: `6px solid ${isConflict ? '#D97706' : cfg.color}`,
+                          bgcolor: '#fff',
+                          transition: 'all 0.15s ease',
+                          '&:hover': {
+                            boxShadow: '0 6px 20px rgba(0,0,0,0.06)',
+                          },
+                        }}
+                      >
+                        {/* Top Row: Time, Conflict, Status, Visit Type */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.75,
+                                px: 1.25,
+                                py: 0.5,
+                                borderRadius: 1.5,
+                                bgcolor: isConflict ? '#FFFBEB' : '#F1F5F9',
+                                color: isConflict ? '#B45309' : '#0F172A',
+                                fontWeight: 800,
+                                fontSize: 13,
+                                border: `1px solid ${isConflict ? '#FDE68A' : '#E2E8F0'}`,
+                              }}
+                            >
+                              <Schedule sx={{ fontSize: 15, color: isConflict ? '#D97706' : BRAND.primaryMain }} />
+                              {v.start_time ? v.start_time.slice(0, 5) : 'Time TBD'}
+                              {v.end_time ? ` – ${v.end_time.slice(0, 5)}` : ''}
+                            </Box>
+
+                            {isConflict && (
+                              <Chip
+                                size="small"
+                                icon={<WarningAmber sx={{ fontSize: '13px !important' }} />}
+                                label="Time Conflict: Overlaps with another session"
+                                sx={{
+                                  height: 24,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  bgcolor: '#FEF3C7',
+                                  color: '#B45309',
+                                  border: '1px solid #FCD34D',
+                                }}
+                              />
+                            )}
+
+                            {v.visit_type_display && (
+                              <Chip
+                                size="small"
+                                label={v.visit_type_display}
+                                sx={{ height: 24, fontSize: 11, fontWeight: 600, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}
+                              />
+                            )}
+                          </Box>
+
+                          <Chip
+                            size="small"
+                            icon={cfg.icon}
+                            label={cfg.label}
+                            sx={{
+                              height: 26,
+                              bgcolor: cfg.bg,
+                              color: cfg.color,
+                              border: `1px solid ${cfg.border}`,
+                              fontWeight: 700,
+                              fontSize: 12,
+                            }}
+                          />
+                        </Box>
+
+                        {/* Middle Row: Enterprise, BGE, Venue, Contact */}
+                        <Grid container spacing={2} sx={{ mb: 1.5 }}>
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="h6" fontWeight={800} sx={{ color: '#0F172A', lineHeight: 1.3 }}>
+                              {v.msme_name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                              Enterprise Code: #{v.msme_code || v.msme} · District: {v.msme_district || 'Northern Uganda'}
+                            </Typography>
+                          </Grid>
+
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="body2" fontWeight={600} sx={{ color: '#334155' }}>
+                              👤 Assigned Expert: <strong>{v.bge_name || 'BGE Specialist'}</strong> {v.bge_code ? `(${v.bge_code})` : ''}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                              📍 Venue: {v.meeting_venue_display || 'MSME Premises'} {v.meeting_venue_notes ? `(${v.meeting_venue_notes})` : ''}
+                            </Typography>
+                          </Grid>
+
+                          {(v.contact_person || v.contact_phone) && (
+                            <Grid item xs={12}>
+                              <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                📞 Key Contact: <strong>{v.contact_person || 'Owner / Representative'}</strong> {v.contact_phone ? `· ${v.contact_phone}` : ''}
+                              </Typography>
+                            </Grid>
+                          )}
+
+                          {v.objectives && (
+                            <Grid item xs={12}>
+                              <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block">
+                                  Session Objectives & BDS Focus:
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#334155', mt: 0.25 }}>
+                                  {v.objectives}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          )}
+                        </Grid>
+
+                        {/* Bottom Row: Actions */}
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, pt: 1.5, borderTop: '1px solid #F1F5F9', flexWrap: 'wrap' }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => {
+                              setSelectedVisit(v);
+                              setDetailDialogOpen(true);
+                            }}
+                            sx={{ fontSize: 11.5, textTransform: 'none', fontWeight: 600 }}
+                          >
+                            View Full Details
+                          </Button>
+
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                            startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
+                            onClick={() => window.open(getGoogleCalendarUrl(v), '_blank', 'noopener,noreferrer')}
+                            sx={{ fontSize: 11.5, textTransform: 'none', fontWeight: 600 }}
+                          >
+                            Google Calendar
+                          </Button>
+
+                          {v.status === 'planned' && (
+                            <>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                startIcon={<CheckCircle sx={{ fontSize: 14 }} />}
+                                onClick={() => {
+                                  setSelectedVisit(v);
+                                  setCompletionNotes('');
+                                  setCompleteDialogOpen(true);
+                                }}
+                                sx={{ fontSize: 11.5, textTransform: 'none', fontWeight: 700 }}
+                              >
+                                Complete Session
+                              </Button>
+
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="warning"
+                                startIcon={<EditCalendar sx={{ fontSize: 14 }} />}
+                                onClick={() => {
+                                  setSelectedVisit(v);
+                                  setRescheduleDate(v.scheduled_date || '');
+                                  setRescheduleStartTime(v.start_time || '09:00');
+                                  setRescheduleReason('');
+                                  setRescheduleDialogOpen(true);
+                                }}
+                                sx={{ fontSize: 11.5, textTransform: 'none', fontWeight: 600 }}
+                              >
+                                Reschedule
+                              </Button>
+                            </>
+                          )}
+                        </Box>
+                      </Paper>
+                    );
+                  })}
+                </Box>
+              )}
+            </Box>
+          );
+        })()
       ) : (
         /* ── AGENDA TIMELINE VIEW ────────────────────────────────────────────── */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -2388,6 +3303,481 @@ export default function CalendarPlanner({
           <Button onClick={() => setGoogleSetupDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* ── Day Appointments Inspector Modal ──────────────────────────────── */}
+      <Dialog
+        open={dayDetailModal.open}
+        onClose={() => setDayDetailModal((prev) => ({ ...prev, open: false }))}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: 'hidden',
+            boxShadow: '0 20px 40px rgba(15,23,42,0.18)',
+          },
+        }}
+      >
+        {(() => {
+          const modalVisits = visitsByDate[dayDetailModal.isoDate] || dayDetailModal.visits || [];
+          const conflictIds = getConflictingVisitIds(modalVisits);
+          const hasConflict = conflictIds.size > 0;
+          const formattedDate = dayDetailModal.date
+            ? dayDetailModal.date.toLocaleDateString('en-GB', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })
+            : '';
+
+          return (
+            <>
+              <DialogTitle sx={{ bgcolor: '#F8FAFC', py: 2, px: 3, borderBottom: '1px solid #E8EDF2' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="h6" fontWeight={800} sx={{ color: BRAND.primaryMain }}>
+                        {formattedDate}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={`${modalVisits.length} ${modalVisits.length === 1 ? 'Appointment' : 'Appointments'}`}
+                        sx={{
+                          bgcolor: BRAND.primaryMain,
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: 11,
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Comprehensive schedule and status overview for this date
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    size="small"
+                    onClick={() => setDayDetailModal((prev) => ({ ...prev, open: false }))}
+                    sx={{ color: '#64748B' }}
+                  >
+                    <Close />
+                  </IconButton>
+                </Box>
+              </DialogTitle>
+
+              <DialogContent sx={{ p: 3, bgcolor: '#FAFBFD' }}>
+                {/* Conflict Alert Banner */}
+                {hasConflict && (
+                  <Alert
+                    severity="warning"
+                    icon={<WarningAmber sx={{ color: '#D97706' }} />}
+                    sx={{
+                      mb: 2.5,
+                      borderRadius: 2,
+                      bgcolor: '#FFFBEB',
+                      border: '1px solid #FDE68A',
+                      color: '#92400E',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <strong>Scheduling Conflict Detected:</strong> Two or more appointments on this date have overlapping or adjacent time slots. Please review their start and end times.
+                  </Alert>
+                )}
+
+                {/* Status Summary Pills */}
+                {modalVisits.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2.5 }}>
+                    {['planned', 'completed', 'missed', 'rescheduled'].map((stKey) => {
+                      const count = modalVisits.filter((v) => v.status === stKey).length;
+                      if (count === 0) return null;
+                      const cfg = STATUS_CONFIG[stKey];
+                      return (
+                        <Chip
+                          key={stKey}
+                          size="small"
+                          icon={cfg.icon}
+                          label={`${cfg.label}: ${count}`}
+                          sx={{
+                            bgcolor: cfg.bg,
+                            color: cfg.color,
+                            border: `1px solid ${cfg.border}`,
+                            fontWeight: 700,
+                            fontSize: 11,
+                          }}
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
+
+                {/* Appointment Cards List */}
+                {modalVisits.length === 0 ? (
+                  <Box sx={{ textAlign: 'center', py: 6, color: '#94A3B8' }}>
+                    <CalendarMonth sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
+                    <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
+                      No appointments scheduled for this date
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {modalVisits.map((v) => {
+                      const cfg = STATUS_CONFIG[v.status] || STATUS_CONFIG.planned;
+                      const isConflict = conflictIds.has(v.id);
+
+                      return (
+                        <Paper
+                          key={v.id}
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2.5,
+                            border: `1px solid ${isConflict ? '#FCD34D' : '#E2E8F0'}`,
+                            borderLeft: `5px solid ${isConflict ? '#D97706' : cfg.color}`,
+                            bgcolor: '#fff',
+                            transition: 'all 0.15s ease',
+                            '&:hover': {
+                              boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                            },
+                          }}
+                        >
+                          {/* Top Row: Time & Status Badges */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  px: 1,
+                                  py: 0.25,
+                                  borderRadius: 1.5,
+                                  bgcolor: isConflict ? '#FFFBEB' : '#F1F5F9',
+                                  color: isConflict ? '#B45309' : '#0F172A',
+                                  fontWeight: 800,
+                                  fontSize: 12,
+                                  border: `1px solid ${isConflict ? '#FDE68A' : '#E2E8F0'}`,
+                                }}
+                              >
+                                <Schedule sx={{ fontSize: 14, color: isConflict ? '#D97706' : BRAND.primaryMain }} />
+                                {v.start_time ? v.start_time.slice(0, 5) : 'Time TBD'}
+                                {v.end_time ? ` – ${v.end_time.slice(0, 5)}` : ''}
+                              </Box>
+
+                              {isConflict && (
+                                <Chip
+                                  size="small"
+                                  icon={<WarningAmber sx={{ fontSize: '13px !important' }} />}
+                                  label="Time Conflict"
+                                  sx={{
+                                    height: 22,
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    bgcolor: '#FEF3C7',
+                                    color: '#B45309',
+                                    border: '1px solid #FCD34D',
+                                  }}
+                                />
+                              )}
+
+                              {v.visit_type_display && (
+                                <Chip
+                                  size="small"
+                                  label={v.visit_type_display}
+                                  sx={{ height: 22, fontSize: 10.5, fontWeight: 600, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}
+                                />
+                              )}
+                            </Box>
+
+                            <Chip
+                              size="small"
+                              icon={cfg.icon}
+                              label={cfg.label}
+                              sx={{
+                                height: 24,
+                                bgcolor: cfg.bg,
+                                color: cfg.color,
+                                border: `1px solid ${cfg.border}`,
+                                fontWeight: 700,
+                                fontSize: 11,
+                              }}
+                            />
+                          </Box>
+
+                          {/* Middle Row: MSME & BGE Information */}
+                          <Grid container spacing={1.5} alignItems="flex-start">
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="subtitle1" fontWeight={800} sx={{ color: '#0F172A', lineHeight: 1.2 }}>
+                                {v.msme_name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Enterprise Code: #{v.msme_code || v.msme} · {v.msme_district || 'Northern Uganda'}
+                              </Typography>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="body2" fontWeight={600} sx={{ color: '#334155' }}>
+                                👤 Specialist: <strong>{v.bge_name || 'BGE Field Officer'}</strong>
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                📍 Venue: {v.meeting_venue_display || 'MSME Premises'}
+                              </Typography>
+                            </Grid>
+
+                            {(v.contact_person || v.contact_phone) && (
+                              <Grid item xs={12}>
+                                <Typography variant="caption" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  📞 Contact: {v.contact_person || 'Owner'} {v.contact_phone ? `(${v.contact_phone})` : ''}
+                                </Typography>
+                              </Grid>
+                            )}
+
+                            {v.objectives && (
+                              <Grid item xs={12}>
+                                <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#F8FAFC', border: '1px solid #F1F5F9', mt: 0.5 }}>
+                                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block' }}>
+                                    Session Focus / Objectives:
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#334155', fontSize: 12.5 }}>
+                                    {v.objectives}
+                                  </Typography>
+                                </Box>
+                              </Grid>
+                            )}
+                          </Grid>
+
+                          {/* Bottom Row: Quick Actions */}
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mt: 2, pt: 1.5, borderTop: '1px solid #F1F5F9', flexWrap: 'wrap' }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => {
+                                setSelectedVisit(v);
+                                setDetailDialogOpen(true);
+                              }}
+                              sx={{ fontSize: 11, textTransform: 'none', fontWeight: 600 }}
+                            >
+                              View Details
+                            </Button>
+
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
+                              onClick={() => window.open(getGoogleCalendarUrl(v), '_blank', 'noopener,noreferrer')}
+                              sx={{ fontSize: 11, textTransform: 'none', fontWeight: 600 }}
+                            >
+                              Google Calendar
+                            </Button>
+
+                            {v.status === 'planned' && (
+                              <>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="success"
+                                  startIcon={<CheckCircle sx={{ fontSize: 14 }} />}
+                                  onClick={() => {
+                                    setSelectedVisit(v);
+                                    setCompletionNotes('');
+                                    setCompleteDialogOpen(true);
+                                  }}
+                                  sx={{ fontSize: 11, textTransform: 'none', fontWeight: 700 }}
+                                >
+                                  Complete Session
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="warning"
+                                  startIcon={<EditCalendar sx={{ fontSize: 14 }} />}
+                                  onClick={() => {
+                                    setSelectedVisit(v);
+                                    setRescheduleDate(v.scheduled_date || '');
+                                    setRescheduleStartTime(v.start_time || '09:00');
+                                    setRescheduleReason('');
+                                    setRescheduleDialogOpen(true);
+                                  }}
+                                  sx={{ fontSize: 11, textTransform: 'none', fontWeight: 600 }}
+                                >
+                                  Reschedule
+                                </Button>
+                              </>
+                            )}
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Box>
+                )}
+              </DialogContent>
+
+              <DialogActions sx={{ p: 2, px: 3, bgcolor: '#F8FAFC', borderTop: '1px solid #E8EDF2', justifyContent: 'space-between' }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => {
+                    setDayDetailModal((prev) => ({ ...prev, open: false }));
+                    openPlanForDate(dayDetailModal.date || new Date());
+                  }}
+                  sx={{ bgcolor: BRAND.primaryMain, fontWeight: 700, textTransform: 'none' }}
+                >
+                  Schedule Another Visit on this Day
+                </Button>
+                <Button
+                  onClick={() => setDayDetailModal((prev) => ({ ...prev, open: false }))}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Close
+                </Button>
+              </DialogActions>
+            </>
+          );
+        })()}
+      </Dialog>
+
+      {/* ── Google Calendar-Style Floating Day Popover ────────────────────── */}
+      <Popover
+        open={Boolean(popoverAnchor.anchorEl)}
+        anchorEl={popoverAnchor.anchorEl}
+        onClose={() => setPopoverAnchor({ anchorEl: null, date: null, isoDate: '', visits: [] })}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
+        PaperProps={{
+          sx: {
+            width: 330,
+            maxWidth: '92vw',
+            borderRadius: 2.5,
+            boxShadow: '0 12px 32px rgba(15,23,42,0.18)',
+            border: '1px solid #E2E8F0',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        {(() => {
+          const popVisits = visitsByDate[popoverAnchor.isoDate] || popoverAnchor.visits || [];
+          const formattedDate = popoverAnchor.date
+            ? popoverAnchor.date.toLocaleDateString('en-GB', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })
+            : '';
+
+          return (
+            <Box>
+              {/* Popover Header */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.25, bgcolor: '#F8FAFC', borderBottom: '1px solid #E8EDF2' }}>
+                <Typography variant="subtitle2" fontWeight={800} sx={{ color: BRAND.primaryMain }}>
+                  {formattedDate} ({popVisits.length})
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Button
+                    size="small"
+                    endIcon={<ArrowForward sx={{ fontSize: 13 }} />}
+                    onClick={() => {
+                      if (popoverAnchor.date) {
+                        setCurrentDate(popoverAnchor.date);
+                        setViewMode('day');
+                      }
+                      setPopoverAnchor({ anchorEl: null, date: null, isoDate: '', visits: [] });
+                    }}
+                    sx={{ fontSize: 11, fontWeight: 700, textTransform: 'none', p: '2px 6px' }}
+                  >
+                    Day View
+                  </Button>
+                  <IconButton
+                    size="small"
+                    onClick={() => setPopoverAnchor({ anchorEl: null, date: null, isoDate: '', visits: [] })}
+                    sx={{ color: '#64748B', p: 0.5 }}
+                  >
+                    <Close sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Box>
+              </Box>
+
+              {/* Popover Visits List */}
+              <Box sx={{ p: 1.5, maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                {popVisits.map((v) => {
+                  const cfg = STATUS_CONFIG[v.status] || STATUS_CONFIG.planned;
+                  return (
+                    <Box
+                      key={v.id}
+                      onClick={() => {
+                        setSelectedVisit(v);
+                        setDetailDialogOpen(true);
+                        setPopoverAnchor({ anchorEl: null, date: null, isoDate: '', visits: [] });
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        p: '6px 10px',
+                        borderRadius: 1.5,
+                        bgcolor: cfg.bg,
+                        borderLeft: `3px solid ${cfg.color}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        '&:hover': {
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                          filter: 'brightness(0.97)',
+                        },
+                      }}
+                      title="Click to view details"
+                    >
+                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: cfg.color, flexShrink: 0 }}>
+                        {v.start_time ? v.start_time.slice(0, 5) : '—'}
+                      </Typography>
+                      <Typography noWrap sx={{ fontSize: 12, fontWeight: 600, color: '#1E293B', flex: 1 }}>
+                        {v.msme_name}
+                      </Typography>
+                      <Box sx={{ display: 'inline-flex', flexShrink: 0, opacity: 0.7 }}>
+                        {cfg.icon}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              {/* Popover Footer */}
+              <Box sx={{ p: 1, px: 2, bgcolor: '#F8FAFC', borderTop: '1px solid #E8EDF2', display: 'flex', justifyContent: 'space-between' }}>
+                <Button
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => {
+                    const dt = popoverAnchor.date;
+                    setPopoverAnchor({ anchorEl: null, date: null, isoDate: '', visits: [] });
+                    if (dt) openPlanForDate(dt);
+                  }}
+                  sx={{ fontSize: 11, fontWeight: 600, textTransform: 'none' }}
+                >
+                  Schedule Visit
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    if (popoverAnchor.date) {
+                      setCurrentDate(popoverAnchor.date);
+                      setViewMode('day');
+                    }
+                    setPopoverAnchor({ anchorEl: null, date: null, isoDate: '', visits: [] });
+                  }}
+                  sx={{ fontSize: 11, fontWeight: 700, textTransform: 'none', color: BRAND.primaryMain }}
+                >
+                  Open Full Day View
+                </Button>
+              </Box>
+            </Box>
+          );
+        })()}
+      </Popover>
     </Box>
   );
 }
