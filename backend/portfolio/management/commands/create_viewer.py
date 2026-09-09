@@ -95,7 +95,7 @@ class Command(BaseCommand):
                 <td style="padding:4px 0;font-weight:700">{temp_pw}</td></tr>
           </table>
           <p>This account has view-only access. Please change your password after first login.</p>
-          <p style="color:#666;font-size:13px">PRUDEV II Programme · GOPA AFC / GIZ</p>
+          <p style="color:#666;font-size:13px">PRUDEV II Programme · GOPA Pro / GIZ</p>
         </div>"""
         msg = EmailMultiAlternatives(
             subject='PRUDEV II — Your Viewer Account',

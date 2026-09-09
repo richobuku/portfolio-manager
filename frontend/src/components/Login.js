@@ -161,10 +161,10 @@ export default function Login({ onLogin, sessionExpired }) {
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, mb: 1.5 }}>
               <Box component="img" src={gizLogo} alt="German Cooperation · Implemented by GIZ" sx={{ height: 38, width: 'auto', display: 'block', opacity: 0.9 }} />
               <Box sx={{ width: 1, height: 28, bgcolor: '#E0E7F0' }} />
-              <Box component="img" src={gopaLogo} alt="GOPA AFC" sx={{ height: 22, width: 'auto', display: 'block', opacity: 0.9 }} />
+              <Box component="img" src={gopaLogo} alt="GOPA Pro" sx={{ height: 22, width: 'auto', display: 'block', opacity: 0.9 }} />
             </Box>
             <Typography variant="caption" color="text.disabled">
-              © {new Date().getFullYear()} PRUDEV II Programme · GIZ · GOPA AFC
+              © {new Date().getFullYear()} PRUDEV II Programme · GIZ · GOPA Pro
             </Typography>
           </Box>
         </Box>

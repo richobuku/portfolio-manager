@@ -4,7 +4,7 @@ from rest_framework.test import APIClient
 
 from .models import MSME, BusinessGrowthExpert, BGEGroup, WorkOrder
 from .serializers import BusinessGrowthExpertSerializer
-from .api_views import BusinessGrowthExpertViewSet
+from .views.bge import BusinessGrowthExpertViewSet
 
 
 class WorkOrderTypeChoicesTests(TestCase):
@@ -365,6 +365,72 @@ class MSMEGPSReportSyncTests(TestCase):
         self.msme.refresh_from_db()
         self.assertAlmostEqual(float(self.msme.latitude), 2.774950, places=5)
         self.assertAlmostEqual(float(self.msme.longitude), 32.299110, places=5)
+
+    def test_visit_report_does_not_overwrite_existing_msme_gps(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from .views.visit_reports import MSMEReportViewSet
+
+        # Set verified coordinates on MSME
+        self.msme.latitude = 2.500000
+        self.msme.longitude = 32.500000
+        self.msme.save(update_fields=['latitude', 'longitude'])
+
+        factory = APIRequestFactory()
+        view = MSMEReportViewSet.as_view({'post': 'create'})
+        data = {
+            'msme': self.msme.id,
+            'visit_type': 'coaching',
+            'visit_date': '2026-08-22',
+            'visit_latitude': 2.999999,
+            'visit_longitude': 32.999999,
+        }
+        req = factory.post('/api/reports/', data, format='json')
+        force_authenticate(req, user=self.bge_user)
+        res = view(req)
+        self.assertEqual(res.status_code, 201)
+
+        # Parent MSME coordinates must NOT have been overwritten
+        self.msme.refresh_from_db()
+        self.assertAlmostEqual(float(self.msme.latitude), 2.500000, places=5)
+        self.assertAlmostEqual(float(self.msme.longitude), 32.500000, places=5)
+
+    def test_first_time_submit_creates_growth_snapshot_and_admin_creation(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from .views.visit_reports import MSMEReportViewSet
+        from .models import MSMEGrowthSnapshot, MSMEReport
+
+        admin_user = User.objects.create_superuser('admin_report_creator', 'adm@rep.com', 'pass123')
+        factory = APIRequestFactory()
+        view = MSMEReportViewSet.as_view({'post': 'create'})
+        data = {
+            'msme': self.msme.id,
+            'bge': self.bge.id,
+            'visit_type': 'annual_review',
+            'visit_date': '2026-08-25',
+            'status': 'submitted',
+            'revenue_ugx': 15000000.00,
+            'total_assets_ugx': 45000000.00,
+            'employees_ft_male': 3,
+            'employees_ft_female': 2,
+            'has_tin': True,
+            'has_ursb': True,
+            'key_achievement': 'Expanded sales to Gulu municipality',
+        }
+        req = factory.post('/api/reports/', data, format='json')
+        force_authenticate(req, user=admin_user)
+        res = view(req)
+        self.assertEqual(res.status_code, 201)
+
+        report = MSMEReport.objects.get(id=res.data['id'])
+        self.assertEqual(report.bge, self.bge)
+        self.assertEqual(report.status, 'submitted')
+
+        # Verify growth snapshot was generated on first-time submission
+        snapshot = MSMEGrowthSnapshot.objects.filter(msme=self.msme, snapshot_date='2026-08-25').first()
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.employees_ft_male, 3)
+        self.assertEqual(snapshot.employees_ft_female, 2)
+        self.assertTrue(snapshot.has_tin)
 
     def test_msme_serializer_fallback_to_report_gps(self):
         from .models import MSMEReport
@@ -729,6 +795,7 @@ class WorkOrderAttachmentAccessTests(TestCase):
             supported_bge=self.bge_supported,
             work_order_type='bge_technical_co_assignment',
             work_order_number='WO-ATTACH-TEST',
+            issue_date='2026-08-04',
             status='issued',
         )
         self.work_order.co_bges.add(self.bge_co)

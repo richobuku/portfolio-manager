@@ -1,3 +1,22 @@
+"""
+========================================================================================
+WARNING / DEPRECATION NOTICE:
+Do NOT add new endpoints or modify view logic in this file!
+This file (api_views.py) is a legacy monolithic module that is NOT imported or routed
+by `backend/portfolio/api_urls.py` or `backend/portfolio/urls.py`.
+
+All active, routed API views are modularized under:
+    `backend/portfolio/views/`
+    e.g.
+        - backend/portfolio/views/visit_reports.py (MSMEReportViewSet)
+        - backend/portfolio/views/work_orders.py   (WorkOrderViewSet)
+        - backend/portfolio/views/bge.py           (BusinessGrowthExpertViewSet)
+        - backend/portfolio/views/msme.py          (MSMEViewSet)
+
+Any changes made to this file WILL NOT TAKE EFFECT in production. Always edit the files
+under `backend/portfolio/views/` instead.
+========================================================================================
+"""
 import logging
 import re
 
@@ -1529,7 +1548,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         lines += [
             "Please log in to the PRUDEV II Portfolio Management System to view full details and submit visit reports.",
-            "", "Best regards,", "PRUDEV II BDS Team", "GIZ · GOPA AFC",
+            "", "Best regards,", "PRUDEV II BDS Team", "GIZ · GOPA Pro",
         ]
         body_text = "\n".join(lines)
 
@@ -1629,7 +1648,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             <tr>
               <td><p style="margin:0;color:#fff;font-size:20px;font-weight:700;">PRUDEV II</p>
                   <p style="margin:2px 0 0;color:rgba(255,255,255,.65);font-size:12px;">MSME Portfolio Management Programme</p></td>
-              <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;font-weight:700;letter-spacing:.05em;">GIZ · GOPA AFC</p></td>
+              <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;font-weight:700;letter-spacing:.05em;">GIZ · GOPA Pro</p></td>
             </tr>
           </table>
         </td></tr>
@@ -1667,7 +1686,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         <!-- Footer -->
         <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #e8edf2;">
-          <p style="margin:0;color:#777;font-size:12px;">Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA AFC</p>
+          <p style="margin:0;color:#777;font-size:12px;">Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA Pro</p>
         </td></tr>
 
       </table>
@@ -3503,7 +3522,7 @@ def _send_co_assignment_alert(existing_bge, new_bge, msme):
         "",
         "Best regards,",
         "PRUDEV II BDS Team",
-        "GIZ · GOPA AFC",
+        "GIZ · GOPA Pro",
     ]
     body_text = "\n".join(lines)
 
@@ -3550,7 +3569,7 @@ def _send_co_assignment_alert(existing_bge, new_bge, msme):
                 <p style="margin:2px 0 0;color:rgba(255,255,255,.65);font-size:12px;">
                   MSME Portfolio Management Programme</p></td>
             <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;
-                font-weight:700;letter-spacing:.05em;">GIZ · GOPA AFC</p></td>
+                font-weight:700;letter-spacing:.05em;">GIZ · GOPA Pro</p></td>
           </tr></table>
         </td></tr>
 
@@ -3603,7 +3622,7 @@ def _send_co_assignment_alert(existing_bge, new_bge, msme):
         <!-- Footer -->
         <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #e8edf2;">
           <p style="margin:0;color:#777;font-size:12px;">
-            Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA AFC</p>
+            Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA Pro</p>
         </td></tr>
 
       </table>
@@ -3915,7 +3934,7 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
                 f'Period: {work_order.start_date or "TBD"} to {work_order.end_date or "TBD"}\n'
                 f'Net Payable: UGX {work_order.rate_per_day * work_order.max_days - int(work_order.rate_per_day * work_order.max_days * 0.06):,}\n'
                 f'{co_text}\n\n'
-                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
             )
             email = EmailMultiAlternatives(subject, body,
                                            getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
@@ -3967,7 +3986,7 @@ class WorkOrderViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, views
                 f'{reason_line}\n'
                 f'Work Order Type: {work_order.get_work_order_type_display()}\n'
                 f'You will be notified when a revised work order is re-issued to you.\n\n'
-                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
             )
             try:
                 msg = EmailMultiAlternatives(
@@ -4687,7 +4706,7 @@ def _build_tshirt_pdf(receipt):
     """Generate a signed PDF for a TshirtReceipt using reportlab.
 
     Landscape A4 with the standard PRUDEV II branded header:
-    GOPA AFC logo (left) | PRUDEV II wordmark (centre) | GIZ logo (right)
+    GOPA Pro logo (left) | PRUDEV II wordmark (centre) | GIZ logo (right)
     — identical to the visit-report and training-report headers.
     """
     try:
@@ -4732,10 +4751,10 @@ def _build_tshirt_pdf(receipt):
         canvas.setFillColor(RED)
         canvas.rect(0, h - BAND_H - RULE_H, w, RULE_H, fill=1, stroke=0)
 
-        # Left: GOPA logo (aspect ≈ 3.06)
+        # Left: GOPA Pro logo (aspect ≈ 5.30)
         if _os.path.isfile(GOPA_PATH):
-            logo_h = 14 * mm
-            logo_w = logo_h * 3.06
+            logo_h = 10.5 * mm
+            logo_w = logo_h * 5.30
             canvas.drawImage(
                 ImageReader(GOPA_PATH),
                 x=14 * mm, y=h - BAND_H + (BAND_H - logo_h) / 2,
@@ -4904,7 +4923,7 @@ def _build_tshirt_pdf(receipt):
         "Verified by: Stella Abote.   Date: _______",
         label_style))
     story.append(Spacer(1, 0.2 * cm))
-    story.append(Paragraph("PRUDEV II Programme — GOPA AFC in partnership with GIZ  |  Confidential", conf_style))
+    story.append(Paragraph("PRUDEV II Programme — GOPA Pro in partnership with GIZ  |  Confidential", conf_style))
 
     doc.build(story, onFirstPage=_draw_header, onLaterPages=_draw_header)
     buf.seek(0)
@@ -5245,7 +5264,7 @@ class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             f'{reference_line}'
             f'{notes_line}\n'
             f'Please log in to confirm receipt of this payment.\n\n'
-            f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+            f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
         )
         try:
             msg = EmailMultiAlternatives(
@@ -5292,7 +5311,7 @@ class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'{reference_line}'
                 f'{notes_line}\n'
                 f'Confirmed at: {payment.confirmed_at:%Y-%m-%d %H:%M}\n\n'
-                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
             )
             try:
                 msg = EmailMultiAlternatives(

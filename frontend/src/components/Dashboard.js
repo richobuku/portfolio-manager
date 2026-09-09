@@ -8252,7 +8252,7 @@ Thank you for your continued cooperation.
 
 Regards,
 PRUDEV II BDS Team
-GOPA AFC / GIZ`,
+GOPA Pro / GIZ`,
     },
     {
       key: 'msme_data_visit',
@@ -11973,7 +11973,7 @@ PRUDEV II BDS Team`
           return <>
             {/* Branded letterhead — hidden on screen, shown on print only. */}
             <div className="print-letterhead">
-              <img className="gopa" src="/gopa-logo.png" alt="GOPA AFC" />
+              <img className="gopa" src="/gopa-logo.png" alt="GOPA Pro" />
               <div className="wordmark">
                 <div className="title">PRUDEV II</div>
                 <div className="subtitle">MSME Portfolio Management</div>

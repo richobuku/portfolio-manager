@@ -166,7 +166,7 @@ def _send_co_assignment_alert(existing_bge, new_bge, msme):
         "",
         "Best regards,",
         "PRUDEV II BDS Team",
-        "GIZ · GOPA AFC",
+        "GIZ · GOPA Pro",
     ]
     body_text = "\n".join(lines)
 
@@ -213,7 +213,7 @@ def _send_co_assignment_alert(existing_bge, new_bge, msme):
                 <p style="margin:2px 0 0;color:rgba(255,255,255,.65);font-size:12px;">
                   MSME Portfolio Management Programme</p></td>
             <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;
-                font-weight:700;letter-spacing:.05em;">GIZ · GOPA AFC</p></td>
+                font-weight:700;letter-spacing:.05em;">GIZ · GOPA Pro</p></td>
           </tr></table>
         </td></tr>
 
@@ -266,7 +266,7 @@ def _send_co_assignment_alert(existing_bge, new_bge, msme):
         <!-- Footer -->
         <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #e8edf2;">
           <p style="margin:0;color:#777;font-size:12px;">
-            Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA AFC</p>
+            Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA Pro</p>
         </td></tr>
 
       </table>
@@ -497,7 +497,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         lines += [
             "Please log in to the PRUDEV II Portfolio Management System to view full details and submit visit reports.",
-            "", "Best regards,", "PRUDEV II BDS Team", "GIZ · GOPA AFC",
+            "", "Best regards,", "PRUDEV II BDS Team", "GIZ · GOPA Pro",
         ]
         body_text = "\n".join(lines)
 
@@ -597,7 +597,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
             <tr>
               <td><p style="margin:0;color:#fff;font-size:20px;font-weight:700;">PRUDEV II</p>
                   <p style="margin:2px 0 0;color:rgba(255,255,255,.65);font-size:12px;">MSME Portfolio Management Programme</p></td>
-              <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;font-weight:700;letter-spacing:.05em;">GIZ · GOPA AFC</p></td>
+              <td align="right"><p style="margin:0;color:#C8102E;font-size:11px;font-weight:700;letter-spacing:.05em;">GIZ · GOPA Pro</p></td>
             </tr>
           </table>
         </td></tr>
@@ -635,7 +635,7 @@ class BusinessGrowthExpertViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyM
 
         <!-- Footer -->
         <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #e8edf2;">
-          <p style="margin:0;color:#777;font-size:12px;">Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA AFC</p>
+          <p style="margin:0;color:#777;font-size:12px;">Best regards,<br><strong>PRUDEV II BDS Team</strong><br>GIZ · GOPA Pro</p>
         </td></tr>
 
       </table>

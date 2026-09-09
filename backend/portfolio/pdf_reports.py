@@ -4,7 +4,7 @@ Uses ReportLab Platypus (paragraphs/tables flowing onto pages) so the
 output paginates cleanly without us hand-cranking coordinates.
 
 Branded palette: navy #1A2F4B header, GIZ red #C8102E accents,
-GIZ logo (German Cooperation + Implemented by giz) and GOPA AFC logo
+GIZ logo (German Cooperation + Implemented by giz) and GOPA Pro logo
 embedded in the header band on every page.
 """
 import io
@@ -84,12 +84,12 @@ def _header(canvas, doc):
     canvas.setFillColor(RED)
     canvas.rect(0, h - band_height - 1.5 * mm, w, 1.5 * mm, fill=1, stroke=0)
 
-    # ── Left: GOPA AFC logo ──────────────────────────────────────────────
+    # ── Left: GOPA Pro logo ──────────────────────────────────────────────
     gopa = _safe_image(GOPA_LOGO_PATH)
     if gopa:
-        # GOPA aspect ratio ≈ 3.06:1; render at 14mm tall.
-        logo_h = 14 * mm
-        logo_w = logo_h * 3.06
+        # GOPA Pro aspect ratio ≈ 5.30:1; render at 10.5mm tall.
+        logo_h = 10.5 * mm
+        logo_w = logo_h * 5.30
         canvas.drawImage(
             gopa,
             x=14 * mm, y=h - band_height + (band_height - logo_h) / 2,
@@ -124,7 +124,7 @@ def _header(canvas, doc):
     canvas.setFont('Helvetica', 8)
     canvas.drawCentredString(
         w / 2, 10 * mm,
-        f'Page {doc.page} · PRUDEV II Programme · GIZ · GOPA AFC'
+        f'Page {doc.page} · PRUDEV II Programme · GIZ · GOPA Pro'
     )
     canvas.restoreState()
 
@@ -340,7 +340,7 @@ def render_msme_report(report):
         if wo and wo.created_by:
             endorser_name = (wo.created_by.get_full_name().strip()
                              or wo.created_by.username)
-            endorser_position = wo.team_leader_position or 'Team Leader, PRUDEV II — GOPA AFC'
+            endorser_position = wo.team_leader_position or 'Team Leader, PRUDEV II — GOPA Pro'
         elif wo:
             # Work order found but no created_by — use the configured team leader name
             endorser_name     = wo.team_leader_name or None
@@ -355,7 +355,7 @@ def render_msme_report(report):
     story.append(_sig_block(
         s, bge,
         signed_date=getattr(report, 'updated_at', None),
-        reviewer_label='Endorsed by — For GOPA AFC / PRUDEV II Programme',
+        reviewer_label='Endorsed by — For GOPA Pro / PRUDEV II Programme',
         reviewer_name=endorser_name,
         reviewer_position=endorser_position,
     ))
@@ -434,7 +434,7 @@ def render_group_report(report):
     team_lead = report.team_lead if report.team_lead else (group.team_lead if group.team_lead else None)
     story.append(_sig_block(
         s, team_lead,
-        reviewer_label='For GOPA AFC / PRUDEV II Programme',
+        reviewer_label='For GOPA Pro / PRUDEV II Programme',
         sig_label='Team Lead Signature',
     ))
 
@@ -866,15 +866,15 @@ def render_work_order(work_order):
         CONDITIONS = [
             'BGE must use standardized PRUDEV II tools and report templates.',
             'All MSME data and business-related information must be treated confidentially.',
-            'All outputs and tools remain the property of GOPA AFC.',
-            'In line with provisions of Ugandan Income Tax laws, professional fees paid to consultants would be subject to a 6% withholding tax, which would be deducted at the source of payment by GOPA AFC GmbH.',
-            'GOPA AFC reserves the right to terminate this Work Order in case of non-performance or breach of contract.',
+            'All outputs and tools remain the property of GOPA Pro.',
+            'In line with provisions of Ugandan Income Tax laws, professional fees paid to consultants would be subject to a 6% withholding tax, which would be deducted at the source of payment by GOPA Pro GmbH.',
+            'GOPA Pro reserves the right to terminate this Work Order in case of non-performance or breach of contract.',
             'Transport and Accommodation: Distances above 7 km will be reimbursed as per the public transportation rates.',
             'Payment Terms: Monthly, upon submission and approval of all deliverables listed, a duly filled and signed timesheet, an approved invoice, and validation by the Business Development Expert or agro-processing expert.',
         ]
     elif work_order.work_order_type == 'bcp_tool_facilitation':
         CONDITIONS = [
-            'The Senior BGE shall facilitate the BCP Tool training with professionalism and in accordance with GOPA AFC and GIZ quality standards.',
+            'The Senior BGE shall facilitate the BCP Tool training with professionalism and in accordance with GOPA Pro and GIZ quality standards.',
             'All training content, session plans, and BCP tool exercises must be reviewed and approved by the BDS Expert before delivery.',
             'The Senior BGE shall submit a Training Report within 5 working days of the training.',
             'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of every session.',
@@ -882,7 +882,7 @@ def render_work_order(work_order):
             'Fees are conditional on satisfactory delivery of reports, approved training content, and completed feedback analysis.',
             'Transport will be reimbursed upon submission of receipts / fuel log.',
             'The Senior BGE shall maintain confidentiality of all BGE and programme information.',
-            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
+            'GOPA Pro reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
         ]
@@ -894,7 +894,7 @@ def render_work_order(work_order):
             'The BGE shall treat all programme materials, MSME data, and training content as confidential.',
             'Fees are conditional on full attendance, active participation, and timely submission of the application note.',
             'Transport will be reimbursed upon submission of receipts / fuel log.',
-            'GOPA AFC reserves the right to withhold payment for non-attendance or unsatisfactory participation.',
+            'GOPA Pro reserves the right to withhold payment for non-attendance or unsatisfactory participation.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
         ]
@@ -905,10 +905,10 @@ def render_work_order(work_order):
             'The BGE shall provide facilitation support to Agro-processing MSMEs during the Business Continuity & Strategic Planning workshop sessions in Gulu (21–22 July 2026) and Lira (23–24 July 2026).',
             'During Agro-processor workshop sessions, the BGE shall assist participants with risk assessment exercises, provide guidance on the BCP tool, and support the lead facilitator as directed.',
             'The BGE shall treat all MSME data, Agro-processor business information, and programme materials as strictly confidential.',
-            'All outputs, tools, and materials produced remain the property of GOPA AFC.',
+            'All outputs, tools, and materials produced remain the property of GOPA Pro.',
             'Fees are conditional on full attendance at the training, active facilitation support at both workshop locations (Gulu and Lira), and timely submission of all required reports.',
             'Transport will be reimbursed upon submission of receipts / fuel log. Distances above 7 km will be reimbursed as per public transportation rates.',
-            'GOPA AFC reserves the right to withhold payment for non-attendance, inadequate support, or failure to submit required deliverables.',
+            'GOPA Pro reserves the right to withhold payment for non-attendance, inadequate support, or failure to submit required deliverables.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
         ]
@@ -916,15 +916,15 @@ def render_work_order(work_order):
         CONDITIONS = [
             'The Senior BGE shall develop all Business Continuity Planning Toolkit materials to the required PRUDEV II quality standard and submit them for review before the BGE training commences.',
             'All training content, session plans, and BCP tool exercises must be reviewed and approved by the BDS Expert before delivery.',
-            'The Senior BGE shall facilitate the BGE capacity building training with professionalism and in accordance with GOPA AFC and GIZ quality standards, ensuring all participating BGEs are equipped to support MSME facilitation.',
+            'The Senior BGE shall facilitate the BGE capacity building training with professionalism and in accordance with GOPA Pro and GIZ quality standards, ensuring all participating BGEs are equipped to support MSME facilitation.',
             'The Senior BGE shall facilitate MSME workshop sessions in both Gulu and Lira, ensuring structured delivery of risk identification, business process mapping, BCP drafting, and strategic planning activities.',
             'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of every session.',
             'A consolidated workshop report covering all three phases must be submitted within 5 working days of the final Lira session.',
             'All MSME data, BGE information, and programme materials must be treated as strictly confidential.',
-            'All outputs, tools, and materials produced under this work order remain the property of GOPA AFC.',
+            'All outputs, tools, and materials produced under this work order remain the property of GOPA Pro.',
             'Fees are conditional on satisfactory completion of all three phases, submission of required reports, and approval by the BDS Expert and Team Leader.',
             'Transport will be reimbursed upon submission of receipts / fuel log. Distances above 7 km will be reimbursed as per public transportation rates.',
-            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables or non-performance.',
+            'GOPA Pro reserves the right to withhold payment for incomplete or unsatisfactory deliverables or non-performance.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             'Any changes to the scope or schedule require written approval from the Team Leader.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
@@ -934,22 +934,22 @@ def render_work_order(work_order):
             'The BGE must use standardised PRUDEV II tools and report templates only — no custom tools, forms, or approaches may be substituted without written approval from the BDS Expert.',
             'Any MSME that is unwilling or unable to engage must be formally documented in the non-engagement register within 2 working days of the attempted contact, with reasons noted and the Senior BGE notified promptly.',
             'All MSME data, business information, and financial records shared during the assignment must be treated as strictly confidential.',
-            'All outputs, tools, documents, and deliverables produced under this work order are the property of GOPA AFC.',
-            'GOPA AFC reserves the right to terminate this work order in the event of non-performance, breach of confidentiality, or failure to comply with PRUDEV II programme standards.',
+            'All outputs, tools, documents, and deliverables produced under this work order are the property of GOPA Pro.',
+            'GOPA Pro reserves the right to terminate this work order in the event of non-performance, breach of confidentiality, or failure to comply with PRUDEV II programme standards.',
             'Transport costs will be reimbursed upon submission of original receipts. Distances above 7 km will be reimbursed as per public transportation rates.',
             'Payment is made monthly upon submission and approval of all deliverables, a signed timesheet, and an approved invoice, validated by the Business Development Expert.',
-            'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA AFC GmbH.',
+            'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA Pro GmbH.',
         ]
     elif work_order.work_order_type == 'csa_rapid_assessment':
         CONDITIONS = [
             'BGE must use only the standardised PRUDEV II tools and templates and submit all reports in the provided formats. The designated data collection tool for this assignment is the KoboToolbox form at: https://ee-eu.kobotoolbox.org/x/HFlLk5ba',
             'Any farmer group that is unavailable or not interested in participating must be formally documented in the non-engagement register with the reason stated. Undocumented gaps in group engagement will be treated as a performance concern.',
             'All group data and business information must be handled with strict confidentiality.',
-            'GOPA AFC retains ownership of all outputs, reports, and data produced under this Work Order.',
-            'GOPA AFC reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
+            'GOPA Pro retains ownership of all outputs, reports, and data produced under this Work Order.',
+            'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
             'Transport costs will be refunded based on public transport rates upon attendance and submission of valid original receipts.',
             'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
-            'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA AFC GmbH.',
+            'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA Pro GmbH.',
         ]
     elif work_order.work_order_type == 'permanent_assignee_support':
         CONDITIONS = [
@@ -964,7 +964,7 @@ def render_work_order(work_order):
             'Confidentiality & Data Protection: All MSME financial statements, business records, and personal proprietor data must be treated with strict professional confidentiality.',
             'Deliverables & Timesheets: Payment of professional fees is strictly contingent upon submission and approval of detailed individual visit reports, an end-of-month milestone summary report, client-signed timesheets verifying physical on-site visits, and photographic proof of engagement.',
             'Transport Reimbursement: Verified travel expenses will be reimbursed in accordance with PRUDEV II public transport rates upon submission of valid receipts or travel logs.',
-            'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA AFC GmbH.',
+            'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
         ]
     elif work_order.work_order_type == 'bge_technical_co_assignment':
         CONDITIONS = [
@@ -977,7 +977,7 @@ def render_work_order(work_order):
             'Visit Reporting & Verification: An individual comprehensive visit report must be submitted in the PRUDEV II portal for each enterprise session within 48 hours, supported by GPS base pinning and photo documentation.',
             'Timesheets & Invoicing: Release of professional fees is strictly contingent upon submission and approval of detailed visit reports, the Technical Handover Note, countersigned client timesheets, and an approved invoice.',
             'Transport Reimbursement: Travel expenses will be reimbursed in accordance with PRUDEV II public transport rates upon submission of valid travel receipts or logs.',
-            'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA AFC GmbH.',
+            'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
         ]
     elif work_order.work_order_type == 'bds_manual_module':
         CONDITIONS = [
@@ -986,38 +986,38 @@ def render_work_order(work_order):
             'The Consultant shall deliver DCO training in Gulu and Lira (1st week of September 2026) using the developed training materials and shall ensure sessions are practical, participatory, and calibrated to the DCO audience.',
             'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of each training day and included in the post-training report.',
             'The Consultant shall treat all PRUDEV II programme information, MSME data, and BGE/DCO contact information as strictly confidential.',
-            'All outputs, modules, training materials, and documents produced under this work order are the intellectual property of GOPA AFC and shall not be reproduced, shared, or distributed beyond PRUDEV II without prior written approval.',
+            'All outputs, modules, training materials, and documents produced under this work order are the intellectual property of GOPA Pro and shall not be reproduced, shared, or distributed beyond PRUDEV II without prior written approval.',
             'Phase 1 fees shall be released upon approval of the finalised BDS Manual Additional Module (Deliverable 7). Phase 2 fees shall be released upon approval of the post-training report (Deliverable 10).',
             'Transport and accommodation costs for training delivery in Gulu and Lira are reimbursed at actual cost upon submission of original receipts.',
-            'GOPA AFC reserves the right to withhold or recover payment for content that is inaccurate, plagiarised, or does not meet PRUDEV II quality standards.',
+            'GOPA Pro reserves the right to withhold or recover payment for content that is inaccurate, plagiarised, or does not meet PRUDEV II quality standards.',
             'Any changes to the scope, content structure, or training schedule require written approval from the Team Leader.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
-            'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA AFC GmbH.',
+            'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA Pro GmbH.',
         ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [
-            'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA AFC and GIZ quality standards.',
+            'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA Pro and GIZ quality standards.',
             'All training content and session plans must be reviewed and approved by the BDS Expert before delivery.',
             'The Senior BGE shall submit a Training Report within 5 working days of each training session.',
-            'A Lessons Learnt document must be submitted at the conclusion of the assignment.',
+            'Lessons Learnt document must be submitted at the conclusion of the assignment.',
             'Participant feedback must be collected using the approved PRUDEV II feedback instrument at the close of every session.',
             'The Senior BGE is responsible for briefing and preparing assigned BGEs before each session and for monitoring their active participation throughout.',
             'Fees are conditional on satisfactory delivery of reports, approved training content, and completed feedback analysis.',
             'Transport will be reimbursed upon submission of receipts / fuel log.',
             'The Senior BGE shall maintain confidentiality of all MSME, BGE, and programme information.',
-            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
+            'GOPA Pro reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             'Any changes to the scope or training schedule require written approval from the Team Leader.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
         ]
     else:
         CONDITIONS = [
-            'The BGE shall carry out the assignment with due diligence and in accordance with GOPA AFC and GIZ standards.',
+            'The BGE shall carry out the assignment with due diligence and in accordance with GOPA Pro and GIZ standards.',
             'The BGE shall submit field visit reports within 5 working days of each visit.',
             'Fees are conditional on satisfactory delivery of reports and approved deliverables.',
             'Transport will be reimbursed upon submission of receipts / fuel log.',
             'The BGE shall maintain confidentiality of all MSME and programme information.',
-            'GOPA AFC reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
+            'GOPA Pro reserves the right to withhold payment for incomplete or unsatisfactory deliverables.',
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             'Any changes to the scope require written approval from the Team Leader.',
             '6% Withholding Tax (WHT) will be deducted from fees as required by Uganda Revenue Authority regulations.',
@@ -1035,7 +1035,7 @@ def render_work_order(work_order):
     # fixed height (SIG_H) so the columns are visually equal even when the TL
     # signature image hasn't been applied yet.
     tl_col = [
-        Paragraph('For GOPA AFC / PRUDEV II Programme', s['label']),
+        Paragraph('For GOPA Pro / PRUDEV II Programme', s['label']),
         Spacer(1, 4),               # same gap as BGE column before the sig area
         Spacer(1, SIG_H),           # equal-height placeholder, always
         Paragraph('_' * 35, s['body']),

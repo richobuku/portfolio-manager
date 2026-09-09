@@ -119,11 +119,11 @@ const STANDARD_CONDITIONS = [
   'The BGE is fully accountable for the accuracy, completeness, and timely submission of all attendance sheets and field reports.',
   'Under no circumstances may the BGE retain, store, or record MSME CRM login credentials. All account access details must be handed directly and exclusively to the MSME owner.',
   'All MSME data and business information must be handled strictly confidentially.',
-  'GOPA AFC retains ownership of all outputs produced under this Work Order.',
+  'GOPA Pro retains ownership of all outputs produced under this Work Order.',
   'A 6% withholding tax will be applied in accordance with Ugandan tax laws.',
   'BGE must use their official BGE code in all documentation.',
   'Timely submission of outputs is required to avoid payment delays.',
-  'GOPA AFC reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
+  'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
 ];
 
 
@@ -318,6 +318,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   // VisitReportForm (new full-screen form)
   const [visitReportOpen, setVisitReportOpen]   = useState(false);
   const [visitReportMsme, setVisitReportMsme]   = useState(null);
+  const [visitReportType, setVisitReportType]   = useState('data_update');
   const [visitReportEdit, setVisitReportEdit]   = useState(null);
 
   // MSME detail dialog
@@ -1078,9 +1079,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [section]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const openNewReport = (msmeId = '') => {
+  const openNewReport = (msmeId = '', type = 'data_update') => {
     const msme = msmes.find(x => x.id === msmeId || x.id === Number(msmeId)) || null;
     setVisitReportMsme(msme);
+    setVisitReportType(type || 'data_update');
     setVisitReportEdit(null);
     setVisitReportOpen(true);
   };
@@ -5255,6 +5257,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         onClose={() => setVisitReportOpen(false)}
         onSaved={() => { fetchMsmes(); fetchReports(); notify('Report saved.'); }}
         msme={visitReportMsme}
+        initialVisitType={visitReportType}
         msmes={msmes}
         token={token}
         bgeProfile={currentUser?.bge_profile}
@@ -5741,7 +5744,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 user prints the page so the print fallback looks official.
                 Uses raw <div> to avoid MUI's @media-print quirks. */}
             <div className="print-letterhead">
-              <img className="gopa" src="/gopa-logo.png" alt="GOPA AFC" />
+              <img className="gopa" src="/gopa-logo.png" alt="GOPA Pro" />
               <div className="wordmark">
                 <div className="title">PRUDEV II</div>
                 <div className="subtitle">MSME Portfolio Management</div>
@@ -5851,7 +5854,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 PRUDEV II Project – {workOrderPreview.work_order_type_display}
               </Typography>
               <Typography variant="body2" align="center" sx={{ mb: 2 }}>
-                Pursuant to the Service Contract between GOPA AFC GmbH and{' '}
+                Pursuant to the Service Contract between GOPA Pro GmbH and{' '}
                 <strong>{workOrderPreview.bge_name}</strong>, this Work Order is issued under the PRUDEV II Project framework.
               </Typography>
               <Divider sx={{ mb: 2 }} />
@@ -5948,7 +5951,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               <Typography fontWeight={700} sx={{ mb: 1 }}>SIGNATURES</Typography>
               <Grid container spacing={4}>
                 <Grid item xs={6}>
-                  <Typography variant="caption" fontWeight={700} display="block">On behalf of GOPA AFC GmbH</Typography>
+                  <Typography variant="caption" fontWeight={700} display="block">On behalf of GOPA Pro GmbH</Typography>
                   <Typography variant="caption" display="block">Name: {workOrderPreview.team_leader_name}</Typography>
                   <Typography variant="caption" display="block">Position: {workOrderPreview.team_leader_position}</Typography>
                   <Typography variant="caption" display="block" sx={{ mt: 3 }}>Signature: ____________________________</Typography>

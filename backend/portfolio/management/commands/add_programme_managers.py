@@ -132,7 +132,7 @@ class Command(BaseCommand):
           </table>
           <p>As a Programme Manager you can view all MSMEs, reports, BGE activity,
              and programme analytics. Please change your password after first login.</p>
-          <p style="color:#888;font-size:12px;margin-top:24px">PRUDEV II Programme · GOPA AFC / GIZ Uganda</p>
+          <p style="color:#888;font-size:12px;margin-top:24px">PRUDEV II Programme · GOPA Pro / GIZ Uganda</p>
         </div>"""
         msg = EmailMultiAlternatives(
             subject=subject,

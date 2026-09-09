@@ -1,7 +1,7 @@
 import { createTheme } from '@mui/material/styles';
 
 // GIZ official brand:  #C8102E (red)
-// GOPA AFC brand:      #003D7A (navy — kept as reference only)
+// GOPA Pro brand:      #F3BB36 (gold) / #6A6E6B (slate gray)
 // Programme accent:    #009B62 (green — used in PDF and success states)
 // UI primary / dark slate: #1A2E42  ← unified colour for sidebar, buttons, chips, badges, headings
 

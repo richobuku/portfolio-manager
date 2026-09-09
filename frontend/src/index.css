@@ -39,7 +39,7 @@ code {
     padding: 8px 12px 12px 12px;
     margin-bottom: 12px;
   }
-  .print-letterhead img.gopa { height: 56px; width: auto; }
+  .print-letterhead img.gopa { height: 44px; max-width: 220px; width: auto; object-fit: contain; }
   .print-letterhead img.giz  { height: 64px; width: auto; }
   .print-letterhead .wordmark {
     text-align: center; flex: 1;

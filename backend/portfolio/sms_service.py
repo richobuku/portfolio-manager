@@ -70,7 +70,7 @@ def build_msme_visit_sms_text(report) -> str:
         f"Hello {first_name}, thank you for your PRUDEV II coaching visit today with {bge_name}. "
         f"Agreed Action: {takeaway}. "
         f"Next Step: {next_step}. "
-        f"Together we grow {business_name}! — PRUDEV II / GOPA AFC"
+        f"Together we grow {business_name}! — PRUDEV II / GOPA Pro"
     )
 
 

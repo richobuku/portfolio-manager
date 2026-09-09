@@ -422,7 +422,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'Net Payable: UGX {work_order.rate_per_day * work_order.max_days - int(work_order.rate_per_day * work_order.max_days * 0.06):,}\n'
                 f'{tech_note}'
                 f'{co_text}\n\n'
-                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
             )
             email = EmailMultiAlternatives(subject, body,
                                            getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
@@ -474,7 +474,7 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'{reason_line}\n'
                 f'Work Order Type: {work_order.get_work_order_type_display()}\n'
                 f'You will be notified when a revised work order is re-issued to you.\n\n'
-                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
             )
             try:
                 msg = EmailMultiAlternatives(
@@ -1236,7 +1236,7 @@ class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             f'{reference_line}'
             f'{notes_line}\n'
             f'Please log in to confirm receipt of this payment.\n\n'
-            f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+            f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
         )
         try:
             msg = EmailMultiAlternatives(
@@ -1283,7 +1283,7 @@ class WorkOrderPaymentViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
                 f'{reference_line}'
                 f'{notes_line}\n'
                 f'Confirmed at: {payment.confirmed_at:%Y-%m-%d %H:%M}\n\n'
-                f'Regards,\nPRUDEV II BDS Team\nGOPA AFC / GIZ'
+                f'Regards,\nPRUDEV II BDS Team\nGOPA Pro / GIZ'
             )
             try:
                 msg = EmailMultiAlternatives(

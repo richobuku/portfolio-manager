@@ -20,7 +20,7 @@ def _build_tshirt_pdf(receipt):
     """Generate a signed PDF for a TshirtReceipt using reportlab.
 
     Landscape A4 with the standard PRUDEV II branded header:
-    GOPA AFC logo (left) | PRUDEV II wordmark (centre) | GIZ logo (right)
+    GOPA Pro logo (left) | PRUDEV II wordmark (centre) | GIZ logo (right)
     — identical to the visit-report and training-report headers.
     """
     try:
@@ -65,10 +65,10 @@ def _build_tshirt_pdf(receipt):
         canvas.setFillColor(RED)
         canvas.rect(0, h - BAND_H - RULE_H, w, RULE_H, fill=1, stroke=0)
 
-        # Left: GOPA logo (aspect ≈ 3.06)
+        # Left: GOPA Pro logo (aspect ≈ 5.30)
         if _os.path.isfile(GOPA_PATH):
-            logo_h = 14 * mm
-            logo_w = logo_h * 3.06
+            logo_h = 10.5 * mm
+            logo_w = logo_h * 5.30
             canvas.drawImage(
                 ImageReader(GOPA_PATH),
                 x=14 * mm, y=h - BAND_H + (BAND_H - logo_h) / 2,
@@ -237,7 +237,7 @@ def _build_tshirt_pdf(receipt):
         "Verified by: Stella Abote.   Date: _______",
         label_style))
     story.append(Spacer(1, 0.2 * cm))
-    story.append(Paragraph("PRUDEV II Programme — GOPA AFC in partnership with GIZ  |  Confidential", conf_style))
+    story.append(Paragraph("PRUDEV II Programme — GOPA Pro in partnership with GIZ  |  Confidential", conf_style))
 
     doc.build(story, onFirstPage=_draw_header, onLaterPages=_draw_header)
     buf.seek(0)

@@ -105,6 +105,7 @@ const TYPE_CONFIG = {
     show_participants: false,
     show_delivery:     false,
     show_focus:        true,
+    show_reflections:  true,
   },
   data_update: {
     context_label:    'Business Status Observed',
@@ -247,10 +248,9 @@ function SectionBlock({ icon, title, color = '#1A2F4B', children }) {
 }
 
 /* ── Draft persistence helpers ───────────────────────────────────────────── */
-function draftKey(editingReport, preselectedMsme) {
+function draftKey(editingReport, msmeId) {
   if (editingReport) return `visit_report_draft_edit_${editingReport.id}`;
-  const msmeId = preselectedMsme?.id || 'new';
-  return `visit_report_draft_new_${msmeId}`;
+  return `visit_report_draft_new_${msmeId || 'new'}`;
 }
 
 function readDraft(key) {
@@ -277,7 +277,7 @@ const roundCoord = (val) => {
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function VisitReportForm({
   open, onClose, onSaved, msme: preselectedMsme, msmes = [],
-  token, bgeProfile, editingReport = null,
+  token, bgeProfile, editingReport = null, initialVisitType = 'data_update',
 }) {
   const [form, setForm]   = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -293,7 +293,8 @@ export default function VisitReportForm({
   /* Populate on open */
   useEffect(() => {
     if (!open) return;
-    const key = draftKey(editingReport, preselectedMsme);
+    const initialMsmeId = preselectedMsme?.id || '';
+    const key = draftKey(editingReport, initialMsmeId);
     currentDraftKey.current = key;
 
     if (editingReport) {
@@ -303,10 +304,13 @@ export default function VisitReportForm({
       });
       f.msme       = editingReport.msme       || '';
       f.visit_type = editingReport.visit_type || 'one_on_one';
-      f.records_sighted   = editingReport.records_sighted   ?? null;
-      f.visit_latitude    = roundCoord(editingReport.visit_latitude);
-      f.visit_longitude   = roundCoord(editingReport.visit_longitude);
+      f.send_sms   = Boolean(editingReport.send_sms ?? true);
+      f.sms_custom_message = editingReport.sms_custom_message || '';
+      f.records_sighted    = editingReport.records_sighted   ?? null;
+      f.visit_latitude     = roundCoord(editingReport.visit_latitude);
+      f.visit_longitude    = roundCoord(editingReport.visit_longitude);
       f.visit_gps_accuracy = editingReport.visit_gps_accuracy != null ? Number(editingReport.visit_gps_accuracy) : null;
+      f.participant_count  = editingReport.participant_count != null ? String(editingReport.participant_count) : '';
       const parsed = parseTools(editingReport.tools_provided || '');
       const knownSelected = parsed.filter(t => TOOLS_OPTIONS.includes(t));
       const otherText = parsed.filter(t => !TOOLS_OPTIONS.includes(t)).join(', ');
@@ -330,12 +334,13 @@ export default function VisitReportForm({
         setSelectedTools(saved.tools || []);
         setToolsOther(saved.toolsOther || '');
       } else {
-        const initialMsme = preselectedMsme || msmes.find(x => x.id === Number(EMPTY_FORM.msme));
+        const initialMsme = preselectedMsme || (initialMsmeId ? msmes.find(x => x.id === Number(initialMsmeId)) : null);
         const msmeLat = roundCoord(initialMsme?.latitude);
         const msmeLng = roundCoord(initialMsme?.longitude);
         setForm({
           ...EMPTY_FORM,
-          msme: preselectedMsme?.id || '',
+          msme: initialMsmeId,
+          visit_type: initialVisitType || 'data_update',
           visit_latitude: msmeLat,
           visit_longitude: msmeLng,
         });
@@ -345,7 +350,7 @@ export default function VisitReportForm({
       }
     }
     setError('');
-  }, [open, editingReport, preselectedMsme]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, editingReport, preselectedMsme, initialVisitType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Auto-save draft to localStorage 800 ms after each change */
   const scheduleDraftSave = useCallback((f, tools, other) => {
@@ -365,16 +370,45 @@ export default function VisitReportForm({
 
   const handleMsmeChange = (newMsmeId) => {
     const selected = msmes.find(x => x.id === Number(newMsmeId) || x.id === newMsmeId);
+    const newKey = draftKey(editingReport, newMsmeId);
+    currentDraftKey.current = newKey;
+
+    // Check if there is a saved draft for this newly selected MSME
+    const saved = !editingReport ? readDraft(newKey) : null;
+    if (saved) {
+      setDraftBanner({ savedAt: saved.savedAt, key: newKey });
+    } else {
+      setDraftBanner(null);
+    }
+
     setForm(f => {
       const next = { ...f, msme: newMsmeId };
-      // If form doesn't already have GPS coordinates, or MSME has coordinates on file, use them
-      if (selected?.latitude != null && selected?.longitude != null && (f.visit_latitude == null || f.visit_longitude == null)) {
+      // If MSME has coordinates on file, use them if coordinates are empty or not live GPS
+      if (selected?.latitude != null && selected?.longitude != null && (f.visit_latitude == null || f.visit_longitude == null || !f.visit_gps_accuracy)) {
         next.visit_latitude = roundCoord(selected.latitude);
         next.visit_longitude = roundCoord(selected.longitude);
+        next.visit_gps_accuracy = null;
       }
       scheduleDraftSave(next, selectedTools, toolsOther);
       return next;
     });
+  };
+
+  const applyMsmeCoordinates = () => {
+    const activeMsme = msmes.find(x => x.id === Number(form.msme) || x.id === form.msme) || preselectedMsme;
+    if (activeMsme?.latitude != null && activeMsme?.longitude != null) {
+      setForm(f => {
+        const next = {
+          ...f,
+          visit_latitude: roundCoord(activeMsme.latitude),
+          visit_longitude: roundCoord(activeMsme.longitude),
+          visit_gps_accuracy: null,
+        };
+        scheduleDraftSave(next, selectedTools, toolsOther);
+        return next;
+      });
+      setGpsError('');
+    }
   };
 
   const toggleTool = (tool) =>
@@ -397,12 +431,13 @@ export default function VisitReportForm({
     clearDraft(currentDraftKey.current);
     setDraftBanner(null);
     if (!editingReport) {
-      const initialMsme = preselectedMsme || msmes.find(x => x.id === Number(EMPTY_FORM.msme));
+      const activeMsme = preselectedMsme || msmes.find(x => x.id === Number(form.msme) || x.id === form.msme);
       setForm({
         ...EMPTY_FORM,
-        msme: preselectedMsme?.id || '',
-        visit_latitude: roundCoord(initialMsme?.latitude),
-        visit_longitude: roundCoord(initialMsme?.longitude),
+        msme: form.msme || preselectedMsme?.id || '',
+        visit_type: initialVisitType || 'data_update',
+        visit_latitude: roundCoord(activeMsme?.latitude),
+        visit_longitude: roundCoord(activeMsme?.longitude),
       });
       setSelectedTools([]);
       setToolsOther('');
@@ -443,17 +478,17 @@ export default function VisitReportForm({
     );
   }, [scheduleDraftSave, selectedTools, toolsOther]);
 
-  /* Auto-capture GPS when form opens (new reports only, and ONLY if neither MSME nor draft has coordinates) */
+  /* Auto-capture GPS when form opens (new reports only, and ONLY if neither MSME nor draft has coordinates and MSME is chosen) */
   useEffect(() => {
     if (open && !editingReport) {
       const currentMsme = preselectedMsme || msmes.find(x => x.id === Number(form.msme) || x.id === form.msme);
       const hasGps = (form.visit_latitude != null && form.visit_longitude != null) ||
                      (currentMsme?.latitude != null && currentMsme?.longitude != null);
-      if (!hasGps) {
+      if (!hasGps && form.msme) {
         captureGPS();
       }
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, form.msme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cfg = TYPE_CONFIG[form.visit_type] || DEFAULT_CONFIG;
   const typeInfo = VISIT_TYPES.find(t => t.value === form.visit_type) || VISIT_TYPES[0];
@@ -463,6 +498,26 @@ export default function VisitReportForm({
   const save = async (submitNow = false) => {
     if (!form.msme || !form.visit_date) {
       setError('MSME and visit date are required.'); return;
+    }
+    if (submitNow) {
+      if (!form.stated_purpose || !form.stated_purpose.trim()) {
+        setError('Please enter the stated purpose agreed with the owner upon arrival before submitting.');
+        return;
+      }
+      if (cfg.show_reflections) {
+        if (!form.advice_delivered || !form.advice_delivered.trim()) {
+          setError('Please describe the immediate practical advice or demonstration delivered on the spot.');
+          return;
+        }
+        if (!form.concrete_takeaway || !form.concrete_takeaway.trim()) {
+          setError('Please record the one concrete change the MSME will do differently starting today (The Acid Test).');
+          return;
+        }
+        if (!form.msme_visible_next_step || !form.msme_visible_next_step.trim()) {
+          setError('Please record the visible next step agreed with the owner before departure.');
+          return;
+        }
+      }
     }
     setSaving(true); setError('');
 
@@ -666,27 +721,46 @@ export default function VisitReportForm({
 
               {form.visit_latitude ? (
                 <Box sx={{
-                  bgcolor: '#E8F5E9', borderRadius: 1, p: 1, fontSize: 11,
+                  bgcolor: '#E8F5E9', borderRadius: 1.5, p: 1.2, fontSize: 11, border: '1px solid #C8E6C9',
                 }}>
-                  <Typography fontSize={11} fontWeight={600} color="#2E7D32"
-                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <GpsFixed sx={{ fontSize: 13 }} /> Location captured
-                  </Typography>
-                  <Typography fontSize={10} color="text.secondary" sx={{ mt: 0.25 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography fontSize={11} fontWeight={700} color="#2E7D32"
+                      sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <GpsFixed sx={{ fontSize: 13 }} /> Location Set
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={form.visit_gps_accuracy ? `Device GPS` : `MSME Profile`}
+                      color={form.visit_gps_accuracy ? 'success' : 'default'}
+                      sx={{ height: 18, fontSize: 9.5, fontWeight: 700 }}
+                    />
+                  </Box>
+                  <Typography fontSize={10} color="text.secondary" sx={{ mt: 0.25, fontFamily: 'monospace' }}>
                     {Number(form.visit_latitude).toFixed(5)}, {Number(form.visit_longitude).toFixed(5)}
                   </Typography>
                   {form.visit_gps_accuracy && (
                     <Typography fontSize={10} color="text.secondary">
-                      ±{Math.round(form.visit_gps_accuracy)} m accuracy
+                      ±{Math.round(form.visit_gps_accuracy)} m device accuracy
                     </Typography>
                   )}
-                  <a
-                    href={`https://maps.google.com/?q=${form.visit_latitude},${form.visit_longitude}`}
-                    target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 10, color: '#1A73E8' }}
-                  >
-                    View on map ↗
-                  </a>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.75 }}>
+                    <a
+                      href={`https://maps.google.com/?q=${form.visit_latitude},${form.visit_longitude}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 10.5, color: '#1A73E8', fontWeight: 600, textDecoration: 'none' }}
+                    >
+                      View map ↗
+                    </a>
+                    {selectedMsme?.latitude != null && (
+                      <Button
+                        size="small"
+                        onClick={applyMsmeCoordinates}
+                        sx={{ fontSize: 9.5, textTransform: 'none', p: '2px 4px', minWidth: 0 }}
+                      >
+                        Reset to MSME GPS
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
               ) : (
                 <Box sx={{
@@ -1029,7 +1103,7 @@ export default function VisitReportForm({
                       SMS Takeaway Preview (Dispatched to owner upon report submission):
                     </Typography>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12, color: '#1E293B', bgcolor: '#F8FAFC', p: 1, borderRadius: 1 }}>
-                      {`Hello ${(selectedMsme.contact_person || selectedMsme.business_name || '').split(' ')[0] || 'Partner'}, thank you for your PRUDEV II coaching visit today with ${bgeProfile?.name?.split(' ')[0] || 'your BGE'}. Agreed Action: ${form.concrete_takeaway || form.action_plan || '[Agreed Action]'}. Next Step: ${form.msme_visible_next_step || form.recommendations || '[Next Step]'}. Together we grow ${selectedMsme.business_name}! — PRUDEV II / GOPA AFC`}
+                      {`Hello ${(selectedMsme.contact_person || selectedMsme.business_name || '').split(' ')[0] || 'Partner'}, thank you for your PRUDEV II coaching visit today with ${bgeProfile?.name?.split(' ')[0] || 'your BGE'}. Agreed Action: ${form.concrete_takeaway || form.action_plan || '[Agreed Action]'}. Next Step: ${form.msme_visible_next_step || form.recommendations || '[Next Step]'}. Together we grow ${selectedMsme.business_name}! — PRUDEV II / GOPA Pro`}
                     </Typography>
                   </Box>
                 )}

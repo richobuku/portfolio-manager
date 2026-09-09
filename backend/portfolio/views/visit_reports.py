@@ -60,6 +60,7 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         import math
 
         user = self.request.user
+        bge = None
         if not (user.is_staff or user.is_superuser):
             try:
                 bge = user.bge_profile
@@ -102,29 +103,60 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
                         f"for this MSME has already been filed by {conflict.bge.name} "
                         f"({period_label}). Only one BGE can file this review per period."
                     )
+        else:
+            # For staff / superuser, resolve BGE from request payload, MSME assigned BGE, or user's BGE profile
+            bge_id = self.request.data.get('bge')
+            if bge_id:
+                from ..models import BusinessGrowthExpert
+                bge = BusinessGrowthExpert.objects.filter(id=bge_id).first()
+            if not bge:
+                msme = serializer.validated_data.get('msme')
+                if msme and hasattr(msme, 'assigned_bge') and msme.assigned_bge:
+                    bge = msme.assigned_bge
+                elif hasattr(user, 'bge_profile'):
+                    bge = user.bge_profile
+            if not bge:
+                raise DRFValidationError({'bge': 'A Business Growth Expert (BGE) must be assigned to this report.'})
 
-            report = serializer.save(bge=bge)
-            self._update_msme_gps(report)
-            if report.status == 'submitted':
-                self._maybe_send_visit_sms(report)
-            return
-        report = serializer.save()
+        report = serializer.save(bge=bge)
         self._update_msme_gps(report)
         if report.status == 'submitted':
-            self._maybe_send_visit_sms(report)
+            self._handle_submission(report)
 
     @staticmethod
     def _update_msme_gps(report):
-        """Sync captured visit GPS coordinates to the parent MSME record."""
+        """Sync captured visit GPS coordinates to the parent MSME record only if MSME coordinates are missing."""
         if report.visit_latitude is not None and report.visit_longitude is not None:
             try:
                 msme = report.msme
-                if msme:
+                if msme and (msme.latitude is None or msme.longitude is None):
                     msme.latitude = report.visit_latitude
                     msme.longitude = report.visit_longitude
                     msme.save(update_fields=['latitude', 'longitude'])
             except Exception as e:
                 logger.warning('Failed to sync MSME GPS from visit report %s: %s', report.id, e)
+
+    def _handle_submission(self, report):
+        """Freeze a PDF copy, generate growth snapshot, and send action SMS on submission."""
+        # 1. Freeze a PDF copy if not already frozen
+        if not report.submitted_pdf or not report.submitted_pdf_data:
+            try:
+                from ..pdf_reports import render_msme_report
+                from django.core.files.base import ContentFile
+                pdf_bytes = render_msme_report(report).read()
+                safe_name = report.msme.business_name[:30].replace(' ', '_')
+                fname = f"MSMEReport_{safe_name}_{report.visit_date}.pdf"
+                report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=False)
+                report.submitted_pdf_data = pdf_bytes
+                report.save(update_fields=['submitted_pdf', 'submitted_pdf_data'])
+            except Exception as e:
+                logger.error('Failed to snapshot MSME report PDF (report id=%s): %s', report.id, e)
+
+        # 2. Auto-create growth snapshot from quantitative fields
+        self._create_snapshot_from_report(report)
+
+        # 3. Check if SMS summary should be sent
+        self._maybe_send_visit_sms(report)
 
     def _maybe_send_visit_sms(self, report):
         """Send action summary SMS to MSME if requested in payload."""
@@ -144,24 +176,7 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         self._update_msme_gps(report)
 
         if instance.status != 'submitted' and new_status == 'submitted':
-            # Freeze a PDF copy on first submission
-            try:
-                from ..pdf_reports import render_msme_report
-                from django.core.files.base import ContentFile
-                pdf_bytes = render_msme_report(report).read()
-                safe_name = report.msme.business_name[:30].replace(' ', '_')
-                fname = f"MSMEReport_{safe_name}_{report.visit_date}.pdf"
-                report.submitted_pdf.save(fname, ContentFile(pdf_bytes), save=False)
-                report.submitted_pdf_data = pdf_bytes
-                report.save(update_fields=['submitted_pdf', 'submitted_pdf_data'])
-            except Exception as e:
-                logger.error('Failed to snapshot MSME report PDF (report id=%s): %s', report.id, e)
-
-            # Auto-create a growth snapshot from the quantitative fields
-            self._create_snapshot_from_report(report)
-
-            # Check if SMS summary should be sent
-            self._maybe_send_visit_sms(report)
+            self._handle_submission(report)
 
     @action(detail=True, methods=['post'], url_path='send-summary-sms')
     def send_summary_sms(self, request, pk=None):
