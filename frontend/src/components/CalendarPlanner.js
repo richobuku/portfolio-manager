@@ -1379,7 +1379,7 @@ export default function CalendarPlanner({
           }}
         >
           {/* Day Names Header */}
-          <Grid container sx={{ bgcolor: '#F8FAFC', borderBottom: '1px solid #E8EDF2' }}>
+          <Grid container sx={{ bgcolor: '#FAF9F6', borderBottom: '1px solid #E8EDF2' }}>
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
               <Grid item xs={12 / 7} key={day} sx={{ py: 1.2, textAlign: 'center' }}>
                 <Typography variant="caption" fontWeight={700} sx={{ color: BRAND.primaryMain, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -1633,7 +1633,7 @@ export default function CalendarPlanner({
             }}
           >
             {/* Week Day Headers */}
-            <Grid container sx={{ bgcolor: '#F8FAFC', borderBottom: '1px solid #E8EDF2' }}>
+            <Grid container sx={{ bgcolor: '#FAF9F6', borderBottom: '1px solid #E8EDF2' }}>
               {currentWeekDays.map((d, index) => {
                 const isDateToday = isToday(d);
                 const iso = toIsoDate(d);
@@ -2041,7 +2041,7 @@ export default function CalendarPlanner({
 
               {/* Day Visits Chronological List */}
               {dayVisits.length === 0 ? (
-                <Paper sx={{ p: 8, textAlign: 'center', borderRadius: 2.5, border: '1px dashed #CBD5E1', bgcolor: '#F8FAFC' }}>
+                <Paper sx={{ p: 8, textAlign: 'center', borderRadius: 2.5, border: '1px dashed #CBD5E1', bgcolor: '#FAF9F6' }}>
                   <CalendarMonth sx={{ fontSize: 56, color: '#94A3B8', mb: 1 }} />
                   <Typography variant="h6" fontWeight={700} color="text.secondary">
                     No Appointments Scheduled for this Day
@@ -2124,7 +2124,7 @@ export default function CalendarPlanner({
                               <Chip
                                 size="small"
                                 label={v.visit_type_display}
-                                sx={{ height: 24, fontSize: 11, fontWeight: 600, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}
+                                sx={{ height: 24, fontSize: 11, fontWeight: 600, bgcolor: '#FAF9F6', border: '1px solid #E2E8F0' }}
                               />
                             )}
                           </Box>
@@ -2174,7 +2174,7 @@ export default function CalendarPlanner({
 
                           {v.objectives && (
                             <Grid item xs={12}>
-                              <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                              <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#FAF9F6', border: '1px solid #F1F5F9' }}>
                                 <Typography variant="caption" fontWeight={700} color="text.secondary" display="block">
                                   Session Objectives & BDS Focus:
                                 </Typography>
@@ -2413,7 +2413,7 @@ export default function CalendarPlanner({
                                 </Box>
 
                                 {v.objectives && (
-                                  <Typography variant="body2" sx={{ mt: 1, color: '#4A5568', bgcolor: '#F8FAFC', p: 1, borderRadius: 1.5, fontSize: 12 }}>
+                                  <Typography variant="body2" sx={{ mt: 1, color: '#4A5568', bgcolor: '#FAF9F6', p: 1, borderRadius: 1.5, fontSize: 12 }}>
                                     <strong>Objectives:</strong> {v.objectives}
                                   </Typography>
                                 )}
@@ -2571,7 +2571,7 @@ export default function CalendarPlanner({
       >
         {selectedVisit && (
           <>
-            <DialogTitle sx={{ bgcolor: '#F8FAFC', pb: 1.5, borderBottom: '1px solid #E8EDF2' }}>
+            <DialogTitle sx={{ bgcolor: '#FAF9F6', pb: 1.5, borderBottom: '1px solid #E8EDF2' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography variant="h6" fontWeight={800} sx={{ color: BRAND.primaryMain }}>
@@ -2633,7 +2633,7 @@ export default function CalendarPlanner({
                 {selectedVisit.objectives && (
                   <Grid item xs={12}>
                     <Typography variant="caption" color="text.secondary">Objectives & Agenda</Typography>
-                    <Typography variant="body2" sx={{ bgcolor: '#F8FAFC', p: 1.5, borderRadius: 2, mt: 0.5 }}>
+                    <Typography variant="body2" sx={{ bgcolor: '#FAF9F6', p: 1.5, borderRadius: 2, mt: 0.5 }}>
                       {selectedVisit.objectives}
                     </Typography>
                   </Grid>
@@ -2712,7 +2712,7 @@ export default function CalendarPlanner({
               </Grid>
             </DialogContent>
 
-            <DialogActions sx={{ px: 2.5, py: 1.5, bgcolor: '#F8FAFC', justifyContent: 'space-between' }}>
+            <DialogActions sx={{ px: 2.5, py: 1.5, bgcolor: '#FAF9F6', justifyContent: 'space-between' }}>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {selectedVisit.status === 'planned' && (
                   <>
@@ -2988,7 +2988,7 @@ export default function CalendarPlanner({
             </Grid>
           </DialogContent>
 
-          <DialogActions sx={{ p: 2.5, bgcolor: '#F8FAFC' }}>
+          <DialogActions sx={{ p: 2.5, bgcolor: '#FAF9F6' }}>
             <Button onClick={() => setPlanDialogOpen(false)} sx={{ color: '#666' }}>
               Cancel
             </Button>
@@ -3065,7 +3065,7 @@ export default function CalendarPlanner({
           />
         </DialogContent>
 
-        <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+        <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
           <Button onClick={() => setMissedDialogOpen(false)}>Cancel</Button>
           <Button
             id="btn-submit-mark-missed"
@@ -3140,7 +3140,7 @@ export default function CalendarPlanner({
           )}
         </DialogContent>
 
-        <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+        <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
           <Button onClick={() => setCompleteDialogOpen(false)}>Cancel</Button>
           <Button
             id="btn-submit-mark-completed"
@@ -3209,7 +3209,7 @@ export default function CalendarPlanner({
           />
         </DialogContent>
 
-        <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+        <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
           <Button onClick={() => setRescheduleDialogOpen(false)}>Cancel</Button>
           <Button
             id="btn-submit-reschedule"
@@ -3294,7 +3294,7 @@ export default function CalendarPlanner({
             </Button>
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: '#F8FAFC' }}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: '#FAF9F6' }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND.primaryMain, mb: 0.5 }}>
               Option 2: 1-Click "Add to Google Calendar"
             </Typography>
@@ -3304,7 +3304,7 @@ export default function CalendarPlanner({
           </Paper>
         </DialogContent>
 
-        <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+        <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
           <Button onClick={() => setGoogleSetupDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
@@ -3338,7 +3338,7 @@ export default function CalendarPlanner({
 
           return (
             <>
-              <DialogTitle sx={{ bgcolor: '#F8FAFC', py: 2, px: 3, borderBottom: '1px solid #E8EDF2' }}>
+              <DialogTitle sx={{ bgcolor: '#FAF9F6', py: 2, px: 3, borderBottom: '1px solid #E8EDF2' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -3488,7 +3488,7 @@ export default function CalendarPlanner({
                                 <Chip
                                   size="small"
                                   label={v.visit_type_display}
-                                  sx={{ height: 22, fontSize: 10.5, fontWeight: 600, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}
+                                  sx={{ height: 22, fontSize: 10.5, fontWeight: 600, bgcolor: '#FAF9F6', border: '1px solid #E2E8F0' }}
                                 />
                               )}
                             </Box>
@@ -3538,7 +3538,7 @@ export default function CalendarPlanner({
 
                             {v.objectives && (
                               <Grid item xs={12}>
-                                <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#F8FAFC', border: '1px solid #F1F5F9', mt: 0.5 }}>
+                                <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#FAF9F6', border: '1px solid #F1F5F9', mt: 0.5 }}>
                                   <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block' }}>
                                     Session Focus / Objectives:
                                   </Typography>
@@ -3617,7 +3617,7 @@ export default function CalendarPlanner({
                 )}
               </DialogContent>
 
-              <DialogActions sx={{ p: 2, px: 3, bgcolor: '#F8FAFC', borderTop: '1px solid #E8EDF2', justifyContent: 'space-between' }}>
+              <DialogActions sx={{ p: 2, px: 3, bgcolor: '#FAF9F6', borderTop: '1px solid #E8EDF2', justifyContent: 'space-between' }}>
                 <Button
                   variant="contained"
                   size="small"
@@ -3679,7 +3679,7 @@ export default function CalendarPlanner({
           return (
             <Box>
               {/* Popover Header */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.25, bgcolor: '#F8FAFC', borderBottom: '1px solid #E8EDF2' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.25, bgcolor: '#FAF9F6', borderBottom: '1px solid #E8EDF2' }}>
                 <Typography variant="subtitle2" fontWeight={800} sx={{ color: BRAND.primaryMain }}>
                   {formattedDate} ({popVisits.length})
                 </Typography>
@@ -3752,7 +3752,7 @@ export default function CalendarPlanner({
               </Box>
 
               {/* Popover Footer */}
-              <Box sx={{ p: 1, px: 2, bgcolor: '#F8FAFC', borderTop: '1px solid #E8EDF2', display: 'flex', justifyContent: 'space-between' }}>
+              <Box sx={{ p: 1, px: 2, bgcolor: '#FAF9F6', borderTop: '1px solid #E8EDF2', display: 'flex', justifyContent: 'space-between' }}>
                 <Button
                   size="small"
                   startIcon={<Add />}
