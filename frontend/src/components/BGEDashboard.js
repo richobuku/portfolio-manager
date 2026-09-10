@@ -1729,7 +1729,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 2px 6px rgba(243,187,54,0.3)',
           }}>
-            <Typography sx={{ fontWeight: 900, fontSize: 8.5, color: '#1A2E42', lineHeight: 1.05, textAlign: 'center' }}>
+            <Typography sx={{ fontWeight: 900, fontSize: 8.5, color: BRAND.primaryMain, lineHeight: 1.05, textAlign: 'center' }}>
               GOPA<br/><span style={{ fontSize: 7.5, fontWeight: 800 }}>Pro</span>
             </Typography>
           </Box>
@@ -2069,7 +2069,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Edit MSME status, location & contacts">
-                                      <IconButton size="small" sx={{ color: '#0288D1' }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
+                                      <IconButton size="small" sx={{ color: BRAND.primaryMain }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
                                         <Edit fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
@@ -2079,7 +2079,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Quick visit check-in: GPS + revenue + employees">
-                                      <IconButton size="small" sx={{ color: '#1565C0' }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
+                                      <IconButton size="small" sx={{ color: BRAND.gopaGoldDark }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
                                         <MyLocation fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
@@ -2219,7 +2219,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Edit MSME status, location & contacts">
-                                      <IconButton size="small" sx={{ color: '#0288D1' }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
+                                      <IconButton size="small" sx={{ color: BRAND.primaryMain }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
                                         <Edit fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
@@ -2229,7 +2229,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Quick visit check-in: GPS + revenue + employees">
-                                      <IconButton size="small" sx={{ color: '#1565C0' }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
+                                      <IconButton size="small" sx={{ color: BRAND.gopaGoldDark }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
                                         <MyLocation fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
@@ -2508,7 +2508,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     </IconButton>
                                   </Tooltip>
                                   <Tooltip title="Edit MSME status, location & contacts">
-                                    <IconButton size="small" sx={{ color: '#0288D1' }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
+                                    <IconButton size="small" sx={{ color: BRAND.primaryMain }} onClick={(e) => { e.stopPropagation(); openEditMsme(m); }}>
                                       <Edit fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
@@ -2518,7 +2518,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     </IconButton>
                                   </Tooltip>
                                   <Tooltip title="Quick visit check-in: GPS + revenue + employees">
-                                    <IconButton size="small" sx={{ color: '#1565C0' }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
+                                    <IconButton size="small" sx={{ color: BRAND.gopaGoldDark }} onClick={(e) => { e.stopPropagation(); openQuickUpdate(m); }}>
                                       <MyLocation fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
@@ -2834,7 +2834,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   });
                   return (
                     <Card variant="outlined" key={wo.id}
-                      sx={wo.work_order_type === 'bge_technical_co_assignment' ? { borderLeft: '4px solid #0288D1' } : {}}>
+                      sx={wo.work_order_type === 'bge_technical_co_assignment' ? { borderLeft: `4px solid ${BRAND.gopaGoldDark}` } : {}}>
                       <CardContent>
                         {/* Header row */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
@@ -2843,7 +2843,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                               <Typography fontWeight={700}>{wo.work_order_number}</Typography>
                               {wo.work_order_type === 'bge_technical_co_assignment' && (
                                 <Chip label="Specialist Co-Assignment" size="small"
-                                  sx={{ bgcolor: '#0288D1', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                                  sx={{ bgcolor: BRAND.gopaGoldDark, color: '#fff', fontSize: 10, fontWeight: 700 }} />
                               )}
                             </Box>
                             <Typography variant="caption" color="text.secondary">
@@ -3299,14 +3299,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {leadSessions.map(s => (
-                  <Card key={s.id} sx={{ borderLeft: '4px solid #1565C0', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                  <Card key={s.id} sx={{ borderLeft: `4px solid ${BRAND.primaryMain}`, '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
                         <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', minWidth: 0 }}>
-                          <School sx={{ color: '#1565C0', fontSize: 20, mt: 0.3, flexShrink: 0 }} />
+                          <School sx={{ color: BRAND.primaryMain, fontSize: 20, mt: 0.3, flexShrink: 0 }} />
                           <Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                              <Chip label="Lead" size="small" sx={{ bgcolor: '#1565C0', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                              <Chip label="Lead" size="small" sx={{ bgcolor: BRAND.primaryMain, color: '#fff', fontWeight: 700, fontSize: 11 }} />
                               <Typography fontWeight={700} fontSize={15}>{s.title}</Typography>
                             </Box>
                             <Typography variant="caption" color="text.secondary">
@@ -3321,12 +3321,12 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             color={s.attendance_count > 0 ? 'success' : 'default'} />
                           <Button size="small" variant="outlined" startIcon={<Assignment />}
                             onClick={() => openAttendance(s)}
-                            sx={{ fontSize: 12, borderColor: '#1565C0', color: '#1565C0' }}>
+                            sx={{ fontSize: 12, borderColor: BRAND.primaryMain, color: BRAND.primaryMain }}>
                             Attendance
                           </Button>
                           <Button size="small" variant="contained" startIcon={<Edit />}
                             onClick={() => openTrReport(s)}
-                            sx={{ bgcolor: '#1565C0', '&:hover': { bgcolor: '#0d47a1' }, fontSize: 12 }}>
+                            sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark }, fontSize: 12 }}>
                             {s._tr ? 'Edit Report' : 'Write Report'}
                           </Button>
                         </Box>
@@ -5160,10 +5160,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
 
           {/* ── Narrative section (Annual / Quarterly reviews only) ── */}
           {(growthForm.source === 'annual' || growthForm.source === 'quarterly') && (
-            <Box sx={{ mt: 3, p: 2, bgcolor: '#F0F4FA', borderRadius: 2, border: '1px solid #C5D3E8' }}>
+            <Box sx={{ mt: 3, p: 2, bgcolor: '#FAF9F6', borderRadius: 2, border: '1px solid #E7E5E4' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <Description sx={{ fontSize: 16, color: '#1A2F4B' }} />
-                <Typography fontWeight={700} fontSize={13} color="#1A2F4B">
+                <Description sx={{ fontSize: 16, color: BRAND.primaryMain }} />
+                <Typography fontWeight={700} fontSize={13} color={BRAND.primaryMain}>
                   Review Narrative
                 </Typography>
                 <Chip label="Creates linked draft report" size="small" variant="outlined"
@@ -5653,16 +5653,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                   </Table>
                 </Box>
                 {grpAttendees.filter(a => a.attendee_name || a.msme).length > 0 && (
-                  <Box sx={{ px: 2, py: 1.5, bgcolor: '#F3F6FB', borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Box sx={{ px: 2, py: 1.5, bgcolor: '#FAF9F6', borderTop: '1px solid', borderColor: 'divider' }}>
                     <Grid container spacing={1}>
                       {[
-                        { label: 'Total', value: grpAttendees.length, color: '#1565C0' },
+                        { label: 'Total', value: grpAttendees.length, color: BRAND.primaryMain },
                         { label: 'Female', value: female.length, color: '#AD1457' },
-                        { label: 'Male', value: male.length, color: '#1565C0' },
+                        { label: 'Male', value: male.length, color: BRAND.primaryMain },
                         { label: 'Youth F', value: youth.filter(a => a.gender === 'F').length, color: '#AD1457' },
-                        { label: 'Youth M', value: youth.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Youth M', value: youth.filter(a => a.gender === 'M').length, color: BRAND.primaryMain },
                         { label: 'Adult F', value: adult.filter(a => a.gender === 'F').length, color: '#AD1457' },
-                        { label: 'Adult M', value: adult.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Adult M', value: adult.filter(a => a.gender === 'M').length, color: BRAND.primaryMain },
                         { label: 'Refugees', value: ref.length, color: '#E65100' },
                         { label: 'Host Comm.', value: grpAttendees.filter(a => a.refugee_status === 'H').length, color: '#2E7D32' },
                       ].map(({ label, value, color }) => (
@@ -5905,8 +5905,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 ))}
               </Grid>
               {workOrderPreview.work_order_type === 'bge_technical_co_assignment' && workOrderPreview.target_msmes_detail?.length > 0 && (
-                <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F0F9FF', borderRadius: 1, border: '1px solid #BAE6FD' }}>
-                  <Typography variant="caption" fontWeight={700} color="#0369A1" display="block" sx={{ mb: 0.5 }}>
+                <Box sx={{ mb: 2, p: 1.5, bgcolor: '#FFFDF5', borderRadius: 1, border: '1px solid #FDE68A' }}>
+                  <Typography variant="caption" fontWeight={700} color="#92400E" display="block" sx={{ mb: 0.5 }}>
                     Target MSMEs for Technical Support ({workOrderPreview.target_msmes_detail.length}):
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
@@ -6187,7 +6187,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             ][helpSection].steps.map(step => (
               <Box key={step.n} sx={{ display: 'flex', gap: 2, mb: 2.5, alignItems: 'flex-start' }}>
                 <Box sx={{
-                  minWidth: 28, height: 28, borderRadius: '50%', bgcolor: '#1565C0', color: '#fff',
+                  minWidth: 28, height: 28, borderRadius: '50%', bgcolor: BRAND.primaryMain, color: '#fff',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 13, fontWeight: 700, flexShrink: 0,
                 }}>

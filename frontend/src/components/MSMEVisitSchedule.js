@@ -311,7 +311,7 @@ export default function MSMEVisitSchedule({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
           <Typography variant="subtitle1" fontWeight={800} sx={{ color: BRAND.primaryMain, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CalendarMonth sx={{ color: '#1A73E8' }} /> Field Visit Schedule
+            <CalendarMonth sx={{ color: BRAND.primaryMain }} /> Field Visit Schedule
           </Typography>
           <Typography variant="caption" color="text.secondary">
             Upcoming sessions, advisory visits, and engagement history for {msme?.business_name}
@@ -362,9 +362,9 @@ export default function MSMEVisitSchedule({
             p: 2.5,
             mb: 3,
             borderRadius: 3,
-            border: '2px solid #1A73E8',
-            background: 'linear-gradient(135deg, #FFFFFF 0%, #F4F8FD 100%)',
-            boxShadow: '0 4px 16px rgba(26, 115, 232, 0.08)',
+            border: `2px solid ${BRAND.primaryMain}`,
+            background: 'linear-gradient(135deg, #FFFFFF 0%, #FAF9F6 100%)',
+            boxShadow: '0 4px 16px rgba(38, 37, 35, 0.08)',
           }}
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
@@ -372,13 +372,13 @@ export default function MSMEVisitSchedule({
               <Chip
                 label="NEXT SCHEDULED SESSION"
                 size="small"
-                sx={{ bgcolor: '#1A73E8', color: '#fff', fontWeight: 800, fontSize: 10, letterSpacing: 0.5 }}
+                sx={{ bgcolor: BRAND.primaryMain, color: '#fff', fontWeight: 800, fontSize: 10, letterSpacing: 0.5 }}
               />
               <Chip
                 label={VISIT_TYPE_LABELS[upcomingVisit.visit_type] || upcomingVisit.visit_type}
                 size="small"
                 variant="outlined"
-                sx={{ borderColor: '#1A73E8', color: '#1A73E8', fontWeight: 700, fontSize: 11 }}
+                sx={{ borderColor: BRAND.primaryMain, color: BRAND.primaryMain, fontWeight: 700, fontSize: 11 }}
               />
               {upcomingVisit.is_google_synced && (
                 <Chip
@@ -397,10 +397,10 @@ export default function MSMEVisitSchedule({
               sx={{
                 fontSize: 12,
                 fontWeight: 700,
-                borderColor: '#1A73E8',
-                color: '#1A73E8',
+                borderColor: BRAND.primaryMain,
+                color: BRAND.primaryMain,
                 bgcolor: '#fff',
-                '&:hover': { bgcolor: '#E8F0FE', borderColor: '#1A73E8' },
+                '&:hover': { bgcolor: '#F5F5F4', borderColor: BRAND.primaryMain },
               }}
             >
               Add to Google Calendar
@@ -415,7 +415,7 @@ export default function MSMEVisitSchedule({
           <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid item xs={12} sm={4}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Event sx={{ color: '#1A73E8', fontSize: 20 }} />
+                <Event sx={{ color: BRAND.primaryMain, fontSize: 20 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">Date</Typography>
                   <Typography variant="body2" fontWeight={700} sx={{ color: BRAND.primaryMain }}>
@@ -427,7 +427,7 @@ export default function MSMEVisitSchedule({
 
             <Grid item xs={12} sm={4}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AccessTime sx={{ color: '#1A73E8', fontSize: 20 }} />
+                <AccessTime sx={{ color: BRAND.primaryMain, fontSize: 20 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">Time Window</Typography>
                   <Typography variant="body2" fontWeight={700} sx={{ color: BRAND.primaryMain }}>
@@ -441,7 +441,7 @@ export default function MSMEVisitSchedule({
 
             <Grid item xs={12} sm={4}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Place sx={{ color: '#1A73E8', fontSize: 20 }} />
+                <Place sx={{ color: BRAND.primaryMain, fontSize: 20 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">Meeting Venue</Typography>
                   <Typography variant="body2" fontWeight={700} sx={{ color: BRAND.primaryMain }}>
@@ -657,7 +657,7 @@ export default function MSMEVisitSchedule({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Tooltip title="Add / View in Google Calendar">
                     <IconButton size="small" onClick={() => openGoogleCalendar(v)}>
-                      <CalendarMonth fontSize="small" sx={{ color: '#1A73E8' }} />
+                      <CalendarMonth fontSize="small" sx={{ color: BRAND.primaryMain }} />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Download .ICS Calendar File">

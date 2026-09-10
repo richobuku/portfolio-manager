@@ -38,11 +38,11 @@ function PasswordChangeModal({ token, onSuccess }) {
       display:'flex', alignItems:'center', justifyContent:'center' }}>
       <div style={{ background:'#fff', borderRadius:10, padding:'32px 36px', width:380,
         maxWidth:'95vw', boxShadow:'0 8px 32px rgba(0,0,0,0.25)' }}>
-        <div style={{ background:'#1A2F4B', borderRadius:6, padding:'12px 16px', marginBottom:20 }}>
+        <div style={{ background:'#262523', borderRadius:6, padding:'12px 16px', marginBottom:20 }}>
           <div style={{ color:'#fff', fontWeight:800, fontSize:18 }}>PRUDEV II</div>
           <div style={{ color:'rgba(255,255,255,0.7)', fontSize:12 }}>Security — Password Update Required</div>
         </div>
-        <h3 style={{ margin:'0 0 6px', color:'#1A2F4B', fontSize:16 }}>Set a new password</h3>
+        <h3 style={{ margin:'0 0 6px', color:'#262523', fontSize:16 }}>Set a new password</h3>
         <p style={{ margin:'0 0 20px', color:'#555', fontSize:13, lineHeight:1.5 }}>
           Your account requires a password change before you can continue.
           Choose a strong password of at least 8 characters.
@@ -86,7 +86,7 @@ function PendingApproval({ currentUser, onLogout }) {
         width: '100%', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center',
       }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
-        <h2 style={{ margin: '0 0 8px', color: '#1A2F4B' }}>Account Pending Approval</h2>
+        <h2 style={{ margin: '0 0 8px', color: '#262523' }}>Account Pending Approval</h2>
         <p style={{ color: '#555', lineHeight: 1.6, margin: '0 0 4px' }}>
           Your account ({currentUser?.email || currentUser?.username}) signed in successfully,
           but an administrator needs to approve access before you can view programme data.

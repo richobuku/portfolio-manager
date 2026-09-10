@@ -1415,15 +1415,15 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
               <Box sx={{
                 p: 2,
                 borderRadius: 2,
-                border: '1.5px solid #0288D1',
-                bgcolor: '#F0F9FF',
+                border: '1.5px solid #D97706',
+                bgcolor: '#FFFDF5',
                 mb: 1,
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#01579B' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#92400E' }}>
                     🤝 Technical Co-Assignment Configuration
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#0288D1', bgcolor: '#E1F5FE', px: 1, py: 0.25, borderRadius: 1, fontWeight: 600 }}>
+                  <Typography variant="caption" sx={{ color: '#92400E', bgcolor: '#FEF3C7', px: 1, py: 0.25, borderRadius: 1, fontWeight: 600 }}>
                     Specialist Area of Greatest Technical Capacity
                   </Typography>
                 </Box>
@@ -1524,8 +1524,8 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                                       p: 0.5,
                                       borderRadius: 1,
                                       cursor: 'pointer',
-                                      bgcolor: checked ? '#E1F5FE' : 'transparent',
-                                      '&:hover': { bgcolor: '#F0F9FF' },
+                                      bgcolor: checked ? '#FEF3C7' : 'transparent',
+                                      '&:hover': { bgcolor: '#F5F5F4' },
                                     }}
                                   >
                                     <Checkbox size="small" checked={checked} sx={{ p: 0.5, mr: 0.5 }} />

@@ -231,7 +231,7 @@ const EMPTY_FORM = {
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
-function SectionBlock({ icon, title, color = '#1A2F4B', children }) {
+function SectionBlock({ icon, title, color = BRAND.primaryMain, children }) {
   return (
     <Box sx={{ mb: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -754,7 +754,7 @@ export default function VisitReportForm({
                     <a
                       href={`https://maps.google.com/?q=${form.visit_latitude},${form.visit_longitude}`}
                       target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 10.5, color: '#1A73E8', fontWeight: 600, textDecoration: 'none' }}
+                      style={{ fontSize: 10.5, color: BRAND.primaryMain, fontWeight: 600, textDecoration: 'none' }}
                     >
                       View map ↗
                     </a>
@@ -805,7 +805,7 @@ export default function VisitReportForm({
             {/* ── 1. OBJECTIVES & STATED PURPOSE ── */}
             <SectionBlock icon={<Flag />} title="1. Objectives & Stated Purpose (Opening Alignment)" color={typeInfo.color}>
               {cfg.show_reflections && (
-                <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #BAE6FD', bgcolor: '#F0F9FF' }}>
+                <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #E7E5E4', bgcolor: '#FAF9F6' }}>
                   <strong>Reflection 1 — Opening Purpose:</strong> Open every visit by agreeing on a clear, single focus with the entrepreneur. Avoid project jargon like <em>"I am here for Visit #3"</em>.
                 </Alert>
               )}
@@ -942,7 +942,7 @@ export default function VisitReportForm({
             {cfg.show_delivered !== false && (
               <SectionBlock icon={<Build />} title="2. Diagnose AND Advise — Immediate Support Delivered" color={typeInfo.color}>
                 {cfg.show_reflections && (
-                  <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #BAE6FD', bgcolor: '#F0F9FF' }}>
+                  <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #E7E5E4', bgcolor: '#FAF9F6' }}>
                     <strong>Reflection 2 — Diagnose AND Advise:</strong> Never leave a diagnosis hanging. If you identify a gap (e.g. mixed personal/business cash, unrecorded credit, pricing issues), immediately demonstrate or calculate the solution on the spot.
                   </Alert>
                 )}
@@ -1042,7 +1042,7 @@ export default function VisitReportForm({
             {/* ── 4. CLOSING & VISIBLE NEXT STEPS ── */}
             <SectionBlock icon={<ArrowForward />} title="4. Closing & Visible Mutual Next Steps" color={typeInfo.color}>
               {cfg.show_reflections && (
-                <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #BAE6FD', bgcolor: '#F0F9FF' }}>
+                <Alert severity="info" sx={{ mb: 2, fontSize: 12, border: '1px solid #E7E5E4', bgcolor: '#FAF9F6' }}>
                   <strong>Reflection 4 — Visible Next Step:</strong> Every visit must close with a stated next step visible and confirmed with the MSME, not just stored invisibly in our system.
                 </Alert>
               )}

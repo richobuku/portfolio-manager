@@ -12,7 +12,7 @@ function SectionHeader({ title, subtitle, children }) {
       mb: 2.5,
     }}>
       <Box sx={{ minWidth: 0, pl: 1.5, borderLeft: '3.5px solid #F3BB36' }}>
-        <Typography variant="h6" fontWeight={700} sx={{ color: '#1A2E42', lineHeight: 1.25 }}>{title}</Typography>
+        <Typography variant="h6" fontWeight={700} sx={{ color: '#262523', lineHeight: 1.25 }}>{title}</Typography>
         {subtitle && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>{subtitle}</Typography>}
       </Box>
       {children && (

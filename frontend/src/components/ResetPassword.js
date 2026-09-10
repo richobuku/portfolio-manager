@@ -6,8 +6,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { API_ENDPOINTS } from '../config';
-
-const BRAND = { dark: '#1A2F4B', gizRed: '#C8102E' };
+import { BRAND } from '../theme';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();

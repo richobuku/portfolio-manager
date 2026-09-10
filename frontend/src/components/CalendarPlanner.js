@@ -37,8 +37,8 @@ const STATUS_CONFIG = {
   planned: {
     label: 'Planned Meeting',
     color: BRAND.primaryMain,
-    bg: '#F1F5F9',
-    border: '#CBD5E1',
+    bg: '#F5F5F4',
+    border: '#E7E5E4',
     icon: <Schedule sx={{ fontSize: 16 }} />,
   },
   completed: {
@@ -65,8 +65,8 @@ const STATUS_CONFIG = {
   cancelled: {
     label: 'Cancelled',
     color: BRAND.proSlate,
-    bg: '#F8FAFC',
-    border: '#E2E8F0',
+    bg: '#FAF9F6',
+    border: '#E7E5E4',
     icon: <Cancel sx={{ fontSize: 16 }} />,
   },
 };
@@ -817,12 +817,12 @@ export default function CalendarPlanner({
                   )
                 }
                 sx={{
-                  borderColor: 'rgba(66,133,244,0.4)',
-                  color: '#1A73E8',
+                  borderColor: 'rgba(38,37,35,0.3)',
+                  color: BRAND.primaryMain,
                   bgcolor: '#fff',
                   fontWeight: 600,
                   textTransform: 'none',
-                  '&:hover': { borderColor: '#1A73E8', bgcolor: 'rgba(66,133,244,0.06)' },
+                  '&:hover': { borderColor: BRAND.primaryMain, bgcolor: 'rgba(38,37,35,0.04)' },
                 }}
               >
                 {googleConnecting ? 'Connecting...' : 'Connect Google Calendar'}
@@ -862,7 +862,7 @@ export default function CalendarPlanner({
               </Typography>
 
               {/* Google OAuth direct status in sync menu */}
-              <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F4F7FB', borderRadius: 1.5, border: '1px solid #E0E7F1' }}>
+              <Box sx={{ mb: 2, p: 1.5, bgcolor: '#FAF9F6', borderRadius: 1.5, border: '1px solid #E7E5E4' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="caption" fontWeight={700} sx={{ color: BRAND.primaryMain }}>
                     Google Calendar Auto-Push
@@ -903,7 +903,7 @@ export default function CalendarPlanner({
                     fullWidth
                     onClick={handleConnectGoogleCalendar}
                     disabled={googleConnecting}
-                    sx={{ fontSize: 11, textTransform: 'none', bgcolor: '#1A73E8' }}
+                    sx={{ fontSize: 11, textTransform: 'none', bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark } }}
                   >
                     Connect Google Calendar
                   </Button>
@@ -1017,9 +1017,9 @@ export default function CalendarPlanner({
             <Card
               sx={{
                 borderRadius: 2.5,
-                border: '1px solid #E0E7FF',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #F4F7FC 100%)',
+                border: '1px solid #E7E5E4',
+                boxShadow: '0 2px 8px rgba(38,37,35,0.04)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #FAF9F6 100%)',
               }}
             >
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
@@ -1043,9 +1043,9 @@ export default function CalendarPlanner({
             <Card
               sx={{
                 borderRadius: 2.5,
-                border: '1px solid #CBD5E1',
-                boxShadow: '0 2px 8px rgba(26,46,66,0.06)',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
+                border: '1px solid #E7E5E4',
+                boxShadow: '0 2px 8px rgba(38,37,35,0.04)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #F5F5F4 100%)',
               }}
             >
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
@@ -1413,15 +1413,15 @@ export default function CalendarPlanner({
                     borderBottom: '1px solid #F0F3F6',
                     bgcolor: cell.isCurrentMonth
                       ? today
-                        ? '#F0F9FF'
+                        ? '#FFFBEB'
                         : '#FFFFFF'
-                      : '#FAFAFA',
+                      : '#FAF9F6',
                     transition: 'all 0.18s ease',
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
                     '&:hover': {
-                      bgcolor: today ? '#E6F4FE' : '#F8FAFC',
+                      bgcolor: today ? '#FEF3C7' : '#F5F5F4',
                       '& .add-visit-btn': { opacity: 1 },
                       '& .cell-more-btn': { borderColor: BRAND.primaryMain },
                     },
@@ -1476,9 +1476,9 @@ export default function CalendarPlanner({
                             px: 0.6,
                             py: 0.1,
                             borderRadius: '10px',
-                            bgcolor: hasConflict ? '#FEF3C7' : '#EFF6FF',
-                            color: hasConflict ? '#92400E' : '#1D4ED8',
-                            border: `1px solid ${hasConflict ? '#FDE68A' : '#BFDBFE'}`,
+                            bgcolor: hasConflict ? '#FEF3C7' : '#F5F5F4',
+                            color: hasConflict ? '#92400E' : '#44403C',
+                            border: `1px solid ${hasConflict ? '#FDE68A' : '#E7E5E4'}`,
                             fontSize: 9.5,
                             fontWeight: 700,
                             cursor: 'pointer',
@@ -1713,8 +1713,8 @@ export default function CalendarPlanner({
                             height: 18,
                             fontSize: 10,
                             fontWeight: 700,
-                            bgcolor: hasConflict ? '#FEF3C7' : '#E0E7FF',
-                            color: hasConflict ? '#B45309' : '#3730A3',
+                            bgcolor: hasConflict ? '#FEF3C7' : '#F5F5F4',
+                            color: hasConflict ? '#B45309' : '#44403C',
                             cursor: 'pointer',
                           }}
                           title="Click to open Day View"
@@ -1743,7 +1743,7 @@ export default function CalendarPlanner({
                     sx={{
                       p: 1.25,
                       borderRight: index < 6 ? '1px solid #F0F3F6' : 'none',
-                      bgcolor: isDateToday ? '#F8FBFF' : '#FFFFFF',
+                      bgcolor: isDateToday ? '#FFFDF5' : '#FFFFFF',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 1,
@@ -1978,8 +1978,8 @@ export default function CalendarPlanner({
                       sx={{
                         fontWeight: 700,
                         fontSize: 12,
-                        bgcolor: dayVisits.length > 0 ? '#E0F2FE' : '#F1F5F9',
-                        color: dayVisits.length > 0 ? '#0369A1' : '#64748B',
+                        bgcolor: dayVisits.length > 0 ? '#FEF3C7' : '#F5F5F4',
+                        color: dayVisits.length > 0 ? '#92400E' : '#78716C',
                       }}
                     />
                   </Box>
@@ -3267,8 +3267,8 @@ export default function CalendarPlanner({
             Sync Your Calendar Immediately:
           </Typography>
 
-          <Paper variant="outlined" sx={{ p: 2, mb: 1.5, borderRadius: 2, bgcolor: '#F8FAFC' }}>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1A73E8', mb: 0.5 }}>
+          <Paper variant="outlined" sx={{ p: 2, mb: 1.5, borderRadius: 2, bgcolor: '#FAF9F6' }}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND.primaryMain, mb: 0.5 }}>
               Option 1: Subscribe in Google Calendar (Live Feed)
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13, mb: 1.5 }}>
@@ -3288,7 +3288,7 @@ export default function CalendarPlanner({
                 });
                 setGoogleSetupDialogOpen(false);
               }}
-              sx={{ bgcolor: '#1A73E8', fontWeight: 600, textTransform: 'none' }}
+              sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark }, fontWeight: 600, textTransform: 'none' }}
             >
               Subscribe in Google Calendar
             </Button>

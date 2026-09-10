@@ -1789,7 +1789,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
             <Box sx={{
               bgcolor: BRAND.gopaGold,
-              color: '#1A2E42',
+              color: BRAND.primaryMain,
               px: 0.8, py: 0.3, borderRadius: 1,
               fontWeight: 900, fontSize: 8.5, letterSpacing: 0.5,
               lineHeight: 1.1, textAlign: 'center',
@@ -2100,7 +2100,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             onDelete={isAdmin ? () => toggleProgrammeGroup(m, g.id) : undefined}
                             sx={{
                               fontSize: 10, height: 20,
-                              bgcolor: g.color || '#1A2F4B',
+                              bgcolor: g.color || BRAND.primaryMain,
                               color: '#fff',
                               '& .MuiChip-deleteIcon': { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
                             }}
@@ -2266,7 +2266,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       { val: totalSessions, label: 'Training Sessions',sub: 'conducted to date',      color: BRAND.gopaGoldDark,  key: 'training' },
       { val: totalReports,  label: 'Reports Filed',    sub: 'MSME + group visits',    color: BRAND.programmeGreen,key: 'reports' },
       { val: totalGroups,   label: 'BGE Groups',       sub: 'active teams',           color: BRAND.proSlate,      key: 'bgegroups' },
-      { val: totalEmployees,label: 'Total Employees',  sub: empSub,                   color: '#1E293B',           key: 'analytics' },
+      { val: totalEmployees,label: 'Total Employees',  sub: empSub,                   color: '#44403C',           key: 'analytics' },
     ];
 
     const quickLinks = [
@@ -2297,11 +2297,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         {/* ── Welcome bar ── */}
         <Box sx={{
           mb: 3, p: 2.5, borderRadius: 2,
-          background: `linear-gradient(135deg, ${BRAND.sidebarBg} 0%, #20354B 60%, #152538 100%)`,
+          background: `linear-gradient(135deg, ${BRAND.sidebarBg} 0%, #353330 60%, #191817 100%)`,
           color: '#fff',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: '0 4px 16px rgba(26,46,66,0.12)',
+          boxShadow: '0 4px 16px rgba(38,37,35,0.15)',
           '&::after': {
             content: '""',
             position: 'absolute',
@@ -2369,10 +2369,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </Card>
           </Grid>
           <Grid item xs={12} md={4}>
-            <Card variant="outlined" sx={{ height: '100%', borderTop: '3px solid #0288D1' }}>
+            <Card variant="outlined" sx={{ height: '100%', borderTop: `3px solid ${BRAND.gopaGoldDark}` }}>
               <CardContent>
                 <Typography variant="overline" color="text.secondary">Training Engagement</Typography>
-                <Typography variant="h4" fontWeight={800} color="#0288D1">{totalSessions}</Typography>
+                <Typography variant="h4" fontWeight={800} color={BRAND.gopaGoldDark}>{totalSessions}</Typography>
                 <Typography variant="caption" color="text.secondary">
                   Sessions held · {trainingSessions.reduce((t, s) => t + (s.attendance_count || 0), 0)} total attendances
                 </Typography>
@@ -2448,7 +2448,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   {upcoming.map((s, i) => (
                     <Box key={s.id} sx={{ px: 2, py: 1.5, borderBottom: i < upcoming.length - 1 ? '1px solid #eee' : 'none',
                       display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <EventNote fontSize="small" sx={{ color: '#0288D1' }} />
+                      <EventNote fontSize="small" sx={{ color: BRAND.gopaGoldDark }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" fontWeight={600} noWrap>{s.title}</Typography>
                         <Typography variant="caption" color="text.secondary">
@@ -2820,8 +2820,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // Brand-aligned palette for charts
   const CHART_PALETTE = [
-    '#1A2F4B', '#C8102E', '#2E7D32', '#F9A825', '#0288D1',
-    '#7B1FA2', '#5D4037', '#00897B', '#FF6F00', '#3949AB',
+    '#262523', '#C8102E', '#D97706', '#009B62', '#6A6E6B',
+    '#8D5B4C', '#B45309', '#44403C', '#991B1B', '#047857',
   ];
 
   // Drill-down filter state for the analytics page
@@ -3081,7 +3081,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               {[
                 { val: totalMsmes,                                          label: 'MSMEs Enrolled',    sub: 'in filtered view',   color: BRAND.primaryMain },
                 { val: A.total_bges || experts.length,                      label: 'BGE Experts',       sub: 'coaches in field',   color: BRAND.gizRed },
-                { val: A.total_groups || 0,                                 label: 'BGE Groups',        sub: 'active teams',       color: '#0288D1' },
+                { val: A.total_groups || 0,                                 label: 'BGE Groups',        sub: 'active teams',       color: BRAND.gopaGoldDark },
                 { val: (A.total_reports||0)+(A.total_group_reports||0),     label: 'Reports Filed',     sub: 'MSME + group visits', color: '#2E7D32' },
                 { val: A.total_employees || 0,                              label: 'Total Employees',   sub: 'from latest data updates', color: '#5D4037' },
                 { val: fmt(A.total_annual_revenue),                         label: 'Total Revenue',     sub: 'self-reported',      color: '#7B1FA2' },
@@ -3163,7 +3163,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <XAxis dataKey="month" tick={{fontSize:11}}/>
                       <YAxis tick={{fontSize:11}}/>
                       <ReTooltip/>
-                      <Area type="monotone" dataKey="MSMEs" stroke="#1A2F4B" fill="#1A2F4B" fillOpacity={0.18} strokeWidth={2}/>
+                      <Area type="monotone" dataKey="MSMEs" stroke="#262523" fill="#262523" fillOpacity={0.18} strokeWidth={2}/>
                     </AreaChart>
                   </ResponsiveContainer>
                 </ChartCard>
@@ -3218,7 +3218,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <PieChart>
                       <Pie data={pieData(A.gender_stats, 'gender')} dataKey="value" nameKey="name"
                            innerRadius={45} outerRadius={80}>
-                        {(A.gender_stats||[]).map((_,i)=><Cell key={i} fill={['#1A2F4B','#C8102E','#999'][i%3]}/>)}
+                        {(A.gender_stats||[]).map((_,i)=><Cell key={i} fill={['#262523','#C8102E','#999'][i%3]}/>)}
                       </Pie>
                       <ReTooltip /><Legend wrapperStyle={{fontSize:11}}/>
                     </PieChart>
@@ -3246,7 +3246,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   {[
                     { val: A.diag_green?.green||0,                                                                   label:'Green Businesses',   sub:`${diagTotal?(((A.diag_green?.green||0)/diagTotal*100).toFixed(0)):'0'}% of total`,  color:'#2E7D32', pct:diagTotal?((A.diag_green?.green||0)/diagTotal*100):0 },
-                    { val: A.diag_compliance?.has_tin||0,                                                            label:'Have TIN',            sub:'Tax ID registered',   color:'#1565C0', pct:diagTotal?((A.diag_compliance?.has_tin||0)/diagTotal*100):0 },
+                    { val: A.diag_compliance?.has_tin||0,                                                            label:'Have TIN',            sub:'Tax ID registered',   color:'#D97706', pct:diagTotal?((A.diag_compliance?.has_tin||0)/diagTotal*100):0 },
                     { val: A.diag_compliance?.has_business_bank||0,                                                  label:'Business Bank Acct',  sub:'Financial access',    color:'#00695C', pct:diagTotal?((A.diag_compliance?.has_business_bank||0)/diagTotal*100):0 },
                     { val: A.diag_compliance?.has_unbs||0,                                                           label:'UNBS Registered',     sub:'Product standard',    color:'#4527A0', pct:diagTotal?((A.diag_compliance?.has_unbs||0)/diagTotal*100):0 },
                     { val:(A.diag_employees?.ft_male||0)+(A.diag_employees?.ft_female||0),                          label:'Full-time Staff',      sub:'Total at baseline',   color:'#5D4037' },
@@ -3260,7 +3260,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <Card variant="outlined" sx={{ height: '100%' }}>
                       <CardContent>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Compliance Rates</Typography>
-                        <ComplianceStat label="Has TIN (Tax ID)"            count={A.diag_compliance?.has_tin||0}           total={diagTotal} color="#1565C0"/>
+                        <ComplianceStat label="Has TIN (Tax ID)"            count={A.diag_compliance?.has_tin||0}           total={diagTotal} color="#D97706"/>
                         <ComplianceStat label="Registered with UNBS"        count={A.diag_compliance?.has_unbs||0}          total={diagTotal} color="#4527A0"/>
                         <ComplianceStat label="Has Business Bank Account"   count={A.diag_compliance?.has_business_bank||0} total={diagTotal} color="#00695C"/>
                         <ComplianceStat label="Has Mobile Money Account"    count={A.diag_compliance?.has_mobile_money||0}  total={diagTotal} color="#E65100"/>
@@ -3292,7 +3292,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <XAxis dataKey="name" tick={{fontSize:10}}/>
                           <YAxis tick={{fontSize:11}}/>
                           <ReTooltip/>
-                          <Bar dataKey="count" fill="#0288D1" radius={[4,4,0,0]}/>
+                          <Bar dataKey="count" fill="#D97706" radius={[4,4,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartCard>
@@ -3324,7 +3324,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
                           <XAxis dataKey="name" tick={{fontSize:11}}/><YAxis tick={{fontSize:11}}/>
                           <ReTooltip/><Legend wrapperStyle={{fontSize:11}}/>
-                          <Bar dataKey="Male"   stackId="a" fill="#1A2F4B"/>
+                          <Bar dataKey="Male"   stackId="a" fill="#262523"/>
                           <Bar dataKey="Female" stackId="a" fill="#C8102E" radius={[4,4,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
@@ -3348,7 +3348,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         <PieChart>
                           <Pie data={(A.diag_owner_sex||[]).map(s=>({name:s.diag_owner_sex,value:s.count}))}
                                dataKey="value" nameKey="name" innerRadius={50} outerRadius={80}>
-                            {(A.diag_owner_sex||[]).map((_,i)=><Cell key={i} fill={['#1A2F4B','#C8102E','#999'][i%3]}/>)}
+                            {(A.diag_owner_sex||[]).map((_,i)=><Cell key={i} fill={['#262523','#C8102E','#999'][i%3]}/>)}
                           </Pie>
                           <ReTooltip/><Legend wrapperStyle={{fontSize:11}}/>
                         </PieChart>
@@ -3377,7 +3377,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <XAxis type="number" tick={{fontSize:11}}/>
                       <YAxis dataKey="name" type="category" width={130} tick={{fontSize:10}}/>
                       <ReTooltip/><Legend wrapperStyle={{fontSize:11}}/>
-                      <Bar dataKey="Direct"   stackId="a" fill="#1A2F4B"/>
+                      <Bar dataKey="Direct"   stackId="a" fill="#262523"/>
                       <Bar dataKey="ViaGroup" stackId="a" fill="#C8102E" radius={[0,4,4,0]}/>
                     </BarChart>
                   </ResponsiveContainer>
@@ -3410,7 +3410,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <CartesianGrid strokeDasharray="3 3" stroke="#eee"/>
                       <XAxis dataKey="name" tick={{fontSize:10}}/><YAxis tick={{fontSize:11}}/>
                       <ReTooltip/><Legend wrapperStyle={{fontSize:11}}/>
-                      <Bar dataKey="MSMEs"   fill="#1A2F4B" radius={[4,4,0,0]}/>
+                      <Bar dataKey="MSMEs"   fill="#262523" radius={[4,4,0,0]}/>
                       <Bar dataKey="Reports" fill="#2E7D32" radius={[4,4,0,0]}/>
                     </BarChart>
                   </ResponsiveContainer>
@@ -3426,7 +3426,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <PieChart>
                       <Pie data={pieData(A.report_status_stats,'status')} dataKey="value" nameKey="name" outerRadius={70}>
                         {(A.report_status_stats||[]).map((s,i)=>(
-                          <Cell key={i} fill={s.status==='submitted'?'#1A2F4B':s.status==='reviewed'?'#2E7D32':'#C8102E'}/>
+                          <Cell key={i} fill={s.status==='submitted'?'#262523':s.status==='reviewed'?'#2E7D32':'#C8102E'}/>
                         ))}
                       </Pie>
                       <ReTooltip/><Legend wrapperStyle={{fontSize:11}}/>
@@ -3440,7 +3440,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <PieChart>
                       <Pie data={pieData(A.group_report_status_stats,'status')} dataKey="value" nameKey="name" outerRadius={70}>
                         {(A.group_report_status_stats||[]).map((s,i)=>(
-                          <Cell key={i} fill={s.status==='submitted'?'#1A2F4B':s.status==='approved'?'#2E7D32':'#C8102E'}/>
+                          <Cell key={i} fill={s.status==='submitted'?'#262523':s.status==='approved'?'#2E7D32':'#C8102E'}/>
                         ))}
                       </Pie>
                       <ReTooltip/><Legend wrapperStyle={{fontSize:11}}/>
@@ -3475,7 +3475,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <XAxis type="number" tick={{fontSize:11}}/>
                       <YAxis dataKey="name" type="category" width={110} tick={{fontSize:11}}/>
                       <ReTooltip/>
-                      <Bar dataKey="count" fill="#1A2F4B" radius={[0,4,4,0]}/>
+                      <Bar dataKey="count" fill="#262523" radius={[0,4,4,0]}/>
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartCard>
@@ -3489,7 +3489,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <XAxis type="number" tick={{fontSize:11}}/>
                       <YAxis dataKey="name" type="category" width={100} tick={{fontSize:11}}/>
                       <ReTooltip/>
-                      <Bar dataKey="count" fill="#0288D1" radius={[0,4,4,0]}/>
+                      <Bar dataKey="count" fill="#D97706" radius={[0,4,4,0]}/>
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartCard>
@@ -3538,7 +3538,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           const fmtUGX = v => v == null || v === '' ? '—' : `UGX ${Number(v).toLocaleString()}`;
           const compFields = [
             { label: 'URSB',         key: 'has_ursb',          color: '#4527A0' },
-            { label: 'TIN',          key: 'has_tin',           color: '#1565C0' },
+            { label: 'TIN',          key: 'has_tin',           color: '#D97706' },
             { label: 'Bank Account', key: 'has_business_bank', color: '#00695C' },
             { label: 'Mobile Money', key: 'has_mobile_money',  color: '#E65100' },
             { label: 'MOMO Pay',     key: 'has_momo_pay',      color: '#F57C00' },
@@ -3722,8 +3722,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   PRINTABLE SUMMARY REPORT (hidden on screen, shown on print)
                   ════════════════════════════════════════════════════════════ */}
               <Box className="prudev2-printable" sx={{ display: 'none' }}>
-                <Box sx={{ mb: 3, pb: 2, borderBottom: '2px solid #1A2F4B' }}>
-                  <Typography variant="h5" fontWeight={800} color="#1A2F4B">PRUDEV II — Growth Impact Report</Typography>
+                <Box sx={{ mb: 3, pb: 2, borderBottom: '2px solid #262523' }}>
+                  <Typography variant="h5" fontWeight={800} color="#262523">PRUDEV II — Growth Impact Report</Typography>
                   <Typography variant="body2" color="text.secondary">
                     Generated {new Date().toLocaleDateString('en-UG', { day: 'numeric', month: 'long', year: 'numeric' })} ·
                     {msmeIds.length} MSMEs · {paired.length} with before/after comparison
@@ -3739,7 +3739,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     { label: 'Staff Change',         val: totalStaffAfter > totalStaffBefore ? `+${totalStaffAfter - totalStaffBefore}` : String(totalStaffAfter - totalStaffBefore) },
                   ].map(({ label, val }) => (
                     <Box key={label} sx={{ textAlign: 'center', minWidth: 110 }}>
-                      <Typography fontSize={22} fontWeight={800} color="#1A2F4B">{val}</Typography>
+                      <Typography fontSize={22} fontWeight={800} color="#262523">{val}</Typography>
                       <Typography fontSize={11} color="#555">{label}</Typography>
                     </Box>
                   ))}
@@ -3757,7 +3757,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         <ReTooltip/>
                         <Legend wrapperStyle={{ fontSize: 11 }}/>
                         <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
-                        <Bar dataKey="After"  fill="#1A2F4B" radius={[3,3,0,0]}/>
+                        <Bar dataKey="After"  fill="#262523" radius={[3,3,0,0]}/>
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
@@ -3793,7 +3793,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         <XAxis dataKey="period" tick={{ fontSize: 11 }}/>
                         <YAxis tickFormatter={v => `${v}K`} tick={{ fontSize: 10 }}/>
                         <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, 'Avg Revenue']}/>
-                        <Bar dataKey="Avg Revenue (K)" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                        <Bar dataKey="Avg Revenue (K)" fill="#262523" radius={[3,3,0,0]}/>
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
@@ -3807,7 +3807,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
                   { val: msmeIds.length,                                    label: 'MSMEs with Data',    sub: `of ${totalEnrolledTab1} total`,   color: BRAND.primaryMain },
-                  { val: paired.length,                                     label: 'Paired (Before/After)', sub: '≥2 snapshots',            color: '#0288D1' },
+                  { val: paired.length,                                     label: 'Paired (Before/After)', sub: '≥2 snapshots',            color: BRAND.gopaGoldDark },
                   { val: `UGX ${(avgRevLatest/1000).toFixed(0)}K`,         label: 'Avg Annual Revenue', sub: 'latest snapshot',            color: '#2E7D32' },
                   { val: pctRevGrowth != null ? `+${pctRevGrowth}%` : '—', label: 'Avg Revenue Growth', sub: 'first → latest',            color: Number(pctRevGrowth) > 0 ? '#2E7D32' : '#C8102E' },
                   { val: `UGX ${(totalRevGrowth/1000).toFixed(0)}K`,       label: 'Total Revenue Uplift', sub: 'across paired MSMEs',     color: '#7B1FA2' },
@@ -3829,7 +3829,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     pct: latestList.length ? bankCount/latestList.length*100 : 0 },
                   { val: `${momoCount} / ${latestList.length}`,    label: 'MOMO Pay Code',       sub: 'registered mobile payment',   color: '#F57C00',
                     pct: latestList.length ? momoCount/latestList.length*100 : 0 },
-                  { val: `${tinCount} / ${latestList.length}`,     label: 'TIN Registered',      sub: 'tax identification number',   color: '#1565C0',
+                  { val: `${tinCount} / ${latestList.length}`,     label: 'TIN Registered',      sub: 'tax identification number',   color: '#D97706',
                     pct: latestList.length ? tinCount/latestList.length*100 : 0 },
                   { val: `${ursbCount} / ${latestList.length}`,    label: 'URSB Registered',     sub: 'business registration',       color: '#4527A0',
                     pct: latestList.length ? ursbCount/latestList.length*100 : 0 },
@@ -3846,7 +3846,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>Total Employees</Typography>
                       {[
                         { label: 'Before (first update)', val: totalEmpBefore, color: '#90A4AE' },
-                        { label: 'After (latest update)',  val: totalEmpAfter,  color: '#1A2F4B' },
+                        { label: 'After (latest update)',  val: totalEmpAfter,  color: '#262523' },
                         { label: 'Net change',
                           val: `${totalEmpAfter - totalEmpBefore >= 0 ? '+' : ''}${totalEmpAfter - totalEmpBefore}`,
                           color: totalEmpAfter >= totalEmpBefore ? '#2E7D32' : '#C8102E' },
@@ -3876,7 +3876,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <ReTooltip/>
                           <Legend wrapperStyle={{ fontSize: 11 }}/>
                           <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
-                          <Bar dataKey="After"  fill="#1A2F4B" radius={[3,3,0,0]}/>
+                          <Bar dataKey="After"  fill="#262523" radius={[3,3,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartCard>
@@ -3917,7 +3917,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                               ]}/>
                               <Legend wrapperStyle={{ fontSize: 11 }}/>
                               <Bar dataKey="Diagnostic"   fill="#C8102E" radius={[3,3,0,0]}/>
-                              <Bar dataKey="GrowthUpdate" name="Growth Update" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                              <Bar dataKey="GrowthUpdate" name="Growth Update" fill="#262523" radius={[3,3,0,0]}/>
                             </BarChart>
                           </ResponsiveContainer>
                         </ChartCard>
@@ -3937,7 +3937,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                               <ReTooltip/>
                               <Legend wrapperStyle={{ fontSize: 11 }}/>
                               <Bar dataKey="Diagnostic"   fill="#C8102E" radius={[3,3,0,0]}/>
-                              <Bar dataKey="GrowthUpdate" name="Growth Update" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                              <Bar dataKey="GrowthUpdate" name="Growth Update" fill="#262523" radius={[3,3,0,0]}/>
                             </BarChart>
                           </ResponsiveContainer>
                         </ChartCard>
@@ -3960,7 +3960,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <ReTooltip/>
                           <Legend wrapperStyle={{ fontSize: 11 }}/>
                           <Bar dataKey="Before" fill="#90A4AE" radius={[3,3,0,0]}/>
-                          <Bar dataKey="After"  fill="#1A2F4B" radius={[3,3,0,0]}/>
+                          <Bar dataKey="After"  fill="#262523" radius={[3,3,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartCard>
@@ -3992,7 +3992,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                           <XAxis dataKey="period" tick={{ fontSize: 11 }}/>
                           <YAxis tickFormatter={v => `${v}K`} tick={{ fontSize: 10 }} width={48}/>
                           <ReTooltip formatter={v => [`UGX ${(v*1000).toLocaleString()}`, 'Avg Revenue']}/>
-                          <Bar dataKey="Avg Revenue (K)" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                          <Bar dataKey="Avg Revenue (K)" fill="#262523" radius={[3,3,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartCard>
@@ -4054,7 +4054,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                   <ReTooltip formatter={(v, n) => [`${v} MSMEs`, n]}/>
                                   <Legend wrapperStyle={{ fontSize: 11 }}/>
                                   <Bar dataKey="Before" name="First update"  fill="#90A4AE" radius={[3,3,0,0]}/>
-                                  <Bar dataKey="After"  name="Latest update" fill="#1A2F4B" radius={[3,3,0,0]}/>
+                                  <Bar dataKey="After"  name="Latest update" fill="#262523" radius={[3,3,0,0]}/>
                                 </BarChart>
                               </ResponsiveContainer>
                             </ChartCard>
@@ -4273,7 +4273,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                         );
                                         // Unchanged — show muted current state
                                         return (
-                                          <TableCell key={f.key} align="center" sx={{ fontSize: 11, color: after ? '#1565C0' : '#BDBDBD' }}>
+                                          <TableCell key={f.key} align="center" sx={{ fontSize: 11, color: after ? '#262523' : '#BDBDBD' }}>
                                             {after ? '✓' : '—'}
                                           </TableCell>
                                         );
@@ -4504,7 +4504,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   { val: fresh30.length,                             label: 'Fresh (≤ 30 days)',  sub: 'updated in the last month',          color: '#2E7D32' },
                   { val: neverUpdatedMsmes.length,                  label: 'Never Updated',       sub: 'no growth data at all',              color: '#C8102E' },
                   { val: stale90180.length + stale180p.length,      label: 'Overdue (90+ days)',  sub: 'last update was 3+ months ago',      color: '#E65100' },
-                  { val: avgUpd,                                     label: 'Avg Updates / MSME',  sub: 'among MSMEs with any data',          color: '#0288D1' },
+                  { val: avgUpd,                                     label: 'Avg Updates / MSME',  sub: 'among MSMEs with any data',          color: BRAND.gopaGoldDark },
                   { val: adminSnapshots.length,                      label: 'Total Snapshots',     sub: 'all updates ever submitted',         color: '#7B1FA2' },
                 ].map((k, i) => <Grid item xs={6} sm={4} lg={2} key={i}><KPI {...k} /></Grid>)}
               </Grid>
@@ -4534,7 +4534,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                         <XAxis dataKey="updates" tick={{ fontSize: 11 }}/>
                         <YAxis tick={{ fontSize: 11 }} allowDecimals={false}/>
                         <ReTooltip formatter={v => [`${v} MSMEs`, '']}/>
-                        <Bar dataKey="count" fill="#1A2F4B" radius={[4,4,0,0]}/>
+                        <Bar dataKey="count" fill="#262523" radius={[4,4,0,0]}/>
                       </BarChart>
                     </ResponsiveContainer>
                   </ChartCard>
@@ -4696,7 +4696,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                               <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false}/>
                               <YAxis dataKey="source" type="category" width={90} tick={{ fontSize: 11 }}/>
                               <ReTooltip formatter={v => [`${v} snapshots`, '']}/>
-                              <Bar dataKey="count" fill="#1A2F4B" radius={[0,4,4,0]}
+                              <Bar dataKey="count" fill="#262523" radius={[0,4,4,0]}
                                 label={{ position:'right', fontSize:10, fill:'#555' }}/>
                             </BarChart>
                           </ResponsiveContainer>
@@ -4741,8 +4741,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }}/>
                                 <YAxis dataKey="tool" type="category" width={135} tick={{ fontSize: 10 }}/>
                                 <ReTooltip formatter={v => [`${v} businesses`, '']}/>
-                                <Bar dataKey="count" fill="#0288D1" radius={[0,4,4,0]}
-                                  label={{ position:'right', fontSize:10, fill:'#0288D1' }}/>
+                                <Bar dataKey="count" fill="#D97706" radius={[0,4,4,0]}
+                                  label={{ position:'right', fontSize:10, fill:'#D97706' }}/>
                               </BarChart>
                             </ResponsiveContainer>
                           </ChartCard>
@@ -4858,7 +4858,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                               </TableCell>
                               <TableCell>
                                 <Chip size="small" label={s.source === 'bge_visit' ? 'BGE' : s.source === 'self_report' ? 'Self' : s.source || '?'}
-                                  sx={{ fontSize: 9, height: 16, bgcolor: s.source === 'bge_visit' ? '#E3F2FD' : '#F3E5F5', color: '#333' }}/>
+                                  sx={{ fontSize: 9, height: 16, bgcolor: s.source === 'bge_visit' ? '#FEF3C7' : '#F3E5F5', color: s.source === 'bge_visit' ? '#92400E' : '#333' }}/>
                               </TableCell>
                               {[fmtUGX2(s.annual_turnover), fmtUGX2(s.last_month_revenue), fmtUGX2(s.total_assets)].map((v,i) => (
                                 <TableCell key={i} sx={{ fontSize: 10, whiteSpace: 'nowrap' }}>
@@ -4884,7 +4884,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                               <TableCell sx={{ fontSize: 10 }}>
                                 {(s.digital_tools||[]).length > 0
                                   ? <Chip size="small" label={`${(s.digital_tools||[]).length} tool${(s.digital_tools||[]).length > 1 ? 's' : ''}`}
-                                      sx={{ fontSize: 9, height: 16, bgcolor: '#E3F2FD', color: '#0277BD' }}/>
+                                      sx={{ fontSize: 9, height: 16, bgcolor: '#F5F5F4', color: '#44403C' }}/>
                                   : <Typography fontSize={10} color="text.disabled">—</Typography>}
                               </TableCell>
                               <TableCell>
@@ -5920,7 +5920,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
           // ── Compliance (latest snapshot per MSME) ─────────────────────
           const compFields = [
-            { label: 'TIN',           key: 'has_tin',           color: '#1565C0' },
+            { label: 'TIN',           key: 'has_tin',           color: '#D97706' },
             { label: 'URSB',          key: 'has_ursb',          color: '#4527A0' },
             { label: 'Business Bank', key: 'has_business_bank', color: '#00695C' },
             { label: 'SACCO',         key: 'has_sacco',         color: '#2E7D32' },
@@ -6500,8 +6500,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             <span>{m.business_name}</span>
                             <Box sx={{ display:'flex', gap:0.5, flexWrap:'wrap' }}>
                               {isOwn    && <Chip label="Primary here" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E8F5E9', color:'#2E7D32' }}/>}
-                              {isCoHere && <Chip label="Co-assigned here" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E8F0FE', color:'#3949AB' }}/>}
-                              {isFree   && <Chip label="Unassigned" size="small" sx={{ fontSize:10, height:18, bgcolor:'#E3F2FD', color:'#0277BD' }}/>}
+                              {isCoHere && <Chip label="Co-assigned here" size="small" sx={{ fontSize:10, height:18, bgcolor:'#FEF3C7', color:'#92400E' }}/>}
+                              {isFree   && <Chip label="Unassigned" size="small" sx={{ fontSize:10, height:18, bgcolor:'#F5F5F4', color:'#57534E' }}/>}
                               {primary  && <Chip label={`Primary: ${primary}`} size="small" sx={{ fontSize:10, height:18, bgcolor:'#FFF3E0', color:'#E65100' }}/>}
                               {coNames.length > 0 && !isCoHere && <Chip label={`Co: ${coNames.join(', ')}`} size="small" sx={{ fontSize:10, height:18, bgcolor:'#F3E5F5', color:'#6A1B9A' }}/>}
                             </Box>
@@ -7282,7 +7282,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 wo.work_order_type === 'training_facilitation'
                   ? { borderLeft: '4px solid #7B1FA2' }
                   : wo.work_order_type === 'bge_technical_co_assignment'
-                  ? { borderLeft: '4px solid #0288D1' }
+                  ? { borderLeft: `4px solid ${BRAND.gopaGoldDark}` }
                   : wo.work_order_type === 'bds_manual_module'
                   ? { borderLeft: '4px solid #E65100' }
                   : {}
@@ -7298,7 +7298,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       )}
                       {wo.work_order_type === 'bge_technical_co_assignment' && (
                         <Chip label="Specialist Co-Assignment" size="small"
-                          sx={{ bgcolor: '#0288D1', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                          sx={{ bgcolor: BRAND.gopaGoldDark, color: '#fff', fontSize: 10, fontWeight: 700 }} />
                       )}
                       {wo.work_order_type === 'bds_manual_module' && (
                         <Chip label="BDS Manual Module" size="small"
@@ -7983,7 +7983,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const renderParticipation = () => {
     const s = participationSummary;
 
-    const statBox = (label, value, color = '#1565C0') => (
+    const statBox = (label, value, color = BRAND.primaryMain) => (
       <Grid item xs={6} sm={4} md={3} lg={2} key={label}>
         <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
           <Typography variant="h4" fontWeight={700} sx={{ color }}>{value ?? '—'}</Typography>
@@ -8135,13 +8135,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             {/* ── 2. Overall totals ─────────────────────────────────────────── */}
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>Overall Attendance Totals</Typography>
             <Grid container spacing={2} sx={{ mb: 4 }}>
-              {statBox('Total Present', s.total, '#1565C0')}
+              {statBox('Total Present', s.total, BRAND.primaryMain)}
               {statBox('Female', s.female, '#AD1457')}
-              {statBox('Male', s.male, '#1565C0')}
+              {statBox('Male', s.male, BRAND.primaryMain)}
               {statBox('Female Youth (18–34)', s.female_youth, '#AD1457')}
-              {statBox('Male Youth (18–34)', s.male_youth, '#1565C0')}
+              {statBox('Male Youth (18–34)', s.male_youth, BRAND.primaryMain)}
               {statBox('Adult Female', s.female_adult, '#AD1457')}
-              {statBox('Adult Male', s.male_adult, '#1565C0')}
+              {statBox('Adult Male', s.male_adult, BRAND.primaryMain)}
               {statBox('Refugees', s.refugees_total, '#E65100')}
               {statBox('Female Refugees', s.refugee_female, '#E65100')}
               {statBox('Male Refugees', s.refugee_male, '#E65100')}
@@ -10915,10 +10915,10 @@ PRUDEV II BDS Team`
                       onClick={() => setAttendanceDay(day)}
                       sx={{
                         px: 2, py: 0.75, borderRadius: '4px 4px 0 0', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                        borderBottom: attendanceDay === day ? '3px solid #1565C0' : '3px solid transparent',
-                        color: attendanceDay === day ? '#1565C0' : 'text.secondary',
-                        bgcolor: attendanceDay === day ? '#E3F2FD' : 'transparent',
-                        '&:hover': { bgcolor: '#F3F6FB' },
+                        borderBottom: attendanceDay === day ? `3px solid ${BRAND.primaryMain}` : '3px solid transparent',
+                        color: attendanceDay === day ? BRAND.primaryMain : 'text.secondary',
+                        bgcolor: attendanceDay === day ? '#F5F5F4' : 'transparent',
+                        '&:hover': { bgcolor: '#F5F5F4' },
                       }}
                     >
                       Day {i + 1} — {new Date(day + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -10963,17 +10963,17 @@ PRUDEV II BDS Team`
                 const ref    = present.filter(a => a.refugee_status === 'R');
                 const host   = present.filter(a => a.refugee_status === 'H');
                 return (
-                  <Box sx={{ m: 2, p: 2, bgcolor: '#F3F6FB', border: '1px solid #c5d5e8', borderRadius: 1 }}>
+                  <Box sx={{ m: 2, p: 2, bgcolor: '#FAF9F6', border: '1px solid #E7E5E4', borderRadius: 1 }}>
                     <Typography variant="subtitle2" fontWeight={700} gutterBottom>Summary</Typography>
                     <Grid container spacing={1}>
                       {[
-                        { label: 'Total', value: present.length, color: '#1565C0' },
+                        { label: 'Total', value: present.length, color: BRAND.primaryMain },
                         { label: 'Female', value: female.length, color: '#AD1457' },
-                        { label: 'Male', value: male.length, color: '#1565C0' },
+                        { label: 'Male', value: male.length, color: BRAND.primaryMain },
                         { label: 'Female Youth', value: youth.filter(a => a.gender === 'F').length, color: '#AD1457' },
-                        { label: 'Male Youth', value: youth.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Male Youth', value: youth.filter(a => a.gender === 'M').length, color: BRAND.primaryMain },
                         { label: 'Adult Female', value: adult.filter(a => a.gender === 'F').length, color: '#AD1457' },
-                        { label: 'Adult Male', value: adult.filter(a => a.gender === 'M').length, color: '#1565C0' },
+                        { label: 'Adult Male', value: adult.filter(a => a.gender === 'M').length, color: BRAND.primaryMain },
                         { label: 'Refugees', value: ref.length, color: '#E65100' },
                         { label: 'Female Refugee', value: ref.filter(a => a.gender === 'F').length, color: '#E65100' },
                         { label: 'Male Refugee', value: ref.filter(a => a.gender === 'M').length, color: '#E65100' },
@@ -11546,7 +11546,7 @@ PRUDEV II BDS Team`
           const ftTotal = (s.employees_ft_male||0)+(s.employees_ft_female||0);
           const ptTotal = (s.employees_pt_male||0)+(s.employees_pt_female||0);
           return <>
-            <Box sx={{ bgcolor: '#1565C0', px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ bgcolor: BRAND.primaryMain, px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
                   Growth Update

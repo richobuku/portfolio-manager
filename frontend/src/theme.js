@@ -1,9 +1,9 @@
 import { createTheme } from '@mui/material/styles';
 
-// GIZ official brand:  #C8102E (red)
-// GOPA Pro brand:      #F3BB36 (gold) / #6A6E6B (slate gray)
-// Programme accent:    #009B62 (green — used in PDF and success states)
-// UI primary / dark slate: #1A2E42  ← unified colour for sidebar, buttons, chips, badges, headings
+// GIZ official brand:     #C8102E (red) / #262523 (charcoal) / white
+// GOPA Pro brand:         #F3BB36 (gold) / #6A6E6B (slate gray) / #262523 (charcoal)
+// Programme accent:       #009B62 (growth green — used in PDF and success states)
+// UI primary / corporate: #262523  ← Warm Bronze-Charcoal for sidebar, buttons, chips, headings
 
 export const BRAND = {
   // GIZ official brand (partnership partner)
@@ -17,29 +17,29 @@ export const BRAND = {
   gopaGoldLight: '#FEF3C7',   // soft gold background for highlights and tags
   gopaGoldHover: '#E5A812',
   proSlate:      '#6A6E6B',   // GOPA Pro brand slate gray
-  proSlateDark:  '#374151',
-  proSlateLight: '#F1F5F9',
+  proSlateDark:  '#44403C',
+  proSlateLight: '#F5F5F4',
 
   // Legacy compat
-  gopaNavy:      '#1A2E42',
-  dark:          '#1A2E42',
+  gopaNavy:      '#262523',
+  dark:          '#262523',
 
   // Programme green (PRUDEV II agriculture / growth indicators)
   programmeGreen:      '#009B62',
   programmeGreenLight: '#ECFDF5',
   accent:              '#F3BB36',  // GOPA Gold warning / highlight
 
-  // ── Single unified primary palette ────────────────────────────────────────
-  // All sidebar, nav, buttons, chips, badges, outlines use this family
-  // so the whole UI feels like one cohesive, state-of-the-art system.
-  primaryMain:  '#1A2E42',   // dark corporate slate
-  primaryDark:  '#0F1F2E',   // pressed / hover state
-  primaryLight: '#2E4A62',   // light variant (outlined chip border, focus rings)
+  // ── Single unified primary palette (Warm Bronze-Charcoal) ─────────────────
+  // A warm, rich dark graphite tone that naturally bridges GOPA Gold and GIZ Red.
+  // Replaces all awkward blue/navy across the platform.
+  primaryMain:  '#262523',   // Warm Bronze-Charcoal
+  primaryDark:  '#191817',   // deep espresso-charcoal (pressed / hover)
+  primaryLight: '#3D3B37',   // muted bronze-slate (borders, rings)
 
   // Sidebar (with GOPA Gold active selection)
-  sidebarBg:       '#1A2E42',
+  sidebarBg:       '#262523',
   sidebarSelected: 'rgba(243, 187, 54, 0.14)',
-  headerBg:        '#1A2E42',
+  headerBg:        '#262523',
 };
 
 const theme = createTheme({
@@ -47,12 +47,12 @@ const theme = createTheme({
     primary:    { main: BRAND.primaryMain,  dark: BRAND.primaryDark,  light: BRAND.primaryLight },
     secondary:  { main: BRAND.gizRed,       dark: BRAND.gizDarkRed,   light: '#E03050' },
     success:    { main: BRAND.programmeGreen, light: BRAND.programmeGreenLight },
-    warning:    { main: BRAND.gopaGold,     dark: BRAND.gopaGoldDark, light: BRAND.gopaGoldLight, contrastText: '#1A2E42' },
-    info:       { main: '#0288D1',          light: '#E1F5FE' },
-    background: { default: '#F8FAFC', paper: '#FFFFFF' },
+    warning:    { main: BRAND.gopaGold,     dark: BRAND.gopaGoldDark, light: BRAND.gopaGoldLight, contrastText: '#262523' },
+    info:       { main: '#57534E',          light: '#F5F5F4' },
+    background: { default: '#FAF9F6', paper: '#FFFFFF' },
     text: {
-      primary:   '#1E293B',
-      secondary: '#64748B',
+      primary:   '#1C1917',
+      secondary: '#78716C',
     },
   },
   typography: {
@@ -85,7 +85,7 @@ const theme = createTheme({
       styleOverrides: {
         colorPrimary:   { backgroundColor: BRAND.primaryMain },
         colorSecondary: { backgroundColor: BRAND.gizRed },
-        colorWarning:   { backgroundColor: BRAND.gopaGold, color: '#1A2E42', fontWeight: 700 },
+        colorWarning:   { backgroundColor: BRAND.gopaGold, color: '#262523', fontWeight: 700 },
       },
     },
     MuiTableHead: {

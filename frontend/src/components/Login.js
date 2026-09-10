@@ -65,7 +65,7 @@ export default function Login({ onLogin, sessionExpired }) {
     <Box sx={{
       minHeight: '100vh',
       display: 'flex',
-      background: `linear-gradient(150deg, #1E293B 0%, ${BRAND.sidebarBg} 35%, #0F1F2E 70%, #080E17 100%)`,
+      background: `linear-gradient(150deg, #353330 0%, ${BRAND.sidebarBg} 35%, #1C1B19 70%, #121110 100%)`,
     }}>
       {/* Left panel — branding only, no logos */}
       <Box sx={{
@@ -102,7 +102,7 @@ export default function Login({ onLogin, sessionExpired }) {
             <Typography variant="caption" color="text.secondary">MSME Portfolio System</Typography>
           </Box>
 
-          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #E0E7F0', position: 'relative', overflow: 'hidden' }}>
+          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #E7E5E4', position: 'relative', overflow: 'hidden' }}>
             {/* Top dual-brand accent stripe */}
             <Box sx={{
               position: 'absolute', top: 0, left: 0, right: 0, height: 3,
@@ -168,7 +168,7 @@ export default function Login({ onLogin, sessionExpired }) {
           <Box sx={{ mt: 4, textAlign: 'center' }}>
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, mb: 1.5 }}>
               <Box component="img" src={gizLogo} alt="German Cooperation · Implemented by GIZ" sx={{ height: 38, width: 'auto', display: 'block', opacity: 0.9 }} />
-              <Box sx={{ width: 1, height: 28, bgcolor: '#E0E7F0' }} />
+              <Box sx={{ width: 1, height: 28, bgcolor: '#E7E5E4' }} />
               <Box component="img" src={gopaLogo} alt="GOPA Pro" sx={{ height: 22, width: 'auto', display: 'block', opacity: 0.9 }} />
             </Box>
             <Typography variant="caption" color="text.disabled">
