@@ -716,7 +716,7 @@ export default function CalendarPlanner({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#fff',
-                boxShadow: '0 4px 12px rgba(26,46,66,0.25)',
+                boxShadow: '0 4px 12px rgba(38,37,35,0.25)',
               }}
             >
               <CalendarMonth />
@@ -838,10 +838,10 @@ export default function CalendarPlanner({
             startIcon={<FileDownload />}
             onClick={(e) => setSyncMenuAnchor(e.currentTarget)}
             sx={{
-              borderColor: 'rgba(26,46,66,0.3)',
+              borderColor: 'rgba(38,37,35,0.25)',
               color: BRAND.primaryMain,
               fontWeight: 600,
-              '&:hover': { borderColor: BRAND.primaryMain, bgcolor: 'rgba(26,46,66,0.04)' },
+              '&:hover': { borderColor: BRAND.primaryMain, bgcolor: 'rgba(38,37,35,0.04)' },
             }}
           >
             Calendar Sync
@@ -1651,7 +1651,7 @@ export default function CalendarPlanner({
                       px: 1,
                       textAlign: 'center',
                       borderRight: index < 6 ? '1px solid #E8EDF2' : 'none',
-                      bgcolor: isDateToday ? '#EFF6FF' : 'transparent',
+                      bgcolor: isDateToday ? '#FEF3C7' : 'transparent',
                     }}
                   >
                     <Typography
@@ -1960,7 +1960,7 @@ export default function CalendarPlanner({
                         px: 1.5,
                         py: 0.5,
                         borderRadius: 2,
-                        bgcolor: isToday(currentDate) ? BRAND.primaryMain : '#F0F4F8',
+                        bgcolor: isToday(currentDate) ? BRAND.primaryMain : '#FAF9F6',
                         color: isToday(currentDate) ? '#fff' : BRAND.primaryMain,
                         fontWeight: 800,
                         fontSize: 13,
@@ -2297,7 +2297,7 @@ export default function CalendarPlanner({
                     sx={{
                       p: 2.5,
                       borderRadius: 2.5,
-                      border: isDateToday ? '2px solid #90CAF9' : '1px solid #E8EDF2',
+                      border: isDateToday ? `2px solid ${BRAND.gopaGold}` : '1px solid #E8EDF2',
                       bgcolor: '#fff',
                       boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
                     }}
@@ -2309,7 +2309,7 @@ export default function CalendarPlanner({
                             px: 1.5,
                             py: 0.5,
                             borderRadius: 2,
-                            bgcolor: isDateToday ? BRAND.primaryMain : '#F0F4F8',
+                            bgcolor: isDateToday ? BRAND.primaryMain : '#FAF9F6',
                             color: isDateToday ? '#fff' : BRAND.primaryMain,
                             fontWeight: 800,
                             fontSize: 13,
@@ -2678,7 +2678,7 @@ export default function CalendarPlanner({
                       p: 1.25,
                       borderRadius: 2,
                       bgcolor: selectedVisit.google_sync_status === 'synced' ? '#E8F5E9' : '#F4F7FB',
-                      border: `1px solid ${selectedVisit.google_sync_status === 'synced' ? '#C8E6C9' : '#E0E7F1'}`,
+                      border: `1px solid ${selectedVisit.google_sync_status === 'synced' ? '#C8E6C9' : '#E8EDF2'}`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -3232,7 +3232,7 @@ export default function CalendarPlanner({
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ bgcolor: '#F4F7FB', borderBottom: '1px solid #E0E7F1', pb: 2 }}>
+        <DialogTitle sx={{ bgcolor: '#FAF9F6', borderBottom: '1px solid #E8EDF2', pb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24">

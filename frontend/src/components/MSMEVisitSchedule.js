@@ -343,7 +343,7 @@ export default function MSMEVisitSchedule({
               fontWeight: 700,
               fontSize: 12,
               px: 2,
-              boxShadow: '0 2px 6px rgba(26, 46, 66, 0.25)',
+              boxShadow: '0 2px 6px rgba(38, 37, 35, 0.2)',
               '&:hover': { bgcolor: BRAND.primaryDark },
             }}
           >
@@ -560,8 +560,8 @@ export default function MSMEVisitSchedule({
             p: 3,
             mb: 3,
             borderRadius: 2.5,
-            border: '1px dashed #CBD5E1',
-            bgcolor: '#F8FAFC',
+            border: '1px dashed #E7E5E4',
+            bgcolor: '#FAF9F6',
             textAlign: 'center',
           }}
         >
@@ -847,7 +847,7 @@ export default function MSMEVisitSchedule({
             </Grid>
           </DialogContent>
 
-          <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+          <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
             <Button onClick={() => setScheduleModalOpen(false)}>Cancel</Button>
             <Button
               type="submit"
@@ -895,7 +895,7 @@ export default function MSMEVisitSchedule({
             onChange={(e) => setMissedNotes(e.target.value)}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+        <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
           <Button onClick={() => setMissedDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
@@ -961,7 +961,7 @@ export default function MSMEVisitSchedule({
             onChange={(e) => setRescheduleReason(e.target.value)}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+        <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
           <Button onClick={() => setRescheduleDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
@@ -995,7 +995,7 @@ export default function MSMEVisitSchedule({
             onChange={(e) => setCompletionNotes(e.target.value)}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+        <DialogActions sx={{ p: 2, bgcolor: '#FAF9F6' }}>
           <Button onClick={() => setCompleteDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"

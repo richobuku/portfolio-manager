@@ -3403,14 +3403,14 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                         (r.training_title === s.title && r.training_dates === tDates)
                       );
                       return (
-                        <Card key={s.id} sx={{ borderLeft: '4px solid #1A5276', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                        <Card key={s.id} sx={{ borderLeft: `4px solid ${BRAND.primaryMain}`, '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
                           <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
                               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', minWidth: 0 }}>
-                                <School sx={{ color: '#1A5276', fontSize: 20, mt: 0.3, flexShrink: 0 }} />
+                                <School sx={{ color: BRAND.primaryMain, fontSize: 20, mt: 0.3, flexShrink: 0 }} />
                                 <Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                    <Chip label="Participant" size="small" sx={{ bgcolor: '#1A5276', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                                    <Chip label="Participant" size="small" sx={{ bgcolor: BRAND.primaryMain, color: '#fff', fontWeight: 700, fontSize: 11 }} />
                                     <Typography fontWeight={700} fontSize={15}>{s.title}</Typography>
                                   </Box>
                                   <Typography variant="caption" color="text.secondary">
@@ -3436,7 +3436,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                       name: p.name, bge_code: p.bge_code || '', phone: '', gender: '', organisation: '',
                                     })),
                                   })}
-                                  sx={{ bgcolor: '#1A5276', '&:hover': { bgcolor: '#154360' }, fontSize: 12 }}>
+                                  sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark }, fontSize: 12 }}>
                                   {existing ? 'Edit Report' : 'Write Report'}
                                 </Button>
                                 {existing && (
@@ -3487,7 +3487,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 ) : (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {ptReports.map(r => (
-                      <Card key={r.id} sx={{ borderLeft: '4px solid #1A5276', '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
+                      <Card key={r.id} sx={{ borderLeft: `4px solid ${BRAND.primaryMain}`, '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
                         <CardContent>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
                             <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -3518,7 +3518,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                               {r.status !== 'submitted' && (
                                 <Button size="small" variant="contained" startIcon={<Edit />}
                                   onClick={() => openPtDialog(r)}
-                                  sx={{ bgcolor: '#1A5276', '&:hover': { bgcolor: '#154360' }, fontSize: 12 }}>
+                                  sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark }, fontSize: 12 }}>
                                   Edit
                                 </Button>
                               )}

@@ -8067,7 +8067,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             ) : (
               <TableContainer component={Paper} variant="outlined" sx={{ mb: 4 }}>
                 <Table size="small">
-                  <TableHead sx={{ bgcolor: '#EEF2F8' }}>
+                  <TableHead sx={{ bgcolor: '#FAF9F6' }}>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Session / Topic</TableCell>
@@ -11919,7 +11919,7 @@ PRUDEV II BDS Team`
             { key: 'action_plan',            label: 'Action Plan & Next Steps' },
           ];
           return <>
-            <Box sx={{ bgcolor: '#1A5276', px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ bgcolor: BRAND.primaryMain, px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
                   BGE Participant Training Report
@@ -11931,7 +11931,7 @@ PRUDEV II BDS Team`
               <Chip label={pt.status} size="small" color={pt.status === 'submitted' ? 'primary' : 'default'} />
             </Box>
             <DialogContent sx={{ p: 0 }}>
-              <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1.5, bgcolor: '#FAF9F6', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
                 {[
                   ['BGE', pt.bge_name],
                   ['Training Dates', pt.training_dates],
@@ -11950,14 +11950,14 @@ PRUDEV II BDS Team`
                 {SECTIONS.map(({ key, label }, idx) => (
                   <Box key={key} sx={{ mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
-                      <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#1A5276',
+                      <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: BRAND.primaryMain,
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Typography sx={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>{idx + 1}</Typography>
                       </Box>
-                      <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1A5276' }}>{label}</Typography>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND.primaryMain }}>{label}</Typography>
                     </Box>
-                    <Box sx={{ bgcolor: '#F4F6F9', borderRadius: 1.5, px: 2, py: 1.5,
-                      borderLeft: `3px solid ${pt[key] ? '#1A5276' : '#E5E7EB'}` }}>
+                    <Box sx={{ bgcolor: '#F5F5F4', borderRadius: 1.5, px: 2, py: 1.5,
+                      borderLeft: `3px solid ${pt[key] ? BRAND.primaryMain : '#E5E7EB'}` }}>
                       {pt[key] ? (
                         <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{pt[key]}</Typography>
                       ) : (
@@ -11968,12 +11968,12 @@ PRUDEV II BDS Team`
                 ))}
                 {(pt.attendees || []).length > 0 && (
                   <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1A5276', mb: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND.primaryMain, mb: 1 }}>
                       Attendance Register ({pt.attendees.length} participants)
                     </Typography>
                     <TableContainer component={Paper} variant="outlined">
                       <Table size="small">
-                        <TableHead sx={{ bgcolor: '#1A5276' }}>
+                        <TableHead sx={{ bgcolor: BRAND.primaryMain }}>
                           <TableRow>
                             {['#', 'Name', 'BGE Code', 'Phone', 'Gender', 'Organisation'].map(h => (
                               <TableCell key={h} sx={{ color: '#fff', fontSize: 11 }}>{h}</TableCell>

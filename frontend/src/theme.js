@@ -93,9 +93,9 @@ const theme = createTheme({
         root: {
           '& .MuiTableCell-root': {
             fontWeight: 700, fontSize: 12, textTransform: 'uppercase',
-            letterSpacing: '0.04em', color: '#475569',
-            backgroundColor: '#F8FAFC',
-            borderBottom: '2px solid #E2E8F0',
+            letterSpacing: '0.04em', color: '#44403C',
+            backgroundColor: '#FAF9F6',
+            borderBottom: '2px solid #E7E5E4',
           },
         },
       },
@@ -121,7 +121,7 @@ const theme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderBottom: '1px solid #F1F5F9',
+          borderBottom: '1px solid #F5F5F4',
           '@media (max-width: 599.95px)': {
             paddingLeft: 10,
             paddingRight: 10,
@@ -130,8 +130,8 @@ const theme = createTheme({
       },
     },
     MuiAppBar:    { styleOverrides: { root:     { backgroundColor: BRAND.headerBg,   boxShadow: 'none' } } },
-    MuiCard:      { styleOverrides: { root:     { boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E2E8F0' } } },
-    MuiPaper:     { styleOverrides: { outlined: { border: '1px solid #E2E8F0' } } },
+    MuiCard:      { styleOverrides: { root:     { boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E7E5E4' } } },
+    MuiPaper:     { styleOverrides: { outlined: { border: '1px solid #E7E5E4' } } },
     MuiLinearProgress: {
       styleOverrides: {
         bar: { backgroundColor: BRAND.gopaGold },
