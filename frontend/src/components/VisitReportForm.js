@@ -76,7 +76,8 @@ const TYPE_CONFIG = {
     msme_hint:        'What specific tasks did the business owner commit to completing before the next visit?',
     bge_label:        'BGE Preparation for Next Visit',
     bge_hint:         'What will you research, prepare, or bring as BGE before returning?',
-    tools_label:      'Tools & Materials Provided',
+    tools_label:      'Key Business Tools Supported / Installed',
+    tools_hint:       'Supporting MSME to install, configure, and adopt key business tools (e.g. ISM, One Tap POS, cashbooks)',
     show_participants: false,
     show_delivery:     false,
     show_focus:        false,
@@ -209,19 +210,25 @@ const COACHING_FOCUS_AREAS = [
 ];
 
 const TOOLS_OPTIONS = [
-  'Business plan template',
+  'ISM (Standard / Pro) — Installed / Supported',
+  'One Tap POS — Installed / Supported',
+  'Structured Physical Cashbook',
+  'Zoho Books / Digital Accounting',
+  'Mobile money setup support',
+  'Digital sales / inventory tool',
+  'Digital tools demonstration',
+  'Business registration guidance (URSB / TIN)',
+  'UNBS / quality compliance checklist',
   'Financial tracking spreadsheet',
   'Budget / cash flow tool',
+  'Calculator / costing tool',
+  'Sales tracking sheet',
+  'Business plan template',
   'Marketing materials / flyer template',
   'Training manual / handout',
-  'Business registration guidance',
-  'Mobile money setup support',
-  'Digital tools demonstration',
-  'Referral / recommendation letter',
-  'Diagnostic / assessment tool',
-  'Sales tracking sheet',
   'HR policy template',
-  'Calculator / costing tool',
+  'Diagnostic / assessment tool',
+  'Referral / recommendation letter',
 ];
 
 /* Tools are stored as comma-separated string in the model */
@@ -1041,9 +1048,14 @@ export default function VisitReportForm({
                   {cfg.show_tools !== false && (
                     <Grid item xs={12}>
                       <Typography variant="caption" color="text.secondary" fontWeight={600}
-                        display="block" sx={{ mb: 1 }}>
+                        display="block" sx={{ mb: 0.5 }}>
                         {cfg.tools_label} — select all that apply
                       </Typography>
+                      {cfg.tools_hint && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, fontSize: 11, fontStyle: 'italic' }}>
+                          {cfg.tools_hint}
+                        </Typography>
+                      )}
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
                         {TOOLS_OPTIONS.map(tool => {
                           const checked = selectedTools.includes(tool);
