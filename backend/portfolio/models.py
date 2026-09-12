@@ -904,7 +904,7 @@ class MSMEReport(models.Model):
     tools_provided        = models.TextField(blank=True, help_text='Comma-separated tools, templates or materials given')
     delivery_method       = models.CharField(max_length=60, blank=True, help_text='Training delivery method (training visits)')
     participant_count     = models.PositiveSmallIntegerField(null=True, blank=True, help_text='Number of participants (training visits)')
-    coaching_focus_area   = models.CharField(max_length=100, blank=True, help_text='Focus area for coaching visits')
+    coaching_focus_area   = models.CharField(max_length=255, blank=True, help_text='Focus areas for coaching or BCP visits')
     key_achievement       = models.TextField(blank=True, help_text='Key outcomes, takeaways or owner insights')
     concrete_takeaway     = models.TextField(
         blank=True,

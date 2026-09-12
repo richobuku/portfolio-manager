@@ -338,15 +338,20 @@ def render_msme_report(report):
         story.append(Paragraph('2. Facilitation Process Milestones Completed', s['sectiontitle']))
         story.append(Paragraph(milestones_html, s['body']))
 
-        story.extend(_section(s, '3.1 Owner & Team Engagement Reality', report.business_overview or report.stated_purpose))
+        engagement_parts = []
+        if getattr(report, 'coaching_focus_area', None):
+            engagement_parts.append(f"<b>Key Engagement Areas Addressed:</b> {report.coaching_focus_area}")
+        narrative = (report.business_overview or report.stated_purpose or '').strip()
+        if narrative:
+            engagement_parts.append(narrative)
+        story.extend(_section(s, '3.1 Owner & Team Engagement Reality', '<br/><br/>'.join(engagement_parts) if engagement_parts else '—'))
+
         if getattr(report, 'concrete_takeaway', None):
             story.extend(_section(s, '3.2 The Acid Test — Concrete Operational Change', report.concrete_takeaway))
         story.extend(_section(s, '3.3 Primary Residual Vulnerability Observed', report.challenges_identified))
 
         story.extend(_section(s, '4.1 Agreed 90-Day Owner Commitments', report.action_plan))
         story.extend(_section(s, '4.2 Strategic Follow-Up Recommendations for PRUDEV II', report.recommendations))
-        if getattr(report, 'tools_provided', None):
-            story.extend(_section(s, '4.3 BCP Tools & Templates Embedded', report.tools_provided))
 
         owner_ack_html = (
             f"<b>Enterprise Owner / Manager Acknowledgment — {msme.business_name}</b><br/>"

@@ -161,10 +161,24 @@ const TYPE_CONFIG = {
     msme_hint:        'What remains the single greatest unmitigated threat to this business that PRUDEV II should monitor?',
     bge_label:        'Strategic Follow-up Coaching Recommendation',
     bge_hint:         'What is the primary focus for subsequent BGE coaching visits (e.g. generator financing, cashbook verification)?',
-    tools_label:      'BCP Tools & Templates Provided / Embedded',
+    focus_label:      'Owner & Team Engagement Areas (Select all that apply)',
+    focus_options: [
+      'Business Operations & Continuity',
+      'Financial Resilience & Cash Runway',
+      'Key Staff, Roles & Cross-Training',
+      'Machinery, Equipment & Maintenance',
+      'Power & Utility Infrastructure',
+      'Supply Chain & Sourcing Resilience',
+      'Customer Communication & Retention',
+      'Compliance & Business Registration',
+      'Record Keeping & Internal Controls',
+      'Other',
+    ],
     show_participants: false,
     show_delivery:     false,
     show_focus:        true,
+    multi_focus:       true,
+    show_tools:        false,
     show_reflections:  true,
   },
 };
@@ -882,18 +896,53 @@ export default function VisitReportForm({
                       onChange={e => set('participant_count', e.target.value)} />
                   </Grid>
                 )}
-                {/* Coaching-specific: focus area */}
+                {/* Focus / Engagement Area selection */}
                 {cfg.show_focus && (
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Coaching Focus Area</InputLabel>
-                      <Select value={form.coaching_focus_area} label="Coaching Focus Area"
-                        onChange={e => set('coaching_focus_area', e.target.value)}>
-                        {COACHING_FOCUS_AREAS.map(a => (
-                          <MenuItem key={a} value={a}>{a}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                  <Grid item xs={12}>
+                    {cfg.multi_focus ? (
+                      <Box sx={{ mb: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}
+                          display="block" sx={{ mb: 1 }}>
+                          {cfg.focus_label || 'Engagement Areas (Select all that apply)'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                          {(cfg.focus_options || COACHING_FOCUS_AREAS).map(area => {
+                            const currentAreas = (form.coaching_focus_area || '')
+                              .split(',')
+                              .map(s => s.trim())
+                              .filter(Boolean);
+                            const checked = currentAreas.includes(area);
+                            return (
+                              <Chip
+                                key={area}
+                                label={area}
+                                size="small"
+                                clickable
+                                variant={checked ? 'filled' : 'outlined'}
+                                color={checked ? 'primary' : 'default'}
+                                onClick={() => {
+                                  const next = checked
+                                    ? currentAreas.filter(a => a !== area)
+                                    : [...currentAreas, area];
+                                  set('coaching_focus_area', next.join(', '));
+                                }}
+                                sx={{ fontSize: 11 }}
+                              />
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    ) : (
+                      <FormControl fullWidth size="small" sx={{ maxWidth: 360 }}>
+                        <InputLabel>Coaching Focus Area</InputLabel>
+                        <Select value={form.coaching_focus_area} label="Coaching Focus Area"
+                          onChange={e => set('coaching_focus_area', e.target.value)}>
+                          {COACHING_FOCUS_AREAS.map(a => (
+                            <MenuItem key={a} value={a}>{a}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
                   </Grid>
                 )}
                 <Grid item xs={12}>
@@ -989,32 +1038,34 @@ export default function VisitReportForm({
                   </Grid>
 
                   {/* Tools multi-select */}
-                  <Grid item xs={12}>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}
-                      display="block" sx={{ mb: 1 }}>
-                      {cfg.tools_label} — select all that apply
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
-                      {TOOLS_OPTIONS.map(tool => {
-                        const checked = selectedTools.includes(tool);
-                        return (
-                          <Chip key={tool} label={tool} size="small" clickable
-                            variant={checked ? 'filled' : 'outlined'}
-                            color={checked ? 'primary' : 'default'}
-                            onClick={() => toggleTool(tool)}
-                            sx={{ fontSize: 11 }} />
-                        );
-                      })}
-                    </Box>
-                    <TextField fullWidth size="small"
-                      label="Other tools or materials (free text)"
-                      placeholder="e.g. Custom pricing calculator, loan application template…"
-                      value={toolsOther}
-                      onChange={e => {
-                        setToolsOther(e.target.value);
-                        scheduleDraftSave(form, selectedTools, e.target.value);
-                      }} />
-                  </Grid>
+                  {cfg.show_tools !== false && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}
+                        display="block" sx={{ mb: 1 }}>
+                        {cfg.tools_label} — select all that apply
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
+                        {TOOLS_OPTIONS.map(tool => {
+                          const checked = selectedTools.includes(tool);
+                          return (
+                            <Chip key={tool} label={tool} size="small" clickable
+                              variant={checked ? 'filled' : 'outlined'}
+                              color={checked ? 'primary' : 'default'}
+                              onClick={() => toggleTool(tool)}
+                              sx={{ fontSize: 11 }} />
+                          );
+                        })}
+                      </Box>
+                      <TextField fullWidth size="small"
+                        label="Other tools or materials (free text)"
+                        placeholder="e.g. Custom pricing calculator, loan application template…"
+                        value={toolsOther}
+                        onChange={e => {
+                          setToolsOther(e.target.value);
+                          scheduleDraftSave(form, selectedTools, e.target.value);
+                        }} />
+                    </Grid>
+                  )}
                 </Grid>
               </SectionBlock>
             )}

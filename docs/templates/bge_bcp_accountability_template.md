@@ -65,6 +65,17 @@ Enterprise Participants (Staff members who actively participated in the BCP proc
 ----------------------------------------------------------------------------------------
 
 4.1 Owner & Team Engagement Reality
+• Engagement Focus Areas (Select all that apply):
+  [✓] Business Operations & Continuity
+  [✓] Financial Resilience & Cash Runway
+  [✓] Key Staff, Roles & Cross-Training
+  [ ] Machinery, Equipment & Maintenance
+  [ ] Power & Utility Infrastructure
+  [ ] Supply Chain & Sourcing Resilience
+  [ ] Customer Communication & Retention
+  [ ] Compliance & Business Registration
+  [ ] Record Keeping & Internal Controls
+
 [Prompt: How receptive was leadership? Did staff actively contribute to identifying operational failure points?]
 > BGE Input:
 > [Brief 2-3 sentence narrative describing leadership openness, staff contributions, and initial mindset shifts observed on-site.]
@@ -87,9 +98,6 @@ Enterprise Participants (Staff members who actively participated in the BCP proc
 
 5.2 Strategic Follow-Up Recommendations for PRUDEV II:
 > [Targeted coaching priority for subsequent visits, e.g., Access to Finance for generator asset leasing, cashbook audit.]
-
-5.3 BCP Tools & Templates Embedded:
-> [Physical or digital tools handed over, e.g., Master Record Book, Pre-check Machine SOP, Emergency Contact Sheet.]
 
 ----------------------------------------------------------------------------------------
 6. MUTUAL VERIFICATION & ENDORSEMENTS
