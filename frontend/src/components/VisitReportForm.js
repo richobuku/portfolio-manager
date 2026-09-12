@@ -54,6 +54,13 @@ const VISIT_TYPES = [
     desc: 'In-depth qualitative review of MSME data',
     color: BRAND.gizRed,
   },
+  {
+    value: 'bcp_facilitation',
+    label: 'BCP Facilitation & Accountability',
+    icon: <Flag />,
+    desc: 'BCP lead facilitator accountability & field verification',
+    color: BRAND.primaryMain,
+  },
 ];
 
 /* ── Per-type field labels ───────────────────────────────────────────────── */
@@ -142,6 +149,23 @@ const TYPE_CONFIG = {
     show_focus:        false,
     show_data_quality: true,
     show_delivered:    false,
+  },
+  bcp_facilitation: {
+    context_label:    'Owner & Team Engagement Reality',
+    context_hint:     'How receptive was leadership? Did staff actively contribute to identifying operational failure points?',
+    delivered_label:  'Field Engagement & Enterprise Participants',
+    delivered_hint:   'List enterprise participants (Name & Role), session dates, and total hours on-site.',
+    outcomes_label:   'The Acid Test — Concrete Operational Change',
+    outcomes_hint:    'What is the ONE tangible operational change the enterprise demonstrated or committed to executing starting immediately?',
+    msme_label:       'Primary Residual Vulnerability Observed',
+    msme_hint:        'What remains the single greatest unmitigated threat to this business that PRUDEV II should monitor?',
+    bge_label:        'Strategic Follow-up Coaching Recommendation',
+    bge_hint:         'What is the primary focus for subsequent BGE coaching visits (e.g. generator financing, cashbook verification)?',
+    tools_label:      'BCP Tools & Templates Provided / Embedded',
+    show_participants: false,
+    show_delivery:     false,
+    show_focus:        true,
+    show_reflections:  true,
   },
 };
 

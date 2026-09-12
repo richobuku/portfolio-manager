@@ -249,85 +249,11 @@ def render_msme_report(report):
     msme = report.msme
     bge  = report.bge
     is_annual = getattr(report, 'visit_type', '') == 'annual_review'
+    is_bcp    = getattr(report, 'visit_type', '') == 'bcp_facilitation'
 
-    visit_label = report.get_visit_type_display() if hasattr(report, 'get_visit_type_display') else report.visit_type
-    story.append(Paragraph(_safe_html(f'Visit Report — {msme.business_name}'), s['h1']))
-    story.append(Paragraph(f'{visit_label} · {report.visit_date}', s['sub']))
-
-    story.append(_kv_table([
-        ['MSME',          msme.business_name],
-        ['MSME Code',     msme.msme_code or '—'],
-        ['Owner',         msme.owner_name or '—'],
-        ['Location',      f'{msme.city or "—"}, {msme.state or "—"}'],
-        ['BGE',           bge.name if bge else '—'],
-        ['BGE Code',      (bge.bge_code if bge else '') or '—'],
-        ['Visit Type',    visit_label],
-        ['Visit Date',    str(report.visit_date)],
-        ['Status',        report.get_status_display() if hasattr(report, 'get_status_display') else report.status],
-    ]))
-
-    story.append(Spacer(1, 8))
-
-    # 1. Objectives & Stated Purpose
-    if getattr(report, 'stated_purpose', None):
-        story.extend(_section(s, 'Stated Purpose (Opening Alignment)', report.stated_purpose))
-    elif getattr(report, 'visit_objectives', None):
-        story.extend(_section(s, 'Objectives of this visit', report.visit_objectives))
-
-    # 2. Context / business status
-    story.extend(_section(s, 'Business status observed', report.business_overview))
-
-    # 3. Data quality (annual_review only)
-    if is_annual:
-        dq_lines = []
-        confidence = getattr(report, 'data_confidence_level', '')
-        conf_labels = {
-            'confirmed':        'Confirmed — figures from actual records',
-            'mostly_confident': 'Mostly confident — minor estimates only',
-            'mixed':            'Mixed — owner unsure on several items',
-            'largely_estimated':'Largely estimated — few actual records',
-            'unreliable':       'Unreliable — mostly guessing',
-        }
-        if confidence:
-            dq_lines.append(f'Data confidence: {conf_labels.get(confidence, confidence)}')
-        records_sighted = getattr(report, 'records_sighted', None)
-        if records_sighted is not None:
-            dq_lines.append(f'Physical records sighted: {"Yes" if records_sighted else "No"}')
-        if dq_lines:
-            story.extend(_section(s, 'Data quality summary', ' | '.join(dq_lines)))
-        if getattr(report, 'owner_certainty_observation', None):
-            story.extend(_section(s, 'Owner certainty & confidence observations',
-                                  report.owner_certainty_observation))
-        if getattr(report, 'data_collection_challenges', None):
-            story.extend(_section(s, 'Data collection challenges',
-                                  report.data_collection_challenges))
-
-    # 4. Support delivered & tools (not for annual_review)
-    if not is_annual:
-        if getattr(report, 'advice_delivered', None):
-            story.extend(_section(s, 'Immediate Advice Delivered on the Spot', report.advice_delivered))
-        story.extend(_section(s, 'Support provided', report.support_provided))
-        if getattr(report, 'tools_provided', None):
-            story.extend(_section(s, 'Tools & materials provided', report.tools_provided))
-
-    # 5. Outcomes / key findings & Concrete Takeaway
-    if getattr(report, 'concrete_takeaway', None):
-        story.extend(_section(s, 'One Concrete Change (What MSME Does Differently)', report.concrete_takeaway))
-    story.extend(_section(s, 'Key findings & outcomes', report.key_achievement))
-    story.extend(_section(s, 'Challenges identified',   report.challenges_identified))
-
-    # 6. Next steps & Visible Agreement
-    if getattr(report, 'msme_visible_next_step', None):
-        story.extend(_section(s, 'Visible Next Step Agreed with Owner', report.msme_visible_next_step))
-    story.extend(_section(s, 'Business owner actions',  report.action_plan))
-    story.extend(_section(s, 'BGE follow-up actions',   report.recommendations))
-    story.extend(_section(s, 'Additional notes',         report.additional_notes))
-
-    story.append(Spacer(1, 12))
-
-    # Endorser: the admin who created the work order covering this visit period.
-    # Falls back to the settings-level default if no matching work order is found.
+    # Retrieve matching work order early so it can be cited in metadata and signature blocks
     endorser_name = endorser_position = None
+    wo = None
     try:
         from .models import WorkOrder
         wo = WorkOrder.objects.filter(
@@ -337,12 +263,16 @@ def render_msme_report(report):
             start_date__lte=report.visit_date,
             end_date__gte=report.visit_date,
         ).select_related('created_by').first()
+        if not wo and bge:
+            wo = WorkOrder.objects.filter(
+                bge=bge,
+                work_order_type__in=['fi_mobilisation_bcp', 'agro_biz_continuity', 'bcp_tool_training']
+            ).order_by('-issue_date').first()
         if wo and wo.created_by:
             endorser_name = (wo.created_by.get_full_name().strip()
                              or wo.created_by.username)
             endorser_position = wo.team_leader_position or 'Team Leader, PRUDEV II — GOPA Pro'
         elif wo:
-            # Work order found but no created_by — use the configured team leader name
             endorser_name     = wo.team_leader_name or None
             endorser_position = wo.team_leader_position or None
     except Exception:
@@ -351,6 +281,138 @@ def render_msme_report(report):
     if not endorser_name:
         endorser_name     = getattr(django_settings, 'REPORT_ENDORSER_NAME',     None)
         endorser_position = getattr(django_settings, 'REPORT_ENDORSER_POSITION', None)
+
+    visit_label = report.get_visit_type_display() if hasattr(report, 'get_visit_type_display') else report.visit_type
+
+    if is_bcp:
+        story.append(Paragraph(_safe_html(f'BGE Facilitation & Accountability Report — {msme.business_name}'), s['h1']))
+        story.append(Paragraph(f'Business Continuity Planning (BCP) Field Implementation · {report.visit_date}', s['sub']))
+        gps_txt = 'Verified on-site at premises'
+        if getattr(report, 'visit_latitude', None) and getattr(report, 'visit_longitude', None):
+            gps_txt = f"{report.visit_latitude:.4f}, {report.visit_longitude:.4f}"
+            if getattr(report, 'visit_gps_accuracy', None):
+                gps_txt += f" (±{int(report.visit_gps_accuracy)}m)"
+
+        story.append(_kv_table([
+            ['Target MSME',       msme.business_name],
+            ['MSME Code',         msme.msme_code or '—'],
+            ['Owner / Contact',   f"{msme.owner_name or '—'} ({msme.phone or '—'})"],
+            ['Sector / Location', f"{msme.sector or '—'} · {msme.city or msme.state or '—'}"],
+            ['Lead BGE',          f"{bge.name if bge else '—'} ({(bge.bge_code if bge else '') or '—'})"],
+            ['BGE Contact',       f"{bge.phone or '—'} | {bge.email or '—'}" if bge else '—'],
+            ['Work Order Ref',    (wo.work_order_number if wo else '') or 'BCP Field Implementation'],
+            ['Field Location',    gps_txt],
+            ['Report Status',     report.get_status_display() if hasattr(report, 'get_status_display') else report.status],
+        ]))
+    else:
+        story.append(Paragraph(_safe_html(f'Visit Report — {msme.business_name}'), s['h1']))
+        story.append(Paragraph(f'{visit_label} · {report.visit_date}', s['sub']))
+
+        story.append(_kv_table([
+            ['MSME',          msme.business_name],
+            ['MSME Code',     msme.msme_code or '—'],
+            ['Owner',         msme.owner_name or '—'],
+            ['Location',      f'{msme.city or "—"}, {msme.state or "—"}'],
+            ['BGE',           bge.name if bge else '—'],
+            ['BGE Code',      (bge.bge_code if bge else '') or '—'],
+            ['Visit Type',    visit_label],
+            ['Visit Date',    str(report.visit_date)],
+            ['Status',        report.get_status_display() if hasattr(report, 'get_status_display') else report.status],
+        ]))
+
+    story.append(Spacer(1, 8))
+
+    if is_bcp:
+        # ── BCP Facilitation & Accountability Sections ──────────────────────────
+        if getattr(report, 'support_provided', None):
+            story.extend(_section(s, '1. Field Engagement & Enterprise Participants', report.support_provided))
+
+        milestones_html = (
+            "<b>[✓] Milestone 1: Operational Baseline & Cash Runway Calculated</b> — Verified monthly revenue, fixed/variable costs, and survival runway.<br/>"
+            "<b>[✓] Milestone 2: Business Impact Analysis (BIA) Completed</b> — Mapped critical business functions and agreed Maximum Tolerable Downtime (MTD).<br/>"
+            "<b>[✓] Milestone 3: Participatory Risk Assessment Scored</b> — Scored Likelihood × Impact ranking with enterprise owner and key staff.<br/>"
+            "<b>[✓] Milestone 4: Disruption Response Protocols Co-Designed</b> — Agreed incident lead, notification scripts, and emergency backup contacts.<br/>"
+            "<b>[✓] Milestone 5: 90-Day Operational Action Plan Committed</b> — Established phased 30/60/90-day actions with dedicated person and budget."
+        )
+        story.append(Spacer(1, 4))
+        story.append(Paragraph('2. Facilitation Process Milestones Completed', s['sectiontitle']))
+        story.append(Paragraph(milestones_html, s['body']))
+
+        story.extend(_section(s, '3.1 Owner & Team Engagement Reality', report.business_overview or report.stated_purpose))
+        if getattr(report, 'concrete_takeaway', None):
+            story.extend(_section(s, '3.2 The Acid Test — Concrete Operational Change', report.concrete_takeaway))
+        story.extend(_section(s, '3.3 Primary Residual Vulnerability Observed', report.challenges_identified))
+
+        story.extend(_section(s, '4.1 Agreed 90-Day Owner Commitments', report.action_plan))
+        story.extend(_section(s, '4.2 Strategic Follow-Up Recommendations for PRUDEV II', report.recommendations))
+        if getattr(report, 'tools_provided', None):
+            story.extend(_section(s, '4.3 BCP Tools & Templates Embedded', report.tools_provided))
+
+        owner_ack_html = (
+            f"<b>Enterprise Owner / Manager Acknowledgment — {msme.business_name}</b><br/>"
+            f"• Facilitation was conducted on-site at business premises: <b>[✓] YES</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            f"• 90-Day Action Plan reviewed and agreed: <b>[✓] YES</b><br/>"
+            f"Owner / Manager: <b>{msme.owner_name or '—'}</b> &nbsp;&nbsp;&nbsp;&nbsp; Signature: ___________________________ &nbsp;&nbsp;&nbsp;&nbsp; Date: _______________"
+        )
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(owner_ack_html, s['meta']))
+    else:
+        # 1. Objectives & Stated Purpose
+        if getattr(report, 'stated_purpose', None):
+            story.extend(_section(s, 'Stated Purpose (Opening Alignment)', report.stated_purpose))
+        elif getattr(report, 'visit_objectives', None):
+            story.extend(_section(s, 'Objectives of this visit', report.visit_objectives))
+
+        # 2. Context / business status
+        story.extend(_section(s, 'Business status observed', report.business_overview))
+
+        # 3. Data quality (annual_review only)
+        if is_annual:
+            dq_lines = []
+            confidence = getattr(report, 'data_confidence_level', '')
+            conf_labels = {
+                'confirmed':        'Confirmed — figures from actual records',
+                'mostly_confident': 'Mostly confident — minor estimates only',
+                'mixed':            'Mixed — owner unsure on several items',
+                'largely_estimated':'Largely estimated — few actual records',
+                'unreliable':       'Unreliable — mostly guessing',
+            }
+            if confidence:
+                dq_lines.append(f'Data confidence: {conf_labels.get(confidence, confidence)}')
+            records_sighted = getattr(report, 'records_sighted', None)
+            if records_sighted is not None:
+                dq_lines.append(f'Physical records sighted: {"Yes" if records_sighted else "No"}')
+            if dq_lines:
+                story.extend(_section(s, 'Data quality summary', ' | '.join(dq_lines)))
+            if getattr(report, 'owner_certainty_observation', None):
+                story.extend(_section(s, 'Owner certainty & confidence observations',
+                                      report.owner_certainty_observation))
+            if getattr(report, 'data_collection_challenges', None):
+                story.extend(_section(s, 'Data collection challenges',
+                                      report.data_collection_challenges))
+
+        # 4. Support delivered & tools (not for annual_review)
+        if not is_annual:
+            if getattr(report, 'advice_delivered', None):
+                story.extend(_section(s, 'Immediate Advice Delivered on the Spot', report.advice_delivered))
+            story.extend(_section(s, 'Support provided', report.support_provided))
+            if getattr(report, 'tools_provided', None):
+                story.extend(_section(s, 'Tools & materials provided', report.tools_provided))
+
+        # 5. Outcomes / key findings & Concrete Takeaway
+        if getattr(report, 'concrete_takeaway', None):
+            story.extend(_section(s, 'One Concrete Change (What MSME Does Differently)', report.concrete_takeaway))
+        story.extend(_section(s, 'Key findings & outcomes', report.key_achievement))
+        story.extend(_section(s, 'Challenges identified',   report.challenges_identified))
+
+        # 6. Next steps & Visible Agreement
+        if getattr(report, 'msme_visible_next_step', None):
+            story.extend(_section(s, 'Visible Next Step Agreed with Owner', report.msme_visible_next_step))
+        story.extend(_section(s, 'Business owner actions',  report.action_plan))
+        story.extend(_section(s, 'BGE follow-up actions',   report.recommendations))
+        story.extend(_section(s, 'Additional notes',         report.additional_notes))
+
+    story.append(Spacer(1, 12))
 
     story.append(_sig_block(
         s, bge,

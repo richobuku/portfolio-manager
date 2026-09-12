@@ -12,7 +12,7 @@ import {
   Link as LinkIcon, EditCalendar, EventBusy, Assessment,
   School, Psychology, QueryStats, WarningAmber, ViewAgenda,
   CalendarViewMonth, CalendarViewWeek, CalendarViewDay, CloudDone, CloudOff, Sync as SyncIcon,
-  Close, ArrowForward,
+  Close, ArrowForward, Flag,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -89,6 +89,7 @@ const VISIT_TYPES = [
   { value: 'data_update',   label: 'Data Collection Visit',  icon: <Assessment fontSize="small" /> },
   { value: 'training',      label: 'Training Visit',         icon: <School fontSize="small" /> },
   { value: 'annual_review', label: 'Annual Review',          icon: <QueryStats fontSize="small" /> },
+  { value: 'bcp_facilitation', label: 'BCP Facilitation & Accountability', icon: <Flag fontSize="small" /> },
   { value: 'followup',      label: 'Follow-up Visit',        icon: <Schedule fontSize="small" /> },
 ];
 

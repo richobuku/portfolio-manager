@@ -857,6 +857,7 @@ class MSMEReport(models.Model):
         ('training',         'Training Visit'),
         ('coaching',         'Business Coaching Visit'),
         ('annual_review',    'Annual Review'),
+        ('bcp_facilitation', 'BCP Facilitation & Accountability'),
         # legacy types kept for backward compat
         ('initial',          'Initial Assessment'),
         ('followup',         'Follow-up Visit'),
