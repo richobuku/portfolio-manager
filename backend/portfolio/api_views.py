@@ -2712,7 +2712,34 @@ class MSMEReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, view
         report_status = self.request.query_params.get('status')
         if report_status:
             qs = qs.filter(status=report_status)
-        return qs.select_related('msme', 'bge')
+        visit_type = self.request.query_params.get('visit_type')
+        if visit_type:
+            qs = qs.filter(visit_type=visit_type)
+
+        ordering = self.request.query_params.get('ordering')
+        if ordering:
+            allowed_ordering = {
+                '-visit_date': ['-visit_date', '-id'],
+                'visit_date': ['visit_date', 'id'],
+                '-created_at': ['-created_at', '-id'],
+                'created_at': ['created_at', 'id'],
+                'msme': ['msme__business_name'],
+                '-msme': ['-msme__business_name'],
+                'msme__business_name': ['msme__business_name'],
+                '-msme__business_name': ['-msme__business_name'],
+                'bge': ['bge__name'],
+                '-bge': ['-bge__name'],
+                'bge__name': ['bge__name'],
+                '-bge__name': ['-bge__name'],
+                'status': ['status', '-visit_date'],
+                '-status': ['-status', '-visit_date'],
+                'visit_type': ['visit_type', '-visit_date'],
+                '-visit_type': ['-visit_type', '-visit_date'],
+            }
+            if ordering in allowed_ordering:
+                return qs.select_related('msme', 'bge').order_by(*allowed_ordering[ordering])
+
+        return qs.select_related('msme', 'bge').order_by('-visit_date', '-id')
 
     def perform_create(self, serializer):
         from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -2925,7 +2952,7 @@ class GroupReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, vie
         st = self.request.query_params.get('status')
         if st:
             qs = qs.filter(status=st)
-        return qs.select_related('group', 'team_lead').prefetch_related('msmes_supported')
+        return qs.select_related('group', 'team_lead').prefetch_related('msmes_supported').order_by('-visit_date', '-id')
 
     def _user_can_write_for_group(self, user, group):
         if user.is_staff or user.is_superuser:

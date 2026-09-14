@@ -900,6 +900,43 @@ class WorkOrderSerializerRobustnessTests(TestCase):
         self.assertTrue(len(items) >= 1)
 
 
+class MSMEReportOrderingTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from rest_framework.test import APIClient
+        from .models import MSME, BusinessGrowthExpert, MSMEReport
+        self.client = APIClient()
+        self.admin = User.objects.create_superuser('admin_ord', 'admin_ord@example.com', 'pass123')
+        self.bge_user = User.objects.create_user('bge_ord', 'bge_ord@example.com', 'pass123')
+        self.bge = BusinessGrowthExpert.objects.create(name='Expert Ordering', email='bge_ord@example.com', user=self.bge_user)
+        self.msme1 = MSME.objects.create(business_name='Alpha Enterprises', msme_code='UG-001')
+        self.msme2 = MSME.objects.create(business_name='Beta Industries', msme_code='UG-002')
+
+        # Create reports with different visit dates
+        self.r1 = MSMEReport.objects.create(msme=self.msme1, bge=self.bge, visit_type='one_on_one', visit_date='2026-08-01', status='submitted')
+        self.r2 = MSMEReport.objects.create(msme=self.msme2, bge=self.bge, visit_type='bcp_facilitation', visit_date='2026-09-10', status='submitted')
+        self.r3 = MSMEReport.objects.create(msme=self.msme1, bge=self.bge, visit_type='coaching', visit_date='2026-08-15', status='draft')
+
+    def test_default_ordering_newest_visit_first(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/reports/')
+        self.assertEqual(res.status_code, 200)
+        items = res.data if isinstance(res.data, list) else res.data.get('results', [])
+        ids = [item['id'] for item in items]
+        # Expected: r2 (2026-09-10), r3 (2026-08-15), r1 (2026-08-01)
+        self.assertEqual(ids, [self.r2.id, self.r3.id, self.r1.id])
+
+    def test_explicit_ordering_oldest_first(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/reports/?ordering=visit_date')
+        self.assertEqual(res.status_code, 200)
+        items = res.data if isinstance(res.data, list) else res.data.get('results', [])
+        ids = [item['id'] for item in items]
+        # Expected: r1 (2026-08-01), r3 (2026-08-15), r2 (2026-09-10)
+        self.assertEqual(ids, [self.r1.id, self.r3.id, self.r2.id])
+
+
+
 
 
 

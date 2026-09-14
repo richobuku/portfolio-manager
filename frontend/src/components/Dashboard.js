@@ -8,7 +8,7 @@ import {
   Tooltip, Checkbox, FormControlLabel, Card, CardContent, Grid, Drawer, List,
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
   Badge, Accordion, AccordionSummary, AccordionDetails,
-  Tab, Tabs, ListSubheader, Popover,
+  Tab, Tabs, ListSubheader, Popover, TableSortLabel, InputAdornment,
 } from '@mui/material';
 import {
   Business, People, School, Assessment, ChevronRight,
@@ -23,6 +23,7 @@ import {
   ArrowForward, TaskAlt, Payments, Description,
   FormatBold, FormatListBulleted, CalendarToday, CalendarMonth,
   GpsFixed, GpsNotFixed, MyLocation,
+  Clear, ViewList, ViewModule, GroupWork,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -425,6 +426,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [groupReports, setGroupReports] = useState([]);
   const [reportFilterBge, setReportFilterBge] = useState('');
   const [reportFilterStatus, setReportFilterStatus] = useState('');
+  const [reportSortBy, setReportSortBy] = useState('visit_date');
+  const [reportSortDir, setReportSortDir] = useState('desc');
+  const [reportSearch, setReportSearch] = useState('');
+  const [reportFilterVisitType, setReportFilterVisitType] = useState('');
+  const [reportViewMode, setReportViewMode] = useState('table'); // 'table' | 'cards' | 'grouped_bge'
+  const [reportRowsPerPage, setReportRowsPerPage] = useState(15);
+  const [reportExpandedBges, setReportExpandedBges] = useState({});
   const [viewReport, setViewReport] = useState(null);
   const [reportPage, setReportPage] = useState(0);
 
@@ -524,6 +532,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       const reportParams = new URLSearchParams();
       if (reportFilterBge) reportParams.append('bge', reportFilterBge);
       if (reportFilterStatus) reportParams.append('status', reportFilterStatus);
+      if (reportFilterVisitType) reportParams.append('visit_type', reportFilterVisitType);
 
       const [mRes, allMRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes] = await Promise.all([
         axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
@@ -743,6 +752,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       const params = new URLSearchParams();
       if (reportFilterBge) params.append('bge', reportFilterBge);
       if (reportFilterStatus) params.append('status', reportFilterStatus);
+      if (reportFilterVisitType) params.append('visit_type', reportFilterVisitType);
       try {
         const r = await axios.get(`${API_ENDPOINTS.REPORTS}?${params}`, {
           headers: h, signal: controller.signal,
@@ -755,7 +765,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       }
     }, 300);
     return () => { clearTimeout(handle); controller.abort(); };
-  }, [token, reportFilterBge, reportFilterStatus]);
+  }, [token, reportFilterBge, reportFilterStatus, reportFilterVisitType]);
 
   // ── helpers ────────────────────────────────────────────────────────────────
   const fmt = (n) => new Intl.NumberFormat('en-UG', { style: 'currency', currency: 'UGX', maximumFractionDigits: 0 }).format(n || 0);
@@ -5133,12 +5143,31 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   };
 
   const REPORT_STATUS_COLORS = { draft: 'default', submitted: 'primary', reviewed: 'success' };
-  const VISIT_LABELS = { initial: 'Initial', followup: 'Follow-up', final: 'Final', training: 'Training', mentoring: 'Mentoring' };
+  const VISIT_LABELS = {
+    bcp_facilitation: 'BCP Facilitation & Accountability',
+    one_on_one:       'One-on-One Visit',
+    coaching:         'Business Coaching',
+    data_update:      'Data Collection',
+    training:         'Training Visit',
+    annual_review:    'Annual Review',
+    quarterly_review: 'Quarterly Review',
+    mentoring:        'Mentoring Session',
+    initial:          'Initial Assessment',
+    followup:         'Follow-up Visit',
+    final:            'Final Assessment',
+  };
 
   const VISIT_TYPE_COLORS = {
-    annual_review:    '#2B5278', one_on_one: '#2E7D32', data_update: '#E67E22',
-    coaching: '#8E44AD', training: '#16A085', followup: '#C0392B',
-    quarterly_review: '#2980B9', mentoring: '#F39C12', initial: '#7F8C8D',
+    bcp_facilitation: '#00695C',
+    annual_review:    '#2B5278',
+    one_on_one:       '#2E7D32',
+    data_update:      '#E67E22',
+    coaching:         '#8E44AD',
+    training:         '#16A085',
+    followup:         '#C0392B',
+    quarterly_review: '#2980B9',
+    mentoring:        '#F39C12',
+    initial:          '#7F8C8D',
   };
 
   const renderReports = () => (
@@ -5385,149 +5414,644 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       <Divider sx={{ my: 3 }} />
 
-      <SectionHeader title="Visit Reports" subtitle={`${reports.length} reports`}>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>
-            <InputLabel>Filter by BGE</InputLabel>
-            <Select value={reportFilterBge} label="Filter by BGE"
-              onChange={e => { setReportFilterBge(e.target.value); setReportPage(0); }}>
-              <MenuItem value="">All BGEs</MenuItem>
-              {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ flex: '1 1 110px', minWidth: 0 }}>
-            <InputLabel>Status</InputLabel>
-            <Select value={reportFilterStatus} label="Status"
-              onChange={e => { setReportFilterStatus(e.target.value); setReportPage(0); }}>
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="draft">Draft</MenuItem>
-              <MenuItem value="submitted">Submitted</MenuItem>
-              <MenuItem value="reviewed">Reviewed</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: 0 }}>
-            <InputLabel>Payment Status</InputLabel>
-            <Select value={reportFilterPaymentStatus} label="Payment Status"
-              onChange={e => { setReportFilterPaymentStatus(e.target.value); setReportPage(0); }}>
-              <MenuItem value="">All Payments</MenuItem>
-              <MenuItem value="unsubmitted">Unsubmitted</MenuItem>
-              <MenuItem value="submitted">Submitted for Payment</MenuItem>
-              <MenuItem value="confirmed">Confirmed by BGE ✓</MenuItem>
-            </Select>
-          </FormControl>
+      <SectionHeader title="Visit Reports" subtitle={`${reports.length} total reports`}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            size="small"
+            variant={reportViewMode === 'table' ? 'contained' : 'outlined'}
+            startIcon={<ViewList fontSize="small" />}
+            onClick={() => setReportViewMode('table')}
+            sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
+          >
+            Table View
+          </Button>
+          <Button
+            size="small"
+            variant={reportViewMode === 'cards' ? 'contained' : 'outlined'}
+            startIcon={<ViewModule fontSize="small" />}
+            onClick={() => setReportViewMode('cards')}
+            sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
+          >
+            Cards View
+          </Button>
+          <Button
+            size="small"
+            variant={reportViewMode === 'grouped_bge' ? 'contained' : 'outlined'}
+            startIcon={<GroupWork fontSize="small" />}
+            onClick={() => setReportViewMode('grouped_bge')}
+            sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
+          >
+            Grouped by BGE
+          </Button>
         </Box>
       </SectionHeader>
 
+      {/* ── Filters & Sort Toolbar ──────────────────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: '#FAFBFD' }}>
+        <Grid container spacing={1.5} alignItems="center">
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              fullWidth size="small" placeholder="Search MSME, BGE, notes, code..."
+              value={reportSearch}
+              onChange={e => { setReportSearch(e.target.value); setReportPage(0); }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: reportSearch ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => { setReportSearch(''); setReportPage(0); }}>
+                      <Clear fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2.5}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Sort Order</InputLabel>
+              <Select
+                value={`${reportSortBy}:${reportSortDir}`}
+                label="Sort Order"
+                onChange={e => {
+                  const [col, dir] = e.target.value.split(':');
+                  setReportSortBy(col);
+                  setReportSortDir(dir);
+                  setReportPage(0);
+                }}
+              >
+                <MenuItem value="visit_date:desc">Newest Visit First (Date ↓)</MenuItem>
+                <MenuItem value="visit_date:asc">Oldest Visit First (Date ↑)</MenuItem>
+                <MenuItem value="created_at:desc">Recently Added (Created ↓)</MenuItem>
+                <MenuItem value="msme:asc">MSME Name (A → Z)</MenuItem>
+                <MenuItem value="msme:desc">MSME Name (Z → A)</MenuItem>
+                <MenuItem value="bge:asc">BGE Expert (A → Z)</MenuItem>
+                <MenuItem value="visit_type:asc">Visit Type</MenuItem>
+                <MenuItem value="status:asc">Status &amp; Payment</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={6} sm={4} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Filter by BGE</InputLabel>
+              <Select value={reportFilterBge} label="Filter by BGE"
+                onChange={e => { setReportFilterBge(e.target.value); setReportPage(0); }}>
+                <MenuItem value="">All BGEs</MenuItem>
+                {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={6} sm={4} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Visit Type</InputLabel>
+              <Select value={reportFilterVisitType} label="Visit Type"
+                onChange={e => { setReportFilterVisitType(e.target.value); setReportPage(0); }}>
+                <MenuItem value="">All Visit Types</MenuItem>
+                {Object.entries(VISIT_LABELS).map(([k, v]) => (
+                  <MenuItem key={k} value={k}>{v}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={6} sm={4} md={1.25}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Status</InputLabel>
+              <Select value={reportFilterStatus} label="Status"
+                onChange={e => { setReportFilterStatus(e.target.value); setReportPage(0); }}>
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="draft">Draft</MenuItem>
+                <MenuItem value="submitted">Submitted</MenuItem>
+                <MenuItem value="reviewed">Reviewed</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={6} sm={4} md={1.25}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Payment</InputLabel>
+              <Select value={reportFilterPaymentStatus} label="Payment"
+                onChange={e => { setReportFilterPaymentStatus(e.target.value); setReportPage(0); }}>
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="unsubmitted">Unsubmitted</MenuItem>
+                <MenuItem value="submitted">Submitted</MenuItem>
+                <MenuItem value="confirmed">Confirmed ✓</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
+
+        {(Boolean(reportSearch) || Boolean(reportFilterBge) || Boolean(reportFilterStatus) ||
+          Boolean(reportFilterPaymentStatus) || Boolean(reportFilterVisitType) ||
+          reportSortBy !== 'visit_date' || reportSortDir !== 'desc') && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, pt: 1, borderTop: '1px dashed #E2E8F0', flexWrap: 'wrap' }}>
+            <Typography variant="caption" color="text.secondary">Active filters applied:</Typography>
+            {reportSearch && <Chip size="small" label={`Search: "${reportSearch}"`} onDelete={() => setReportSearch('')} />}
+            {reportFilterBge && <Chip size="small" label={`BGE: ${experts.find(e => e.id === reportFilterBge)?.name || reportFilterBge}`} onDelete={() => setReportFilterBge('')} />}
+            {reportFilterVisitType && <Chip size="small" label={`Type: ${VISIT_LABELS[reportFilterVisitType] || reportFilterVisitType}`} onDelete={() => setReportFilterVisitType('')} />}
+            {reportFilterStatus && <Chip size="small" label={`Status: ${reportFilterStatus}`} onDelete={() => setReportFilterStatus('')} />}
+            {reportFilterPaymentStatus && <Chip size="small" label={`Payment: ${reportFilterPaymentStatus}`} onDelete={() => setReportFilterPaymentStatus('')} />}
+            {(reportSortBy !== 'visit_date' || reportSortDir !== 'desc') && (
+              <Chip size="small" variant="outlined" label={`Sorted by: ${reportSortBy} (${reportSortDir})`} onDelete={() => { setReportSortBy('visit_date'); setReportSortDir('desc'); }} />
+            )}
+            <Button
+              size="small" color="inherit"
+              onClick={() => {
+                setReportSearch('');
+                setReportFilterBge('');
+                setReportFilterStatus('');
+                setReportFilterPaymentStatus('');
+                setReportFilterVisitType('');
+                setReportSortBy('visit_date');
+                setReportSortDir('desc');
+                setReportPage(0);
+              }}
+              sx={{ textTransform: 'none', fontSize: 11, ml: 'auto' }}
+            >
+              Reset All Filters
+            </Button>
+          </Box>
+        )}
+      </Paper>
+
       {(() => {
+        const handleReportSort = (col) => {
+          if (reportSortBy === col) {
+            setReportSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+          } else {
+            setReportSortBy(col);
+            setReportSortDir(col === 'visit_date' || col === 'created_at' ? 'desc' : 'asc');
+          }
+          setReportPage(0);
+        };
+
+        const renderReportStatusChips = (r) => (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+            <Chip label={r.status} size="small" color={REPORT_STATUS_COLORS[r.status] || 'default'} />
+            {r.payment_status === 'submitted' && (
+              <Tooltip title={`Submitted for payment: ${r.payment_reference || 'N/A'}`}>
+                <Chip label={r.payment_reference ? `Submitted: ${r.payment_reference}` : 'Submitted'} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontSize: 10, height: 20 }} />
+              </Tooltip>
+            )}
+            {(r.payment_status === 'confirmed' || r.payment_confirmed_by_bge) && (
+              <Tooltip title={`Payment confirmed by BGE on ${r.payment_confirmed_at ? r.payment_confirmed_at.slice(0, 16).replace('T', ' ') : ''}`}>
+                <Chip label="Confirmed ✓" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontSize: 10, height: 20 }} />
+              </Tooltip>
+            )}
+          </Box>
+        );
+
+        const renderReportActions = (r, msme, bge) => (
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'nowrap' }}>
+            <Tooltip title="View report">
+              <IconButton size="small" color="primary" onClick={() => setViewReport({ ...r, _msme: msme, _bgeName: r.bge_name || bge.name })}>
+                <Visibility fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Open PDF">
+              <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'view')}>
+                <PictureAsPdf fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download PDF">
+              <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'download')}>
+                <Download fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            {isStaff && (
+              <Tooltip title="Submit for Payment / Update Reference">
+                <IconButton size="small" color={r.payment_confirmed_by_bge ? 'success' : r.payment_status === 'submitted' ? 'warning' : 'default'} onClick={() => openReportPaymentSubmit(r, 'msme')}>
+                  <Payments fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {r.status !== 'draft' && (
+              <Tooltip title="Revert to draft">
+                <IconButton size="small" color="warning" onClick={() => revertReport('msme', r.id)}>
+                  <Undo fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {r.status === 'draft' && (
+              <Tooltip title="Delete draft">
+                <IconButton size="small" color="error" onClick={() => deleteReport(r)}>
+                  <Delete fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        );
+
+        // Filter reports
         const filteredReports = reports.filter(r => {
-          if (!reportFilterPaymentStatus) return true;
-          if (reportFilterPaymentStatus === 'confirmed') return r.payment_status === 'confirmed' || r.payment_confirmed_by_bge;
-          if (reportFilterPaymentStatus === 'submitted') return r.payment_status === 'submitted';
-          if (reportFilterPaymentStatus === 'unsubmitted') return !r.payment_status || r.payment_status === 'unsubmitted';
+          if (reportFilterPaymentStatus) {
+            if (reportFilterPaymentStatus === 'confirmed' && !(r.payment_status === 'confirmed' || r.payment_confirmed_by_bge)) return false;
+            if (reportFilterPaymentStatus === 'submitted' && r.payment_status !== 'submitted') return false;
+            if (reportFilterPaymentStatus === 'unsubmitted' && !(!r.payment_status || r.payment_status === 'unsubmitted')) return false;
+          }
+          if (reportFilterVisitType && r.visit_type !== reportFilterVisitType) {
+            return false;
+          }
+          if (reportSearch.trim()) {
+            const q = reportSearch.toLowerCase().trim();
+            const msmeObj = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || {};
+            const bgeObj  = experts.find(e => e.id === r.bge) || {};
+            const msmeName = (r.msme_name || msmeObj.business_name || '').toLowerCase();
+            const msmeCode = (r.msme_code || msmeObj.msme_code || '').toLowerCase();
+            const bgeName  = (r.bge_name || bgeObj.name || '').toLowerCase();
+            const vType    = (VISIT_LABELS[r.visit_type] || r.visit_type || '').toLowerCase();
+            const takeaway = (r.concrete_takeaway || '').toLowerCase();
+            const ach      = (r.key_achievement || '').toLowerCase();
+            const purpose  = (r.stated_purpose || r.visit_objectives || '').toLowerCase();
+            const notes    = (r.additional_notes || '').toLowerCase();
+            const ref      = (r.payment_reference || '').toLowerCase();
+
+            if (!msmeName.includes(q) &&
+                !msmeCode.includes(q) &&
+                !bgeName.includes(q) &&
+                !vType.includes(q) &&
+                !takeaway.includes(q) &&
+                !ach.includes(q) &&
+                !purpose.includes(q) &&
+                !notes.includes(q) &&
+                !ref.includes(q)) {
+              return false;
+            }
+          }
           return true;
         });
 
+        // Sort reports (defaults to visit_date desc, with id desc tiebreaker)
+        const sortedReports = [...filteredReports].sort((a, b) => {
+          let cmp = 0;
+          if (reportSortBy === 'visit_date') {
+            const da = a.visit_date ? new Date(a.visit_date).getTime() : 0;
+            const db = b.visit_date ? new Date(b.visit_date).getTime() : 0;
+            cmp = da - db;
+          } else if (reportSortBy === 'created_at') {
+            const da = a.created_at ? new Date(a.created_at).getTime() : (a.id || 0);
+            const db = b.created_at ? new Date(b.created_at).getTime() : (b.id || 0);
+            cmp = da - db;
+          } else if (reportSortBy === 'msme') {
+            const na = (a.msme_name || '').toLowerCase();
+            const nb = (b.msme_name || '').toLowerCase();
+            cmp = na.localeCompare(nb);
+          } else if (reportSortBy === 'bge') {
+            const na = (a.bge_name || '').toLowerCase();
+            const nb = (b.bge_name || '').toLowerCase();
+            cmp = na.localeCompare(nb);
+          } else if (reportSortBy === 'status') {
+            const sa = (a.status || '').toLowerCase();
+            const sb = (b.status || '').toLowerCase();
+            cmp = sa.localeCompare(sb);
+          } else if (reportSortBy === 'visit_type') {
+            const ta = (VISIT_LABELS[a.visit_type] || a.visit_type || '').toLowerCase();
+            const tb = (VISIT_LABELS[b.visit_type] || b.visit_type || '').toLowerCase();
+            cmp = ta.localeCompare(tb);
+          }
+          if (cmp === 0) {
+            return (b.id || 0) - (a.id || 0);
+          }
+          return reportSortDir === 'desc' ? -cmp : cmp;
+        });
+
+        const pagedReports = paginate(sortedReports, reportPage);
+
         return (
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell>MSME</TableCell>
-                  <TableCell>BGE Expert</TableCell>
-                  <TableCell>Visit Type</TableCell>
-                  <TableCell>Visit Date</TableCell>
-                  <TableCell>Status &amp; Payment</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginate(filteredReports, reportPage).length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                      No reports found
-                    </TableCell>
-                  </TableRow>
-                ) : paginate(filteredReports, reportPage).map(r => {
-                  const msme = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
-                  const bge  = experts.find(e => e.id === r.bge)  || { name: r.bge_name };
-                  return (
-                    <TableRow key={r.id} hover>
+          <Box>
+            {/* View Mode 1: Table View */}
+            {reportViewMode === 'table' && (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                    <TableRow>
                       <TableCell>
-                        <Typography variant="body2" fontWeight={500}>{r.msme_name || msme.business_name}</Typography>
-                        {(r.msme_code || msme.msme_code) &&
-                          <Typography variant="caption" color="text.secondary">{r.msme_code || msme.msme_code}</Typography>}
-                      </TableCell>
-                      <TableCell>{r.bge_name || bge.name}</TableCell>
-                      <TableCell>
-                        <Chip label={VISIT_LABELS[r.visit_type] || r.visit_type} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell>{r.visit_date}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
-                          <Chip label={r.status} size="small" color={REPORT_STATUS_COLORS[r.status] || 'default'} />
-                          {r.payment_status === 'submitted' && (
-                            <Tooltip title={`Submitted for payment: ${r.payment_reference || 'N/A'}`}>
-                              <Chip label={r.payment_reference ? `Submitted: ${r.payment_reference}` : 'Submitted'} size="small" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontSize: 10, height: 20 }} />
-                            </Tooltip>
-                          )}
-                          {(r.payment_status === 'confirmed' || r.payment_confirmed_by_bge) && (
-                            <Tooltip title={`Payment confirmed by BGE on ${r.payment_confirmed_at ? r.payment_confirmed_at.slice(0, 16).replace('T', ' ') : ''}`}>
-                              <Chip label="Confirmed ✓" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontSize: 10, height: 20 }} />
-                            </Tooltip>
-                          )}
-                        </Box>
+                        <TableSortLabel
+                          active={reportSortBy === 'msme'}
+                          direction={reportSortBy === 'msme' ? reportSortDir : 'asc'}
+                          onClick={() => handleReportSort('msme')}
+                        >
+                          MSME
+                        </TableSortLabel>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="View report">
-                            <IconButton size="small" color="primary" onClick={() => setViewReport({ ...r, _msme: msme, _bgeName: r.bge_name || bge.name })}>
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Open PDF">
-                            <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'view')}>
-                              <PictureAsPdf fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download PDF">
-                            <IconButton size="small" onClick={() => openReportPdf('msme', r.id, 'download')}>
-                              <Download fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {isStaff && (
-                            <Tooltip title="Submit for Payment / Update Reference">
-                              <IconButton size="small" color={r.payment_confirmed_by_bge ? 'success' : r.payment_status === 'submitted' ? 'warning' : 'default'} onClick={() => openReportPaymentSubmit(r, 'msme')}>
-                                <Payments fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {r.status !== 'draft' && (
-                            <Tooltip title="Revert to draft">
-                              <IconButton size="small" color="warning" onClick={() => revertReport('msme', r.id)}>
-                                <Undo fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {r.status === 'draft' && (
-                            <Tooltip title="Delete draft">
-                              <IconButton size="small" color="error" onClick={() => deleteReport(r)}>
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
+                        <TableSortLabel
+                          active={reportSortBy === 'bge'}
+                          direction={reportSortBy === 'bge' ? reportSortDir : 'asc'}
+                          onClick={() => handleReportSort('bge')}
+                        >
+                          BGE Expert
+                        </TableSortLabel>
                       </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={reportSortBy === 'visit_type'}
+                          direction={reportSortBy === 'visit_type' ? reportSortDir : 'asc'}
+                          onClick={() => handleReportSort('visit_type')}
+                        >
+                          Visit Type
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={reportSortBy === 'visit_date'}
+                          direction={reportSortBy === 'visit_date' ? reportSortDir : 'desc'}
+                          onClick={() => handleReportSort('visit_date')}
+                        >
+                          Visit Date
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={reportSortBy === 'status'}
+                          direction={reportSortBy === 'status' ? reportSortDir : 'asc'}
+                          onClick={() => handleReportSort('status')}
+                        >
+                          Status &amp; Payment
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>Actions</TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <TablePagination
-              component="div" count={filteredReports.length} page={reportPage}
-              rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
-              onPageChange={(_, p) => setReportPage(p)}
-            />
-          </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {pagedReports.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                          No reports found matching criteria
+                        </TableCell>
+                      </TableRow>
+                    ) : pagedReports.map(r => {
+                      const msme = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
+                      const bge  = experts.find(e => e.id === r.bge)  || { name: r.bge_name };
+                      return (
+                        <TableRow key={r.id} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={600}>{r.msme_name || msme.business_name}</Typography>
+                            {(r.msme_code || msme.msme_code) &&
+                              <Typography variant="caption" color="text.secondary">{r.msme_code || msme.msme_code}</Typography>}
+                          </TableCell>
+                          <TableCell>{r.bge_name || bge.name}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={VISIT_LABELS[r.visit_type] || r.visit_type}
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                borderColor: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                color: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                fontWeight: 500,
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: reportSortBy === 'visit_date' ? 600 : 400 }}>
+                            {r.visit_date}
+                          </TableCell>
+                          <TableCell>
+                            {renderReportStatusChips(r)}
+                          </TableCell>
+                          <TableCell>
+                            {renderReportActions(r, msme, bge)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                <TablePagination
+                  component="div"
+                  count={sortedReports.length}
+                  page={reportPage}
+                  rowsPerPage={reportRowsPerPage}
+                  rowsPerPageOptions={[10, 15, 25, 50, 100]}
+                  onPageChange={(_, p) => setReportPage(p)}
+                  onRowsPerPageChange={e => {
+                    setReportRowsPerPage(parseInt(e.target.value, 10));
+                    setReportPage(0);
+                  }}
+                />
+              </TableContainer>
+            )}
+
+            {/* View Mode 2: Cards View */}
+            {reportViewMode === 'cards' && (
+              <Box>
+                {pagedReports.length === 0 ? (
+                  <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                    No reports found matching criteria
+                  </Paper>
+                ) : (
+                  <Grid container spacing={2}>
+                    {pagedReports.map(r => {
+                      const msme = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
+                      const bge  = experts.find(e => e.id === r.bge)  || { name: r.bge_name };
+                      return (
+                        <Grid item xs={12} sm={6} md={4} key={r.id}>
+                          <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 2, '&:hover': { boxShadow: 2 } }}>
+                            <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                <Box sx={{ minWidth: 0, mr: 1 }}>
+                                  <Typography variant="subtitle2" fontWeight={700} noWrap title={r.msme_name || msme.business_name}>
+                                    {r.msme_name || msme.business_name}
+                                  </Typography>
+                                  {(r.msme_code || msme.msme_code) && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      {r.msme_code || msme.msme_code}
+                                    </Typography>
+                                  )}
+                                </Box>
+                                <Chip
+                                  label={r.visit_date}
+                                  size="small"
+                                  sx={{ bgcolor: '#F1F5F9', color: '#334155', fontWeight: 600, fontSize: 11, flexShrink: 0 }}
+                                />
+                              </Box>
+
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, gap: 1, flexWrap: 'wrap' }}>
+                                <Chip
+                                  label={VISIT_LABELS[r.visit_type] || r.visit_type}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{
+                                    borderColor: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                    color: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                    fontWeight: 600,
+                                    fontSize: 11,
+                                  }}
+                                />
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <People sx={{ fontSize: 14 }} /> {r.bge_name || bge.name}
+                                </Typography>
+                              </Box>
+
+                              {r.concrete_takeaway ? (
+                                <Box sx={{ p: 1.25, bgcolor: '#F8FAFC', borderRadius: 1.5, borderLeft: '3px solid #00695C', mb: 1.5 }}>
+                                  <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" sx={{ fontSize: 10, textTransform: 'uppercase' }}>
+                                    Acid Test Takeaway
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontSize: 12, color: '#1E293B', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                    {r.concrete_takeaway}
+                                  </Typography>
+                                </Box>
+                              ) : r.key_achievement ? (
+                                <Box sx={{ p: 1.25, bgcolor: '#F8FAFC', borderRadius: 1.5, borderLeft: '3px solid #2B5278', mb: 1.5 }}>
+                                  <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" sx={{ fontSize: 10, textTransform: 'uppercase' }}>
+                                    Key Achievement
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontSize: 12, color: '#1E293B', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                    {r.key_achievement}
+                                  </Typography>
+                                </Box>
+                              ) : r.stated_purpose ? (
+                                <Box sx={{ p: 1.25, bgcolor: '#F8FAFC', borderRadius: 1.5, borderLeft: '3px solid #94A3B8', mb: 1.5 }}>
+                                  <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" sx={{ fontSize: 10, textTransform: 'uppercase' }}>
+                                    Purpose
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontSize: 12, color: '#1E293B', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                    {r.stated_purpose}
+                                  </Typography>
+                                </Box>
+                              ) : null}
+
+                              <Box sx={{ mt: 'auto', pt: 1, borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                {renderReportStatusChips(r)}
+                                {renderReportActions(r, msme, bge)}
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )}
+                <TablePagination
+                  component="div"
+                  count={sortedReports.length}
+                  page={reportPage}
+                  rowsPerPage={reportRowsPerPage}
+                  rowsPerPageOptions={[10, 15, 25, 50, 100]}
+                  onPageChange={(_, p) => setReportPage(p)}
+                  onRowsPerPageChange={e => {
+                    setReportRowsPerPage(parseInt(e.target.value, 10));
+                    setReportPage(0);
+                  }}
+                  sx={{ mt: 2 }}
+                />
+              </Box>
+            )}
+
+            {/* View Mode 3: Grouped by BGE */}
+            {reportViewMode === 'grouped_bge' && (() => {
+              const bgeGroups = {};
+              sortedReports.forEach(r => {
+                const bgeId = r.bge || 'unassigned';
+                const bgeObj = experts.find(e => e.id === r.bge);
+                const bgeName = r.bge_name || (bgeObj ? bgeObj.name : 'Unassigned');
+                if (!bgeGroups[bgeId]) {
+                  bgeGroups[bgeId] = { bgeId, bgeName, reports: [] };
+                }
+                bgeGroups[bgeId].reports.push(r);
+              });
+
+              const bgeList = Object.values(bgeGroups).sort((a, b) => b.reports.length - a.reports.length);
+
+              if (bgeList.length === 0) {
+                return (
+                  <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                    No reports found matching criteria
+                  </Paper>
+                );
+              }
+
+              return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {bgeList.map(group => {
+                    const submittedCount = group.reports.filter(r => r.status === 'submitted' || r.status === 'reviewed').length;
+                    const confirmedCount = group.reports.filter(r => r.payment_status === 'confirmed' || r.payment_confirmed_by_bge).length;
+                    const isExpanded = reportExpandedBges[group.bgeId] ?? (bgeList.length <= 3);
+                    return (
+                      <Accordion
+                        key={group.bgeId}
+                        variant="outlined"
+                        expanded={isExpanded}
+                        onChange={() => setReportExpandedBges(prev => ({ ...prev, [group.bgeId]: !isExpanded }))}
+                        sx={{ borderRadius: '8px !important', '&:before': { display: 'none' } }}
+                      >
+                        <AccordionSummary expandIcon={<ExpandMore />}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', width: '100%', pr: 2 }}>
+                            <Avatar sx={{ width: 32, height: 32, bgcolor: '#162A3A', fontSize: 13, fontWeight: 700 }}>
+                              {group.bgeName.slice(0, 2).toUpperCase()}
+                            </Avatar>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ minWidth: 160 }}>
+                              {group.bgeName}
+                            </Typography>
+                            <Chip label={`${group.reports.length} reports`} size="small" sx={{ fontWeight: 600, bgcolor: '#EEF2FF', color: '#3730A3' }} />
+                            <Chip label={`${submittedCount} submitted`} size="small" variant="outlined" color="primary" sx={{ fontSize: 11 }} />
+                            {confirmedCount > 0 && (
+                              <Chip label={`${confirmedCount} paid ✓`} size="small" variant="outlined" color="success" sx={{ fontSize: 11 }} />
+                            )}
+                            <Box sx={{ flexGrow: 1 }} />
+                            <Typography variant="caption" color="text.secondary">
+                              Latest: {group.reports[0]?.visit_date || '—'}
+                            </Typography>
+                          </Box>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ p: 0 }}>
+                          <Table size="small">
+                            <TableHead sx={{ bgcolor: '#FAFAFA' }}>
+                              <TableRow>
+                                <TableCell>MSME</TableCell>
+                                <TableCell>Visit Type</TableCell>
+                                <TableCell>Visit Date</TableCell>
+                                <TableCell>Status &amp; Payment</TableCell>
+                                <TableCell>Actions</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {group.reports.map(r => {
+                                const msme = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
+                                const bge = experts.find(e => e.id === r.bge) || { name: r.bge_name };
+                                return (
+                                  <TableRow key={r.id} hover>
+                                    <TableCell>
+                                      <Typography variant="body2" fontWeight={600}>{r.msme_name || msme.business_name}</Typography>
+                                      {(r.msme_code || msme.msme_code) && (
+                                        <Typography variant="caption" color="text.secondary">{r.msme_code || msme.msme_code}</Typography>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Chip
+                                        label={VISIT_LABELS[r.visit_type] || r.visit_type}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{
+                                          borderColor: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                          color: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                          fontWeight: 500,
+                                        }}
+                                      />
+                                    </TableCell>
+                                    <TableCell>{r.visit_date}</TableCell>
+                                    <TableCell>{renderReportStatusChips(r)}</TableCell>
+                                    <TableCell>{renderReportActions(r, msme, bge)}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </AccordionDetails>
+                      </Accordion>
+                    );
+                  })}
+                </Box>
+              );
+            })()}
+          </Box>
         );
       })()}
 
@@ -5553,7 +6077,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {groupReports.map(g => (
+                {[...groupReports].sort((a, b) => new Date(b.visit_date || 0) - new Date(a.visit_date || 0) || ((b.id || 0) - (a.id || 0))).map(g => (
                   <TableRow key={g.id} hover>
                     <TableCell>
                       <Typography variant="body2" fontWeight={500}>{g.group_name}</Typography>

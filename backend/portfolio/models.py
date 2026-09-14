@@ -1030,6 +1030,10 @@ class MSMEReport(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ['-visit_date', '-created_at', '-id']
+        verbose_name = "MSME Report"
+
     def __str__(self):
         return f"{self.visit_type} report — {self.msme.business_name} by {self.bge.name} ({self.visit_date})"
 
