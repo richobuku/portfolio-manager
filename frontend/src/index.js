@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import theme from './theme';
+import theme, { BRAND } from './theme';
 import API_BASE_URL from './config';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
@@ -82,6 +82,12 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Ensure browser / PWA title bar theme-color matches Warm Bronze-Charcoal
+const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+if (metaThemeColor) {
+  metaThemeColor.setAttribute('content', BRAND.primaryMain);
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

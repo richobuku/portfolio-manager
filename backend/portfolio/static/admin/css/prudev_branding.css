@@ -1,27 +1,27 @@
 /* PRUDEV II admin theme — overrides Django admin to match the React frontend.
-   Brand palette: navy #1A2F4B (sidebar/header), GIZ red #C8102E (accent),
-   off-white surface #F5F5F5, dark text #1A2F4B.
+   Brand palette: Warm Bronze-Charcoal #262523 (sidebar/header), GIZ red #C8102E (accent),
+   GOPA Gold #F3BB36, off-white surface #FAF9F6, dark text #1C1917.
    Loaded automatically via portfolio/static/admin/css/base.css (collectstatic). */
 
 :root {
-  --primary:        #1A2F4B;        /* navy header / sidebar */
+  --primary:        #262523;        /* Warm Bronze-Charcoal header / sidebar */
   --primary-fg:     #FFFFFF;
-  --secondary:      #243a5b;        /* hover/lighter navy */
+  --secondary:      #3D3B37;        /* hover/lighter charcoal */
   --accent:         #C8102E;        /* GIZ red */
-  --link-fg:        #1A2F4B;
+  --link-fg:        #262523;
   --link-hover-color: #C8102E;
   --link-selected-fg: #FFFFFF;
-  --header-bg:      #1A2F4B;
+  --header-bg:      #262523;
   --header-color:   #FFFFFF;
   --header-link-color: #FFFFFF;
-  --breadcrumbs-bg: #243a5b;
-  --breadcrumbs-fg: #d8e0ee;
+  --breadcrumbs-bg: #3D3B37;
+  --breadcrumbs-fg: #FAF9F6;
   --breadcrumbs-link-fg: #FFFFFF;
-  --button-bg:      #1A2F4B;
+  --button-bg:      #262523;
   --button-fg:      #FFFFFF;
-  --button-hover-bg: #243a5b;
-  --default-button-bg: #1A2F4B;
-  --default-button-hover-bg: #243a5b;
+  --button-hover-bg: #3D3B37;
+  --default-button-bg: #262523;
+  --default-button-hover-bg: #3D3B37;
   --close-button-bg: #6c757d;
   --close-button-hover-bg: #495057;
   --delete-button-bg: #C8102E;
@@ -29,8 +29,8 @@
   --object-tools-bg: #C8102E;
   --object-tools-fg: #FFFFFF;
   --object-tools-hover-bg: #a00d24;
-  --body-bg:        #F5F5F5;
-  --body-fg:        #1A2F4B;
+  --body-bg:        #FAF9F6;
+  --body-fg:        #1C1917;
   --body-quiet-color: #6b7280;
   --darkened-bg:    #ECECEC;
   --selected-bg:    #fff5f5;
