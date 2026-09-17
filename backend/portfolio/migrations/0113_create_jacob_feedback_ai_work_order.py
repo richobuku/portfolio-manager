@@ -135,7 +135,7 @@ def create_jacob_ai_wo(apps, schema_editor):
         payment_notes=PAYMENT_NOTES,
         team_leader_name='Stephen Maxi Opwonya',
         team_leader_position='Team Leader',
-        created_by=admin_user,
+        created_by_id=admin_user.pk if admin_user else None,
         msme_ids_snapshot=[],
     )
 

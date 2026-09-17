@@ -100,12 +100,17 @@ def create_jacob_bankable_wo(apps, schema_editor):
     WorkOrder = apps.get_model('portfolio', 'WorkOrder')
     User = apps.get_model('auth', 'User')
 
-    bge = BusinessGrowthExpert.objects.filter(name='Jacob Odur').first()
+    bge = (
+        BusinessGrowthExpert.objects.filter(bge_code='PRUDEV II-BGE-010T-01').first()
+        or BusinessGrowthExpert.objects.filter(name='Jacob Odur').first()
+        or BusinessGrowthExpert.objects.filter(name__icontains='Jacob').first()
+    )
     if not bge:
         return
 
     wo_number = 'PRUDEV II-CONS-JO-03'
     if WorkOrder.objects.filter(work_order_number=wo_number).exists():
+        WorkOrder.objects.filter(work_order_number=wo_number).update(status='issued')
         return
 
     admin_user = User.objects.filter(username__in=['richard', 'admin', 'Stephen']).first()
@@ -120,7 +125,7 @@ def create_jacob_bankable_wo(apps, schema_editor):
         end_date=datetime.date(2026, 10, 2),
         location='Northern Uganda (Gulu & Lira)',
         duration='5 days (28 Sep – 2 Oct 2026)',
-        status='draft',
+        status='issued',
         rate_per_day=80000,
         max_days=5,
         transport_reimbursed=True,
@@ -130,7 +135,7 @@ def create_jacob_bankable_wo(apps, schema_editor):
         payment_notes=PAYMENT_NOTES,
         team_leader_name='Stephen Maxi Opwonya',
         team_leader_position='Team Leader',
-        created_by=admin_user,
+        created_by_id=admin_user.pk if admin_user else None,
         msme_ids_snapshot=[],
     )
 
