@@ -605,23 +605,30 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, trReportsLoaded, token]);
 
-  const fetchWorkOrders = useCallback(async () => {
+  const fetchWorkOrders = useCallback(async (isRetry = false) => {
     if (!token) return;
     const h = { Authorization: `Bearer ${token}` };
     const params = {};
     if (woFilterBge) params.bge = woFilterBge;
     if (woFilterStatus) params.status = woFilterStatus;
     if (woFilterType) params.work_order_type = woFilterType;
-    setWoLoading(true);
-    setWoError('');
+    if (!isRetry) {
+      setWoLoading(true);
+      setWoError('');
+    }
     try {
       const res = await axios.get(API_ENDPOINTS.WORK_ORDERS, { headers: h, params });
       setWorkOrders(Array.isArray(res.data) ? res.data : res.data.results || []);
+      setWoLoading(false);
     } catch (err) {
+      if (!isRetry && (!err.response || err.message === 'Network Error' || err.response?.status >= 500)) {
+        // Backend may be waking up from sleep on Render — auto-retry once after 2.5s
+        setTimeout(() => fetchWorkOrders(true), 2500);
+        return;
+      }
       setWorkOrders([]);
       const msg = getErrorMessage(err, 'Failed to load work orders.');
       setWoError(msg);
-    } finally {
       setWoLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

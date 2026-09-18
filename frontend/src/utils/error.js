@@ -55,6 +55,9 @@ export function getErrorMessage(err, fallback = 'An unexpected error occurred.')
   if (typeof err.message === 'string' && err.message.trim()) {
     const msg = err.message.trim();
     if (msg && msg !== '{}' && msg !== '[object Object]') {
+      if (msg.toLowerCase() === 'network error') {
+        return 'Server is waking up or reconnecting. Please wait a moment and tap Retry.';
+      }
       return msg;
     }
   }
