@@ -701,6 +701,52 @@ def render_work_order(work_order):
         ]))
         story.append(tp_table)
 
+    # Workshop Programme — rendered for Bankable Documents workshop work orders
+    if work_order.work_order_type in ('bge_bankable_docs_training', 'bge_bankable_docs_participant'):
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('WORKSHOP PROGRAMME', s['sectiontitle']))
+        story.append(Paragraph(
+            '<b>Workshop Topic:</b> Bankable Documents for MSMEs &amp; BGE Field Feedback Review Workshop',
+            ParagraphStyle('bd_subtitle', parent=s['body'], fontSize=9, spaceBefore=2, spaceAfter=6),
+        ))
+        bge_name = work_order.bge.name if work_order.bge else '—'
+        if work_order.work_order_type == 'bge_bankable_docs_training':
+            role_rows = [
+                ['Workshop Topic',   'Bankable Documents & Field Feedback Review'],
+                ['Facilitation Role','Jacob Odur (Senior BGE / Co-Facilitator)'],
+                ['Lead Facilitator', 'Lead BDS Expert / PRUDEV II Team'],
+                ['Role Description', 'Workshop Co-Facilitator & Field Feedback Moderator'],
+            ]
+        else:
+            role_rows = [
+                ['Workshop Topic',   'Bankable Documents & Field Feedback Review'],
+                ['Lead Facilitator', 'Lead BDS Expert & Jacob Odur (Co-Facilitator)'],
+                ['Participant',      bge_name],
+                ['Role Description', 'BGE Participant / Trainee'],
+            ]
+        story.append(_kv_table(role_rows))
+        story.append(Spacer(1, 6))
+        _tp_cell  = ParagraphStyle('tp_cell_bd', parent=s['body'], fontSize=9)
+        _tp_hdr   = ParagraphStyle('tp_hdr_bd',  parent=s['body'], fontSize=9,
+                                   fontName='Helvetica-Bold', textColor=HexColor('#FFFFFF'))
+        bd_rows = [
+            [Paragraph('Day', _tp_hdr), Paragraph('Session & Core Focus', _tp_hdr), Paragraph('Schedule', _tp_hdr)],
+            [Paragraph('Day 1', _tp_cell), Paragraph('Bankable Documents: Defining bankability, statutory compliance (URSB/TIN), and financial record reconstruction from informal books.', _tp_cell), Paragraph('29 Sep 2026 &#x2014; Full Day', _tp_cell)],
+            [Paragraph('Day 2', _tp_cell), Paragraph('FSP Loan Dossier Packaging &amp; BGE Field Feedback Session: Structuring loan applications, "The Acid Test" field review, and digital tool adoption.', _tp_cell), Paragraph('30 Sep 2026 &#x2014; Full Day', _tp_cell)],
+        ]
+        bd_table = Table(bd_rows, hAlign='LEFT', colWidths=[18 * mm, 102 * mm, 50 * mm], repeatRows=1)
+        bd_table.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, 0),  NAVY),
+            ('LINEBELOW',     (0, 0), (-1, -1), 0.25, LIGHT_GREY),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+            ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
+        ]))
+        story.append(bd_table)
+
     # Training Programme — 3-phase table for the Senior BGE Lead Facilitator
     if work_order.work_order_type == 'bcp_senior_facilitator':
         story.append(Spacer(1, 8))
@@ -924,16 +970,17 @@ def render_work_order(work_order):
             '<b>Note:</b> Transport refunds are <b>NOT</b> provided to attendees, but meals will be covered on the day.',
             ParagraphStyle('ma_intro', parent=s['body'], fontSize=9, spaceBefore=4, spaceAfter=6),
         ))
+        _cell = ParagraphStyle('ma_cell', parent=s['body'], fontSize=8.5, leading=11)
         sched_headers = ['Date', 'Location / District', 'Venue', 'Session Time']
         sched_data = [
             [Paragraph(f'<b>{h}</b>', ParagraphStyle('th', parent=s['body'], fontSize=8.5, textColor=HexColor('#1E293B'))) for h in sched_headers],
-            [Paragraph('21-09-2026', s['cell']), Paragraph('Agago (Patongo)', s['cell']), Paragraph('Top View Hotel / White House', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
-            [Paragraph('23-09-2026', s['cell']), Paragraph('Dokolo', s['cell']), Paragraph('Exodus Inn', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
-            [Paragraph('24-09-2026', s['cell']), Paragraph('Lira City', s['cell']), Paragraph('Graceville Hotel', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
-            [Paragraph('25-09-2026', s['cell']), Paragraph('Kole', s['cell']), Paragraph('District Hall', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
-            [Paragraph('28-09-2026', s['cell']), Paragraph('Nwoya (Koch Goma)', s['cell']), Paragraph('Vilanova Business Park, SMC Limited', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
-            [Paragraph('29-09-2026', s['cell']), Paragraph('Gulu City', s['cell']), Paragraph('Lamaco White House Hotel', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
-            [Paragraph('02-10-2026', s['cell']), Paragraph('Kitgum Municipality', s['cell']), Paragraph('Kitgum Royal Hotel', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+            [Paragraph('21-09-2026', _cell), Paragraph('Agago (Patongo)', _cell), Paragraph('Top View Hotel / White House', _cell), Paragraph('9:00 AM – 4:00 PM', _cell)],
+            [Paragraph('23-09-2026', _cell), Paragraph('Dokolo', _cell), Paragraph('Exodus Inn', _cell), Paragraph('9:00 AM – 4:00 PM', _cell)],
+            [Paragraph('24-09-2026', _cell), Paragraph('Lira City', _cell), Paragraph('Graceville Hotel', _cell), Paragraph('9:00 AM – 4:00 PM', _cell)],
+            [Paragraph('25-09-2026', _cell), Paragraph('Kole', _cell), Paragraph('District Hall', _cell), Paragraph('9:00 AM – 4:00 PM', _cell)],
+            [Paragraph('28-09-2026', _cell), Paragraph('Nwoya (Koch Goma)', _cell), Paragraph('Vilanova Business Park, SMC Limited', _cell), Paragraph('9:00 AM – 4:00 PM', _cell)],
+            [Paragraph('29-09-2026', _cell), Paragraph('Gulu City', _cell), Paragraph('Lamaco White House Hotel', _cell), Paragraph('9:00 AM – 4:00 PM', _cell)],
+            [Paragraph('02-10-2026', _cell), Paragraph('Kitgum Municipality', _cell), Paragraph('Kitgum Royal Hotel', _cell), Paragraph('9:00 AM – 4:00 PM', _cell)],
         ]
         sched_table = Table(sched_data, colWidths=[26 * mm, 44 * mm, 68 * mm, 32 * mm], hAlign='LEFT')
         sched_table.setStyle(TableStyle([
@@ -1130,6 +1177,17 @@ def render_work_order(work_order):
             'Post-Session Synthesis & Reporting: A consolidated workshop and field feedback report synthesizing participant learning, field coaching challenges, and actionable management recommendations must be submitted within 3 days of session completion.',
             'Invoicing & Timesheets: Release of professional fees (5 days @ UGX 80,000/day) is strictly contingent upon submission and approval of the final report, countersigned timesheets, and an approved invoice.',
             'Transport Reimbursement: Verified travel expenses incurred will be reimbursed in accordance with approved PRUDEV II transport rates upon submission of valid claims.',
+            'Withholding Tax (WHT): In accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
+        ]
+    elif work_order.work_order_type == 'bge_bankable_docs_participant':
+        CONDITIONS = [
+            'Workshop Attendance & Punctuality: The BGE shall attend both days of the Bankable Documents & Field Feedback Workshop (29–30 September 2026) punctually and participate actively throughout all sessions.',
+            'Attendance Verification: Daily attendance registers must be signed in person on each workshop day. Unexcused absence or partial attendance will result in forfeiture of the daily professional allowance.',
+            'Simulation Exercises: The BGE shall complete all hands-on bankability simulations, case studies, and mock enterprise dossiers assigned during the training.',
+            'Field Feedback Contribution: The BGE shall actively contribute constructive insights and ground-level field observations during the BGE Feedback Review Session, addressing coaching bottlenecks and digital tool adoption.',
+            'Post-Workshop Action Plan: The BGE shall submit an Individual MSME Portfolio Action Plan within three (3) working days of workshop completion.',
+            'Travel Reimbursement: Verified travel expenses incurred will be reimbursed in accordance with approved PRUDEV II transport rates upon submission of valid travel claims.',
+            'Professional Fee Disbursement: Release of professional fees (2 days @ UGX 60,000/day) is contingent upon verified attendance, satisfactory completion of simulations, and submission of the action plan.',
             'Withholding Tax (WHT): In accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
         ]
     elif work_order.work_order_type == 'bds_manual_module':

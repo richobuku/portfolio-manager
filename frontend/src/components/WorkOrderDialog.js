@@ -1041,6 +1041,48 @@ PHASE 3 — POST-SESSION SYNTHESIS & REPORTING (1 Day)
       },
     ],
   },
+  bge_bankable_docs_participant: {
+    objective:
+      'To participate actively in the PRUDEV II Business Growth Expert (BGE) Capacity Building Workshop focusing on Bankable Documents for MSMEs and the structured BGE Field Feedback Review Session (29–30 September 2026). Participating BGEs will acquire practical skills in diagnosing MSME credit readiness, assembling bank-standard enterprise documentation (URSB registrations, TINs, digital books/cashbooks, and financial statements), and packaging loan applications for Financial Service Providers (FSPs). Additionally, BGEs will actively participate in the reflective field feedback session, sharing ground-level coaching bottlenecks, evaluating adherence to "The Acid Test" verification protocol, reviewing digital tool adoption (One Tap POS, ISM, Zoho), and formulating actionable coaching plans for their assigned MSME portfolios.',
+    key_tasks: `1. Attend all scheduled sessions of the 2-day Bankable Documents & Field Feedback Workshop punctually (8:30 AM – 5:00 PM) at the designated workshop venue in Gulu/Lira.
+2. Actively participate in interactive training modules on MSME bankability, credit appraisal criteria, formal registration (URSB/TIN), and financial record-keeping.
+3. Complete hands-on group exercises and case study simulations, critiquing mock MSME financial profiles and structuring bank-ready loan dossiers.
+4. Actively contribute to the structured BGE Field Feedback Session, presenting candid field observations regarding MSME coaching dynamics, "The Acid Test" verification standards, and digital tool adoption challenges.
+5. Sign the official PRUDEV II daily attendance register for each workshop day.
+6. Formulate and submit an Individual BGE Action Plan detailing how bankable document preparation and digital tools will be rolled out across assigned MSMEs.`,
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Full Attendance & Active Workshop Participation (Day 1 & Day 2) — Punctual attendance and active engagement throughout the 2-day workshop sessions (29–30 September 2026).',
+        due_date: '30 September 2026',
+        quantitative_result: '100% attendance verified across both days on official PRUDEV II attendance registers countersigned by facilitators.',
+        qualitative_result: 'Active participation in plenary discussions, diagnostic simulations, and peer learning exchanges.',
+        means_of_verification: 'Signed daily attendance registers countersigned by Lead BDS Facilitator and Team Leader.',
+        unit_rate: '60000',
+        payment_condition: 'Mandatory requirement for professional allowance release; unexcused absence forfeits fee.',
+      },
+      {
+        task_num: 2,
+        description: 'Bankability Simulation & Mock Enterprise Dossier Completion — Practical exercise critiquing sample MSME financial profiles, diagnosing documentation gaps, and compiling a mock bank-ready loan dossier.',
+        due_date: '30 September 2026',
+        quantitative_result: '1 completed enterprise bankability simulation worksheet and mock loan proposal dossier submitted.',
+        qualitative_result: 'Demonstrated competency in evaluating MSME credit readiness, assembling required statutory records (URSB/TIN), and structuring financial statements.',
+        means_of_verification: 'Completed and evaluated simulation worksheets submitted to workshop facilitators.',
+        unit_rate: '30000',
+        payment_condition: 'Required technical deliverable for workshop completion sign-off.',
+      },
+      {
+        task_num: 3,
+        description: 'Individual BGE Portfolio Action Plan & Field Rollout Strategy — Structured post-training action plan outlining how bankable document preparation and digital tools (One Tap POS, ISM) will be rolled out to assigned MSMEs.',
+        due_date: '5 October 2026',
+        quantitative_result: '1 individual action plan submitted outlining specific milestone targets for assigned MSME portfolio.',
+        qualitative_result: 'Action plan is grounded in field realities, adheres to "The Acid Test" verification standards, and details concrete enterprise support steps.',
+        means_of_verification: 'Submitted action plan approved by BDS Component Coordinator.',
+        unit_rate: '30000',
+        payment_condition: 'Final milestone for closeout and fee clearance.',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -1326,6 +1368,19 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_position = 'Team Leader';
       extra.payment_notes        = `Total contract value: UGX 400,000 (5 days × UGX 80,000/day).\nPayment disbursed upon completion of the assignment, submission and approval of the final report, signed attendance lists, and countersigned invoice/timesheet.\nIn accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA Pro GmbH.\nVerified travel expenses will be reimbursed in accordance with PRUDEV II approved transport rates.`;
     }
+    if (type === 'bge_bankable_docs_participant') {
+      extra.start_date           = '2026-09-29';
+      extra.end_date             = '2026-09-30';
+      extra.duration             = '2 days (29–30 September 2026)';
+      extra.max_days             = 2;
+      extra.rate_per_day         = 60000;
+      extra.transport_reimbursed = true;
+      extra.location             = 'Northern Uganda (Gulu & Lira)';
+      extra.project_name         = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      extra.payment_notes        = `Total contract value: UGX 120,000 (2 days × UGX 60,000/day).\nPayment disbursed upon full attendance at the 2-day workshop, submission of signed attendance registers, completed simulation worksheets, and post-workshop action plan.\nIn accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA Pro GmbH.\nVerified travel expenses will be reimbursed in accordance with PRUDEV II approved transport rates.`;
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, [experts, selectedBges, woEditing, woForm.bge]);
 
@@ -1555,7 +1610,8 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="bds_manual_module">BDS Manual — Additional Module</MenuItem>
                 <MenuItem value="bge_technical_co_assignment">BGE Technical Co-Assignment Support (Specialist Technical Capacity)</MenuItem>
                 <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation &amp; Tool Demonstration</MenuItem>
-                <MenuItem value="bge_bankable_docs_training">BGE Training — Bankable Documents &amp; Field Feedback Review</MenuItem>
+                <MenuItem value="bge_bankable_docs_training">BGE Co-Facilitator — Bankable Documents &amp; Field Feedback Workshop</MenuItem>
+                <MenuItem value="bge_bankable_docs_participant">BGE Participant — Bankable Documents &amp; Field Feedback Workshop</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
