@@ -88,11 +88,7 @@ def _drive_service():
         if not os.path.exists(key_path):
             key_path = os.path.join(settings.BASE_DIR, '..', 'drive_service_account.json')
         if not os.path.exists(key_path):
-            raise CommandError(
-                'No Google Drive credentials found. Set GOOGLE_OAUTH2_CLIENT_ID, '
-                'GOOGLE_OAUTH2_CLIENT_SECRET, and GOOGLE_OAUTH2_REFRESH_TOKEN in Render, '
-                'or run backend/get_drive_token.py to generate them.'
-            )
+            return None
         creds = service_account.Credentials.from_service_account_file(key_path, scopes=SCOPES)
 
     return build('drive', 'v3', credentials=creds, cache_discovery=False)
@@ -186,6 +182,13 @@ class Command(BaseCommand):
         # ── Connect to Drive ──────────────────────────────────────────────────
         if not dry_run:
             service = _drive_service()
+            if not service:
+                self.stdout.write(self.style.WARNING(
+                    'No Google Drive credentials found. Set GOOGLE_OAUTH2_CLIENT_ID, '
+                    'GOOGLE_OAUTH2_CLIENT_SECRET, and GOOGLE_OAUTH2_REFRESH_TOKEN in Render, '
+                    'or run backend/get_drive_token.py to generate them. Skipping export for now.'
+                ))
+                return
             root_id = _find_folder(service, ROOT_FOLDER_NAME)
             if not root_id:
                 raise CommandError(
