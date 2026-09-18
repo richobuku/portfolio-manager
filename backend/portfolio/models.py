@@ -1217,6 +1217,7 @@ class WorkOrder(models.Model):
         ('bds_manual_module',     'BDS Manual — Additional Module'),
         ('bge_technical_co_assignment', 'BGE Technical Co-Assignment Support (Specialist Technical Capacity)'),
         ('market_activation_mobilisation', 'Market Activation Event — MSME Mobilisation & Tool Demonstration'),
+        ('bge_bankable_docs_training', 'BGE Training — Bankable Documents & Field Feedback Review'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [

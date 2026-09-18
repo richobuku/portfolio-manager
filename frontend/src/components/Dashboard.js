@@ -7775,6 +7775,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework</MenuItem>
             <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
             <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation</MenuItem>
+            <MenuItem value="bge_bankable_docs_training">BGE Training — Bankable Documents &amp; Field Feedback</MenuItem>
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
@@ -7812,6 +7813,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   ? { borderLeft: '4px solid #E65100' }
                   : wo.work_order_type === 'market_activation_mobilisation'
                   ? { borderLeft: '4px solid #0284C7' }
+                  : wo.work_order_type === 'bge_bankable_docs_training'
+                  ? { borderLeft: '4px solid #4A148C' }
                   : {}
               }>
               <CardContent>
@@ -7834,6 +7837,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       {wo.work_order_type === 'market_activation_mobilisation' && (
                         <Chip label="Market Activation" size="small"
                           sx={{ bgcolor: '#0284C7', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      {wo.work_order_type === 'bge_bankable_docs_training' && (
+                        <Chip label="Bankable Documents Training" size="small"
+                          sx={{ bgcolor: '#4A148C', color: '#fff', fontSize: 10, fontWeight: 700 }} />
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">

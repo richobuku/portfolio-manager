@@ -972,6 +972,75 @@ PHASE 2 — CO-FACILITATION OF TRAINING (5 days, 1st Week of September 2026)
       },
     ],
   },
+  bge_bankable_docs_training: {
+    objective:
+      'To co-facilitate the PRUDEV II Business Growth Expert (BGE) Capacity Building Workshop focusing on Bankable Documents for MSMEs and to co-lead the structured BGE Field Feedback Review Session. The Senior BGE / Co-Facilitator will collaborate with the Lead Trainer and BDS Team to train BGEs on diagnosing MSME credit readiness, assembling bank-standard documentation (URSB registrations, TINs, digital books/cashbooks, and financial statements), and packaging loan applications for Financial Service Providers (FSPs). Additionally, the Consultant will co-lead the reflective BGE feedback session, synthesizing ground-level coaching bottlenecks, adherence to verification standards ("The Acid Test"), digital tool adoption (One Tap POS, ISM, Zoho), and compiling actionable recommendations for programme leadership.',
+    key_tasks: `PHASE 1 — PREPARATION & SESSION MATERIALS HARMONIZATION (2 Days)
+1. Review the bankable documents training curriculum, credit appraisal criteria, FSP checklist standards, and session timetable.
+2. Develop practical case studies and mock enterprise financial profiles (cashbooks, revenue estimates, asset registers, and loan application forms) for hands-on BGE simulation.
+3. Formulate structured breakout discussion templates and diagnostic reflection prompts for the BGE feedback session.
+4. Harmonize facilitation roles, session exercises, presentation slide decks, and logistical requirements with the Lead BDS Facilitator.
+
+PHASE 2 — INTERACTIVE TRAINING & FEEDBACK CO-FACILITATION (2 Days)
+5. Co-deliver interactive training modules on Bankable Documents:
+   - Defining bankability and credit readiness in rural and semi-urban Northern Uganda MSME contexts.
+   - Guiding MSMEs to prepare formal legal records (URSB registration, TIN, and local operational licenses).
+   - Developing verifiable financial records from informal receipts and digital tools (One Tap POS, ISM, cashbooks).
+   - Assembling loan dossier packages and preparing entrepreneurs for bank credit officer interactions.
+6. Facilitate practical group simulations where BGEs critique sample business dossiers, identify documentation gaps, and structure bank-ready loan proposals.
+7. Co-lead the structured BGE Feedback Session:
+   - Plenary and cluster breakouts examining field coaching dynamics and MSME responsiveness.
+   - Reviewing the adoption and field rigor of "The Acid Test" verification protocol.
+   - Assessing field bottlenecks regarding digital tool onboarding, visit scheduling, and portal reporting.
+8. Administer participant feedback and learning assessment instruments; ensure 100% completion of daily signed attendance registers.
+
+PHASE 3 — POST-SESSION SYNTHESIS & REPORTING (1 Day)
+9. Collate and evaluate participant learning scores, workshop evaluations, and bankability simulation outputs.
+10. Compile a comprehensive Bankable Documents Training & BGE Feedback Session Report, highlighting key learning outcomes, systemic field challenges, and actionable recommendations for PRUDEV II BDS management.
+11. Submit final approved report, original attendance sheets, verified travel logs, approved invoice, and timesheet for Team Leader sign-off.`,
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Inception Note & Session Curriculum Package (agenda, presentation deck, mock enterprise bankability case studies, and feedback session reflection guide)',
+        due_date: '28 September 2026',
+        quantitative_result: '1 complete session package (agenda + presentation deck + case study worksheets + feedback templates) submitted and approved',
+        qualitative_result: 'Content tailored to Northern Uganda MSME realities and FSP credit appraisal requirements; session exercises directly build BGE coaching capacity',
+        means_of_verification: 'Submitted session package approved by Lead BDS Expert / Team Leader',
+        unit_rate: '80000',
+        payment_condition: 'Prerequisite for session delivery',
+      },
+      {
+        task_num: 2,
+        description: 'Training & Feedback Co-Facilitation (2 full days of co-facilitation delivered covering bankable documents and BGE feedback review)',
+        due_date: '30 September 2026',
+        quantitative_result: '2 full days of workshop co-facilitation delivered; signed attendance registers capturing 100% of participating BGEs',
+        qualitative_result: 'Facilitation is highly engaging and practical; BGEs actively evaluate mock dossiers and draft loan proposals; feedback session yields clear, verified action points',
+        means_of_verification: 'Signed daily attendance registers, session photo documentation, and completed participant exercise logs',
+        unit_rate: '160000',
+        payment_condition: 'Required for payment — attendance registers and completed exercises must be submitted',
+      },
+      {
+        task_num: 3,
+        description: 'Consolidated Training & BGE Feedback Review Report (comprehensive synthesis of training outcomes, field feedback analysis, and BDS recommendations)',
+        due_date: '2 October 2026',
+        quantitative_result: '1 consolidated final report (including evaluation score analysis, thematic feedback synthesis, and photo evidence) submitted to the BDS team',
+        qualitative_result: 'Report provides clear, actionable thematic analysis of BGE feedback; details participant learning progress; outlines practical management follow-ups',
+        means_of_verification: 'Submitted final report approved by BDS Expert and Team Leader',
+        unit_rate: '80000',
+        payment_condition: 'Phase closeout payment processed upon approval of final report',
+      },
+      {
+        task_num: 4,
+        description: 'Financial Clearance & Administrative Closeout (approved invoice and countersigned timesheet reflecting 5 working days)',
+        due_date: '2 October 2026',
+        quantitative_result: '1 approved invoice and 1 duly signed timesheet reflecting 5 working days',
+        qualitative_result: 'Documentation fully compliant with GOPA Pro and GIZ financial guidelines',
+        means_of_verification: 'Countersigned invoice and timesheet approved by Team Leader',
+        unit_rate: '80000',
+        payment_condition: 'Final fee disbursement contingent on complete verification',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -1244,6 +1313,19 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_position = 'Team Leader';
       extra.payment_notes        = `Payment disbursed upon completion of mobilisation and event facilitation, submission of signed attendance registers, verified tool demonstration logs, final summary report, and approved invoice/timesheet.\nProfessional fees are subject to 6% Withholding Tax (WHT) deducted at source by GOPA Pro GmbH.\nBGE travel will be reimbursed in accordance with approved PRUDEV II transport rates upon submission of valid travel claims. MSME participants do not receive transport refunds (meals are covered on the day).`;
     }
+    if (type === 'bge_bankable_docs_training') {
+      extra.start_date           = '2026-09-28';
+      extra.end_date             = '2026-10-02';
+      extra.duration             = '5 days (28 Sep – 02 Oct 2026)';
+      extra.max_days             = 5;
+      extra.rate_per_day         = 80000;
+      extra.transport_reimbursed = true;
+      extra.location             = 'Northern Uganda (Gulu & Lira)';
+      extra.project_name         = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      extra.payment_notes        = `Total contract value: UGX 400,000 (5 days × UGX 80,000/day).\nPayment disbursed upon completion of the assignment, submission and approval of the final report, signed attendance lists, and countersigned invoice/timesheet.\nIn accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA Pro GmbH.\nVerified travel expenses will be reimbursed in accordance with PRUDEV II approved transport rates.`;
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, [experts, selectedBges, woEditing, woForm.bge]);
 
@@ -1473,6 +1555,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="bds_manual_module">BDS Manual — Additional Module</MenuItem>
                 <MenuItem value="bge_technical_co_assignment">BGE Technical Co-Assignment Support (Specialist Technical Capacity)</MenuItem>
                 <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation &amp; Tool Demonstration</MenuItem>
+                <MenuItem value="bge_bankable_docs_training">BGE Training — Bankable Documents &amp; Field Feedback Review</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>

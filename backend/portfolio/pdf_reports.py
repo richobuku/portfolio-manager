@@ -1121,6 +1121,17 @@ def render_work_order(work_order):
             'BGE Travel Reimbursement: Verified travel expenses incurred by the BGE will be reimbursed in accordance with PRUDEV II approved public transport rates upon submission of valid travel receipts or logs.',
             'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
         ]
+    elif work_order.work_order_type == 'bge_bankable_docs_training':
+        CONDITIONS = [
+            'Curriculum & Session Preparation: The Consultant shall prepare and submit a high-quality Inception Note and Session Curriculum Package covering MSME credit readiness, bank-standard documentation (URSB, TIN, cashbooks, financial statements), and FSP loan packaging prior to workshop delivery.',
+            'Co-Facilitation Delivery: The Consultant shall co-deliver two (2) full days of interactive workshop sessions in close coordination with the Lead BDS Facilitator, guiding BGEs through realistic loan appraisal simulations and dossier evaluations.',
+            'BGE Field Feedback Moderation: The Consultant shall co-lead the structured BGE Field Feedback Session, systematically examining field coaching dynamics, the rigor of "The Acid Test" verification protocol, and digital tool adoption (One Tap POS, ISM, Zoho).',
+            'Attendance & Quality Verification: Daily attendance registers must be signed by 100% of participating BGEs and countersigned by the Lead BDS Facilitator and Team Leader.',
+            'Post-Session Synthesis & Reporting: A consolidated workshop and field feedback report synthesizing participant learning, field coaching challenges, and actionable management recommendations must be submitted within 3 days of session completion.',
+            'Invoicing & Timesheets: Release of professional fees (5 days @ UGX 80,000/day) is strictly contingent upon submission and approval of the final report, countersigned timesheets, and an approved invoice.',
+            'Transport Reimbursement: Verified travel expenses incurred will be reimbursed in accordance with approved PRUDEV II transport rates upon submission of valid claims.',
+            'Withholding Tax (WHT): In accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
+        ]
     elif work_order.work_order_type == 'bds_manual_module':
         CONDITIONS = [
             'The Consultant shall develop all BDS Manual Additional Module content to the required PRUDEV II quality standard, incorporating current PPDA guidelines, public procurement procedures, and URA 2026 regulatory changes.',
