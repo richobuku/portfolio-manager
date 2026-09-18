@@ -912,6 +912,69 @@ def render_work_order(work_order):
                 story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', tc_item_style))
         story.append(Spacer(1, 8))
 
+    # Expected Outcomes & Schedule — rendered for Market Activation Event
+    if work_order.work_order_type == 'market_activation_mobilisation':
+        _roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('SCHEDULE OF REGIONAL MARKET ACTIVATION EVENTS (9:00 AM – 4:00 PM)', s['sectiontitle']))
+        story.append(Paragraph(
+            'The PRUDEV II consortium (GOPA, Friends Consult, and Farm Africa) is organizing a series of regional '
+            'Market Activation Events bringing together MSMEs, cooperative leaders, and Business Development Service Providers. '
+            'All sessions run strictly from 9:00 AM to 4:00 PM. Participants attend only the event closest to their enterprise. '
+            '<b>Note:</b> Transport refunds are <b>NOT</b> provided to attendees, but meals will be covered on the day.',
+            ParagraphStyle('ma_intro', parent=s['body'], fontSize=9, spaceBefore=4, spaceAfter=6),
+        ))
+        sched_headers = ['Date', 'Location / District', 'Venue', 'Session Time']
+        sched_data = [
+            [Paragraph(f'<b>{h}</b>', ParagraphStyle('th', parent=s['body'], fontSize=8.5, textColor=HexColor('#1E293B'))) for h in sched_headers],
+            [Paragraph('21-09-2026', s['cell']), Paragraph('Agago (Patongo)', s['cell']), Paragraph('Top View Hotel / White House', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+            [Paragraph('23-09-2026', s['cell']), Paragraph('Dokolo', s['cell']), Paragraph('Exodus Inn', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+            [Paragraph('24-09-2026', s['cell']), Paragraph('Lira City', s['cell']), Paragraph('Graceville Hotel', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+            [Paragraph('25-09-2026', s['cell']), Paragraph('Kole', s['cell']), Paragraph('District Hall', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+            [Paragraph('28-09-2026', s['cell']), Paragraph('Nwoya (Koch Goma)', s['cell']), Paragraph('Vilanova Business Park, SMC Limited', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+            [Paragraph('29-09-2026', s['cell']), Paragraph('Gulu City', s['cell']), Paragraph('Lamaco White House Hotel', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+            [Paragraph('02-10-2026', s['cell']), Paragraph('Kitgum Municipality', s['cell']), Paragraph('Kitgum Royal Hotel', s['cell']), Paragraph('9:00 AM – 4:00 PM', s['cell'])],
+        ]
+        sched_table = Table(sched_data, colWidths=[26 * mm, 44 * mm, 68 * mm, 32 * mm], hAlign='LEFT')
+        sched_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), HexColor('#F1F5F9')),
+            ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#CBD5E1')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(sched_table)
+        story.append(Spacer(1, 8))
+
+        story.append(Paragraph('EXPECTED OUTCOMES — MSME MOBILISATION & TOOL DEMONSTRATION', s['sectiontitle']))
+        ma_outcome_groups = [
+            ('Mobilisation Outreach & Confirmed Participation', [
+                'Comprehensive outreach and confirmation of assigned MSMEs, cooperative leaders, and BDSPs in the BGE\'s cluster.',
+                'Clear dissemination of event objectives, schedule, venue location, and logistics (meals covered, no transport refunds for participants).',
+                'Submission of a verified mobilization and confirmed participant list to PRUDEV II management prior to the activation date.',
+            ]),
+            ('Live Tool Demonstrations & Practical Advisory Solutions', [
+                'Delivery of hands-on, live demonstrations of practical business tools (digital marketing, online presence, POS, accounting/cashbooks).',
+                'Engagement of MSME proprietors with actionable solutions addressing operational, financial, and marketing bottlenecks.',
+                'Direct BGE consultation and guidance on adopting digital bookkeeping and business management systems.',
+            ]),
+            ('Commercial B2B Linkages & Business Networking', [
+                'Facilitating direct linkages connecting local MSMEs with reliable suppliers of raw materials, commercial buyers, and service providers.',
+                'Assisting entrepreneurs in exploring business partnerships and negotiating concrete commercial deals during the event.',
+            ]),
+            ('Field Verification, Reporting & Accountability', [
+                'Active on-site facilitation, participant registration verification, and full-day session support from 9:00 AM to 4:00 PM.',
+                'Collection and submission of complete, countersigned daily attendance registers and photo evidence of MSME participation.',
+                'Submission of a comprehensive post-event mobilization report, countersigned timesheets, and approved invoice.',
+            ]),
+        ]
+        ma_item_style = ParagraphStyle('ma_item', parent=s['body'], fontSize=9, leftIndent=14, spaceBefore=2)
+        for heading, items in ma_outcome_groups:
+            story.append(Paragraph(f'<b>{heading}</b>', ParagraphStyle('ma_hd', parent=s['body'], fontSize=10, spaceBefore=6, spaceAfter=2)))
+            for i, item in enumerate(items):
+                story.append(Paragraph(f'{_roman[i]}. {_safe_html(item)}', ma_item_style))
+        story.append(Spacer(1, 8))
+
     story.append(Paragraph('SCHEDULE 2 — PAYMENT TERMS', s['sectiontitle']))
     gross = work_order.rate_per_day * work_order.max_days
     wht   = int(gross * 0.06)
@@ -1044,6 +1107,18 @@ def render_work_order(work_order):
             'Visit Reporting & Verification: An individual comprehensive visit report must be submitted in the PRUDEV II portal for each enterprise session within 48 hours, supported by GPS base pinning and photo documentation.',
             'Timesheets & Invoicing: Release of professional fees is strictly contingent upon submission and approval of detailed visit reports, the Technical Handover Note, countersigned client timesheets, and an approved invoice.',
             'Transport Reimbursement: Travel expenses will be reimbursed in accordance with PRUDEV II public transport rates upon submission of valid travel receipts or logs.',
+            'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
+        ]
+    elif work_order.work_order_type == 'market_activation_mobilisation':
+        CONDITIONS = [
+            'Mobilisation Scope & Target Outreach: The BGE shall mobilise MSME proprietors, enterprise managers, cooperative leaders, and Business Development Service Providers within their designated district/cluster to attend the regional Market Activation Event.',
+            'Event Attendance & Full-Day On-Site Facilitation: All activation sessions run strictly from 9:00 AM to 4:00 PM. The BGE must be physically present on-site at their designated cluster venue throughout the session to support registration, guide participants, and provide direct BGE advisory.',
+            'Transparent Participant Communication & Logistics: The BGE must clearly inform all mobilised participants that meals will be covered on the day, but transport refunds will NOT be provided to attendees. Participants must attend only the event closest to them.',
+            'Live Business Tool Demonstrations: The BGE shall actively demonstrate practical business solutions and tools (digital marketing, online presence, POS systems, accounting/cashbooks, and financial management tools) to visiting MSMEs, ensuring proprietors observe practical applications for their businesses.',
+            'B2B Linkage & Commercial Deal Facilitation: The BGE shall facilitate business networking between MSMEs, suppliers, buyers, and BDSPs, supporting participants to explore raw material sources, negotiate commercial deals, and establish supply relationships.',
+            'Registration & Attendance Verification: The BGE shall coordinate registration at the venue entrance, ensuring all attendees sign the official PRUDEV II attendance register with contact and enterprise details.',
+            'Deliverables & Payment Release: Release of professional fees is strictly contingent upon: (i) submission of the verified mobilisation and confirmed attendee list, (ii) full-day on-site facilitation evidenced by photo documentation and signed attendance sheets, (iii) post-event summary report, and (iv) client-countersigned timesheets and invoice.',
+            'BGE Travel Reimbursement: Verified travel expenses incurred by the BGE will be reimbursed in accordance with PRUDEV II approved public transport rates upon submission of valid travel receipts or logs.',
             'Withholding Tax (WHT): In accordance with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax, deducted at source by GOPA Pro GmbH.',
         ]
     elif work_order.work_order_type == 'bds_manual_module':

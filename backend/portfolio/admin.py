@@ -2,8 +2,14 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
 from django.contrib import messages
-from .account_setup import ensure_bge_account
-from .models import Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest, TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport, GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel, ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate, TrainingFacilitationAssignment, TrainingReport
+from .models import (
+    Portfolio, Investment, Transaction, MSME, BusinessGrowthExpert, SupportRequest,
+    TrainingSession, Attendance, TrainingTopic, Cohort, BGEGroup, MSMEReport,
+    GroupReport, GroupReportContribution, CohortAdmin as CohortAdminModel,
+    ProgrammeGroup, MSMEGrowthSnapshot, VisitReportTemplate,
+    TrainingFacilitationAssignment, TrainingReport,
+    WorkOrder, WorkOrderSubmission, WorkOrderPayment, WorkOrderAttachment,
+)
 
 # ── Brand the admin to match the PRUDEV II frontend ──────────────────────────
 admin.site.site_header = "PRUDEV II — Portfolio Manager"
@@ -312,3 +318,107 @@ class TrainingReportAdmin(admin.ModelAdmin):
     def total_participants(self, obj):
         return obj.total_participants
     total_participants.short_description = 'Total participants'
+
+
+class WorkOrderSubmissionInline(admin.TabularInline):
+    model = WorkOrderSubmission
+    extra = 0
+    readonly_fields = ('created_at', 'updated_at')
+    fields = ('bge', 'timesheet_file', 'invoice_file', 'uploaded_by', 'created_at')
+
+
+class WorkOrderAttachmentInline(admin.TabularInline):
+    model = WorkOrderAttachment
+    extra = 0
+    readonly_fields = ('created_at',)
+    fields = ('filename', 'caption', 'file', 'uploaded_by', 'created_at')
+
+
+class WorkOrderPaymentInline(admin.TabularInline):
+    model = WorkOrderPayment
+    extra = 0
+    readonly_fields = ('created_at',)
+    fields = ('amount', 'payment_date', 'balance', 'reference', 'recorded_by', 'confirmed_by_bge', 'created_at')
+
+
+@admin.register(WorkOrder)
+class WorkOrderAdmin(admin.ModelAdmin):
+    list_display = (
+        'work_order_number', 'bge', 'work_order_type', 'status',
+        'start_date', 'end_date', 'rate_per_day', 'max_days',
+        'payment_status', 'created_at',
+    )
+    list_filter = (
+        'work_order_type', 'status', 'payment_status',
+        'transport_reimbursed', 'start_date', 'issue_date',
+    )
+    search_fields = (
+        'work_order_number', 'bge__name', 'bge__bge_code',
+        'location', 'project_name', 'objective',
+    )
+    readonly_fields = ('created_at', 'updated_at', 'work_order_number')
+    filter_horizontal = ('co_bges', 'participant_bges')
+    date_hierarchy = 'issue_date'
+    inlines = [WorkOrderSubmissionInline, WorkOrderAttachmentInline, WorkOrderPaymentInline]
+    fieldsets = (
+        ('Basic Information', {
+            'fields': (
+                'work_order_number', 'work_order_type', 'status', 'bge', 'group',
+                'project_name', 'location', 'duration',
+                'issue_date', 'start_date', 'end_date',
+            ),
+        }),
+        ('Technical Co-Assignment (if applicable)', {
+            'fields': ('supported_bge', 'technical_area'),
+            'classes': ('collapse',),
+        }),
+        ('Scope & Deliverables', {
+            'fields': ('objective', 'key_tasks', 'deliverables_json', 'msme_ids_snapshot'),
+        }),
+        ('Payment Terms', {
+            'fields': (
+                'rate_per_day', 'max_days', 'transport_reimbursed', 'payment_notes',
+                'payment_status', 'payment_reference', 'payment_submitted_at',
+                'payment_submitted_by', 'payment_confirmed_at', 'payment_confirmed_by_bge',
+            ),
+        }),
+        ('Signatures & Verification', {
+            'fields': (
+                'team_leader_name', 'team_leader_position', 'created_by',
+                'bge_signed_date', 'signed_pdf',
+            ),
+        }),
+        ('Collaborating BGEs', {
+            'fields': ('co_bges', 'participant_bges'),
+            'classes': ('collapse',),
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+
+@admin.register(WorkOrderSubmission)
+class WorkOrderSubmissionAdmin(admin.ModelAdmin):
+    list_display = ('work_order', 'bge', 'timesheet_filename', 'invoice_filename', 'uploaded_by', 'created_at')
+    list_filter = ('created_at', 'work_order__work_order_type')
+    search_fields = ('work_order__work_order_number', 'bge__name', 'timesheet_filename', 'invoice_filename')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(WorkOrderAttachment)
+class WorkOrderAttachmentAdmin(admin.ModelAdmin):
+    list_display = ('work_order', 'filename', 'caption', 'uploaded_by', 'created_at')
+    list_filter = ('created_at', 'work_order__work_order_type')
+    search_fields = ('work_order__work_order_number', 'filename', 'caption')
+    readonly_fields = ('created_at',)
+
+
+@admin.register(WorkOrderPayment)
+class WorkOrderPaymentAdmin(admin.ModelAdmin):
+    list_display = ('work_order', 'amount', 'payment_date', 'balance', 'reference', 'recorded_by', 'confirmed_by_bge', 'created_at')
+    list_filter = ('payment_date', 'confirmed_by_bge', 'created_at')
+    search_fields = ('work_order__work_order_number', 'reference', 'notes')
+    readonly_fields = ('created_at',)
+

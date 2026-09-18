@@ -917,6 +917,61 @@ PHASE 2 — CO-FACILITATION OF TRAINING (5 days, 1st Week of September 2026)
       },
     ],
   },
+  market_activation_mobilisation: {
+    objective: `To mobilise and confirm attendance of permanently assigned MSMEs, local cooperative leaders, and Business Development Service Providers (BDSPs) across Northern Uganda (Agago, Dokolo, Lira City, Kole, Nwoya, Gulu City, Kitgum Municipality) for the PRUDEV II Market Activation Event (21 September – 2 October 2026). The BGE will conduct targeted outreach to ensure enterprise participation, clarify event objectives and logistics (meals covered, no transport refunds), provide on-site session facilitation, deliver live interactive demonstrations of practical business tools (digital marketing, online presence, POS systems, accounting/cashbooks, and financial management tools), and actively support B2B networking, supplier-buyer linkages, and commercial deal negotiations.`,
+    key_tasks: `1. Review assigned MSME portfolios, local cooperative registers, and BDSP networks to identify and prioritize target participants for the Market Activation Event.
+2. Conduct structured mobilisation outreach (direct telephone contact and physical field visits) to invite and confirm participation of MSME proprietors, enterprise managers, and cooperative leaders.
+3. Clearly communicate the schedule of events, session hours (strictly 9:00 AM – 4:00 PM), nearest cluster venue, and logistical conditions: meals will be covered on the day, but transport refunds will NOT be provided to participants.
+4. Prepare and submit a verified Mobilisation & Attendee Confirmation Register to the BDS Component Coordinator prior to the scheduled district activation date.
+5. Provide follow-up SMS reminders and call confirmations to registered participants 24–48 hours prior to the event date with exact venue directions.
+6. Attend and actively facilitate the Market Activation Event session at the designated cluster venue from 9:00 AM to 4:00 PM, coordinating entrance registration and ensuring participants sign the official PRUDEV II attendance register.
+7. Deliver live, interactive demonstrations of practical business solutions and tools (digital marketing, online presence, POS, accounting systems, and financial management) to visiting entrepreneurs, applying "The Acid Test" to ensure owners grasp immediate practical benefits.
+8. Actively facilitate business-to-business (B2B) networking sessions, helping MSMEs connect with potential raw material suppliers, institutional buyers, and service providers to negotiate commercial deals.
+9. Capture photo documentation of participant engagements, tool demonstrations, and B2B linkage discussions.
+10. Compile and submit the final post-event Mobilisation & Tool Demonstration Summary Report, original signed attendance registers, client-signed timesheets, and invoice for Team Leader approval.`,
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Verified Mobilisation & Attendee Confirmation Register — List of confirmed MSMEs, cooperative leaders, and BDSPs mobilised for the cluster event with contact details, business sectors, and confirmation status.',
+        due_date: 'Prior to each scheduled cluster event',
+        quantitative_result: '100% of mobilised MSMEs and cooperative leaders documented with verified phone numbers, locations, and confirmed attendance.',
+        qualitative_result: 'Participants understand session purpose, timing (9:00 AM – 4:00 PM), and logistics (meals provided, no transport refunds).',
+        means_of_verification: 'Submitted and approved mobilisation register in PRUDEV II system.',
+        unit_rate: '',
+        payment_condition: 'Prerequisite deliverable for event participation sign-off.',
+      },
+      {
+        task_num: 2,
+        description: 'On-Site Event Facilitation, Registration & Participant Engagement — Active on-site presence supporting entrance registration, crowd guidance, and session facilitation from 9:00 AM to 4:00 PM at designated venue.',
+        due_date: 'Day of scheduled event',
+        quantitative_result: 'Full-day attendance (9:00 AM – 4:00 PM) verified; 100% of attending mobilised participants registered on official PRUDEV II attendance sheets.',
+        qualitative_result: 'Smooth participant registration, active engagement throughout the day, and verified attendance sheets without omissions.',
+        means_of_verification: 'Original signed attendance sheets countersigned by BDS Team Leader/Coordinator.',
+        unit_rate: '',
+        payment_condition: 'Required milestone for daily rate verification.',
+      },
+      {
+        task_num: 3,
+        description: 'Live Business Tool Demonstrations & B2B Matchmaking Records — Interactive demonstrations of business solutions (digital marketing, POS, accounting, financial management) and documentation of commercial supplier-buyer linkages.',
+        due_date: 'Day of scheduled event',
+        quantitative_result: 'Minimum 3 live tool demonstrations delivered; documented B2B linkage discussions and deal negotiations with MSMEs.',
+        qualitative_result: 'Demonstrations pass "The Acid Test" (entrepreneurs articulate concrete tool benefits); linkage records document prospective supply/deal agreements.',
+        means_of_verification: 'Demonstration activity logs, B2B linkage notes, and event photo documentation.',
+        unit_rate: '',
+        payment_condition: 'Required core technical deliverable.',
+      },
+      {
+        task_num: 4,
+        description: 'Post-Event Mobilisation Summary Report, Signed Timesheets & Invoice — Comprehensive summary report covering mobilisation numbers, tool demonstrations, B2B linkages, signed timesheets, and approved invoice.',
+        due_date: 'Within 3 days of event completion',
+        quantitative_result: '1 comprehensive event summary report, 1 client-signed timesheet covering assignment days, photo evidence package, and 1 invoice.',
+        qualitative_result: 'Report clearly highlights mobilisation turnout, key deals negotiated, tool adoption interest, and actionable recommendations.',
+        means_of_verification: 'Submitted summary report, countersigned timesheets, photo documentation, and approved invoice.',
+        unit_rate: '',
+        payment_condition: 'Final payment release contingent upon BDS Expert and Team Leader approval.',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -1176,6 +1231,19 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.end_date             = '2026-09-26';
       extra.payment_notes        = `Phase 1 payment (30 days × UGX 80,000 = UGX 2,400,000): upon submission and acceptance of both final BDS Manual modules and all associated training content.\nPhase 2 payment (10 days × UGX 80,000 = UGX 800,000): upon completion of 5-day BGE/DCO training co-facilitation, confirmed by Team Leader sign-off.\nTotal contract value: UGX 3,200,000 (40 days × UGX 80,000/day).\n10% Withholding Tax (WHT) will be deducted at source per applicable tax regulations.`;
     }
+    if (type === 'market_activation_mobilisation') {
+      extra.start_date           = '2026-09-21';
+      extra.end_date             = '2026-10-02';
+      extra.duration             = '2 weeks (21 Sep – 02 Oct 2026)';
+      extra.max_days             = 7;
+      extra.rate_per_day         = 60000;
+      extra.transport_reimbursed = true;
+      extra.location             = 'Northern Uganda (Agago, Dokolo, Lira, Kole, Nwoya, Gulu, Kitgum)';
+      extra.project_name         = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      extra.payment_notes        = `Payment disbursed upon completion of mobilisation and event facilitation, submission of signed attendance registers, verified tool demonstration logs, final summary report, and approved invoice/timesheet.\nProfessional fees are subject to 6% Withholding Tax (WHT) deducted at source by GOPA Pro GmbH.\nBGE travel will be reimbursed in accordance with approved PRUDEV II transport rates upon submission of valid travel claims. MSME participants do not receive transport refunds (meals are covered on the day).`;
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, [experts, selectedBges, woEditing, woForm.bge]);
 
@@ -1404,6 +1472,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
                 <MenuItem value="bds_manual_module">BDS Manual — Additional Module</MenuItem>
                 <MenuItem value="bge_technical_co_assignment">BGE Technical Co-Assignment Support (Specialist Technical Capacity)</MenuItem>
+                <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation &amp; Tool Demonstration</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>

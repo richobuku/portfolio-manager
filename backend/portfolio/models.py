@@ -1216,6 +1216,7 @@ class WorkOrder(models.Model):
         ('csa_rapid_assessment',  'CSA Rapid Assessment — Resilience Activity'),
         ('bds_manual_module',     'BDS Manual — Additional Module'),
         ('bge_technical_co_assignment', 'BGE Technical Co-Assignment Support (Specialist Technical Capacity)'),
+        ('market_activation_mobilisation', 'Market Activation Event — MSME Mobilisation & Tool Demonstration'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [

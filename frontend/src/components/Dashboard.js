@@ -7774,6 +7774,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
             <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework</MenuItem>
             <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
+            <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation</MenuItem>
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
@@ -7809,6 +7810,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   ? { borderLeft: `4px solid ${BRAND.gopaGoldDark}` }
                   : wo.work_order_type === 'bds_manual_module'
                   ? { borderLeft: '4px solid #E65100' }
+                  : wo.work_order_type === 'market_activation_mobilisation'
+                  ? { borderLeft: '4px solid #0284C7' }
                   : {}
               }>
               <CardContent>
@@ -7827,6 +7830,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       {wo.work_order_type === 'bds_manual_module' && (
                         <Chip label="BDS Manual Module" size="small"
                           sx={{ bgcolor: '#E65100', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      {wo.work_order_type === 'market_activation_mobilisation' && (
+                        <Chip label="Market Activation" size="small"
+                          sx={{ bgcolor: '#0284C7', color: '#fff', fontSize: 10, fontWeight: 700 }} />
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">
@@ -9488,6 +9495,19 @@ PRUDEV II BDS Team`
               <CalendarToday fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Box sx={{ ml: 'auto' }}>
+            <Button
+              size="small"
+              variant="outlined"
+              sx={{ fontSize: '0.72rem', py: 0.2, px: 1 }}
+              onClick={() => {
+                setCommSubject('Invitation: Market Activation Event — PRUDEV II');
+                setCommBody(`Dear {{name}},\n\nThe PRUDEV II consortium including GOPA, Friends Consult and Farm Africa invites you to a Market Activation Event bringing together MSMEs, cooperative leaders and Business Development Service Providers.\n\nCome and explore opportunities to:\n• Connect with potential suppliers and customers.\n• Find reliable sources of raw materials and negotiate business deals.\n• Discover practical business solutions to improve your performance, including digital marketing, online presence, accounting systems, financial management and more.\n• Interact directly with Business Growth Experts and see live demonstrations of tools you can use in your business.\n\nCome ready to learn, connect, and do business.\n\nSchedule of Events — all sessions run from 9:00 AM – 4:00 PM:\n\n<b>Date</b>\t     <b>Location</b>\t     <b>Venue</b>\n21-09-26\t     Agago (Patongo)\t       Top View Hotel/White House\n23-09-26\t     Dokolo\t                        Exodus Inn\n24-09-26\t     Lira City\t                        Graceville Hotel\n25-09-26\t     Kole\t                                District Hall\n28-09-26\t     Nwoya (Koch Goma)\t        Vilanova Business Park, SMC Limited\n29-09-26\t     Gulu City\t                        Lamaco White House Hotel\n02-10-26\t     Kitgum Municipality\t        Kitgum Royal Hotel\n\nPlease attend only the event closest to you. <b>Note</b>: transport refunds will <b>NOT</b> be provided, but meals will be covered on the day.\n\nWe look forward to having you with us.\n\nBest regards,\n\nRichard Obuku\nBDS Expert / BDS Component Coordinator, WP2, PRUDEV II / GOPA AFC\n+256774963756 | richard.obuku@gopa.eu`);
+              }}
+            >
+              Insert Market Activation Invite
+            </Button>
+          </Box>
         </Box>
 
         <TextField
