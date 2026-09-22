@@ -68,7 +68,7 @@ export const TBIP_CATEGORIES = [
     questions: [
       { id: 'mkt_1', text: 'Is the business revenue growing month by month?' },
       { id: 'mkt_2', text: 'Does the business maintain a customer database or reward system?' },
-      { id: 'mkt_3', text: 'Is the business (or owner) a member of a sector association?' },
+      { id: 'mkt_3', text: 'Does the business have a diversified customer base (not reliant on a single buyer)?' },
       { id: 'mkt_4', text: 'Has the business been involved in public procurement or supplies to government/institutions?' },
       { id: 'mkt_5', text: 'Is the business able to produce/deliver enough to meet current market demand?' },
     ],
