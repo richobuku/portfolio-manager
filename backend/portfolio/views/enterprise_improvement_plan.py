@@ -29,7 +29,7 @@ TBIP_CATEGORIES = [
             {'id': 'gov_1', 'text': 'Does the business have a written business/strategic plan?'},
             {'id': 'gov_2', 'text': 'Is the business actively implementing that plan (using it for decisions/investments)?'},
             {'id': 'gov_3', 'text': 'Does the business have a Board of Directors/Advisors supporting decisions?'},
-            {'id': 'gov_4', 'text': 'Are minutes kept of board/advisor meetings?'},
+            {'id': 'gov_4', 'text': 'Are minutes kept of board/advisor meetings (including BGE visits)?'},
             {'id': 'gov_5', 'text': 'Does the business have segregated/independent management structures (e.g. finance and HR)?'},
             {'id': 'gov_6', 'text': 'Does the business have HR and finance policies/manuals in place?'},
         ]
@@ -60,10 +60,10 @@ TBIP_CATEGORIES = [
         'id': 'market',
         'name': 'Market & Customers',
         'questions': [
-            {'id': 'mkt_1', 'text': 'Does the business have a reward programme for customers?'},
-            {'id': 'mkt_2', 'text': 'Does the business maintain a customer database?'},
+            {'id': 'mkt_1', 'text': 'Is the business revenue growing month by month?'},
+            {'id': 'mkt_2', 'text': 'Does the business maintain a customer database or reward system?'},
             {'id': 'mkt_3', 'text': 'Is the business (or owner) a member of a sector association?'},
-            {'id': 'mkt_4', 'text': 'Does the business participate in sector/value-chain events (fairs, dialogues, networking)?'},
+            {'id': 'mkt_4', 'text': "Has the business been involved in public procurement or supplies to government/institutions?"},
             {'id': 'mkt_5', 'text': 'Is the business able to produce/deliver enough to meet current market demand?'},
         ]
     },
@@ -71,7 +71,7 @@ TBIP_CATEGORIES = [
         'id': 'digital',
         'name': 'Digital & Technology',
         'questions': [
-            {'id': 'dig_1', 'text': 'Does the business own computer-related hardware?'},
+            {'id': 'dig_1', 'text': 'Does the business own computer-related hardware (including smartphones and internet router)?'},
             {'id': 'dig_2', 'text': 'Does the business have dedicated internet connectivity for operations?'},
             {'id': 'dig_3', 'text': 'Does the business use digital tools (website, online booking/deliveries, stock, payroll, management systems)?'},
             {'id': 'dig_4', 'text': 'Does the business use social media to promote products/services?'},
