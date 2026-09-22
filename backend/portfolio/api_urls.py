@@ -22,6 +22,8 @@ from .views import (
     google_calendar_status_view, google_calendar_disconnect_view,
     google_calendar_sync_now_view,
     upload_bge_photo_view, list_bge_photos_view, download_bge_photo_view,
+    DiagnosticSummaryAnalyticsView, DiagnosticCohortComparisonView, MSMEProgressDetailView,
+    DiagnosticExcelExportView,
 )
 from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
 from .views.smart_assign import smart_assign, smart_assign_export
@@ -101,4 +103,9 @@ urlpatterns = [
     path('api/bges/upload-photo/', upload_bge_photo_view, name='bge_upload_photo'),
     path('api/bges/photos/', list_bge_photos_view, name='bge_list_photos'),
     path('api/bges/photos/<int:photo_id>/download/', download_bge_photo_view, name='bge_download_photo'),
+    # Diagnostic Analytics & Progress Reporting
+    path('api/diagnostics/analytics/summary/', DiagnosticSummaryAnalyticsView.as_view(), name='diagnostic_summary_analytics'),
+    path('api/diagnostics/analytics/cohorts/', DiagnosticCohortComparisonView.as_view(), name='diagnostic_cohort_analytics'),
+    path('api/diagnostics/analytics/export-excel/', DiagnosticExcelExportView.as_view(), name='diagnostic_export_excel'),
+    path('api/diagnostics/msmes/<int:pk>/progress/', MSMEProgressDetailView.as_view(), name='msme_progress_detail'),
 ]

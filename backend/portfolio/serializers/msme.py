@@ -134,7 +134,11 @@ class MSMEListSerializer(MSMESerializer):
             # All diagnostic baseline fields (confirmed against model)
             'diag_annual_turnover', 'diag_total_assets',
             'diag_employees_ft_male', 'diag_employees_ft_female',
+            'diag_employees_ft_youth', 'diag_employees_pt_total',
             'diag_employees_pt_male', 'diag_employees_pt_female',
+            'diag_monthly_profit', 'diag_profit_status',
+            'diag_digitalization_score', 'diag_capacity_needs',
+            'diagnostic_data',
             'diag_has_tin', 'diag_has_unbs',
             'diag_has_business_bank', 'diag_has_mobile_money',
             'diag_is_green_business', 'diag_green_categories',

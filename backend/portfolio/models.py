@@ -284,6 +284,20 @@ class MSME(models.Model):
         help_text='How long the business has been operating (as reported)')
     diag_district             = models.CharField(max_length=100, blank=True,
         help_text='District from diagnostic tool (District_clean column)')
+    diag_digitalization_score = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Level of digitalization on a scale of 1 to 5')
+    diag_employees_ft_youth   = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Full-time youth employees at diagnostic baseline')
+    diag_employees_pt_total   = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Total part-time / casual employees at diagnostic baseline')
+    diag_monthly_profit       = models.CharField(max_length=100, blank=True,
+        help_text='Average monthly profit reported in diagnostic tool')
+    diag_profit_status        = models.CharField(max_length=50, blank=True,
+        help_text='Profitability status (Yes/No/Break-even)')
+    diag_capacity_needs       = models.JSONField(default=list, blank=True,
+        help_text='List of requested capacity development areas')
+    diagnostic_data           = models.JSONField(default=dict, blank=True,
+        help_text='Full 181-indicator survey responses dictionary')
     diag_imported_at          = models.DateTimeField(null=True, blank=True,
         help_text='When the diagnostic baseline was imported')
 
@@ -397,6 +411,7 @@ class MSMEGrowthSnapshot(models.Model):
     # Workforce
     employees_ft_male      = models.PositiveSmallIntegerField(null=True, blank=True)
     employees_ft_female    = models.PositiveSmallIntegerField(null=True, blank=True)
+    employees_ft_youth     = models.PositiveSmallIntegerField(null=True, blank=True)
     employees_pt_male      = models.PositiveSmallIntegerField(null=True, blank=True)
     employees_pt_female    = models.PositiveSmallIntegerField(null=True, blank=True)
     employees_ft_refugee   = models.PositiveSmallIntegerField(null=True, blank=True,
@@ -412,6 +427,8 @@ class MSMEGrowthSnapshot(models.Model):
         help_text='Registered with Uganda Registration Services Bureau')
     ursb_reg_number   = models.CharField(max_length=50, blank=True, default='',
         help_text='URSB registration number')
+    has_unbs          = models.BooleanField(null=True, blank=True,
+        help_text='Has UNBS certification or product standard')
     has_business_bank = models.BooleanField(null=True, blank=True)
     bank_name         = models.CharField(max_length=100, blank=True, default='',
         help_text='Name of the business bank')
@@ -424,6 +441,8 @@ class MSMEGrowthSnapshot(models.Model):
         help_text='MTN/Airtel MOMO Pay merchant code')
 
     # Digital tools adoption
+    digitalization_score = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text='Level of digitalization on a scale of 1 to 5')
     digital_tools       = models.JSONField(default=list, blank=True,
         help_text='Digital tools the business has adopted (list of strings)')
     digital_tools_other = models.CharField(max_length=300, blank=True, default='',

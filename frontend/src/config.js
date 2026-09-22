@@ -42,6 +42,9 @@ export const API_ENDPOINTS = {
   WORK_ORDER_ATTACHMENTS:    `${API_BASE_URL}/api/work-order-attachments/`,
   PLANNED_VISITS:            `${API_BASE_URL}/api/planned-visits/`,
   ENTERPRISE_IMPROVEMENT_PLANS: `${API_BASE_URL}/api/enterprise-improvement-plans/`,
+  DIAGNOSTIC_SUMMARY:        `${API_BASE_URL}/api/diagnostics/analytics/summary/`,
+  DIAGNOSTIC_COHORTS:        `${API_BASE_URL}/api/diagnostics/analytics/cohorts/`,
+  DIAGNOSTIC_EXPORT_EXCEL:   `${API_BASE_URL}/api/diagnostics/analytics/export-excel/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;

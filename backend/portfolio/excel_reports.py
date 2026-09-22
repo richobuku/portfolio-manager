@@ -532,3 +532,224 @@ def generate_enterprise_improvement_plan_excel(plan):
     buf.seek(0)
     return buf.getvalue()
 
+
+def generate_diagnostic_progress_excel(msmes_qs=None):
+    """Generate an Executive Diagnostic Baseline & Progress Excel Workbook using openpyxl."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from .models import MSME, Cohort
+
+    if msmes_qs is None:
+        msmes_qs = MSME.objects.filter(is_active=True).select_related('cohort', 'assigned_bge').prefetch_related('growth_snapshots')
+
+    msmes_list = list(msmes_qs)
+    diag_msmes = [m for m in msmes_list if m.diag_imported_at]
+
+    c1_msmes = [m for m in diag_msmes if m.cohort and 'cohort 1' in m.cohort.name.lower()]
+    c2_msmes = [m for m in diag_msmes if m.cohort and 'cohort 2' in m.cohort.name.lower()]
+
+    wb = openpyxl.Workbook()
+    # Remove default sheet
+    wb.remove(wb.active)
+
+    # Styles
+    navy_fill = PatternFill(start_color="162A3A", end_color="162A3A", fill_type="solid")
+    green_fill = PatternFill(start_color="27AE60", end_color="27AE60", fill_type="solid")
+    alt_fill = PatternFill(start_color="F4F6F9", end_color="F4F6F9", fill_type="solid")
+    white_bold = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+    title_font = Font(name="Arial", size=14, bold=True, color="162A3A")
+    subtitle_font = Font(name="Arial", size=10, italic=True, color="555555")
+    bold_font = Font(name="Arial", size=10, bold=True, color="162A3A")
+    regular_font = Font(name="Arial", size=9)
+    center_align = Alignment(horizontal="center", vertical="center")
+    left_align = Alignment(horizontal="left", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin', color='E0E0E0'),
+        right=Side(style='thin', color='E0E0E0'),
+        top=Side(style='thin', color='E0E0E0'),
+        bottom=Side(style='thin', color='E0E0E0')
+    )
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # Sheet 1: Executive Summary & Cohort Comparison
+    # ═════════════════════════════════════════════════════════════════════════
+    ws1 = wb.create_sheet(title='Executive Summary')
+    ws1.column_dimensions['A'].width = 38
+    ws1.column_dimensions['B'].width = 24
+    ws1.column_dimensions['C'].width = 20
+    ws1.column_dimensions['D'].width = 20
+
+    ws1.cell(row=2, column=1, value='PRUDEV II MSME DIAGNOSTIC BASELINE & COMPARATIVE REPORT').font = title_font
+    ws1.cell(row=3, column=1, value='Comprehensive Diagnostic Analysis across Cohort 1 & Cohort 2').font = subtitle_font
+
+    headers_s1 = ['Key Performance Indicator', 'All Diagnostic MSMEs', 'Cohort 1', 'Cohort 2']
+    for col_idx, h in enumerate(headers_s1, 1):
+        cell = ws1.cell(row=5, column=col_idx, value=h)
+        cell.fill = green_fill if col_idx == 2 else navy_fill
+        cell.font = white_bold
+        cell.alignment = center_align if col_idx > 1 else left_align
+
+    def compute_stats(msme_sub):
+        cnt = len(msme_sub)
+        if cnt == 0:
+            return {'cnt': 0, 'ft_m': 0, 'ft_f': 0, 'ft_y': 0, 'pt': 0, 'tot_jobs': 0, 'f_pct': 0, 'tin_pct': 0, 'unbs_pct': 0, 'bank_pct': 0, 'green_pct': 0, 'avg_score': 0}
+        ft_m = sum(m.diag_employees_ft_male or 0 for m in msme_sub)
+        ft_f = sum(m.diag_employees_ft_female or 0 for m in msme_sub)
+        ft_y = sum(m.diag_employees_ft_youth or 0 for m in msme_sub)
+        pt = sum(m.diag_employees_pt_total or 0 for m in msme_sub)
+        tot_jobs = ft_m + ft_f + pt
+        f_pct = round((ft_f / (ft_m + ft_f) * 100), 1) if (ft_m + ft_f) > 0 else 0
+        tin_pct = round((len([m for m in msme_sub if m.diag_has_tin]) / cnt * 100), 1)
+        unbs_pct = round((len([m for m in msme_sub if m.diag_has_unbs]) / cnt * 100), 1)
+        bank_pct = round((len([m for m in msme_sub if m.diag_has_business_bank]) / cnt * 100), 1)
+        green_pct = round((len([m for m in msme_sub if m.diag_is_green_business]) / cnt * 100), 1)
+        scores = [m.diag_digitalization_score for m in msme_sub if m.diag_digitalization_score]
+        avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+        return {'cnt': cnt, 'ft_m': ft_m, 'ft_f': ft_f, 'ft_y': ft_y, 'pt': pt, 'tot_jobs': tot_jobs, 'f_pct': f_pct, 'tin_pct': tin_pct, 'unbs_pct': unbs_pct, 'bank_pct': bank_pct, 'green_pct': green_pct, 'avg_score': avg_score}
+
+    st_all = compute_stats(diag_msmes)
+    st_c1 = compute_stats(c1_msmes)
+    st_c2 = compute_stats(c2_msmes)
+
+    kpis = [
+        ('Total Enterprises Assessed', f"{st_all['cnt']}", f"{st_c1['cnt']}", f"{st_c2['cnt']}"),
+        ('Total Baseline Jobs', f"{st_all['tot_jobs']:,}", f"{st_c1['tot_jobs']:,}", f"{st_c2['tot_jobs']:,}"),
+        ('Full-time Male Employees', f"{st_all['ft_m']:,}", f"{st_c1['ft_m']:,}", f"{st_c2['ft_m']:,}"),
+        ('Full-time Female Employees', f"{st_all['ft_f']:,}", f"{st_c1['ft_f']:,}", f"{st_c2['ft_f']:,}"),
+        ('Female Workforce Share (%)', f"{st_all['f_pct']}%", f"{st_c1['f_pct']}%", f"{st_c2['f_pct']}%"),
+        ('Full-time Youth Employees', f"{st_all['ft_y']:,}", f"{st_c1['ft_y']:,}", f"{st_c2['ft_y']:,}"),
+        ('Part-time / Casual Employees', f"{st_all['pt']:,}", f"{st_c1['pt']:,}", f"{st_c2['pt']:,}"),
+        ('URA TIN Registered (%)', f"{st_all['tin_pct']}%", f"{st_c1['tin_pct']}%", f"{st_c2['tin_pct']}%"),
+        ('UNBS Certified / Standards (%)', f"{st_all['unbs_pct']}%", f"{st_c1['unbs_pct']}%", f"{st_c2['unbs_pct']}%"),
+        ('Dedicated Business Bank Account (%)', f"{st_all['bank_pct']}%", f"{st_c1['bank_pct']}%", f"{st_c2['bank_pct']}%"),
+        ('Green Business Classification (%)', f"{st_all['green_pct']}%", f"{st_c1['green_pct']}%", f"{st_c2['green_pct']}%"),
+        ('Average Digitalization Score (1 to 5)', f"{st_all['avg_score']:.2f}", f"{st_c1['avg_score']:.2f}", f"{st_c2['avg_score']:.2f}"),
+    ]
+
+    for idx, (label, v_all, v_c1, v_c2) in enumerate(kpis, 6):
+        c1 = ws1.cell(row=idx, column=1, value=label)
+        c2 = ws1.cell(row=idx, column=2, value=v_all)
+        c3 = ws1.cell(row=idx, column=3, value=v_c1)
+        c4 = ws1.cell(row=idx, column=4, value=v_c2)
+        c1.font = bold_font
+        c1.border = thin_border
+        for c in [c2, c3, c4]:
+            c.font = bold_font
+            c.alignment = center_align
+            c.border = thin_border
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # Sheet 2: Baseline vs Progress Tracking
+    # ═════════════════════════════════════════════════════════════════════════
+    ws2 = wb.create_sheet(title='Baseline vs Progress')
+    prog_headers = [
+        'MSME Code', 'Business Name', 'Cohort', 'District', 'Sector',
+        'Baseline FT Jobs', 'Baseline PT Jobs', 'Latest FT Jobs', 'Latest PT Jobs',
+        'Net Job Change', 'Has TIN', 'Growth Notes'
+    ]
+    for col_idx, h in enumerate(prog_headers, 1):
+        cell = ws2.cell(row=1, column=col_idx, value=h)
+        cell.fill = navy_fill
+        cell.font = white_bold
+        cell.alignment = center_align if col_idx not in [2, 12] else left_align
+
+    for r_idx, m in enumerate(diag_msmes, 2):
+        b_snap = m.growth_snapshots.filter(source='diagnostic').first()
+        l_snap = m.growth_snapshots.order_by('-snapshot_date', '-id').first()
+
+        b_ft = ((b_snap.employees_ft_male or 0) + (b_snap.employees_ft_female or 0)) if b_snap else ((m.diag_employees_ft_male or 0) + (m.diag_employees_ft_female or 0))
+        b_pt = b_snap.employees_pt_male or 0 if b_snap else (m.diag_employees_pt_total or 0)
+
+        l_ft = ((l_snap.employees_ft_male or 0) + (l_snap.employees_ft_female or 0)) if l_snap else b_ft
+        l_pt = ((l_snap.employees_pt_male or 0) + (l_snap.employees_pt_female or 0)) if l_snap else b_pt
+
+        job_delta = (l_ft + l_pt) - (b_ft + b_pt)
+        row_fill = alt_fill if r_idx % 2 == 0 else None
+
+        values = [
+            m.msme_code or '',
+            m.business_name or '',
+            m.cohort.name if m.cohort else '',
+            m.district or '',
+            m.sector or '',
+            b_ft,
+            b_pt,
+            l_ft,
+            l_pt,
+            f"+{job_delta}" if job_delta > 0 else str(job_delta),
+            'Yes' if m.diag_has_tin else 'No',
+            l_snap.notes if l_snap else '',
+        ]
+
+        for col_idx, val in enumerate(values, 1):
+            cell = ws2.cell(row=r_idx, column=col_idx, value=val)
+            cell.font = regular_font
+            cell.border = thin_border
+            if row_fill:
+                cell.fill = row_fill
+            if col_idx in [1, 6, 7, 8, 9, 10, 11]:
+                cell.alignment = center_align
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # Sheet 3: Diagnostic Master Table
+    # ═════════════════════════════════════════════════════════════════════════
+    ws3 = wb.create_sheet(title='Diagnostic Master Data')
+    master_hdrs = [
+        'MSME Code', 'Business Name', 'Cohort', 'District', 'Sector', 'Owner Name', 'Owner Sex', 'Owner Age',
+        'Years Operating', 'Monthly Turnover Band', 'FT Male', 'FT Female', 'FT Youth', 'PT Total',
+        'Has TIN', 'Has UNBS', 'Has Bank Account', 'Digital Score (1-5)', 'Is Green', 'Green Categories', 'Capacity Needs'
+    ]
+    for col_idx, h in enumerate(master_hdrs, 1):
+        cell = ws3.cell(row=1, column=col_idx, value=h)
+        cell.fill = navy_fill
+        cell.font = white_bold
+        cell.alignment = center_align if col_idx not in [2, 6, 20, 21] else left_align
+
+    for r_idx, m in enumerate(diag_msmes, 2):
+        row_fill = alt_fill if r_idx % 2 == 0 else None
+        values = [
+            m.msme_code or '',
+            m.business_name or '',
+            m.cohort.name if m.cohort else '',
+            m.district or '',
+            m.sector or '',
+            m.owner_name or '',
+            m.diag_owner_sex or '',
+            m.diag_owner_age or '',
+            m.diag_years_operating or '',
+            m.diag_annual_turnover or '',
+            m.diag_employees_ft_male or 0,
+            m.diag_employees_ft_female or 0,
+            m.diag_employees_ft_youth or 0,
+            m.diag_employees_pt_total or 0,
+            'Yes' if m.diag_has_tin else 'No',
+            'Yes' if m.diag_has_unbs else 'No',
+            'Yes' if m.diag_has_business_bank else 'No',
+            m.diag_digitalization_score or '',
+            'Yes' if m.diag_is_green_business else 'No',
+            '; '.join(m.diag_green_categories or []),
+            '; '.join(m.diag_capacity_needs or []),
+        ]
+
+        for col_idx, val in enumerate(values, 1):
+            cell = ws3.cell(row=r_idx, column=col_idx, value=val)
+            cell.font = regular_font
+            cell.border = thin_border
+            if row_fill:
+                cell.fill = row_fill
+            if col_idx in [1, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18, 19]:
+                cell.alignment = center_align
+
+    # Auto-adjust column widths for all sheets
+    for ws in [ws1, ws2, ws3]:
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+

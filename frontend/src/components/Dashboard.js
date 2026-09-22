@@ -2881,6 +2881,39 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [snapshotPage, setSnapshotPage] = useState(0);
   const [viewSnapshot, setViewSnapshot] = useState(null);
 
+  // ── diagnostic baseline analytics state ───────────────────────────────────
+  const [diagSummary, setDiagSummary] = useState(null);
+  const [diagCohorts, setDiagCohorts] = useState(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagCohortFilter, setDiagCohortFilter] = useState('all');
+  const [diagExportLoading, setDiagExportLoading] = useState(false);
+
+  const fetchDiagnosticData = useCallback((cohortFilter = 'all') => {
+    if (!token) return;
+    setDiagLoading(true);
+    const summaryUrl = cohortFilter && cohortFilter !== 'all'
+      ? `${API_ENDPOINTS.DIAGNOSTIC_SUMMARY}?cohort=${encodeURIComponent(cohortFilter)}`
+      : API_ENDPOINTS.DIAGNOSTIC_SUMMARY;
+
+    Promise.all([
+      axios.get(summaryUrl, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(API_ENDPOINTS.DIAGNOSTIC_COHORTS, { headers: { Authorization: `Bearer ${token}` } }),
+    ])
+      .then(([sumRes, cohortRes]) => {
+        setDiagSummary(sumRes.data);
+        setDiagCohorts(cohortRes.data);
+      })
+      .catch(err => {
+        console.error('Failed to load diagnostic analytics:', err);
+      })
+      .finally(() => setDiagLoading(false));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || (section !== 'analytics' && section !== 'reports')) return;
+    fetchDiagnosticData(diagCohortFilter);
+  }, [token, section, diagCohortFilter, fetchDiagnosticData]);
+
   // Fetch all growth snapshots for the admin view (MSMEs table + analytics + reports).
   // Runs once on mount and whenever section switches to msmes/analytics/reports.
   useEffect(() => {
@@ -3095,6 +3128,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <Tab label="Operations"        />
             <Tab label="Business Profiles" />
             <Tab label="Data Updates"      />
+            <Tab label="Diagnostic Baselines & Cohorts" />
           </Tabs>
         </Paper>
 
@@ -5016,6 +5050,349 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     BGEs need to submit at least one growth update before data appears here.
                   </Typography>
                 </Box>
+              )}
+        {/* ════════════════════════════════════════════════════════════════
+            TAB 5 — Diagnostic Baselines & Cohorts Analytics
+            ════════════════════════════════════════════════════════════════ */}
+        {analyticTab === 5 && (() => {
+          if (diagLoading) return <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>;
+          if (!diagSummary) return (
+            <Box sx={{ py: 6, textAlign: 'center' }}>
+              <Assessment sx={{ fontSize: 56, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary">Diagnostic data not loaded.</Typography>
+            </Box>
+          );
+
+          const handleExportDiagExcel = async () => {
+            try {
+              setDiagExportLoading(true);
+              const resp = await axios.get(
+                `${API_ENDPOINTS.DIAGNOSTIC_EXPORT_EXCEL}${diagCohortFilter !== 'all' ? `?cohort=${encodeURIComponent(diagCohortFilter)}` : ''}`,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                  responseType: 'blob',
+                }
+              );
+              const blobUrl = window.URL.createObjectURL(new Blob([resp.data]));
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.setAttribute('download', `PRUDEV_II_Diagnostic_Progress_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            } catch (err) {
+              console.error('Failed to export diagnostic report:', err);
+            } finally {
+              setDiagExportLoading(false);
+            }
+          };
+
+          const wf = diagSummary.workforce || {};
+          const form = diagSummary.formalization || {};
+          const dig = diagSummary.digitalization || {};
+          const grn = diagSummary.green || {};
+          const c1 = diagCohorts?.cohort_1 || {};
+          const c2 = diagCohorts?.cohort_2 || {};
+
+          return (
+            <Box>
+              {/* ── Context & Action Header ── */}
+              <Box sx={{ mb: 3, p: 2.5, bgcolor: '#F0F4FA', borderRadius: 2, borderLeft: `4px solid ${BRAND.primaryMain}`, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { md: 'center' }, gap: 2 }}>
+                <Box>
+                  <Typography variant="h6" fontWeight={700} color={BRAND.primaryMain}>
+                    PRUDEV II MSME Diagnostic Baseline &amp; Cohort Analytics
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Enriched multi-dimensional baseline analysis across <strong>{diagSummary.total_assessed} assessed enterprises</strong> (170 in Cohort 1, 77 in Cohort 2).
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={diagExportLoading ? <CircularProgress size={18} color="inherit" /> : <Download />}
+                  onClick={handleExportDiagExcel}
+                  disabled={diagExportLoading}
+                  sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: '#0D1B2A' }, whiteSpace: 'nowrap' }}
+                >
+                  {diagExportLoading ? 'Generating…' : 'Export Diagnostic Report (.xlsx)'}
+                </Button>
+              </Box>
+
+              {/* ── Cohort Filter Tabs / Chips ── */}
+              <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+                  Cohort View:
+                </Typography>
+                {[
+                  { key: 'all', label: `All Assessed (${diagSummary.total_assessed})` },
+                  { key: 'Cohort 1', label: `Cohort 1 (${diagSummary.cohort_counts?.['Cohort 1 (Selected MSMEs)'] || 170})` },
+                  { key: 'Cohort 2', label: `Cohort 2 (${diagSummary.cohort_counts?.['Cohort 2 (Selected MSMEs)'] || 77})` },
+                  { key: 'compare', label: 'Side-by-Side Comparison' },
+                ].map(({ key, label }) => (
+                  <Chip
+                    key={key}
+                    label={label}
+                    clickable
+                    color={diagCohortFilter === key ? 'primary' : 'default'}
+                    variant={diagCohortFilter === key ? 'filled' : 'outlined'}
+                    onClick={() => setDiagCohortFilter(key)}
+                    sx={{ fontWeight: 600, fontSize: 12 }}
+                  />
+                ))}
+              </Box>
+
+              {/* ── Side-by-Side Cohort Comparison View ── */}
+              {diagCohortFilter === 'compare' ? (
+                <Box sx={{ mb: 4 }}>
+                  <SectionLabel>Cohort 1 vs Cohort 2 Baseline Comparison</SectionLabel>
+                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#F5F5F5' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Indicator / Metric</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12, bgcolor: '#E8F5E9', color: '#1B5E20' }}>
+                            Cohort 1 (Selected MSMEs)
+                          </TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12, bgcolor: '#E3F2FD', color: '#0D47A1' }}>
+                            Cohort 2 (Selected MSMEs)
+                          </TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12 }}>Variance / Insight</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[
+                          { label: 'Enterprises Assessed', c1: `${c1.count || 0}`, c2: `${c2.count || 0}`, note: 'Diagnostic baseline coverage' },
+                          { label: 'Total Baseline Jobs', c1: `${(c1.jobs_total || 0).toLocaleString()}`, c2: `${(c2.jobs_total || 0).toLocaleString()}`, note: `Avg ${(c1.count ? (c1.jobs_total / c1.count).toFixed(1) : 0)} vs ${(c2.count ? (c2.jobs_total / c2.count).toFixed(1) : 0)} jobs/enterprise` },
+                          { label: 'Female Workforce Share (%)', c1: `${c1.jobs_female_pct || 0}%`, c2: `${c2.jobs_female_pct || 0}%`, note: (c2.jobs_female_pct > c1.jobs_female_pct ? '+ Higher female share in Cohort 2' : '') },
+                          { label: 'Youth Employment Share (%)', c1: `${c1.jobs_youth_pct || 0}%`, c2: `${c2.jobs_youth_pct || 0}%`, note: `${c1.jobs_youth || 0} vs ${c2.jobs_youth || 0} youth employed` },
+                          { label: 'URA Tax ID (TIN) Registered', c1: `${c1.tin_pct || 0}%`, c2: `${c2.tin_pct || 0}%`, note: `${c1.tin_pct > c2.tin_pct ? 'Cohort 1 significantly more tax formalized' : ''}` },
+                          { label: 'UNBS Certified Products', c1: `${c1.unbs_pct || 0}%`, c2: `${c2.unbs_pct || 0}%`, note: 'Formal standards certification' },
+                          { label: 'Dedicated Business Bank Account', c1: `${c1.bank_pct || 0}%`, c2: `${c2.bank_pct || 0}%`, note: 'Banking inclusion baseline' },
+                          { label: 'Average Digitalization Score (1–5)', c1: `${c1.avg_digital_score || 0}`, c2: `${c2.avg_digital_score || 0}`, note: 'Self-rated digital adoption' },
+                          { label: 'Green Business Classification', c1: `${c1.green_pct || 0}%`, c2: `${c2.green_pct || 0}%`, note: 'GIZ green definition match' },
+                        ].map((row, idx) => (
+                          <TableRow key={idx} hover sx={idx % 2 === 1 ? { bgcolor: '#FAFAFA' } : {}}>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{row.label}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c1}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c2}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.note || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              ) : (
+                <>
+                  {/* ── Summary KPI Grid ── */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} sm={6} md={2.4}>
+                      <Card variant="outlined" sx={{ height: '100%', borderLeft: '4px solid #162A3A' }}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase">
+                            Assessed MSMEs
+                          </Typography>
+                          <Typography variant="h4" fontWeight={800} color="#162A3A" sx={{ my: 0.5 }}>
+                            {diagSummary.total_assessed}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Cohort 1: {diagSummary.cohort_counts?.['Cohort 1 (Selected MSMEs)'] || 170} | C2: {diagSummary.cohort_counts?.['Cohort 2 (Selected MSMEs)'] || 77}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={2.4}>
+                      <Card variant="outlined" sx={{ height: '100%', borderLeft: '4px solid #27AE60' }}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase">
+                            Baseline Jobs
+                          </Typography>
+                          <Typography variant="h4" fontWeight={800} color="#27AE60" sx={{ my: 0.5 }}>
+                            {(wf.total_baseline_jobs || 0).toLocaleString()}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {wf.female_share_pct}% Female | {wf.youth_share_pct}% Youth
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={2.4}>
+                      <Card variant="outlined" sx={{ height: '100%', borderLeft: '4px solid #D97706' }}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase">
+                            TIN Registered
+                          </Typography>
+                          <Typography variant="h4" fontWeight={800} color="#D97706" sx={{ my: 0.5 }}>
+                            {form.has_tin_pct}%
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {form.has_tin_count} of {diagSummary.total_assessed} with Tax ID
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={2.4}>
+                      <Card variant="outlined" sx={{ height: '100%', borderLeft: '4px solid #00695C' }}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase">
+                            Bank Account
+                          </Typography>
+                          <Typography variant="h4" fontWeight={800} color="#00695C" sx={{ my: 0.5 }}>
+                            {form.has_bank_pct}%
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {form.has_bank_count} MSMEs banked
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={2.4}>
+                      <Card variant="outlined" sx={{ height: '100%', borderLeft: '4px solid #2E7D32' }}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase">
+                            Green Business
+                          </Typography>
+                          <Typography variant="h4" fontWeight={800} color="#2E7D32" sx={{ my: 0.5 }}>
+                            {grn.green_pct}%
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {grn.green_count} green enterprises
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
+
+                  {/* ── Workforce & Formalization Breakdown ── */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                            Workforce Breakdown at Baseline
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Direct employment generated across assessed micro and small enterprises
+                          </Typography>
+                          <Grid container spacing={1.5}>
+                            {[
+                              { label: 'Full-time Male', val: wf.ft_male || 0, color: '#1E88E5' },
+                              { label: 'Full-time Female', val: wf.ft_female || 0, color: '#E91E63' },
+                              { label: 'Full-time Youth', val: wf.ft_youth || 0, color: '#8E24AA' },
+                              { label: 'Part-time / Casual', val: wf.pt_total || 0, color: '#F57C00' },
+                            ].map((item, i) => (
+                              <Grid item xs={6} key={i}>
+                                <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5, border: '1px solid #E2E8F0' }}>
+                                  <Typography variant="caption" color="text.secondary">{item.label}</Typography>
+                                  <Typography variant="h6" fontWeight={700} color={item.color}>
+                                    {(item.val).toLocaleString()}
+                                  </Typography>
+                                </Box>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                            Business Formalization &amp; Financial Inclusion
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Baseline compliance and financial account penetration
+                          </Typography>
+                          {[
+                            { label: 'Tax Identification Number (URA TIN)', pct: form.has_tin_pct || 0, count: form.has_tin_count, color: '#D97706' },
+                            { label: 'Dedicated Business Bank Account', pct: form.has_bank_pct || 0, count: form.has_bank_count, color: '#00695C' },
+                            { label: 'Mobile Money Digital Payments', pct: form.has_mobile_money_pct || 0, count: form.has_mobile_money_count, color: '#E65100' },
+                            { label: 'UNBS Product Quality Certification', pct: form.has_unbs_pct || 0, count: form.has_unbs_count, color: '#2E7D32' },
+                          ].map((item, i) => (
+                            <Box key={i} sx={{ mb: 1.5 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="body2" fontSize={12} fontWeight={600}>{item.label}</Typography>
+                                <Typography variant="body2" fontSize={12} fontWeight={700} color={item.color}>
+                                  {item.pct}% ({item.count || 0})
+                                </Typography>
+                              </Box>
+                              <LinearProgress
+                                variant="determinate"
+                                value={item.pct}
+                                sx={{ height: 7, borderRadius: 3.5, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: item.color } }}
+                              />
+                            </Box>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
+
+                  {/* ── Capacity Development Needs & Green Categories ── */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                            Prioritized Capacity Building Demands
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Support areas requested by MSMEs during the diagnostic interview
+                          </Typography>
+                          {Object.entries(diagSummary.capacity_needs || {}).map(([need, cnt], i) => (
+                            <Box key={i} sx={{ mb: 1.5 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="body2" fontSize={12} fontWeight={500}>{need}</Typography>
+                                <Typography variant="body2" fontSize={12} fontWeight={700} color={BRAND.primaryMain}>
+                                  {cnt} MSMEs ({Math.round(cnt / (diagSummary.total_assessed || 1) * 100)}%)
+                                </Typography>
+                              </Box>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Math.round(cnt / (diagSummary.total_assessed || 1) * 100)}
+                                sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: BRAND.primaryMain } }}
+                              />
+                            </Box>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                            Green Business Classifications &amp; Practices
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Prevalence of environmental sustainability practices across the portfolio
+                          </Typography>
+                          {Object.entries(grn.categories || {}).map(([catName, cnt], i) => (
+                            <Box key={i} sx={{ mb: 1.5 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="body2" fontSize={11} fontWeight={500} sx={{ maxWidth: '80%', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                  {catName}
+                                </Typography>
+                                <Typography variant="body2" fontSize={12} fontWeight={700} color="#27AE60">
+                                  {cnt}
+                                </Typography>
+                              </Box>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Math.min(Math.round(cnt / (diagSummary.total_assessed || 1) * 100), 100)}
+                                sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: '#27AE60' } }}
+                              />
+                            </Box>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                </>
               )}
             </Box>
           );
