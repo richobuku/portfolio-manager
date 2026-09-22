@@ -455,6 +455,7 @@ export default function EnterpriseImprovementPlanDialog({
   };
 
   const currentCategory = TBIP_CATEGORIES[activeCatIdx];
+  const currentCatData = diagnostic.categories[currentCategory.name] || {};
 
   const priorityColor = (p) => {
     if (p === 'High') return { bg: '#FEE2E2', text: '#991B1B', border: '#F87171' };
@@ -522,48 +523,59 @@ export default function EnterpriseImprovementPlanDialog({
           </Box>
         </Box>
 
-        {/* Diagnostic Bar Quick Overview */}
-        <Box sx={{ mt: 2, p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+        {/* Diagnostic Overview Strip */}
+        <Box
+          sx={{
+            mt: 1.5,
+            p: 1.5,
+            bgcolor: '#F8FAFC',
+            borderRadius: 2,
+            border: '1px solid #E2E8F0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 3 }, flexWrap: 'wrap' }}>
             <Box>
-              <Typography variant="caption" color="text.secondary" fontWeight={600}>Total Gaps</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', fontSize: 11 }}>
+                TOTAL GAPS IDENTIFIED
+              </Typography>
               <Typography variant="subtitle1" fontWeight={800} color={diagnostic.totalGaps > 0 ? '#C8102E' : '#009B62'}>
-                {diagnostic.totalGaps} / {diagnostic.totalApplicable} <span style={{ fontSize: 11, fontWeight: 500, color: '#64748B' }}>({diagnostic.totalApplicable > 0 ? Math.round((diagnostic.totalGaps / diagnostic.totalApplicable) * 100) : 0}%)</span>
+                {diagnostic.totalGaps} / {diagnostic.totalApplicable}
+                <Typography component="span" sx={{ ml: 0.5, fontSize: 12, fontWeight: 600, color: '#64748B' }}>
+                  ({diagnostic.totalApplicable > 0 ? Math.round((diagnostic.totalGaps / diagnostic.totalApplicable) * 100) : 0}% gap rate)
+                </Typography>
               </Typography>
             </Box>
-            <Divider orientation="vertical" flexItem />
+            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
             <Box>
-              <Typography variant="caption" color="text.secondary" fontWeight={600}>Assessment Date</Typography>
-              <Typography variant="subtitle2" fontWeight={700} color={BRAND.primaryMain}>{assessmentDate}</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', fontSize: 11 }}>
+                ASSESSMENT DATE
+              </Typography>
+              <Typography variant="subtitle2" fontWeight={700} color={BRAND.primaryMain}>
+                {assessmentDate || 'Today'}
+              </Typography>
             </Box>
-            <Divider orientation="vertical" flexItem />
+            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
             <Box>
-              <Typography variant="caption" color="text.secondary" fontWeight={600}>Lead BGE</Typography>
-              <Typography variant="subtitle2" fontWeight={700} color={BRAND.primaryMain}>{bge?.name || plan?.bge_name || '—'}</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', fontSize: 11 }}>
+                LEAD BGE
+              </Typography>
+              <Typography variant="subtitle2" fontWeight={700} color={BRAND.primaryMain}>
+                {bge?.name || plan?.bge_name || '—'}
+              </Typography>
             </Box>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {TBIP_CATEGORIES.map((cat, idx) => {
-              const cdata = diagnostic.categories[cat.name] || {};
-              const hasGap = (cdata.gaps || 0) > 0;
-              return (
-                <Tooltip key={cat.id} title={`${cat.name}: ${cdata.gaps || 0} gaps (${cdata.status})`}>
-                  <Box
-                    onClick={() => { setActiveTab(0); setActiveCatIdx(idx); }}
-                    sx={{
-                      px: 1, py: 0.5, borderRadius: 1.5, cursor: 'pointer',
-                      bgcolor: activeTab === 0 && activeCatIdx === idx ? BRAND.primaryMain : (hasGap ? '#FEE2E2' : '#ECFDF5'),
-                      color: activeTab === 0 && activeCatIdx === idx ? '#fff' : (hasGap ? '#991B1B' : '#065F46'),
-                      fontSize: 11, fontWeight: 700, border: '1px solid',
-                      borderColor: activeTab === 0 && activeCatIdx === idx ? BRAND.primaryMain : (hasGap ? '#F87171' : '#A7F3D0'),
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {cat.icon} {cdata.gaps || 0}
-                  </Box>
-                </Tooltip>
-              );
-            })}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip
+              label={`${priorityActions.length} Priority Actions Defined`}
+              size="small"
+              variant="outlined"
+              sx={{ fontWeight: 700, borderColor: BRAND.primaryMain, color: BRAND.primaryMain }}
+            />
           </Box>
         </Box>
 
@@ -574,10 +586,22 @@ export default function EnterpriseImprovementPlanDialog({
           variant="scrollable"
           scrollButtons="auto"
           sx={{
-            mt: 1.5,
-            borderBottom: 1,
-            borderColor: 'divider',
-            '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', fontSize: 13.5 },
+            mt: 2,
+            borderBottom: '2px solid #E2E8F0',
+            '& .MuiTab-root': {
+              fontWeight: 700,
+              textTransform: 'none',
+              fontSize: 13.5,
+              minHeight: 46,
+              px: 2,
+            },
+            '& .Mui-selected': {
+              color: `${BRAND.primaryMain} !important`,
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: BRAND.gopaGold,
+              height: 3,
+            },
           }}
         >
           <Tab icon={<FactCheck fontSize="small" />} iconPosition="start" label="1. Diagnostic Questions" />
@@ -587,192 +611,287 @@ export default function EnterpriseImprovementPlanDialog({
         </Tabs>
       </DialogTitle>
 
-      <DialogContent sx={{ p: { xs: 2, md: 3 }, pt: 2 }}>
+      <DialogContent sx={{ p: { xs: 2, md: 3 }, pt: { xs: 1.5, md: 2 } }}>
         {/* ── TAB 0: DIAGNOSTIC QUESTIONS ── */}
         {activeTab === 0 && (
           <Box>
-            {/* Category Selector Subtabs */}
-            <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 1.5, mb: 2, borderBottom: '1px solid #E2E8F0' }}>
-              {TBIP_CATEGORIES.map((cat, idx) => {
-                const cdata = diagnostic.categories[cat.name] || {};
-                const isSelected = activeCatIdx === idx;
-                return (
-                  <Button
-                    key={cat.id}
-                    variant={isSelected ? 'contained' : 'outlined'}
-                    size="small"
-                    onClick={() => setActiveCatIdx(idx)}
-                    sx={{
-                      borderRadius: 2,
-                      px: 1.8,
-                      py: 0.8,
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      fontSize: 12.5,
-                      whiteSpace: 'nowrap',
-                      bgcolor: isSelected ? BRAND.primaryMain : '#fff',
-                      color: isSelected ? '#fff' : BRAND.primaryMain,
-                      borderColor: isSelected ? BRAND.primaryMain : '#CBD5E1',
-                      '&:hover': {
-                        bgcolor: isSelected ? BRAND.primaryDark : '#F1F5F9',
-                      },
-                    }}
-                  >
-                    <Box component="span" sx={{ mr: 1 }}>{cat.icon}</Box>
-                    {cat.name}
+            <Grid container spacing={2.5}>
+              {/* Left Column: Vertical Category Navigation Rail */}
+              <Grid item xs={12} md={4} lg={3.5}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2.5,
+                    border: '1px solid #E2E8F0',
+                    bgcolor: '#F8FAFC',
+                    position: { md: 'sticky' },
+                    top: 10,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, px: 0.5 }}>
+                    <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: 0.6, textTransform: 'uppercase' }}>
+                      Diagnostic Areas (7)
+                    </Typography>
+                    <Typography variant="caption" fontWeight={700} color={BRAND.primaryMain}>
+                      {Object.keys(answers).length} / {TBIP_CATEGORIES.reduce((acc, c) => acc + c.questions.length, 0)} answered
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {TBIP_CATEGORIES.map((cat, idx) => {
+                      const cdata = diagnostic.categories[cat.name] || {};
+                      const isSelected = activeCatIdx === idx;
+                      const hasGap = (cdata.gaps || 0) > 0;
+                      const catAnsweredCount = cat.questions.filter((q) => answers[q.id] !== undefined).length;
+                      const isComplete = catAnsweredCount === cat.questions.length;
+
+                      return (
+                        <Paper
+                          key={cat.id}
+                          elevation={0}
+                          onClick={() => setActiveCatIdx(idx)}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 2,
+                            cursor: 'pointer',
+                            border: '1.5px solid',
+                            borderColor: isSelected ? BRAND.primaryMain : '#E2E8F0',
+                            bgcolor: isSelected ? '#F0FDF4' : '#FFFFFF',
+                            transition: 'all 0.15s ease',
+                            '&:hover': {
+                              borderColor: isSelected ? BRAND.primaryMain : '#CBD5E1',
+                              bgcolor: isSelected ? '#F0FDF4' : '#F8FAFC',
+                              transform: 'translateX(2px)',
+                            },
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                              <Box
+                                sx={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 14,
+                                  bgcolor: isSelected ? BRAND.primaryMain : '#F1F5F9',
+                                  color: isSelected ? '#fff' : BRAND.primaryMain,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                {idx + 1}
+                              </Box>
+                              <Box>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={isSelected ? 800 : 700}
+                                  sx={{
+                                    fontSize: 13,
+                                    color: isSelected ? BRAND.primaryMain : '#1E293B',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {cat.icon} {cat.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, mt: 0.3, display: 'block' }}>
+                                  {catAnsweredCount}/{cat.questions.length} answered
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            {/* Category Status Chip */}
+                            <Chip
+                              label={hasGap ? `${cdata.gaps} Gap${cdata.gaps > 1 ? 's' : ''}` : isComplete ? 'OK' : 'Pending'}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: 10.5,
+                                fontWeight: 800,
+                                bgcolor: hasGap ? '#FEE2E2' : isComplete ? '#ECFDF5' : '#F1F5F9',
+                                color: hasGap ? '#991B1B' : isComplete ? '#065F46' : '#64748B',
+                                border: '1px solid',
+                                borderColor: hasGap ? '#F87171' : isComplete ? '#A7F3D0' : '#E2E8F0',
+                              }}
+                            />
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Box>
+                </Paper>
+              </Grid>
+
+              {/* Right Column: Questions Canvas */}
+              <Grid item xs={12} md={8} lg={8.5}>
+                {/* Category Header Card */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    mb: 2,
+                    borderRadius: 2,
+                    bgcolor: '#FFFFFF',
+                    border: '1.5px solid #E2E8F0',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                    <Box>
+                      <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: 0.5 }}>
+                        CATEGORY {activeCatIdx + 1} OF {TBIP_CATEGORIES.length}
+                      </Typography>
+                      <Typography variant="h6" fontWeight={800} color={BRAND.primaryMain} sx={{ fontSize: 17, mt: 0.2 }}>
+                        {currentCategory.icon} {currentCategory.name}
+                      </Typography>
+                    </Box>
                     <Chip
-                      label={`${cdata.gaps || 0} gaps`}
+                      label={currentCatData.status || 'In Assessment'}
                       size="small"
                       sx={{
-                        ml: 1,
-                        height: 18,
-                        fontSize: 10,
                         fontWeight: 800,
-                        bgcolor: isSelected ? 'rgba(255,255,255,0.2)' : ((cdata.gaps || 0) > 0 ? '#FEE2E2' : '#ECFDF5'),
-                        color: isSelected ? '#fff' : ((cdata.gaps || 0) > 0 ? '#991B1B' : '#065F46'),
+                        fontSize: 11,
+                        bgcolor: currentCatData.status === 'Critical Gap' ? '#FEE2E2' : currentCatData.status === 'Needs Improvement' ? '#FEF3C7' : '#ECFDF5',
+                        color: currentCatData.status === 'Critical Gap' ? '#991B1B' : currentCatData.status === 'Needs Improvement' ? '#92400E' : '#065F46',
                       }}
                     />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 12.5 }}>
+                    Select <b>Yes</b> (Compliance/Strength), <b>No (Gap)</b> (Area needing intervention), or <b>N/A</b> (Not applicable) for each item below.
+                  </Typography>
+                </Paper>
+
+                {/* Questions List */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {currentCategory.questions.map((q, qIdx) => {
+                    const currentAns = answers[q.id];
+                    return (
+                      <Paper
+                        key={q.id}
+                        elevation={0}
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          border: '1.5px solid',
+                          borderColor: currentAns === 'No' ? '#FCA5A5' : currentAns === 'Yes' ? '#A7F3D0' : '#E2E8F0',
+                          bgcolor: currentAns === 'No' ? '#FFF5F5' : currentAns === 'Yes' ? '#F0FDF4' : '#FFFFFF',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <Grid container spacing={1.5} alignItems="center">
+                          <Grid item xs={12} sm={7} md={7.5}>
+                            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                              <Typography sx={{ fontWeight: 800, fontSize: 13, color: '#64748B', minWidth: 26, pt: 0.2 }}>
+                                #{qIdx + 1}
+                              </Typography>
+                              <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: '#1E293B', lineHeight: 1.45 }}>
+                                {q.text}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={12} sm={5} md={4.5}>
+                            <Box sx={{ display: 'flex', gap: 0.8, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                              <Button
+                                size="small"
+                                variant={currentAns === 'Yes' ? 'contained' : 'outlined'}
+                                onClick={() => handleAnswerChange(q.id, 'Yes')}
+                                disabled={isReadOnly}
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: 11.5,
+                                  px: 1.5,
+                                  minWidth: 64,
+                                  borderRadius: 1.5,
+                                  bgcolor: currentAns === 'Yes' ? '#009B62' : 'transparent',
+                                  color: currentAns === 'Yes' ? '#fff' : '#009B62',
+                                  borderColor: '#009B62',
+                                  '&:hover': { bgcolor: currentAns === 'Yes' ? '#007A4D' : '#ECFDF5' },
+                                }}
+                                startIcon={<Check fontSize="small" />}
+                              >
+                                Yes
+                              </Button>
+                              <Button
+                                size="small"
+                                variant={currentAns === 'No' ? 'contained' : 'outlined'}
+                                onClick={() => handleAnswerChange(q.id, 'No')}
+                                disabled={isReadOnly}
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: 11.5,
+                                  px: 1.5,
+                                  minWidth: 84,
+                                  borderRadius: 1.5,
+                                  bgcolor: currentAns === 'No' ? BRAND.gizRed : 'transparent',
+                                  color: currentAns === 'No' ? '#fff' : BRAND.gizRed,
+                                  borderColor: BRAND.gizRed,
+                                  '&:hover': { bgcolor: currentAns === 'No' ? BRAND.gizDarkRed : '#FFF1F2' },
+                                }}
+                                startIcon={<Close fontSize="small" />}
+                              >
+                                No (Gap)
+                              </Button>
+                              <Button
+                                size="small"
+                                variant={currentAns === 'N/A' ? 'contained' : 'outlined'}
+                                onClick={() => handleAnswerChange(q.id, 'N/A')}
+                                disabled={isReadOnly}
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: 11.5,
+                                  px: 1,
+                                  minWidth: 50,
+                                  borderRadius: 1.5,
+                                  bgcolor: currentAns === 'N/A' ? '#64748B' : 'transparent',
+                                  color: currentAns === 'N/A' ? '#fff' : '#64748B',
+                                  borderColor: '#94A3B8',
+                                  '&:hover': { bgcolor: currentAns === 'N/A' ? '#475569' : '#F1F5F9' },
+                                }}
+                                startIcon={<DoNotDisturb fontSize="small" />}
+                              >
+                                N/A
+                              </Button>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    );
+                  })}
+                </Box>
+
+                {/* Bottom Category Stepper Footer */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, pt: 2, borderTop: '1px solid #E2E8F0' }}>
+                  <Button
+                    disabled={activeCatIdx === 0}
+                    onClick={() => setActiveCatIdx((i) => i - 1)}
+                    startIcon={<ArrowBack />}
+                    sx={{ textTransform: 'none', fontWeight: 600 }}
+                  >
+                    Previous: {activeCatIdx > 0 ? TBIP_CATEGORIES[activeCatIdx - 1].name : ''}
                   </Button>
-                );
-              })}
-            </Box>
-
-            {/* Questions for Active Category */}
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                <Typography variant="subtitle1" fontWeight={800} color={BRAND.primaryMain}>
-                  {currentCategory.icon} {currentCategory.name}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Answer <b>Yes</b> / <b>No</b> (Gap) / <b>N/A</b> for each diagnostic question
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {currentCategory.questions.map((q, qIdx) => {
-                  const currentAns = answers[q.id];
-                  return (
-                    <Paper
-                      key={q.id}
-                      elevation={0}
-                      sx={{
-                        p: 2,
-                        borderRadius: 2,
-                        border: '1.5px solid',
-                        borderColor: currentAns === 'No' ? '#FCA5A5' : currentAns === 'Yes' ? '#A7F3D0' : '#E2E8F0',
-                        bgcolor: currentAns === 'No' ? '#FFF5F5' : currentAns === 'Yes' ? '#F0FDF4' : '#FFFFFF',
-                        transition: 'all 0.15s ease',
-                      }}
+                  {activeCatIdx < TBIP_CATEGORIES.length - 1 ? (
+                    <Button
+                      variant="contained"
+                      onClick={() => setActiveCatIdx((i) => i + 1)}
+                      endIcon={<ArrowForward />}
+                      sx={{ textTransform: 'none', fontWeight: 700, bgcolor: BRAND.primaryMain }}
                     >
-                      <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={12} md={8}>
-                          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
-                            <Typography sx={{ fontWeight: 800, fontSize: 13, color: '#64748B', minWidth: 24 }}>
-                              #{qIdx + 1}
-                            </Typography>
-                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#1E293B', lineHeight: 1.4 }}>
-                              {q.text}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <Box sx={{ display: 'flex', gap: 1, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-                            <Button
-                              size="small"
-                              variant={currentAns === 'Yes' ? 'contained' : 'outlined'}
-                              onClick={() => handleAnswerChange(q.id, 'Yes')}
-                              disabled={isReadOnly}
-                              sx={{
-                                fontWeight: 700,
-                                fontSize: 12,
-                                px: 2,
-                                borderRadius: 1.5,
-                                bgcolor: currentAns === 'Yes' ? '#009B62' : 'transparent',
-                                color: currentAns === 'Yes' ? '#fff' : '#009B62',
-                                borderColor: '#009B62',
-                                '&:hover': { bgcolor: currentAns === 'Yes' ? '#007A4D' : '#ECFDF5' },
-                              }}
-                              startIcon={<Check fontSize="small" />}
-                            >
-                              Yes
-                            </Button>
-                            <Button
-                              size="small"
-                              variant={currentAns === 'No' ? 'contained' : 'outlined'}
-                              onClick={() => handleAnswerChange(q.id, 'No')}
-                              disabled={isReadOnly}
-                              sx={{
-                                fontWeight: 700,
-                                fontSize: 12,
-                                px: 2,
-                                borderRadius: 1.5,
-                                bgcolor: currentAns === 'No' ? BRAND.gizRed : 'transparent',
-                                color: currentAns === 'No' ? '#fff' : BRAND.gizRed,
-                                borderColor: BRAND.gizRed,
-                                '&:hover': { bgcolor: currentAns === 'No' ? BRAND.gizDarkRed : '#FFF1F2' },
-                              }}
-                              startIcon={<Close fontSize="small" />}
-                            >
-                              No (Gap)
-                            </Button>
-                            <Button
-                              size="small"
-                              variant={currentAns === 'N/A' ? 'contained' : 'outlined'}
-                              onClick={() => handleAnswerChange(q.id, 'N/A')}
-                              disabled={isReadOnly}
-                              sx={{
-                                fontWeight: 700,
-                                fontSize: 12,
-                                px: 1.5,
-                                borderRadius: 1.5,
-                                bgcolor: currentAns === 'N/A' ? '#64748B' : 'transparent',
-                                color: currentAns === 'N/A' ? '#fff' : '#64748B',
-                                borderColor: '#94A3B8',
-                                '&:hover': { bgcolor: currentAns === 'N/A' ? '#475569' : '#F1F5F9' },
-                              }}
-                              startIcon={<DoNotDisturb fontSize="small" />}
-                            >
-                              N/A
-                            </Button>
-                          </Box>
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  );
-                })}
-              </Box>
-            </Box>
-
-            {/* Navigation buttons */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, pt: 2, borderTop: '1px solid #E2E8F0' }}>
-              <Button
-                disabled={activeCatIdx === 0}
-                onClick={() => setActiveCatIdx((i) => i - 1)}
-                startIcon={<ArrowBack />}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
-              >
-                Previous Category
-              </Button>
-              {activeCatIdx < TBIP_CATEGORIES.length - 1 ? (
-                <Button
-                  variant="contained"
-                  onClick={() => setActiveCatIdx((i) => i + 1)}
-                  endIcon={<ArrowForward />}
-                  sx={{ textTransform: 'none', fontWeight: 700, bgcolor: BRAND.primaryMain }}
-                >
-                  Next Category
-                </Button>
-              ) : (
-                <Button
-                  variant="contained"
-                  onClick={() => setActiveTab(1)}
-                  endIcon={<ArrowForward />}
-                  sx={{ textTransform: 'none', fontWeight: 700, bgcolor: BRAND.gopaGold, color: '#262523', '&:hover': { bgcolor: BRAND.gopaGoldHover } }}
-                >
-                  Proceed to Diagnostic Snapshot
-                </Button>
-              )}
-            </Box>
+                      Next: {TBIP_CATEGORIES[activeCatIdx + 1].name}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      onClick={() => setActiveTab(1)}
+                      endIcon={<ArrowForward />}
+                      sx={{ textTransform: 'none', fontWeight: 700, bgcolor: BRAND.gopaGold, color: '#262523', '&:hover': { bgcolor: BRAND.gopaGoldHover } }}
+                    >
+                      Proceed to Snapshot & Notes
+                    </Button>
+                  )}
+                </Box>
+              </Grid>
+            </Grid>
           </Box>
         )}
 
