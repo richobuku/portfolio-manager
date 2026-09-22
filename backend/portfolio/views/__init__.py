@@ -34,4 +34,6 @@ from .bge_photos import (
     list_bge_photos_view,
     download_bge_photo_view,
 )
+from .enterprise_improvement_plan import EnterpriseImprovementPlanViewSet
+
 

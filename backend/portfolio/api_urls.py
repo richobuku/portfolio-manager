@@ -13,6 +13,7 @@ from .views import (
     TshirtReceiptViewSet, TshirtReceiptEntryViewSet,
     WorkOrderSubmissionViewSet, WorkOrderPaymentViewSet, WorkOrderAttachmentViewSet,
     PlannedVisitViewSet,
+    EnterpriseImprovementPlanViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
     bulk_email_view, bulk_email_log_view,
     bulk_sms_view, bulk_sms_log_view, bulk_sms_balance_view,
@@ -61,6 +62,7 @@ router.register(r'participant-training-reports', BGEParticipantTrainingReportVie
 router.register(r'tshirt-receipts', TshirtReceiptViewSet, basename='tshirt-receipt')
 router.register(r'tshirt-entries', TshirtReceiptEntryViewSet, basename='tshirt-entry')
 router.register(r'planned-visits', PlannedVisitViewSet, basename='planned-visit')
+router.register(r'enterprise-improvement-plans', EnterpriseImprovementPlanViewSet, basename='enterprise-improvement-plan')
 router.register(r'blockchain/transactions', BlockchainTransactionViewSet)
 router.register(r'blockchain/contracts', SmartContractViewSet)
 router.register(r'blockchain/tokens', TokenViewSet)

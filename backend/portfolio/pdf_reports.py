@@ -2177,3 +2177,253 @@ def render_activity_report(data_updates, sessions, mentor_reports,
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
     return buf
+
+
+def generate_enterprise_improvement_plan_pdf(plan):
+    """
+    Generate the official PRUDEV II MSME Business Assessment & Technical Business Improvement Plan (TBIP) PDF.
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=14 * mm,
+        rightMargin=14 * mm,
+        topMargin=28 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    s = _styles()
+    CW = doc.width  # available printable width
+
+    from .views.enterprise_improvement_plan import TBIP_CATEGORIES, calculate_diagnostic
+
+    answers = plan.assessment_answers or {}
+    gap_notes = plan.gap_notes or {}
+    diag = plan.diagnostic_snapshot or calculate_diagnostic(answers)
+    categories_diag = diag.get('categories', {})
+    ov_priority = plan.overall_priority or diag.get('overall_priority', 'Low')
+
+    # Custom styles
+    p_title = ParagraphStyle(
+        'tbip_title',
+        parent=s['h1'],
+        fontSize=15,
+        leading=18,
+        textColor=HexColor('#9E0A1E'),
+        fontName='Helvetica-Bold',
+        spaceAfter=2,
+    )
+    p_sub = ParagraphStyle(
+        'tbip_sub',
+        parent=s['body'],
+        fontSize=8.5,
+        leading=11,
+        textColor=HexColor('#555555'),
+        spaceAfter=8,
+    )
+    p_sec_hdr = ParagraphStyle(
+        'tbip_sec',
+        fontName='Helvetica-Bold',
+        fontSize=10.5,
+        leading=13,
+        textColor=HexColor('#1A365D'),
+        spaceBefore=10,
+        spaceAfter=4,
+    )
+    th_style = ParagraphStyle(
+        'tbip_th',
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=HexColor('#FFFFFF'),
+        alignment=TA_LEFT,
+    )
+    th_style_c = ParagraphStyle(
+        'tbip_th_c',
+        parent=th_style,
+        alignment=TA_CENTER,
+    )
+    td_style = ParagraphStyle(
+        'tbip_td',
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=HexColor('#222222'),
+    )
+    td_bold = ParagraphStyle(
+        'tbip_td_b',
+        parent=td_style,
+        fontName='Helvetica-Bold',
+        textColor=HexColor('#1A2F4B'),
+    )
+    td_style_c = ParagraphStyle(
+        'tbip_td_c',
+        parent=td_style,
+        alignment=TA_CENTER,
+    )
+
+    story = []
+
+    # Title & Subtitle
+    story.append(Paragraph("PRUDEV II — MSME Business Assessment & Technical Business Improvement Plan", p_title))
+    story.append(Paragraph("Enterprise Diagnostic Assessment and Actionable Technical Improvement Roadmap", p_sub))
+
+    # Meta card table
+    meta_data = [
+        [
+            Paragraph("<b>MSME Name:</b>", td_style),
+            Paragraph(_safe_html(plan.msme.name), td_bold),
+            Paragraph("<b>Assessment Date:</b>", td_style),
+            Paragraph(str(plan.assessment_date), td_bold),
+        ],
+        [
+            Paragraph("<b>MSME Code:</b>", td_style),
+            Paragraph(_safe_html(plan.msme.msme_code or '—'), td_style),
+            Paragraph("<b>Lead BGE:</b>", td_style),
+            Paragraph(_safe_html(plan.bge.name if plan.bge else '—'), td_style),
+        ],
+        [
+            Paragraph("<b>District / Sector:</b>", td_style),
+            Paragraph(_safe_html(f"{plan.msme.district or '—'} · {plan.msme.sector or '—'}"), td_style),
+            Paragraph("<b>Overall Priority / Status:</b>", td_style),
+            Paragraph(f"<b>{ov_priority} Priority</b> · {plan.get_status_display()}", td_bold),
+        ],
+    ]
+    meta_table = Table(meta_data, colWidths=[CW * 0.20, CW * 0.30, CW * 0.22, CW * 0.28])
+    meta_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#CBD5E1')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 8))
+
+    # Section 1: Diagnostic Snapshot Table
+    story.append(Paragraph("1. Diagnostic Snapshot — Category Status", p_sec_hdr))
+    snap_rows = [[
+        Paragraph("Category", th_style),
+        Paragraph("Status", th_style_c),
+        Paragraph("Gaps / Applicable", th_style_c),
+        Paragraph("BGE Note on Key Gap", th_style),
+    ]]
+
+    for cat in TBIP_CATEGORIES:
+        cat_name = cat['name']
+        cdata = categories_diag.get(cat_name, {})
+        c_status = cdata.get('status', 'N/A')
+        c_ratio = cdata.get('ratio', f"{cdata.get('gaps', 0)} / {cdata.get('applicable', 0)}")
+        note = gap_notes.get(cat_name) or gap_notes.get(cat['id']) or '—'
+
+        snap_rows.append([
+            Paragraph(_safe_html(cat_name), td_bold),
+            Paragraph(_safe_html(c_status), td_style_c),
+            Paragraph(_safe_html(c_ratio), td_style_c),
+            Paragraph(_safe_html(note), td_style),
+        ])
+
+    snap_table = Table(snap_rows, colWidths=[CW * 0.30, CW * 0.18, CW * 0.18, CW * 0.34])
+    snap_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#2A4365')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
+        ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#CBD5E1')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#F8FAFC')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(snap_table)
+    story.append(Spacer(1, 8))
+
+    # Section 2: Priority Actions Table (TBIP)
+    story.append(Paragraph("2. Priority Actions — Technical Business Improvement Plan", p_sec_hdr))
+    act_rows = [[
+        Paragraph("#", th_style_c),
+        Paragraph("Priority Action", th_style),
+        Paragraph("Linked Category", th_style),
+        Paragraph("Owner (BGE)", th_style),
+        Paragraph("Timeline", th_style_c),
+        Paragraph("Expected Outcome", th_style),
+        Paragraph("Status", th_style_c),
+    ]]
+
+    actions_list = plan.priority_actions or []
+    if not actions_list:
+        actions_list = [{'id': 1, 'action': 'No priority actions recorded yet.', 'category': '—', 'owner': '—', 'timeline': '—', 'outcome': '—', 'status': 'Pending'}]
+
+    for idx, act in enumerate(actions_list):
+        act_rows.append([
+            Paragraph(str(act.get('id', idx + 1)), td_style_c),
+            Paragraph(_safe_html(act.get('action', act.get('priority_action', '—'))), td_style),
+            Paragraph(_safe_html(act.get('category', act.get('linked_category', '—'))), td_style),
+            Paragraph(_safe_html(act.get('owner', act.get('owner_bge', '—'))), td_style),
+            Paragraph(_safe_html(act.get('timeline', '—')), td_style_c),
+            Paragraph(_safe_html(act.get('outcome', act.get('expected_outcome', '—'))), td_style),
+            Paragraph(_safe_html(act.get('status', 'Pending')), td_style_c),
+        ])
+
+    act_table = Table(act_rows, colWidths=[CW * 0.05, CW * 0.26, CW * 0.17, CW * 0.13, CW * 0.11, CW * 0.18, CW * 0.10])
+    act_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#1A365D')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
+        ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#CBD5E1')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#F8FAFC')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(act_table)
+    story.append(Spacer(1, 10))
+
+    # Section 3: Sign-off & Approvals
+    sig_data = [
+        [
+            Paragraph("<b>BGE Sign-off:</b>", td_style),
+            Paragraph(_safe_html(plan.bge_sign_off_name or (plan.bge.name if plan.bge_signed else '—')), td_bold),
+            Paragraph("<b>Date:</b>", td_style),
+            Paragraph(str(plan.bge_signed_at or '—'), td_style),
+        ],
+        [
+            Paragraph("<b>Head of Assignment Approval:</b>", td_style),
+            Paragraph(_safe_html(plan.hoa_sign_off_name or (plan.hoa_approved_by.get_full_name() if plan.hoa_approved_by else '—')), td_bold),
+            Paragraph("<b>Date:</b>", td_style),
+            Paragraph(str(plan.hoa_approved_at or '—'), td_style),
+        ],
+    ]
+    if plan.hoa_notes:
+        sig_data.append([
+            Paragraph("<b>Approval Notes:</b>", td_style),
+            Paragraph(_safe_html(plan.hoa_notes), td_style),
+            Paragraph("", td_style),
+            Paragraph("", td_style),
+        ])
+
+    sig_table = Table(sig_data, colWidths=[CW * 0.28, CW * 0.38, CW * 0.10, CW * 0.24])
+    sig_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F1F5F9')),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#94A3B8')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(KeepTogether([sig_table]))
+
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=HexColor('#CBD5E1'), spaceAfter=4))
+    story.append(Paragraph(
+        f"Generated from PRUDEV II Portfolio Management System · Assessment Date: {plan.assessment_date}",
+        ParagraphStyle('tbip_foot', fontName='Helvetica', fontSize=7, textColor=HexColor('#888888'), alignment=TA_CENTER),
+    ))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf.getvalue()
+

@@ -22,6 +22,7 @@ from .work_orders import WorkOrderSerializer, WorkOrderSubmissionSerializer, Wor
 from .tshirt import TshirtReceiptEntrySerializer, TshirtReceiptSerializer
 from .communications import ScheduledMessageSerializer
 from .planned_visits import PlannedVisitSerializer
+from .enterprise_improvement_plan import EnterpriseImprovementPlanSerializer
 
 __all__ = [
     'PortfolioSerializer',
@@ -54,4 +55,6 @@ __all__ = [
     'TshirtReceiptSerializer',
     'ScheduledMessageSerializer',
     'PlannedVisitSerializer',
+    'EnterpriseImprovementPlanSerializer',
 ]
+

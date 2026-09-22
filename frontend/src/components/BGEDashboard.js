@@ -25,6 +25,7 @@ import {
   WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
   WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, WORK_ORDER_CONFIRM_PAYMENT_URL,
   REPORT_CONFIRM_PAYMENT_URL, GROUP_REPORT_CONFIRM_PAYMENT_URL,
+  TBIP_PDF_URL, TBIP_EXCEL_URL,
 } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -32,6 +33,7 @@ import VisitReportForm from './VisitReportForm';
 import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
 import MSMEVisitSchedule from './MSMEVisitSchedule';
+import EnterpriseImprovementPlanDialog from './EnterpriseImprovementPlanDialog';
 import { getErrorMessage } from '../utils/error';
 
 const DRAWER_WIDTH = 220;
@@ -327,6 +329,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [msmeReports, setMsmeReports] = useState([]);
   const [msmeDetailTab, setMsmeDetailTab] = useState(0);
   const [msmeDetailSnapshots, setMsmeDetailSnapshots] = useState([]);
+
+  // Enterprise Improvement Plans (TBIP)
+  const [tbipPlans, setTbipPlans] = useState([]);
+  const [tbipDialog, setTbipDialog] = useState(false);
+  const [selectedTbip, setSelectedTbip] = useState(null);
+  const [selectedTbipMsme, setSelectedTbipMsme] = useState(null);
+  const [tbipFilterStatus, setTbipFilterStatus] = useState('all');
+  const [tbipFilterPriority, setTbipFilterPriority] = useState('all');
+  const [tbipSearch, setTbipSearch] = useState('');
+  const [tbipPage, setTbipPage] = useState(0);
+  const [newTbipMsmePicker, setNewTbipMsmePicker] = useState(false);
+
 
   // Full MSME list for training attendance (bypasses personal assignment scope)
 
@@ -729,6 +743,17 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchTbipPlans = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.ENTERPRISE_IMPROVEMENT_PLANS, { headers: h });
+      setTbipPlans(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // non-critical
+    }
+  }, [token]);
+
+
   const fetchSubmissions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
     try {
@@ -1066,12 +1091,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchAttachments();
     fetchSessions();
     fetchPtReports();
+    fetchTbipPlans();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMyProfile, fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, fetchPtReports, token]);
+  }, [fetchMyProfile, fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, fetchPtReports, fetchTbipPlans, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -1687,6 +1713,57 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  // ── Enterprise Improvement Plans (TBIP) ──────────────────────────────────
+  const handleDownloadTbipPdf = async (planObj) => {
+    try {
+      const res = await axios.get(TBIP_PDF_URL(planObj.id), {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `TBIP_${planObj.msme_name || 'MSME'}_${planObj.assessment_date}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      notify('Failed to download PDF', 'error');
+    }
+  };
+
+  const handleDownloadTbipExcel = async (planObj) => {
+    try {
+      const res = await axios.get(TBIP_EXCEL_URL(planObj.id), {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `TBIP_${planObj.msme_name || 'MSME'}_${planObj.assessment_date}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      notify('Failed to download Excel workbook', 'error');
+    }
+  };
+
+  const deleteTbipPlan = async (planObj) => {
+    if (!window.confirm(`Delete draft assessment for ${planObj.msme_name || 'this MSME'}?`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.ENTERPRISE_IMPROVEMENT_PLANS}${planObj.id}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      notify('Draft plan deleted.', 'success');
+      fetchTbipPlans();
+    } catch {
+      notify('Failed to delete draft plan.', 'error');
+    }
+  };
+
+
   // ── sidebar ─────────────────────────────────────────────────────────────────
   const navItems = [
     { key: 'msmes',       label: 'My MSMEs',      icon: <Business /> },
@@ -1694,6 +1771,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'maps',        label: 'MSME Maps',     icon: <Place /> },
     { key: 'groups',      label: 'My Groups',      icon: <GroupIcon /> },
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
+    { key: 'tbip',        label: 'Improvement Plan', icon: <TrendingUp />,
+      badge: tbipPlans.filter(p => p.status === 'draft').length || undefined },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
     { key: 'training',   label: 'Training',       icon: <School />,
       badge: leadSessions.length + mentorSessions.length + participantSessions.length || undefined },
@@ -2086,6 +2165,21 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     <Tooltip title="Full growth data update">
                                       <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); openGrowthForm(m); }}>
                                         <TrendingUp fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Enterprise Improvement Plan (TBIP)">
+                                      <IconButton
+                                        size="small"
+                                        sx={{ color: '#B45309' }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const existing = tbipPlans.find(p => p.msme === m.id);
+                                          setSelectedTbipMsme(m);
+                                          setSelectedTbip(existing || null);
+                                          setTbipDialog(true);
+                                        }}
+                                      >
+                                        <Assignment fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
                                   </Box>
@@ -2751,6 +2845,274 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             )}
           </Box>
         )}
+
+        {/* ── Enterprise Improvement Plans (TBIP) ── */}
+        {section === 'tbip' && (() => {
+          const filteredPlans = tbipPlans.filter(p => {
+            if (tbipFilterStatus !== 'all' && p.status !== tbipFilterStatus) return false;
+            if (tbipFilterPriority !== 'all' && p.overall_priority !== tbipFilterPriority) return false;
+            if (tbipSearch.trim()) {
+              const q = tbipSearch.toLowerCase();
+              const name = (p.msme_name || '').toLowerCase();
+              const code = (p.msme_code || '').toLowerCase();
+              if (!name.includes(q) && !code.includes(q)) return false;
+            }
+            return true;
+          });
+
+          const totalTbips = tbipPlans.length;
+          const highPriorityCount = tbipPlans.filter(p => p.overall_priority === 'High').length;
+          const approvedCount = tbipPlans.filter(p => p.status === 'approved').length;
+          const draftCount = tbipPlans.filter(p => p.status === 'draft').length;
+
+          return (
+            <Box>
+              {/* Header */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: 'space-between',
+                alignItems: { xs: 'stretch', sm: 'center' },
+                gap: { xs: 1.5, sm: 2 },
+                mb: 3,
+              }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="h6" fontWeight={800} color={BRAND.primaryMain}>
+                    Enterprise Improvement Plans (TBIP)
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    PRUDEV II MSME Diagnostic Assessments & Technical Improvement Plans
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => setNewTbipMsmePicker(true)}
+                  sx={{
+                    bgcolor: BRAND.gizRed,
+                    '&:hover': { bgcolor: BRAND.gizDarkRed },
+                    whiteSpace: 'nowrap',
+                    fontWeight: 700,
+                    borderRadius: 2,
+                  }}
+                >
+                  New Assessment / TBIP
+                </Button>
+              </Box>
+
+              {/* KPI Summary Cards */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>Total Plans</Typography>
+                    <Typography variant="h5" fontWeight={800} color={BRAND.primaryMain}>{totalTbips}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #FCA5A5', bgcolor: '#FEF2F2' }}>
+                    <Typography variant="caption" color="error.main" fontWeight={700}>High Priority</Typography>
+                    <Typography variant="h5" fontWeight={800} color="#991B1B">{highPriorityCount}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #FDE68A', bgcolor: '#FFFBEB' }}>
+                    <Typography variant="caption" color="warning.dark" fontWeight={700}>Drafts</Typography>
+                    <Typography variant="h5" fontWeight={800} color="#92400E">{draftCount}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #A7F3D0', bgcolor: '#ECFDF5' }}>
+                    <Typography variant="caption" color="success.main" fontWeight={700}>HOA Approved</Typography>
+                    <Typography variant="h5" fontWeight={800} color="#065F46">{approvedCount}</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Filters Toolbar */}
+              <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #CBD5E1', bgcolor: '#FFFFFF', mb: 2.5 }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6} md={5}>
+                    <TextField
+                      size="small"
+                      placeholder="Search by MSME name or code..."
+                      value={tbipSearch}
+                      onChange={(e) => setTbipSearch(e.target.value)}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={6} sm={3} md={3}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Status</InputLabel>
+                      <Select
+                        label="Status"
+                        value={tbipFilterStatus}
+                        onChange={(e) => setTbipFilterStatus(e.target.value)}
+                      >
+                        <MenuItem value="all">All Statuses</MenuItem>
+                        <MenuItem value="draft">Draft</MenuItem>
+                        <MenuItem value="submitted">Submitted</MenuItem>
+                        <MenuItem value="approved">Approved</MenuItem>
+                        <MenuItem value="rejected">Rejected</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={6} sm={3} md={4}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Priority</InputLabel>
+                      <Select
+                        label="Priority"
+                        value={tbipFilterPriority}
+                        onChange={(e) => setTbipFilterPriority(e.target.value)}
+                      >
+                        <MenuItem value="all">All Priorities</MenuItem>
+                        <MenuItem value="High">High Priority</MenuItem>
+                        <MenuItem value="Medium">Medium Priority</MenuItem>
+                        <MenuItem value="Low">Low Priority</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Table */}
+              {filteredPlans.length === 0 ? (
+                <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                  <TrendingUp sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                  <Typography fontWeight={600} color="text.secondary">No Enterprise Improvement Plans found.</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Click "New Assessment / TBIP" to conduct an MSME diagnostic assessment.
+                  </Typography>
+                </Paper>
+              ) : (
+                <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto', border: '1px solid #CBD5E1', borderRadius: 2 }}>
+                  <Table size="small" sx={{ minWidth: 720 }}>
+                    <TableHead sx={{ bgcolor: '#1A365D' }}>
+                      <TableRow>
+                        <TableCell sx={{ color: '#fff', fontWeight: 700 }}>MSME</TableCell>
+                        <TableCell sx={{ color: '#fff', fontWeight: 700 }}>Assessment Date</TableCell>
+                        <TableCell sx={{ color: '#fff', fontWeight: 700 }} align="center">Diagnostic Snapshot</TableCell>
+                        <TableCell sx={{ color: '#fff', fontWeight: 700 }} align="center">Priority</TableCell>
+                        <TableCell sx={{ color: '#fff', fontWeight: 700 }} align="center">Status</TableCell>
+                        <TableCell sx={{ color: '#fff', fontWeight: 700 }} align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {paged(filteredPlans, tbipPage).map((p) => {
+                        const diag = p.diagnostic_snapshot || {};
+                        const totalGaps = diag.total_gaps != null ? diag.total_gaps : (diag.totalGaps || 0);
+                        const totalApp = diag.total_applicable != null ? diag.total_applicable : (diag.totalApplicable || 0);
+                        const isHigh = p.overall_priority === 'High';
+                        const isMed = p.overall_priority === 'Medium';
+
+                        return (
+                          <TableRow key={p.id} hover>
+                            <TableCell>
+                              <Typography fontSize={13.5} fontWeight={700} color={BRAND.primaryMain}>
+                                {p.msme_name || `MSME #${p.msme}`}
+                              </Typography>
+                              <Typography fontSize={11} color="text.secondary">
+                                {p.msme_code || '—'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 13, fontWeight: 600 }}>
+                              {p.assessment_date}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <Typography fontSize={12} fontWeight={800} color={totalGaps > 0 ? '#C8102E' : '#009B62'}>
+                                  {totalGaps} / {totalApp} gaps
+                                </Typography>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={totalApp > 0 ? (totalGaps / totalApp) * 100 : 0}
+                                  sx={{
+                                    width: 70,
+                                    height: 4,
+                                    borderRadius: 2,
+                                    mt: 0.5,
+                                    bgcolor: '#E2E8F0',
+                                    '& .MuiLinearProgress-bar': {
+                                      bgcolor: totalGaps > 6 ? '#C8102E' : totalGaps > 3 ? '#F59E0B' : '#009B62',
+                                    },
+                                  }}
+                                />
+                              </Box>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                label={p.overall_priority || 'Low'}
+                                size="small"
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: 11,
+                                  bgcolor: isHigh ? '#FEE2E2' : isMed ? '#FEF3C7' : '#ECFDF5',
+                                  color: isHigh ? '#991B1B' : isMed ? '#92400E' : '#065F46',
+                                  border: '1px solid',
+                                  borderColor: isHigh ? '#F87171' : isMed ? '#FBBF24' : '#A7F3D0',
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                label={(p.status || 'draft').toUpperCase()}
+                                size="small"
+                                color={p.status === 'approved' ? 'success' : p.status === 'submitted' ? 'primary' : p.status === 'rejected' ? 'error' : 'default'}
+                                sx={{ fontWeight: 700, fontSize: 10.5 }}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+                                <Tooltip title="View / Edit Assessment">
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => {
+                                      const mTarget = msmes.find(m => m.id === p.msme);
+                                      setSelectedTbipMsme(mTarget || null);
+                                      setSelectedTbip(p);
+                                      setTbipDialog(true);
+                                    }}
+                                  >
+                                    <Edit fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download Official PDF">
+                                  <IconButton size="small" color="error" onClick={() => handleDownloadTbipPdf(p)}>
+                                    <PictureAsPdf fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download Excel Workbook">
+                                  <IconButton size="small" color="success" onClick={() => handleDownloadTbipExcel(p)}>
+                                    <Download fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                {p.status === 'draft' && (
+                                  <Tooltip title="Delete draft">
+                                    <IconButton size="small" color="default" onClick={() => deleteTbipPlan(p)}>
+                                      <Delete fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  <TablePagination
+                    component="div"
+                    count={filteredPlans.length}
+                    page={tbipPage}
+                    rowsPerPage={ROWS_PER_PAGE}
+                    rowsPerPageOptions={[ROWS_PER_PAGE]}
+                    onPageChange={(_, p) => setTbipPage(p)}
+                  />
+                </TableContainer>
+              )}
+            </Box>
+          );
+        })()}
 
         {/* ── Work Orders (read-only — admin issues) ── */}
         {section === 'workorders' && (
@@ -5283,6 +5645,60 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         bgeProfile={currentUser?.bge_profile}
         editingReport={visitReportEdit}
       />
+
+      {/* ── Enterprise Improvement Plan (TBIP) Dialog ── */}
+      <EnterpriseImprovementPlanDialog
+        open={tbipDialog}
+        onClose={() => setTbipDialog(false)}
+        plan={selectedTbip}
+        msme={selectedTbipMsme || (selectedTbip ? msmes.find(m => m.id === selectedTbip.msme) : null)}
+        bge={currentUser?.bge_profile}
+        currentUser={currentUser}
+        token={token}
+        onSaved={(updated) => {
+          fetchTbipPlans();
+          setSelectedTbip(updated);
+        }}
+        notify={notify}
+      />
+
+      {/* ── MSME Picker for New TBIP ── */}
+      <Dialog open={newTbipMsmePicker} onClose={() => setNewTbipMsmePicker(false)} maxWidth="xs" fullWidth disableScrollLock>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: 16 }}>Select MSME for Assessment</DialogTitle>
+        <DialogContent dividers sx={{ p: 1.5 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, px: 0.5 }}>
+            Choose an assigned MSME to conduct the diagnostic assessment and formulate the Technical Business Improvement Plan (TBIP).
+          </Typography>
+          <List sx={{ pt: 0, maxHeight: 360, overflowY: 'auto' }}>
+            {msmes.map((m) => (
+              <ListItemButton
+                key={m.id}
+                onClick={() => {
+                  setSelectedTbipMsme(m);
+                  setSelectedTbip(null);
+                  setNewTbipMsmePicker(false);
+                  setTbipDialog(true);
+                }}
+                sx={{
+                  borderRadius: 1.5,
+                  mb: 0.75,
+                  border: '1px solid #E2E8F0',
+                  '&:hover': { bgcolor: '#F1F5F9', borderColor: BRAND.primaryMain },
+                }}
+              >
+                <ListItemText
+                  primary={<Typography fontWeight={700} fontSize={13.5} color={BRAND.primaryMain}>{m.name}</Typography>}
+                  secondary={<Typography fontSize={11} color="text.secondary">{m.msme_code || '—'} · {m.district || ''} · {m.sector || ''}</Typography>}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ p: 1.5 }}>
+          <Button onClick={() => setNewTbipMsmePicker(false)} sx={{ textTransform: 'none', color: '#64748B' }}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
 
       {/* ── Group Report (team lead only) ────────────────────────────────── */}
       <Dialog open={groupReportDialog} onClose={() => setGroupReportDialog(false)} maxWidth="md" fullWidth>

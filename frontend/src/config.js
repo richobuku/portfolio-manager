@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
   WORK_ORDER_PAYMENTS:       `${API_BASE_URL}/api/work-order-payments/`,
   WORK_ORDER_ATTACHMENTS:    `${API_BASE_URL}/api/work-order-attachments/`,
   PLANNED_VISITS:            `${API_BASE_URL}/api/planned-visits/`,
+  ENTERPRISE_IMPROVEMENT_PLANS: `${API_BASE_URL}/api/enterprise-improvement-plans/`,
 };
 
 export const EXPERT_SEND_EMAIL_URL  = (id) => `${API_BASE_URL}/api/experts/${id}/send-email/`;
@@ -57,6 +58,11 @@ export const MENTOR_REPORT_PDF_URL     = (id) => `${API_BASE_URL}/api/mentor-rep
 export const TSHIRT_RECEIPT_PDF_URL    = (id) => `${API_BASE_URL}/api/tshirt-receipts/${id}/pdf/`;
 export const TSHIRT_RECEIPT_BULK_SIGN  = (id) => `${API_BASE_URL}/api/tshirt-receipts/${id}/bulk-sign/`;
 export const TSHIRT_ENTRY_SIGN_URL     = (id) => `${API_BASE_URL}/api/tshirt-entries/${id}/sign/`;
+export const TBIP_PDF_URL              = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/export_pdf/`;
+export const TBIP_EXCEL_URL            = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/export_excel/`;
+export const TBIP_SUBMIT_URL           = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/submit/`;
+export const TBIP_APPROVE_URL          = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/approve/`;
+export const TBIP_REJECT_URL           = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/reject/`;
 export const WORK_ORDER_SUBMISSION_TIMESHEET_URL = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-timesheet/`;
 export const WORK_ORDER_SUBMISSION_INVOICE_URL   = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-invoice/`;
 export const WORK_ORDER_PAYMENT_NOTIFY_URL  = (id) => `${API_BASE_URL}/api/work-order-payments/${id}/notify/`;

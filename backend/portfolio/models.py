@@ -1904,4 +1904,74 @@ class BGEFieldPhoto(models.Model):
         return f"{self.bge.name} — {self.filename} ({self.created_at:%Y-%m-%d})"
 
 
+class EnterpriseImprovementPlan(models.Model):
+    """
+    PRUDEV II — MSME Business Assessment & Technical Business Improvement Plan (TBIP).
+    Conducted by BGEs during enterprise diagnostic visits.
+    """
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    PRIORITY_CHOICES = [
+        ('Low', 'Low'),
+        ('Medium', 'Medium'),
+        ('High', 'High'),
+    ]
+
+    msme = models.ForeignKey(
+        'MSME', on_delete=models.CASCADE, related_name='enterprise_improvement_plans'
+    )
+    bge = models.ForeignKey(
+        BusinessGrowthExpert, on_delete=models.CASCADE, related_name='enterprise_improvement_plans'
+    )
+    assessment_date = models.DateField(help_text='Date of diagnostic assessment')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    
+    # Stores answers to all questions: { [questionId]: 'Yes' | 'No' | 'N/A' }
+    assessment_answers = models.JSONField(default=dict, blank=True)
+    
+    # Stores calculated stats per category and overall:
+    # { [categoryName]: { total: int, applicable: int, gaps: int, status: str, gap_pct: float } }
+    diagnostic_snapshot = models.JSONField(default=dict, blank=True)
+    
+    # Stores BGE notes per category: { [categoryName]: str }
+    gap_notes = models.JSONField(default=dict, blank=True)
+    
+    # Stores priority actions (list of dicts):
+    # [{ id: 1, action: str, category: str, owner: str, timeline: str, outcome: str, status: str }]
+    priority_actions = models.JSONField(default=list, blank=True)
+    
+    overall_priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='Low')
+    
+    # BGE sign-off
+    bge_signed = models.BooleanField(default=False)
+    bge_signed_at = models.DateField(null=True, blank=True)
+    bge_sign_off_name = models.CharField(max_length=255, blank=True)
+    
+    # Head of Assignment approval
+    hoa_approved_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_improvement_plans'
+    )
+    hoa_approved_at = models.DateField(null=True, blank=True)
+    hoa_sign_off_name = models.CharField(max_length=255, blank=True)
+    hoa_notes = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-assessment_date', '-created_at']
+        verbose_name = "Enterprise Improvement Plan"
+        verbose_name_plural = "Enterprise Improvement Plans"
+
+    def __str__(self):
+        return f"TBIP: {self.msme.name} ({self.assessment_date}) - {self.get_status_display()}"
+
+
+
 

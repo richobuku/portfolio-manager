@@ -327,3 +327,208 @@ def generate_activity_excel(data_updates, sessions, mentor_reports,
     wb.close()
     buf.seek(0)
     return buf
+
+
+def generate_enterprise_improvement_plan_excel(plan):
+    """
+    Generate an Excel workbook for an Enterprise Improvement Plan (TBIP)
+    matching the official PRUDEV II layout.
+    """
+    import xlsxwriter
+
+    buf = io.BytesIO()
+    wb = xlsxwriter.Workbook(buf, {'in_memory': True})
+    ws = wb.add_worksheet('MSME Assessment & TBIP')
+
+    # Color definitions
+    DARK_RED   = '#9E0A1E'
+    NAVY_BLUE  = '#1A365D'
+    HEADER_BLUE= '#2A4365'
+    LIGHT_GRAY = '#F7FAFC'
+    YELLOW     = '#FFFF00'
+    LIGHT_GREEN= '#E6FFFA'
+    BORDER_CLR = '#CBD5E0'
+
+    # Formats
+    fmt_banner = wb.add_format({
+        'bold': True, 'font_size': 13, 'font_color': '#FFFFFF',
+        'bg_color': DARK_RED, 'align': 'left', 'valign': 'vcenter',
+        'border': 1, 'border_color': DARK_RED,
+    })
+    fmt_subtitle = wb.add_format({
+        'italic': True, 'font_size': 9, 'font_color': '#4A5568',
+        'align': 'left', 'valign': 'vcenter',
+    })
+    fmt_section_hdr = wb.add_format({
+        'bold': True, 'font_size': 11, 'font_color': '#FFFFFF',
+        'bg_color': NAVY_BLUE, 'align': 'left', 'valign': 'vcenter',
+        'border': 1, 'border_color': NAVY_BLUE,
+    })
+    fmt_tbl_hdr = wb.add_format({
+        'bold': True, 'font_size': 10, 'font_color': '#FFFFFF',
+        'bg_color': HEADER_BLUE, 'align': 'left', 'valign': 'vcenter',
+        'border': 1, 'border_color': '#2C5282',
+    })
+    fmt_tbl_hdr_c = wb.add_format({
+        'bold': True, 'font_size': 10, 'font_color': '#FFFFFF',
+        'bg_color': HEADER_BLUE, 'align': 'center', 'valign': 'vcenter',
+        'border': 1, 'border_color': '#2C5282',
+    })
+    fmt_cell = wb.add_format({
+        'font_size': 9.5, 'valign': 'vcenter', 'border': 1,
+        'border_color': BORDER_CLR, 'text_wrap': True,
+    })
+    fmt_cell_bold = wb.add_format({
+        'font_size': 9.5, 'bold': True, 'valign': 'vcenter', 'border': 1,
+        'border_color': BORDER_CLR,
+    })
+    fmt_cell_center = wb.add_format({
+        'font_size': 9.5, 'align': 'center', 'valign': 'vcenter',
+        'border': 1, 'border_color': BORDER_CLR,
+    })
+    fmt_answer_cell = wb.add_format({
+        'font_size': 9.5, 'bold': True, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#FEFCBF', 'border': 1, 'border_color': BORDER_CLR,
+    })
+    fmt_meta_label = wb.add_format({
+        'bold': True, 'font_size': 9, 'font_color': '#2D3748',
+        'bg_color': '#EDF2F7', 'border': 1, 'border_color': BORDER_CLR,
+    })
+    fmt_meta_val = wb.add_format({
+        'font_size': 9.5, 'border': 1, 'border_color': BORDER_CLR,
+    })
+    fmt_priority_low = wb.add_format({
+        'bold': True, 'font_size': 10, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#C6F6D5', 'font_color': '#22543D', 'border': 1, 'border_color': BORDER_CLR,
+    })
+    fmt_priority_med = wb.add_format({
+        'bold': True, 'font_size': 10, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#FEEBC8', 'font_color': '#7B341E', 'border': 1, 'border_color': BORDER_CLR,
+    })
+    fmt_priority_high = wb.add_format({
+        'bold': True, 'font_size': 10, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#FED7D7', 'font_color': '#742A2A', 'border': 1, 'border_color': BORDER_CLR,
+    })
+
+    # Set column widths
+    ws.set_column('A:A', 24)
+    ws.set_column('B:B', 65)
+    ws.set_column('C:C', 15)
+    ws.set_column('D:D', 20)
+    ws.set_column('E:E', 18)
+    ws.set_column('F:F', 30)
+    ws.set_column('G:G', 15)
+
+    # 1. Title Banner
+    ws.merge_range('A1:G1', 'PRUDEV II — MSME Business Assessment & Technical Business Improvement Plan', fmt_banner)
+    ws.set_row(0, 26)
+    ws.write('A2', 'Answer each question Yes / No / N/A during the visit. Category status and priority below calculate automatically.', fmt_subtitle)
+
+    # Metadata rows
+    ws.write('A3', 'MSME Name:', fmt_meta_label)
+    ws.write('B3', f"{plan.msme.name} ({plan.msme.msme_code or '—'})", fmt_meta_val)
+    ws.write('C3', 'Assessment Date:', fmt_meta_label)
+    ws.write('D3', str(plan.assessment_date), fmt_meta_val)
+    ws.write('E3', 'Lead BGE:', fmt_meta_label)
+    ws.write('F3', plan.bge.name if plan.bge else '—', fmt_meta_val)
+
+    # Section 1: Business Assessment
+    ws.merge_range('A5:C5', 'Business Assessment', fmt_section_hdr)
+    ws.write('A6', 'Category', fmt_tbl_hdr)
+    ws.write('B6', 'Question', fmt_tbl_hdr)
+    ws.write('C6', 'Answer', fmt_tbl_hdr_c)
+
+    from .views.enterprise_improvement_plan import TBIP_CATEGORIES, calculate_diagnostic
+
+    answers = plan.assessment_answers or {}
+    gap_notes = plan.gap_notes or {}
+    row_idx = 6
+
+    for cat in TBIP_CATEGORIES:
+        cat_name = cat['name']
+        for q in cat['questions']:
+            ans = answers.get(q['id']) or answers.get(q['text']) or 'N/A'
+            ws.write(row_idx, 0, cat_name, fmt_cell_bold)
+            ws.write(row_idx, 1, q['text'], fmt_cell)
+            ws.write(row_idx, 2, ans, fmt_answer_cell)
+            row_idx += 1
+
+    row_idx += 1
+    # Section 2: Diagnostic Snapshot
+    snap_start = row_idx
+    ws.merge_range(snap_start, 0, snap_start, 3, 'Diagnostic Snapshot — Category Status (calculated automatically)', fmt_section_hdr)
+    row_idx += 1
+    ws.write(row_idx, 0, 'Category', fmt_tbl_hdr)
+    ws.write(row_idx, 1, 'Status', fmt_tbl_hdr_c)
+    ws.write(row_idx, 2, 'Gaps / Applicable', fmt_tbl_hdr_c)
+    ws.write(row_idx, 3, 'BGE Note on Key Gap', fmt_tbl_hdr)
+    row_idx += 1
+
+    diag = plan.diagnostic_snapshot or calculate_diagnostic(answers)
+    categories_diag = diag.get('categories', {})
+
+    for cat in TBIP_CATEGORIES:
+        cat_name = cat['name']
+        cdata = categories_diag.get(cat_name, {})
+        c_status = cdata.get('status', 'N/A')
+        c_ratio = cdata.get('ratio', f"{cdata.get('gaps', 0)} / {cdata.get('applicable', 0)}")
+        note = gap_notes.get(cat_name) or gap_notes.get(cat['id']) or ''
+
+        ws.write(row_idx, 0, cat_name, fmt_cell_bold)
+        ws.write(row_idx, 1, c_status, fmt_cell_center)
+        ws.write(row_idx, 2, c_ratio, fmt_cell_center)
+        ws.write(row_idx, 3, note, fmt_cell)
+        row_idx += 1
+
+    # Overall Priority
+    ov_priority = plan.overall_priority or diag.get('overall_priority', 'Low')
+    p_fmt = fmt_priority_high if ov_priority == 'High' else (fmt_priority_med if ov_priority == 'Medium' else fmt_priority_low)
+    ws.write(row_idx, 0, 'Overall Priority', fmt_cell_bold)
+    ws.write(row_idx, 1, ov_priority, p_fmt)
+    ws.write(row_idx, 2, f"{diag.get('total_gaps', 0)} total gaps", fmt_cell_center)
+    ws.write(row_idx, 3, '', fmt_cell)
+    row_idx += 2
+
+    # Section 3: Priority Actions — Technical Business Improvement Plan (3–5 actions)
+    ws.merge_range(row_idx, 0, row_idx, 6, 'Priority Actions — Technical Business Improvement Plan (3–5 actions)', fmt_section_hdr)
+    row_idx += 1
+    ws.write(row_idx, 0, '#', fmt_tbl_hdr_c)
+    ws.write(row_idx, 1, 'Priority Action', fmt_tbl_hdr)
+    ws.write(row_idx, 2, 'Linked Category', fmt_tbl_hdr)
+    ws.write(row_idx, 3, 'Owner (BGE)', fmt_tbl_hdr)
+    ws.write(row_idx, 4, 'Timeline', fmt_tbl_hdr_c)
+    ws.write(row_idx, 5, 'Expected Outcome', fmt_tbl_hdr)
+    ws.write(row_idx, 6, 'Status', fmt_tbl_hdr_c)
+    row_idx += 1
+
+    actions_list = plan.priority_actions or []
+    if not actions_list:
+        actions_list = [{'id': i+1, 'action': '', 'category': '', 'owner': plan.bge.name if plan.bge else '', 'timeline': '', 'outcome': '', 'status': 'Pending'} for i in range(3)]
+
+    for idx, act in enumerate(actions_list):
+        ws.write(row_idx, 0, str(act.get('id', idx + 1)), fmt_cell_center)
+        ws.write(row_idx, 1, act.get('action', act.get('priority_action', '')), fmt_cell)
+        ws.write(row_idx, 2, act.get('category', act.get('linked_category', '')), fmt_cell)
+        ws.write(row_idx, 3, act.get('owner', act.get('owner_bge', '')), fmt_cell)
+        ws.write(row_idx, 4, act.get('timeline', ''), fmt_cell_center)
+        ws.write(row_idx, 5, act.get('outcome', act.get('expected_outcome', '')), fmt_cell)
+        ws.write(row_idx, 6, act.get('status', 'Pending'), fmt_cell_center)
+        row_idx += 1
+
+    row_idx += 1
+    # Section 4: Sign-offs
+    ws.write(row_idx, 0, 'BGE Sign-off:', fmt_meta_label)
+    ws.write(row_idx, 1, plan.bge_sign_off_name or (plan.bge.name if plan.bge_signed else '—'), fmt_meta_val)
+    ws.write(row_idx, 2, 'Date:', fmt_meta_label)
+    ws.write(row_idx, 3, str(plan.bge_signed_at or '—'), fmt_meta_val)
+    row_idx += 1
+
+    ws.write(row_idx, 0, 'Head of Assignment Approval:', fmt_meta_label)
+    ws.write(row_idx, 1, plan.hoa_sign_off_name or (plan.hoa_approved_by.get_full_name() if plan.hoa_approved_by else '—'), fmt_meta_val)
+    ws.write(row_idx, 2, 'Date:', fmt_meta_label)
+    ws.write(row_idx, 3, str(plan.hoa_approved_at or '—'), fmt_meta_val)
+
+    wb.close()
+    buf.seek(0)
+    return buf.getvalue()
+
