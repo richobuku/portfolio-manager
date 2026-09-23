@@ -288,28 +288,29 @@ def extract_survey_row(row, headers):
     )
 
 
-import os
-
 # ── Command ───────────────────────────────────────────────────────────────────
 
 class Command(BaseCommand):
     help = 'Import PRUDEV II diagnostic baseline data and match with DB MSMEs'
 
     def add_arguments(self, parser):
-        parser.add_argument('excel_path', nargs='?', default=None, help='Path to the diagnostics Excel file')
+        parser.add_argument('excel_path', help='Path to the diagnostics Excel file')
         parser.add_argument('--cohort', default='Cohort 1',
                             help='Cohort name to assign (e.g. "Cohort 1", "Cohort 2")')
         parser.add_argument('--create-missing', action='store_true',
                             help='Create new MSME records for diagnostic entries not already in the DB')
-        parser.add_argument('--auto', action='store_true',
-                            help='Automatically import both bundled Cohort 1 and Cohort 2 diagnostic datasets')
         parser.add_argument('--dry-run', action='store_true',
                             help='Show matches without writing anything')
         parser.add_argument('--snapshot-date', default=None,
                             help='ISO date YYYY-MM-DD for the baseline snapshot (default: today)')
 
     def handle(self, *args, **options):
-        snap_date = options['snapshot_date']
+        path           = options['excel_path']
+        cohort_arg     = options['cohort']
+        create_missing = options['create_missing']
+        dry_run        = options['dry_run']
+        snap_date      = options['snapshot_date']
+
         if snap_date:
             try:
                 snap_date = date.fromisoformat(snap_date)
@@ -318,36 +319,6 @@ class Command(BaseCommand):
         else:
             snap_date = date.today()
 
-        auto_mode = options['auto'] or options['excel_path'] is None
-
-        if auto_mode:
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            data_dir = os.path.join(base_dir, 'data', 'diagnostics')
-            c1_path = os.path.join(data_dir, 'cohort_1_diagnostics.xlsx')
-            c2_path = os.path.join(data_dir, 'cohort_2_diagnostics.xlsx')
-
-            if os.path.exists(c1_path):
-                self.stdout.write(self.style.MIGRATE_HEADING('=== Ingesting Cohort 1 Diagnostics ==='))
-                self._import_file(c1_path, 'Cohort 1', create_missing=False, dry_run=options['dry_run'], snap_date=snap_date)
-            else:
-                self.stdout.write(self.style.WARNING(f'Cohort 1 file not found at {c1_path}'))
-
-            if os.path.exists(c2_path):
-                self.stdout.write(self.style.MIGRATE_HEADING('\n=== Ingesting Cohort 2 Diagnostics ==='))
-                self._import_file(c2_path, 'Cohort 2', create_missing=True, dry_run=options['dry_run'], snap_date=snap_date)
-            else:
-                self.stdout.write(self.style.WARNING(f'Cohort 2 file not found at {c2_path}'))
-            return
-
-        self._import_file(
-            options['excel_path'],
-            options['cohort'],
-            create_missing=options['create_missing'],
-            dry_run=options['dry_run'],
-            snap_date=snap_date
-        )
-
-    def _import_file(self, path, cohort_arg, create_missing, dry_run, snap_date):
         self.stdout.write(f'Loading {path} …')
         try:
             wb = openpyxl.load_workbook(path, data_only=True)
@@ -574,27 +545,25 @@ class Command(BaseCommand):
             new_msme.save()
             created_count += 1
 
-            MSMEGrowthSnapshot.objects.update_or_create(
+            MSMEGrowthSnapshot.objects.create(
                 msme                = new_msme,
+                snapshot_date       = snap_date,
                 source              = 'diagnostic',
-                defaults            = dict(
-                    snapshot_date       = snap_date,
-                    collected_by        = None,
-                    annual_turnover     = d['annual_revenue'],
-                    employees_ft_male   = d['ft_male'],
-                    employees_ft_female = d['ft_female'],
-                    employees_ft_youth  = d['ft_youth'],
-                    employees_pt_male   = d['pt_male'],
-                    employees_pt_female = d['pt_female'],
-                    has_tin             = d['has_tin'],
-                    has_unbs            = d['has_unbs'],
-                    has_ursb            = d['has_ursb'],
-                    has_business_bank   = d['has_business_bank'],
-                    has_mobile_money    = d['has_mobile_money'],
-                    digitalization_score= d['digitalization_score'],
-                    digital_tools       = d['digital_tools'],
-                    notes               = f'Baseline diagnostic imported for newly registered {cohort_arg} enterprise',
-                )
+                collected_by        = None,
+                annual_turnover     = d['annual_revenue'],
+                employees_ft_male   = d['ft_male'],
+                employees_ft_female = d['ft_female'],
+                employees_ft_youth  = d['ft_youth'],
+                employees_pt_male   = d['pt_male'],
+                employees_pt_female = d['pt_female'],
+                has_tin             = d['has_tin'],
+                has_unbs            = d['has_unbs'],
+                has_ursb            = d['has_ursb'],
+                has_business_bank   = d['has_business_bank'],
+                has_mobile_money    = d['has_mobile_money'],
+                digitalization_score= d['digitalization_score'],
+                digital_tools       = d['digital_tools'],
+                notes               = f'Baseline diagnostic imported for newly registered {cohort_arg} enterprise',
             )
             snapshots_count += 1
 

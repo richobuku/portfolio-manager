@@ -18,165 +18,352 @@ from ..models import MSME, Cohort, MSMEGrowthSnapshot, MSMEReport
 from .mixins import ViewerReadOnlyMixin, _managed_groups, _is_viewer
 
 
-def get_answer(data, snippet):
-    if not data:
-        return None
-    snip = snippet.lower()
-    for k, v in data.items():
-        if snip in k.lower():
-            return v
-    return None
-
-
-def is_yes(val):
-    if val is None:
-        return False
-    s = str(val).strip().lower()
-    return s in ('yes', 'true', '1', 'y', 'always', 'regularly') or s.startswith('yes')
-
-
-def calc_pct(msmes, snippet):
-    if not msmes:
-        return 0.0
-    cnt = sum(1 for m in msmes if is_yes(get_answer(m.diagnostic_data, snippet)))
-    return round(cnt / len(msmes) * 100, 1)
-
-
-def extract_deep_metrics(msmes, total_count):
-    if not total_count or not msmes:
+def build_diagnostic_metrics(qs):
+    """
+    Computes a comprehensive, multi-dimensional analysis from diagnostic data
+    and MSME baseline records.
+    """
+    total = qs.count()
+    if total == 0:
         return {
-            'financial_health': {},
-            'decent_work': {},
-            'technology_digital': {},
-            'environmental_sustainability': {},
-            'quality_and_standards': {},
-            'capacity_demand_tracks': {},
+            'total_assessed': 0,
+            'workforce': {'total_baseline_jobs': 0, 'ft_male': 0, 'ft_female': 0, 'ft_youth': 0, 'pt_total': 0, 'female_share_pct': 0, 'youth_share_pct': 0},
+            'formalization': {'has_tin_pct': 0, 'has_unbs_pct': 0, 'has_bank_pct': 0, 'has_mobile_money_pct': 0, 'has_brand_logo_pct': 0, 'has_trademark_pct': 0, 'has_association_pct': 0},
+            'financial_health': {'profit_breakdown': {}, 'avg_monthly_profit': 0, 'revenue_trend': {}, 'cost_trend': {}, 'bookkeeping': {}, 'audited_pct': 0, 'loan_applied_pct': 0, 'loan_outstanding_pct': 0, 'cash_reserves_pct': 0, 'reserves_duration': {}},
+            'operations_quality': {'unbs_pct': 0, 'qc_measures_pct': 0, 'food_health_pct': 0, 'hsseq_pct': 0, 'innovation_2yr_pct': 0, 'meets_demand_pct': 0},
+            'digitalization': {'avg_score': 0, 'score_distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}, 'has_it_staff_pct': 0, 'social_media_pct': 0, 'social_platforms': {}, 'digital_payments_pct': 0, 'cloud_storage_pct': 0, 'data_decision_pct': 0},
+            'green': {'green_count': 0, 'green_pct': 0, 'categories': {}, 'env_plan_pct': 0, 'resource_monitor_pct': 0, 'waste_systems_pct': 0},
+            'governance': {'legal_forms': {}, 'owner_gender': {'male': 0, 'female': 0}},
+            'capacity_needs': {},
+            'districts': [],
+            'sectors': [],
+            'financials': {'total_annual_revenue': 0, 'avg_annual_revenue': 0},
         }
 
-    # Financial Health & Credit Access
-    applied_loans = calc_pct(msmes, 'applied for a business loan in the past 3 years')
-    successful_loans = calc_pct(msmes, 'SUCCESSFUL')
-    outstanding_loans = calc_pct(msmes, 'outstanding business loan')
-    crb_card = calc_pct(msmes, 'financial card issued by the CRB')
-    audited_records = calc_pct(msmes, 'records audited/checked every year')
-    statutory_tax = calc_pct(msmes, 'statutory tax returns')
-    cash_reserves = calc_pct(msmes, 'cash reserves aside to keep business afloat')
-    suppliers_ontime = calc_pct(msmes, 'pay its suppliers on time')
-    employees_ontime = calc_pct(msmes, 'pay its employees according to agreed payment')
+    # Workforce
+    ft_male = sum(m.diag_employees_ft_male or 0 for m in qs)
+    ft_female = sum(m.diag_employees_ft_female or 0 for m in qs)
+    ft_youth = sum(m.diag_employees_ft_youth or 0 for m in qs)
+    pt_total = sum(m.diag_employees_pt_total or 0 for m in qs)
+    tot_jobs = ft_male + ft_female + pt_total
+    f_share = round((ft_female / (ft_male + ft_female) * 100), 1) if (ft_male + ft_female) > 0 else 0
+    y_share = round((ft_youth / (ft_male + ft_female) * 100), 1) if (ft_male + ft_female) > 0 else 0
 
-    # Decent Work, HR & Social Protection
-    written_contracts = calc_pct(msmes, 'written employment contracts')
-    harassment_policy = calc_pct(msmes, 'protect workers from harassment')
-    grievance_mechanism = calc_pct(msmes, 'mechanisms for employees to complain')
-    protective_wear = calc_pct(msmes, 'protective wear')
-    vacation_leave = calc_pct(msmes, 'entitled to leave/vacation')
-    sick_leave = calc_pct(msmes, 'entitled to sick leave')
-    nssf = calc_pct(msmes, 'NSSF contributions')
-    health_insurance = calc_pct(msmes, 'health insurance')
-    pwd_provisions = calc_pct(msmes, 'provisions been made for employment of persons with disability')
+    # Counters and Accumulators
+    profit_counts = Counter()
+    monthly_profits = []
+    rev_trend = Counter()
+    cost_trend = Counter()
+    bookkeeping = Counter()
+    audited = 0
+    loan_app = 0
+    loan_out = 0
+    cash_res = 0
+    res_dur = Counter()
 
-    # Technology & Digitalization
-    dedicated_it = calc_pct(msmes, 'person in charge of IT/digitisation')
-    internet_conn = calc_pct(msmes, 'internet dedicated for business')
-    computer_hardware = calc_pct(msmes, 'computer related hardware')
-    digital_payments = calc_pct(msmes, 'digital payments using either a bank')
-    momo_bank_accept = calc_pct(msmes, 'allow customers to pay it using a bank account or mobile money')
-    cloud_storage = calc_pct(msmes, 'internet based storage')
-    social_media = calc_pct(msmes, 'social media to promote')
-    online_sales = calc_pct(msmes, 'purchased or sold any good or services online')
-    inventory_software = calc_pct(msmes, 'supply chain or inventory')
+    unbs = 0
+    qc_in_place = 0
+    food_health = 0
+    hsseq = 0
+    innov_2yr = 0
+    meets_demand = 0
+    brand_logo = 0
+    trademark = 0
+    assoc = 0
+    legal_forms = Counter()
 
-    # Environmental Sustainability & Green
-    env_plan = calc_pct(msmes, 'environmental management plan')
-    env_permits = calc_pct(msmes, 'environmental permits/licenses')
-    resource_monitoring = calc_pct(msmes, 'monitor its use of resources')
-    resource_efficiency = calc_pct(msmes, 'improve resource efficiency')
-    waste_reduction = calc_pct(msmes, 'reduce waste generation')
-    pollution_control = calc_pct(msmes, 'reduce pollution and environmental')
+    it_person = 0
+    social_media = 0
+    social_plats = Counter()
+    cloud_store = 0
+    data_decisions = 0
+    digital_pay = 0
 
-    # Quality & Standards
-    meets_demand = calc_pct(msmes, 'produce to meet the current market demand')
-    has_logo = calc_pct(msmes, 'have a brand logo')
-    ursb_trademark = calc_pct(msmes, 'trademark registered wsith URSB')
-    unbs_cert = calc_pct(msmes, 'from Uganda National Bureau of Standards')
-    food_health_cert = calc_pct(msmes, 'received health certificate')
-    cert_of_origin = calc_pct(msmes, 'certificate of origin')
-    quality_control = calc_pct(msmes, 'quality control measures')
+    env_plan = 0
+    resource_mon = 0
+    waste_sys = 0
+    green_cats = Counter()
+    cap_needs = Counter()
 
-    # Capacity Development Demand Interest
-    cap_market = calc_pct(msmes, 'related to market development')
-    cap_decent = calc_pct(msmes, 'related to decent working conditions')
-    cap_tech = calc_pct(msmes, 'related to technology and digitalizat')
-    cap_env = calc_pct(msmes, 'related to environmental sustainabili')
-    cap_reg = calc_pct(msmes, 'regarding regulatory compliance')
-    cap_qa = calc_pct(msmes, 'regarding quality assurance')
+    male_owners = 0
+    female_owners = 0
+
+    valid_revs = []
+
+    for m in qs:
+        d = m.diagnostic_data or {}
+
+        if m.annual_revenue:
+            try:
+                valid_revs.append(float(m.annual_revenue))
+            except Exception:
+                pass
+
+        if m.diag_monthly_profit:
+            try:
+                monthly_profits.append(float(m.diag_monthly_profit))
+            except Exception:
+                pass
+
+        # Owner Gender
+        o_sex = (m.diag_owner_sex or d.get('Sex of main founder/owner: add N/A and not known if shareholders are not persons. Separate founder from current owner') or '').strip().lower()
+        if o_sex in ['female', 'f']:
+            female_owners += 1
+        elif o_sex in ['male', 'm']:
+            male_owners += 1
+
+        # Profit status
+        p = d.get('Considering all sources of income in the past 12 months, did your business generate a profit') or m.diag_profit_status
+        if p:
+            p_clean = 'Profitable' if 'yes' in str(p).lower() else ('Loss / Break-even' if 'no' in str(p).lower() else str(p).strip())
+            profit_counts[p_clean] += 1
+
+        # Trends
+        rt = d.get('Overall, how has business revenue/turnover changed in the past 12 months?')
+        if rt:
+            rev_trend[str(rt).strip()] += 1
+
+        ct = d.get('Overall, how did the costs develop over the past 12 months?')
+        if ct:
+            cost_trend[str(ct).strip()] += 1
+
+        # Books
+        bk = d.get('Does the business keep financial accounts?')
+        if bk:
+            bk_str = str(bk).strip()
+            if 'electronically' in bk_str.lower():
+                bookkeeping['Electronic Software'] += 1
+            elif 'paper' in bk_str.lower():
+                bookkeeping['Manual / Paper Books'] += 1
+            elif 'no' in bk_str.lower():
+                bookkeeping['No Formal Records'] += 1
+            else:
+                bookkeeping[bk_str] += 1
+
+        aud = d.get('If yes, are your financial records audited/checked every year by an accredited accountant?')
+        if aud and 'yes' in str(aud).lower():
+            audited += 1
+
+        # Loan
+        lapp = d.get('Have you applied for a business loan in the past 3 years, including from individuals?  (NOTE: NOT FOR PERSONAL OR HOUSEHOLD USE. ONLY FOR PURPOSES OF THE BUSINESS)')
+        if lapp and 'yes' in str(lapp).lower():
+            loan_app += 1
+
+        lout = d.get('Do you have an outstanding business loan?')
+        if lout and 'yes' in str(lout).lower():
+            loan_out += 1
+
+        # Cash reserves
+        cres = d.get('Does the business have cash reserves aside to keep business afloat in case of a crisis?')
+        if cres and 'yes' in str(cres).lower():
+            cash_res += 1
+
+        cdur = d.get('If YES, how long would these cash reserves be able to keep your business afloat in case of a major economic crisis?')
+        if cdur:
+            res_dur[str(cdur).strip()] += 1
+
+        # Quality & Operations
+        if m.diag_has_unbs:
+            unbs += 1
+
+        qc = d.get('What quality control measures does the business have?')
+        if qc and str(qc).strip().lower() not in ['none', 'no', 'n/a', '']:
+            qc_in_place += 1
+
+        fh = d.get('If the business is into food processing, has the business received health certificate for any of its products')
+        if fh and 'yes' in str(fh).lower():
+            food_health += 1
+
+        hsq = d.get('Is the MSME familiar with the legal aspects in HSSEQ? Kindly define Health, Safety, Security, Environment & Quality (HSSEQ)')
+        if hsq and 'yes' in str(hsq).lower():
+            hsseq += 1
+
+        inv = d.get('During the last two years, has the business introduced any new or significantly improved processes or product/service offering? (e.g. methods of manufacturing products/offering services, logistics...')
+        if inv and 'yes' in str(inv).lower():
+            innov_2yr += 1
+
+        md = d.get('Is the business able to produce to meet the current market demand for your products/service?')
+        if md and 'yes' in str(md).lower():
+            meets_demand += 1
+
+        bl = d.get('Do you have a brand logo?')
+        if bl and 'yes' in str(bl).lower():
+            brand_logo += 1
+
+        tm = d.get('Do you have a  trademark registered wsith URSB?')
+        if tm and 'yes' in str(tm).lower():
+            trademark += 1
+
+        ass = d.get('Is this business affiliated to any association (such as UMA; USSIA, FSME, PSFU, UNFFE, BDSPN, UNEDI, Coop360 Network etc)')
+        if ass and 'yes' in str(ass).lower():
+            assoc += 1
+
+        lf = d.get('Legal form of business')
+        if lf:
+            lf_str = str(lf).strip()
+            if 'shares' in lf_str.lower() or 'limited by shares' in lf_str.lower():
+                legal_forms['Limited by Shares'] += 1
+            elif 'guarantee' in lf_str.lower():
+                legal_forms['Limited by Guarantee'] += 1
+            elif 'sole' in lf_str.lower():
+                legal_forms['Sole Proprietorship'] += 1
+            elif 'partnership' in lf_str.lower():
+                legal_forms['Partnership'] += 1
+            elif 'cooperative' in lf_str.lower():
+                legal_forms['Cooperative'] += 1
+            else:
+                legal_forms[lf_str] += 1
+
+        # Digital
+        itp = d.get('Does the   business have a person in charge of IT/digitisation?')
+        if itp and 'yes' in str(itp).lower():
+            it_person += 1
+
+        sm = d.get('Does the business use social media to promote its products/services?')
+        if sm and 'yes' in str(sm).lower():
+            social_media += 1
+
+        smp = d.get('Which social media platform do you use?')
+        if smp:
+            for p_item in str(smp).replace(';', ',').split(','):
+                p_clean = p_item.strip()
+                if p_clean and p_clean.lower() not in ['none', 'no']:
+                    social_plats[p_clean.capitalize()] += 1
+
+        cs = d.get('Does the business use internet based storage to keep the data?')
+        if cs and 'yes' in str(cs).lower():
+            cloud_store += 1
+
+        dd = d.get('Does the business store and refer to data to inform decision making?')
+        if dd and 'yes' in str(dd).lower():
+            data_decisions += 1
+
+        dp = d.get('Does the business make or receive digital payments using either a bank account or mobile money')
+        if dp and 'yes' in str(dp).lower():
+            digital_pay += 1
+
+        # Environment
+        ep = d.get('Does the MSME have an environmental management plan to address the impacts? Eg. how to reduce the business\' negative impact on the environment')
+        if ep and 'yes' in str(ep).lower():
+            env_plan += 1
+
+        rm = d.get('Does the business monitor its use of resources such as water, energy, soil, land, trees etc?')
+        if rm and 'yes' in str(rm).lower():
+            resource_mon += 1
+
+        ws = d.get('Has the business put in place systems to reduce waste generation and manage waste?')
+        if ws and 'yes' in str(ws).lower():
+            waste_sys += 1
+
+        if m.diag_green_categories:
+            for gc in m.diag_green_categories:
+                green_cats[gc] += 1
+
+        if m.diag_capacity_needs:
+            for cn in m.diag_capacity_needs:
+                cap_needs[cn] += 1
+
+    # Digital score distribution
+    scores = [m.diag_digitalization_score for m in qs if m.diag_digitalization_score]
+    avg_digital_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+    score_dist = {i: scores.count(i) for i in range(1, 6)}
+
+    # Formalization counts
+    has_tin_count = qs.filter(diag_has_tin=True).count()
+    has_bank_count = qs.filter(diag_has_business_bank=True).count()
+    has_momo_count = qs.filter(diag_has_mobile_money=True).count()
+    green_msmes_count = qs.filter(diag_is_green_business=True).count()
+
+    total_ann_rev = sum(valid_revs)
+    avg_ann_rev = round(total_ann_rev / len(valid_revs), 2) if valid_revs else 0
+    avg_mo_prof = round(sum(monthly_profits) / len(monthly_profits), 2) if monthly_profits else 0
+
+    district_counts = qs.values('district').annotate(count=Count('id')).order_by('-count')[:12]
+    sector_counts = qs.values('sector').annotate(count=Count('id')).order_by('-count')
 
     return {
+        'total_assessed': total,
+        'workforce': {
+            'total_baseline_jobs': tot_jobs,
+            'ft_male': ft_male,
+            'ft_female': ft_female,
+            'ft_youth': ft_youth,
+            'pt_total': pt_total,
+            'female_share_pct': f_share,
+            'youth_share_pct': y_share,
+        },
+        'formalization': {
+            'has_tin_count': has_tin_count,
+            'has_tin_pct': round((has_tin_count / total * 100), 1),
+            'has_unbs_count': unbs,
+            'has_unbs_pct': round((unbs / total * 100), 1),
+            'has_bank_count': has_bank_count,
+            'has_bank_pct': round((has_bank_count / total * 100), 1),
+            'has_mobile_money_count': has_momo_count,
+            'has_mobile_money_pct': round((has_momo_count / total * 100), 1),
+            'has_brand_logo_pct': round((brand_logo / total * 100), 1),
+            'has_trademark_pct': round((trademark / total * 100), 1),
+            'has_association_pct': round((assoc / total * 100), 1),
+        },
         'financial_health': {
-            'loans_applied_pct': applied_loans,
-            'loans_successful_pct': successful_loans,
-            'outstanding_loans_pct': outstanding_loans,
-            'crb_card_pct': crb_card,
-            'audited_accounts_pct': audited_records,
-            'statutory_tax_pct': statutory_tax,
-            'cash_reserves_pct': cash_reserves,
-            'suppliers_ontime_pct': suppliers_ontime,
-            'employees_ontime_pct': employees_ontime,
+            'profit_breakdown': dict(profit_counts),
+            'avg_monthly_profit': avg_mo_prof,
+            'revenue_trend': dict(rev_trend),
+            'cost_trend': dict(cost_trend),
+            'bookkeeping': dict(bookkeeping),
+            'audited_pct': round((audited / total * 100), 1),
+            'loan_applied_pct': round((loan_app / total * 100), 1),
+            'loan_outstanding_pct': round((loan_out / total * 100), 1),
+            'cash_reserves_pct': round((cash_res / total * 100), 1),
+            'reserves_duration': dict(res_dur),
         },
-        'decent_work': {
-            'written_contracts_pct': written_contracts,
-            'harassment_policy_pct': harassment_policy,
-            'grievance_mechanism_pct': grievance_mechanism,
-            'protective_wear_pct': protective_wear,
-            'vacation_leave_pct': vacation_leave,
-            'sick_leave_pct': sick_leave,
-            'nssf_pct': nssf,
-            'health_insurance_pct': health_insurance,
-            'pwd_provisions_pct': pwd_provisions,
+        'operations_quality': {
+            'unbs_pct': round((unbs / total * 100), 1),
+            'qc_measures_pct': round((qc_in_place / total * 100), 1),
+            'food_health_pct': round((food_health / total * 100), 1),
+            'hsseq_pct': round((hsseq / total * 100), 1),
+            'innovation_2yr_pct': round((innov_2yr / total * 100), 1),
+            'meets_demand_pct': round((meets_demand / total * 100), 1),
         },
-        'technology_digital': {
-            'dedicated_it_pct': dedicated_it,
-            'internet_connectivity_pct': internet_conn,
-            'computer_hardware_pct': computer_hardware,
-            'accepts_digital_payments_pct': digital_payments,
-            'momo_bank_accept_pct': momo_bank_accept,
-            'cloud_storage_pct': cloud_storage,
-            'social_media_pct': social_media,
-            'online_sales_pct': online_sales,
-            'inventory_software_pct': inventory_software,
+        'digitalization': {
+            'avg_score': avg_digital_score,
+            'score_distribution': score_dist,
+            'has_it_staff_pct': round((it_person / total * 100), 1),
+            'social_media_pct': round((social_media / total * 100), 1),
+            'social_platforms': dict(social_plats.most_common(6)),
+            'digital_payments_pct': round((digital_pay / total * 100), 1),
+            'cloud_storage_pct': round((cloud_store / total * 100), 1),
+            'data_decision_pct': round((data_decisions / total * 100), 1),
         },
-        'environmental_sustainability': {
-            'env_plan_pct': env_plan,
-            'env_permits_pct': env_permits,
-            'resource_monitoring_pct': resource_monitoring,
-            'resource_efficiency_pct': resource_efficiency,
-            'waste_reduction_pct': waste_reduction,
-            'pollution_control_pct': pollution_control,
+        'green': {
+            'green_count': green_msmes_count,
+            'green_pct': round((green_msmes_count / total * 100), 1),
+            'categories': dict(green_cats.most_common(10)),
+            'env_plan_pct': round((env_plan / total * 100), 1),
+            'resource_monitor_pct': round((resource_mon / total * 100), 1),
+            'waste_systems_pct': round((waste_sys / total * 100), 1),
         },
-        'quality_and_standards': {
-            'meets_demand_pct': meets_demand,
-            'has_brand_logo_pct': has_logo,
-            'ursb_trademark_pct': ursb_trademark,
-            'unbs_cert_pct': unbs_cert,
-            'food_health_cert_pct': food_health_cert,
-            'cert_of_origin_pct': cert_of_origin,
-            'quality_control_pct': quality_control,
+        'governance': {
+            'legal_forms': dict(legal_forms),
+            'owner_gender': {
+                'male': male_owners,
+                'female': female_owners,
+            },
         },
-        'capacity_demand_tracks': {
-            'market_development_pct': cap_market,
-            'decent_work_pct': cap_decent,
-            'technology_digital_pct': cap_tech,
-            'environmental_sustainability_pct': cap_env,
-            'regulatory_compliance_pct': cap_reg,
-            'quality_assurance_pct': cap_qa,
-        }
+        'capacity_needs': dict(cap_needs.most_common(12)),
+        'financials': {
+            'total_annual_revenue': total_ann_rev,
+            'avg_annual_revenue': avg_ann_rev,
+        },
+        'districts': list(district_counts),
+        'sectors': list(sector_counts),
     }
 
 
 class DiagnosticSummaryAnalyticsView(APIView):
     """
     Returns aggregate diagnostic baseline metrics with cohort breakdown,
-    sector & district distributions, deep multidimensional pillars, and capacity building demands.
+    sector & district distributions, and comprehensive thematic analysis.
     """
     permission_classes = [IsAuthenticated]
 
@@ -212,124 +399,20 @@ class DiagnosticSummaryAnalyticsView(APIView):
             qs = qs.filter(sector__iexact=sector_param)
 
         total_msmes = qs.count()
-        diag_msmes_qs = qs.filter(diag_imported_at__isnull=False)
-        diag_msmes = list(diag_msmes_qs)
-        total_assessed = len(diag_msmes)
+        diag_msmes = qs.filter(diag_imported_at__isnull=False)
 
         # Cohort breakdown
         cohort_counts = {}
         for c in Cohort.objects.all():
-            cnt = sum(1 for m in diag_msmes if m.cohort_id == c.id)
+            cnt = diag_msmes.filter(cohort=c).count()
             if cnt > 0:
                 cohort_counts[c.name] = cnt
 
-        # Workforce baselines
-        ft_male = sum(m.diag_employees_ft_male or 0 for m in diag_msmes)
-        ft_female = sum(m.diag_employees_ft_female or 0 for m in diag_msmes)
-        ft_youth = sum(m.diag_employees_ft_youth or 0 for m in diag_msmes)
-        pt_total = sum(m.diag_employees_pt_total or 0 for m in diag_msmes)
-        total_baseline_jobs = ft_male + ft_female + pt_total
-        female_share = round((ft_female / (ft_male + ft_female) * 100), 1) if (ft_male + ft_female) > 0 else 0
-        youth_share = round((ft_youth / (ft_male + ft_female) * 100), 1) if (ft_male + ft_female) > 0 else 0
+        res_data = build_diagnostic_metrics(diag_msmes)
+        res_data['total_msmes'] = total_msmes
+        res_data['cohort_counts'] = cohort_counts
 
-        # Formalization & Compliance
-        has_tin_count = sum(1 for m in diag_msmes if m.diag_has_tin)
-        has_unbs_count = sum(1 for m in diag_msmes if m.diag_has_unbs)
-        has_bank_count = sum(1 for m in diag_msmes if m.diag_has_business_bank)
-        has_momo_count = sum(1 for m in diag_msmes if m.diag_has_mobile_money)
-
-        tin_pct = round((has_tin_count / total_assessed * 100), 1) if total_assessed > 0 else 0
-        unbs_pct = round((has_unbs_count / total_assessed * 100), 1) if total_assessed > 0 else 0
-        bank_pct = round((has_bank_count / total_assessed * 100), 1) if total_assessed > 0 else 0
-        momo_pct = round((has_momo_count / total_assessed * 100), 1) if total_assessed > 0 else 0
-
-        # Digitalization & Innovation
-        scores = [m.diag_digitalization_score for m in diag_msmes if m.diag_digitalization_score]
-        avg_digital_score = round(sum(scores) / len(scores), 2) if scores else 0.0
-        score_dist = {i: scores.count(i) for i in range(1, 6)}
-
-        # Green & Sustainability
-        green_msmes_count = sum(1 for m in diag_msmes if m.diag_is_green_business)
-        green_pct = round((green_msmes_count / total_assessed * 100), 1) if total_assessed > 0 else 0
-
-        green_cats_counter = Counter()
-        for m in diag_msmes:
-            if m.diag_green_categories:
-                for gc in m.diag_green_categories:
-                    green_cats_counter[gc] += 1
-
-        # Capacity Development Demand
-        cap_counter = Counter()
-        for m in diag_msmes:
-            if m.diag_capacity_needs:
-                for cn in m.diag_capacity_needs:
-                    cap_counter[cn] += 1
-
-        # District distribution
-        district_counter = Counter(m.district for m in diag_msmes if m.district)
-        district_counts = [{'district': d, 'count': c} for d, c in district_counter.most_common(12)]
-
-        # Sector distribution
-        sector_counter = Counter(m.sector for m in diag_msmes if m.sector)
-        sector_counts = [{'sector': s, 'count': c} for s, c in sector_counter.most_common(10)]
-
-        # Owner Gender distribution
-        male_owners = sum(1 for m in diag_msmes if (m.diag_owner_sex or '').lower() in ('male', 'm'))
-        female_owners = sum(1 for m in diag_msmes if (m.diag_owner_sex or '').lower() in ('female', 'f'))
-
-        # Revenue estimates
-        valid_revenues = [float(m.annual_revenue) for m in diag_msmes if m.annual_revenue]
-        total_baseline_annual_rev = sum(valid_revenues)
-        avg_baseline_annual_rev = round(total_baseline_annual_rev / len(valid_revenues), 2) if valid_revenues else 0
-
-        # Deep dimensional analytics
-        deep_metrics = extract_deep_metrics(diag_msmes, total_assessed)
-
-        return Response({
-            'total_msmes': total_msmes,
-            'total_assessed': total_assessed,
-            'cohort_counts': cohort_counts,
-            'workforce': {
-                'total_baseline_jobs': total_baseline_jobs,
-                'ft_male': ft_male,
-                'ft_female': ft_female,
-                'ft_youth': ft_youth,
-                'pt_total': pt_total,
-                'female_share_pct': female_share,
-                'youth_share_pct': youth_share,
-            },
-            'formalization': {
-                'has_tin_count': has_tin_count,
-                'has_tin_pct': tin_pct,
-                'has_unbs_count': has_unbs_count,
-                'has_unbs_pct': unbs_pct,
-                'has_bank_count': has_bank_count,
-                'has_bank_pct': bank_pct,
-                'has_mobile_money_count': has_momo_count,
-                'has_mobile_money_pct': momo_pct,
-            },
-            'digitalization': {
-                'avg_score': avg_digital_score,
-                'score_distribution': score_dist,
-            },
-            'green': {
-                'green_count': green_msmes_count,
-                'green_pct': green_pct,
-                'categories': dict(green_cats_counter.most_common(10)),
-            },
-            'capacity_needs': dict(cap_counter.most_common(10)),
-            'demographics': {
-                'male_owners': male_owners,
-                'female_owners': female_owners,
-            },
-            'financials': {
-                'total_annual_revenue': total_baseline_annual_rev,
-                'avg_annual_revenue': avg_baseline_annual_rev,
-            },
-            'districts': district_counts,
-            'sectors': sector_counts,
-            'deep_analytics': deep_metrics,
-        })
+        return Response(res_data)
 
 
 class DiagnosticCohortComparisonView(APIView):
@@ -339,73 +422,15 @@ class DiagnosticCohortComparisonView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        def get_cohort_stats(cohort_query):
-            qs = MSME.objects.filter(is_active=True, diag_imported_at__isnull=False).filter(cohort__name__icontains=cohort_query)
-            msmes = list(qs)
-            count = len(msmes)
-            if count == 0:
-                return {
-                    'count': 0,
-                    'jobs_total': 0, 'jobs_female_pct': 0, 'jobs_youth_pct': 0,
-                    'tin_pct': 0, 'unbs_pct': 0, 'bank_pct': 0,
-                    'avg_digital_score': 0, 'green_pct': 0,
-                    'avg_annual_rev': 0,
-                    'capacity_needs': {},
-                    'deep_analytics': {},
-                }
+        c1_qs = MSME.objects.filter(is_active=True, diag_imported_at__isnull=False, cohort__name__icontains='1')
+        c2_qs = MSME.objects.filter(is_active=True, diag_imported_at__isnull=False, cohort__name__icontains='2')
 
-            ft_m = sum(m.diag_employees_ft_male or 0 for m in msmes)
-            ft_f = sum(m.diag_employees_ft_female or 0 for m in msmes)
-            ft_y = sum(m.diag_employees_ft_youth or 0 for m in msmes)
-            pt = sum(m.diag_employees_pt_total or 0 for m in msmes)
-            tot_jobs = ft_m + ft_f + pt
-            f_pct = round((ft_f / (ft_m + ft_f) * 100), 1) if (ft_m + ft_f) > 0 else 0
-            y_pct = round((ft_y / (ft_m + ft_f) * 100), 1) if (ft_m + ft_f) > 0 else 0
-
-            tin_pct = round((sum(1 for m in msmes if m.diag_has_tin) / count * 100), 1)
-            unbs_pct = round((sum(1 for m in msmes if m.diag_has_unbs) / count * 100), 1)
-            bank_pct = round((sum(1 for m in msmes if m.diag_has_business_bank) / count * 100), 1)
-            green_pct = round((sum(1 for m in msmes if m.diag_is_green_business) / count * 100), 1)
-
-            scores = [m.diag_digitalization_score for m in msmes if m.diag_digitalization_score]
-            avg_digital = round(sum(scores) / len(scores), 2) if scores else 0.0
-
-            revs = [float(m.annual_revenue) for m in msmes if m.annual_revenue]
-            avg_rev = round(sum(revs) / len(revs), 2) if revs else 0
-
-            cap_cnt = Counter()
-            for m in msmes:
-                if m.diag_capacity_needs:
-                    for cn in m.diag_capacity_needs:
-                        cap_cnt[cn] += 1
-
-            deep_metrics = extract_deep_metrics(msmes, count)
-
-            return {
-                'count': count,
-                'jobs_total': tot_jobs,
-                'jobs_male': ft_m,
-                'jobs_female': ft_f,
-                'jobs_female_pct': f_pct,
-                'jobs_youth': ft_y,
-                'jobs_youth_pct': y_pct,
-                'jobs_part_time': pt,
-                'tin_pct': tin_pct,
-                'unbs_pct': unbs_pct,
-                'bank_pct': bank_pct,
-                'avg_digital_score': avg_digital,
-                'green_pct': green_pct,
-                'avg_annual_rev': avg_rev,
-                'capacity_needs': dict(cap_cnt.most_common(6)),
-                'deep_analytics': deep_metrics,
-            }
-
-        c1_stats = get_cohort_stats('Cohort 1')
-        c2_stats = get_cohort_stats('Cohort 2')
+        c1_metrics = build_diagnostic_metrics(c1_qs)
+        c2_metrics = build_diagnostic_metrics(c2_qs)
 
         return Response({
-            'cohort_1': c1_stats,
-            'cohort_2': c2_stats,
+            'cohort_1': c1_metrics,
+            'cohort_2': c2_metrics,
         })
 
 
@@ -423,94 +448,84 @@ class MSMEProgressDetailView(APIView):
         # Baseline snapshot
         baseline_snap = msme.growth_snapshots.filter(source='diagnostic').order_by('snapshot_date').first()
         # Latest snapshot
-        latest_snap = msme.growth_snapshots.order_by('-snapshot_date', '-id').first()
+        latest_snap = msme.growth_snapshots.order_by('-snapshot_date').first()
 
+        # All snapshots
         snapshots = list(msme.growth_snapshots.order_by('snapshot_date').values(
-            'id', 'snapshot_date', 'source', 'annual_turnover', 'last_month_revenue',
+            'id', 'snapshot_date', 'source', 'annual_turnover', 'monthly_turnover',
             'employees_ft_male', 'employees_ft_female', 'employees_ft_youth',
-            'employees_pt_male', 'employees_pt_female',
-            'has_tin', 'has_unbs', 'has_ursb', 'has_business_bank', 'has_mobile_money',
-            'digitalization_score', 'notes'
+            'employees_pt_male', 'employees_pt_female', 'employees_ft_refugee',
+            'has_tin', 'has_ursb', 'has_business_bank', 'has_mobile_money',
+            'has_unbs', 'digitalization_score', 'is_green_business', 'notes'
         ))
 
-        # Calculate delta / progress
-        baseline_jobs = None
-        latest_jobs = None
-        jobs_growth = None
-
-        if baseline_snap:
-            baseline_jobs = (baseline_snap.employees_ft_male or 0) + (baseline_snap.employees_ft_female or 0) + (baseline_snap.employees_pt_male or 0) + (baseline_snap.employees_pt_female or 0)
-        if latest_snap:
-            latest_jobs = (latest_snap.employees_ft_male or 0) + (latest_snap.employees_ft_female or 0) + (latest_snap.employees_pt_male or 0) + (latest_snap.employees_pt_female or 0)
-        if baseline_jobs is not None and latest_jobs is not None:
-            jobs_growth = latest_jobs - baseline_jobs
+        # Recent coaching visit reports
+        visit_reports = list(msme.reports.order_by('-visit_date')[:5].values(
+            'id', 'visit_date', 'visit_type', 'coaching_focus_area', 'general_progress_assessment'
+        ))
 
         return Response({
             'msme_id': msme.id,
             'msme_code': msme.msme_code,
             'business_name': msme.business_name,
-            'cohort': msme.cohort.name if msme.cohort else None,
             'owner_name': msme.owner_name,
             'district': msme.district,
             'sector': msme.sector,
-            'status': msme.status,
-            'diag_imported_at': msme.diag_imported_at,
-            'progress': {
-                'baseline_jobs': baseline_jobs,
-                'latest_jobs': latest_jobs,
-                'jobs_growth': jobs_growth,
-                'baseline_turnover': baseline_snap.annual_turnover if baseline_snap else None,
-                'latest_turnover': latest_snap.annual_turnover if latest_snap else None,
-                'baseline_has_tin': baseline_snap.has_tin if baseline_snap else None,
-                'latest_has_tin': latest_snap.has_tin if latest_snap else None,
-                'baseline_has_unbs': baseline_snap.has_unbs if baseline_snap else None,
-                'latest_has_unbs': latest_snap.has_unbs if latest_snap else None,
-                'baseline_has_bank': baseline_snap.has_business_bank if baseline_snap else None,
-                'latest_has_bank': latest_snap.has_business_bank if latest_snap else None,
+            'cohort': msme.cohort.name if msme.cohort else None,
+            'assigned_bge': msme.assigned_bge.name if msme.assigned_bge else None,
+            'diagnostic_baseline': {
+                'imported_at': msme.diag_imported_at,
+                'digitalization_score': msme.diag_digitalization_score,
+                'monthly_profit': msme.diag_monthly_profit,
+                'profit_status': msme.diag_profit_status,
+                'capacity_needs': msme.diag_capacity_needs,
+                'green_categories': msme.diag_green_categories,
+                'diagnostic_data': msme.diagnostic_data,
             },
-            'snapshots': snapshots,
-            'diagnostic_data': msme.diagnostic_data,
+            'baseline_snapshot': {
+                'date': baseline_snap.snapshot_date if baseline_snap else None,
+                'turnover': baseline_snap.annual_turnover if baseline_snap else msme.annual_revenue,
+                'ft_jobs': ((baseline_snap.employees_ft_male or 0) + (baseline_snap.employees_ft_female or 0)) if baseline_snap else ((msme.diag_employees_ft_male or 0) + (msme.diag_employees_ft_female or 0)),
+                'youth_jobs': baseline_snap.employees_ft_youth if baseline_snap else msme.diag_employees_ft_youth,
+                'has_tin': baseline_snap.has_tin if baseline_snap else msme.diag_has_tin,
+                'has_unbs': baseline_snap.has_unbs if baseline_snap else msme.diag_has_unbs,
+                'has_bank': baseline_snap.has_business_bank if baseline_snap else msme.diag_has_business_bank,
+            } if baseline_snap or msme.diag_imported_at else None,
+            'latest_snapshot': {
+                'date': latest_snap.snapshot_date if latest_snap else None,
+                'turnover': latest_snap.annual_turnover if latest_snap else None,
+                'ft_jobs': ((latest_snap.employees_ft_male or 0) + (latest_snap.employees_ft_female or 0)) if latest_snap else None,
+                'youth_jobs': latest_snap.employees_ft_youth if latest_snap else None,
+                'has_tin': latest_snap.has_tin if latest_snap else None,
+                'has_unbs': latest_snap.has_unbs if latest_snap else None,
+                'has_bank': latest_snap.has_business_bank if latest_snap else None,
+            } if latest_snap else None,
+            'snapshots_history': snapshots,
+            'recent_visit_reports': visit_reports,
         })
 
 
 class DiagnosticExcelExportView(APIView):
     """
-    Exports the Executive Diagnostic Baseline & Progress Excel report.
+    Exports comprehensive diagnostic baseline & progress workbook as XLSX.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         from django.http import HttpResponse
         from ..excel_reports import generate_diagnostic_progress_excel
-        from datetime import datetime
-
-        user = request.user
-        qs = MSME.objects.filter(is_active=True).select_related('cohort', 'assigned_bge').prefetch_related('growth_snapshots')
-
-        group_ids = _managed_groups(user)
-        if group_ids is not None:
-            qs = qs.filter(programme_groups__in=group_ids).distinct()
-        elif not (user.is_staff or user.is_superuser or _is_viewer(user)):
-            try:
-                bge = user.bge_profile
-                qs = qs.filter(
-                    Q(assigned_bge=bge) |
-                    Q(assigned_group__members=bge) |
-                    Q(co_assigned_bges=bge)
-                ).distinct()
-            except Exception:
-                qs = qs.none()
 
         cohort_param = request.query_params.get('cohort')
+        qs = MSME.objects.filter(is_active=True, diag_imported_at__isnull=False)
         if cohort_param and cohort_param != 'all':
             qs = qs.filter(cohort__name__icontains=cohort_param)
 
-        excel_bytes = generate_diagnostic_progress_excel(qs)
+        excel_data = generate_diagnostic_progress_excel(qs)
 
-        filename = f"PRUDEV_II_Diagnostic_Progress_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filename = f"PRUDEV_MSME_Diagnostic_Progress_Report.xlsx"
         response = HttpResponse(
-            excel_bytes,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            excel_data,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
