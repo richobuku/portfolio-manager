@@ -5146,35 +5146,146 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               {/* ── Side-by-Side Cohort Comparison View ── */}
               {diagCohortFilter === 'compare' ? (
                 <Box sx={{ mb: 4 }}>
-                  <SectionLabel>Cohort 1 vs Cohort 2 Baseline Comparison</SectionLabel>
+                  <SectionLabel>Cohort 1 vs Cohort 2 Multi-Dimensional Comparison</SectionLabel>
                   <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
                     <Table size="small">
                       <TableHead sx={{ bgcolor: '#F5F5F5' }}>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Indicator / Metric</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Diagnostic Pillar / Indicator</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12, bgcolor: '#E8F5E9', color: '#1B5E20' }}>
                             Cohort 1 (Selected MSMEs)
                           </TableCell>
                           <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12, bgcolor: '#E3F2FD', color: '#0D47A1' }}>
                             Cohort 2 (Selected MSMEs)
                           </TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12 }}>Variance / Insight</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12 }}>Comparative Analysis &amp; Variance</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
+                        {/* Section 1: Portfolio & Demographics */}
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell colSpan={4} sx={{ fontWeight: 700, fontSize: 11, color: BRAND.primaryMain, textTransform: 'uppercase', py: 1 }}>
+                            1. Portfolio Overview &amp; Employment
+                          </TableCell>
+                        </TableRow>
                         {[
-                          { label: 'Enterprises Assessed', c1: `${c1.count || 0}`, c2: `${c2.count || 0}`, note: 'Diagnostic baseline coverage' },
-                          { label: 'Total Baseline Jobs', c1: `${(c1.jobs_total || 0).toLocaleString()}`, c2: `${(c2.jobs_total || 0).toLocaleString()}`, note: `Avg ${(c1.count ? (c1.jobs_total / c1.count).toFixed(1) : 0)} vs ${(c2.count ? (c2.jobs_total / c2.count).toFixed(1) : 0)} jobs/enterprise` },
-                          { label: 'Female Workforce Share (%)', c1: `${c1.jobs_female_pct || 0}%`, c2: `${c2.jobs_female_pct || 0}%`, note: (c2.jobs_female_pct > c1.jobs_female_pct ? '+ Higher female share in Cohort 2' : '') },
-                          { label: 'Youth Employment Share (%)', c1: `${c1.jobs_youth_pct || 0}%`, c2: `${c2.jobs_youth_pct || 0}%`, note: `${c1.jobs_youth || 0} vs ${c2.jobs_youth || 0} youth employed` },
-                          { label: 'URA Tax ID (TIN) Registered', c1: `${c1.tin_pct || 0}%`, c2: `${c2.tin_pct || 0}%`, note: `${c1.tin_pct > c2.tin_pct ? 'Cohort 1 significantly more tax formalized' : ''}` },
-                          { label: 'UNBS Certified Products', c1: `${c1.unbs_pct || 0}%`, c2: `${c2.unbs_pct || 0}%`, note: 'Formal standards certification' },
-                          { label: 'Dedicated Business Bank Account', c1: `${c1.bank_pct || 0}%`, c2: `${c2.bank_pct || 0}%`, note: 'Banking inclusion baseline' },
-                          { label: 'Average Digitalization Score (1–5)', c1: `${c1.avg_digital_score || 0}`, c2: `${c2.avg_digital_score || 0}`, note: 'Self-rated digital adoption' },
-                          { label: 'Green Business Classification', c1: `${c1.green_pct || 0}%`, c2: `${c2.green_pct || 0}%`, note: 'GIZ green definition match' },
+                          { label: 'Enterprises Assessed', c1: `${c1.count || 0}`, c2: `${c2.count || 0}`, note: 'Diagnostic baseline sample size' },
+                          { label: 'Total Baseline Jobs Created/Maintained', c1: `${(c1.jobs_total || 0).toLocaleString()}`, c2: `${(c2.jobs_total || 0).toLocaleString()}`, note: `Avg ${(c1.count ? (c1.jobs_total / c1.count).toFixed(1) : 0)} vs ${(c2.count ? (c2.jobs_total / c2.count).toFixed(1) : 0)} jobs/enterprise` },
+                          { label: 'Female Workforce Share (%)', c1: `${c1.jobs_female_pct || 0}%`, c2: `${c2.jobs_female_pct || 0}%`, note: (c2.jobs_female_pct > c1.jobs_female_pct ? '+ Higher female workforce representation in Cohort 2' : '') },
+                          { label: 'Youth Employment Share (%)', c1: `${c1.jobs_youth_pct || 0}%`, c2: `${c2.jobs_youth_pct || 0}%`, note: `${c1.jobs_youth || 0} vs ${c2.jobs_youth || 0} youth jobs supported` },
+                          { label: 'Average Self-Reported Annual Revenue (UGX)', c1: `${((c1.avg_annual_rev || 0) / 1000000).toFixed(1)}M`, c2: `${((c2.avg_annual_rev || 0) / 1000000).toFixed(1)}M`, note: 'Baseline financial scale' },
                         ].map((row, idx) => (
-                          <TableRow key={idx} hover sx={idx % 2 === 1 ? { bgcolor: '#FAFAFA' } : {}}>
-                            <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{row.label}</TableCell>
+                          <TableRow key={`p1-${idx}`} hover>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 500 }}>{row.label}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c1}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c2}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.note || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+
+                        {/* Section 2: Financial Health & Credit Access */}
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell colSpan={4} sx={{ fontWeight: 700, fontSize: 11, color: '#D97706', textTransform: 'uppercase', py: 1 }}>
+                            2. Financial Health &amp; Credit Access
+                          </TableCell>
+                        </TableRow>
+                        {[
+                          { label: 'Applied for Business Loan (Past 3 Years)', c1: `${c1.deep_analytics?.financial_health?.loans_applied_pct || 0}%`, c2: `${c2.deep_analytics?.financial_health?.loans_applied_pct || 0}%`, note: 'Credit market engagement' },
+                          { label: 'CRB Financial Card Ownership', c1: `${c1.deep_analytics?.financial_health?.crb_card_pct || 0}%`, c2: `${c2.deep_analytics?.financial_health?.crb_card_pct || 0}%`, note: 'Credit reference bureau linkage' },
+                          { label: 'Annual Audited Financial Records', c1: `${c1.deep_analytics?.financial_health?.audited_accounts_pct || 0}%`, c2: `${c2.deep_analytics?.financial_health?.audited_accounts_pct || 0}%`, note: 'External accounting verification' },
+                          { label: 'Statutory Tax Returns Filed (URA)', c1: `${c1.deep_analytics?.financial_health?.statutory_tax_pct || 0}%`, c2: `${c2.deep_analytics?.financial_health?.statutory_tax_pct || 0}%`, note: 'Fiscal compliance' },
+                          { label: 'Emergency Cash Reserves Available', c1: `${c1.deep_analytics?.financial_health?.cash_reserves_pct || 0}%`, c2: `${c2.deep_analytics?.financial_health?.cash_reserves_pct || 0}%`, note: 'Liquidity buffer / resilience' },
+                          { label: 'Dedicated Business Bank Account', c1: `${c1.bank_pct || 0}%`, c2: `${c2.bank_pct || 0}%`, note: 'Banking inclusion baseline' },
+                        ].map((row, idx) => (
+                          <TableRow key={`p2-${idx}`} hover>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 500 }}>{row.label}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c1}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c2}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.note || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+
+                        {/* Section 3: Decent Work & HR Conditions */}
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell colSpan={4} sx={{ fontWeight: 700, fontSize: 11, color: '#8E24AA', textTransform: 'uppercase', py: 1 }}>
+                            3. Decent Work &amp; Human Resources
+                          </TableCell>
+                        </TableRow>
+                        {[
+                          { label: 'Written Employment Contracts', c1: `${c1.deep_analytics?.decent_work?.written_contracts_pct || 0}%`, c2: `${c2.deep_analytics?.decent_work?.written_contracts_pct || 0}%`, note: 'Contractual job security' },
+                          { label: 'Worker Anti-Harassment Safeguards', c1: `${c1.deep_analytics?.decent_work?.harassment_policy_pct || 0}%`, c2: `${c2.deep_analytics?.decent_work?.harassment_policy_pct || 0}%`, note: 'Workplace safety & dignity' },
+                          { label: 'Employee Grievance Mechanisms', c1: `${c1.deep_analytics?.decent_work?.grievance_mechanism_pct || 0}%`, c2: `${c2.deep_analytics?.decent_work?.grievance_mechanism_pct || 0}%`, note: 'Worker feedback channels' },
+                          { label: 'Protective Wear & Equipment (PPE)', c1: `${c1.deep_analytics?.decent_work?.protective_wear_pct || 0}%`, c2: `${c2.deep_analytics?.decent_work?.protective_wear_pct || 0}%`, note: 'Occupational health & safety' },
+                          { label: 'Entitled to Vacation / Annual Leave', c1: `${c1.deep_analytics?.decent_work?.vacation_leave_pct || 0}%`, c2: `${c2.deep_analytics?.decent_work?.vacation_leave_pct || 0}%`, note: 'Labor rights compliance' },
+                          { label: 'NSSF Social Security Contributions', c1: `${c1.deep_analytics?.decent_work?.nssf_pct || 0}%`, c2: `${c2.deep_analytics?.decent_work?.nssf_pct || 0}%`, note: 'Social protection' },
+                          { label: 'Provisions for Persons with Disabilities (PWD)', c1: `${c1.deep_analytics?.decent_work?.pwd_provisions_pct || 0}%`, c2: `${c2.deep_analytics?.decent_work?.pwd_provisions_pct || 0}%`, note: 'Workplace accessibility' },
+                        ].map((row, idx) => (
+                          <TableRow key={`p3-${idx}`} hover>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 500 }}>{row.label}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c1}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c2}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.note || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+
+                        {/* Section 4: Technology & Digital Tools */}
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell colSpan={4} sx={{ fontWeight: 700, fontSize: 11, color: '#1E88E5', textTransform: 'uppercase', py: 1 }}>
+                            4. Technology &amp; Digitalization
+                          </TableCell>
+                        </TableRow>
+                        {[
+                          { label: 'Average Digitalization Score (1–5 scale)', c1: `${c1.avg_digital_score || 0}`, c2: `${c2.avg_digital_score || 0}`, note: 'Overall self-rated digital maturity' },
+                          { label: 'Dedicated IT / Digitalization Lead', c1: `${c1.deep_analytics?.technology_digital?.dedicated_it_pct || 0}%`, c2: `${c2.deep_analytics?.technology_digital?.dedicated_it_pct || 0}%`, note: 'Internal tech management' },
+                          { label: 'Dedicated Business Internet Connectivity', c1: `${c1.deep_analytics?.technology_digital?.internet_connectivity_pct || 0}%`, c2: `${c2.deep_analytics?.technology_digital?.internet_connectivity_pct || 0}%`, note: 'Online operational readiness' },
+                          { label: 'Accepts Digital Payments (Bank / Mobile Money)', c1: `${c1.deep_analytics?.technology_digital?.accepts_digital_payments_pct || 0}%`, c2: `${c2.deep_analytics?.technology_digital?.accepts_digital_payments_pct || 0}%`, note: 'Cashless customer transactions' },
+                          { label: 'Cloud / Internet-Based Data Storage', c1: `${c1.deep_analytics?.technology_digital?.cloud_storage_pct || 0}%`, c2: `${c2.deep_analytics?.technology_digital?.cloud_storage_pct || 0}%`, note: 'Digital record resilience' },
+                          { label: 'Social Media Marketing Adoption', c1: `${c1.deep_analytics?.technology_digital?.social_media_pct || 0}%`, c2: `${c2.deep_analytics?.technology_digital?.social_media_pct || 0}%`, note: 'Digital customer acquisition' },
+                        ].map((row, idx) => (
+                          <TableRow key={`p4-${idx}`} hover>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 500 }}>{row.label}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c1}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c2}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.note || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+
+                        {/* Section 5: Environmental Sustainability */}
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell colSpan={4} sx={{ fontWeight: 700, fontSize: 11, color: '#2E7D32', textTransform: 'uppercase', py: 1 }}>
+                            5. Environmental Sustainability &amp; Green Practices
+                          </TableCell>
+                        </TableRow>
+                        {[
+                          { label: 'Green Business Classification', c1: `${c1.green_pct || 0}%`, c2: `${c2.green_pct || 0}%`, note: 'GIZ green enterprise criteria match' },
+                          { label: 'Environmental Management Plan in Place', c1: `${c1.deep_analytics?.environmental_sustainability?.env_plan_pct || 0}%`, c2: `${c2.deep_analytics?.environmental_sustainability?.env_plan_pct || 0}%`, note: 'Structured environmental mitigation' },
+                          { label: 'Necessary Environmental Permits / Licenses', c1: `${c1.deep_analytics?.environmental_sustainability?.env_permits_pct || 0}%`, c2: `${c2.deep_analytics?.environmental_sustainability?.env_permits_pct || 0}%`, note: 'Regulatory green compliance' },
+                          { label: 'Resource Monitoring (Water, Energy, Soil)', c1: `${c1.deep_analytics?.environmental_sustainability?.resource_monitoring_pct || 0}%`, c2: `${c2.deep_analytics?.environmental_sustainability?.resource_monitoring_pct || 0}%`, note: 'Resource consumption tracking' },
+                          { label: 'Waste Reduction & Management Systems', c1: `${c1.deep_analytics?.environmental_sustainability?.waste_reduction_pct || 0}%`, c2: `${c2.deep_analytics?.environmental_sustainability?.waste_reduction_pct || 0}%`, note: 'Circular & waste mitigation' },
+                        ].map((row, idx) => (
+                          <TableRow key={`p5-${idx}`} hover>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 500 }}>{row.label}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c1}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c2}</TableCell>
+                            <TableCell align="center" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.note || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+
+                        {/* Section 6: Quality, Standards & Market Access */}
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell colSpan={4} sx={{ fontWeight: 700, fontSize: 11, color: '#00695C', textTransform: 'uppercase', py: 1 }}>
+                            6. Quality Assurance &amp; Market Access
+                          </TableCell>
+                        </TableRow>
+                        {[
+                          { label: 'URA Tax ID (TIN) Registered', c1: `${c1.tin_pct || 0}%`, c2: `${c2.tin_pct || 0}%`, note: 'Formal registration baseline' },
+                          { label: 'UNBS Product Quality Certification', c1: `${c1.unbs_pct || 0}%`, c2: `${c2.unbs_pct || 0}%`, note: 'National standards mark' },
+                          { label: 'Registered Trademark with URSB', c1: `${c1.deep_analytics?.quality_and_standards?.ursb_trademark_pct || 0}%`, c2: `${c2.deep_analytics?.quality_and_standards?.ursb_trademark_pct || 0}%`, note: 'Brand legal protection' },
+                          { label: 'Food Safety / Health Certification', c1: `${c1.deep_analytics?.quality_and_standards?.food_health_cert_pct || 0}%`, c2: `${c2.deep_analytics?.quality_and_standards?.food_health_cert_pct || 0}%`, note: 'Hygiene & food safety clearance' },
+                          { label: 'Able to Meet Current Market Demand', c1: `${c1.deep_analytics?.quality_and_standards?.meets_demand_pct || 0}%`, c2: `${c2.deep_analytics?.quality_and_standards?.meets_demand_pct || 0}%`, note: 'Production capacity adequacy' },
+                        ].map((row, idx) => (
+                          <TableRow key={`p6-${idx}`} hover>
+                            <TableCell sx={{ fontSize: 12, fontWeight: 500 }}>{row.label}</TableCell>
                             <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c1}</TableCell>
                             <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700 }}>{row.c2}</TableCell>
                             <TableCell align="center" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.note || '—'}</TableCell>
@@ -5269,64 +5380,148 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     </Grid>
                   </Grid>
 
-                  {/* ── Workforce & Formalization Breakdown ── */}
+                  {/* ── 6 Deep Diagnostic Analytical Pillars ── */}
                   <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {/* Pillar 1: Financial Health & Credit Access */}
                     <Grid item xs={12} md={6}>
                       <Card variant="outlined" sx={{ height: '100%' }}>
                         <CardContent>
-                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                            Workforce Breakdown at Baseline
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#D97706' }}>
+                            Financial Management &amp; Credit Access
                           </Typography>
                           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-                            Direct employment generated across assessed micro and small enterprises
-                          </Typography>
-                          <Grid container spacing={1.5}>
-                            {[
-                              { label: 'Full-time Male', val: wf.ft_male || 0, color: '#1E88E5' },
-                              { label: 'Full-time Female', val: wf.ft_female || 0, color: '#E91E63' },
-                              { label: 'Full-time Youth', val: wf.ft_youth || 0, color: '#8E24AA' },
-                              { label: 'Part-time / Casual', val: wf.pt_total || 0, color: '#F57C00' },
-                            ].map((item, i) => (
-                              <Grid item xs={6} key={i}>
-                                <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5, border: '1px solid #E2E8F0' }}>
-                                  <Typography variant="caption" color="text.secondary">{item.label}</Typography>
-                                  <Typography variant="h6" fontWeight={700} color={item.color}>
-                                    {(item.val).toLocaleString()}
-                                  </Typography>
-                                </Box>
-                              </Grid>
-                            ))}
-                          </Grid>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-
-                    <Grid item xs={12} md={6}>
-                      <Card variant="outlined" sx={{ height: '100%' }}>
-                        <CardContent>
-                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                            Business Formalization &amp; Financial Inclusion
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-                            Baseline compliance and financial account penetration
+                            Baseline banking, loan history, bookkeeping standards, and financial buffers
                           </Typography>
                           {[
-                            { label: 'Tax Identification Number (URA TIN)', pct: form.has_tin_pct || 0, count: form.has_tin_count, color: '#D97706' },
-                            { label: 'Dedicated Business Bank Account', pct: form.has_bank_pct || 0, count: form.has_bank_count, color: '#00695C' },
-                            { label: 'Mobile Money Digital Payments', pct: form.has_mobile_money_pct || 0, count: form.has_mobile_money_count, color: '#E65100' },
-                            { label: 'UNBS Product Quality Certification', pct: form.has_unbs_pct || 0, count: form.has_unbs_count, color: '#2E7D32' },
+                            { label: 'Bank Account in Business Name', pct: form.has_bank_pct || 0, color: '#00695C' },
+                            { label: 'Applied for Business Loan (Past 3 Yrs)', pct: diagSummary.deep_analytics?.financial_health?.loans_applied_pct || 0, color: '#D97706' },
+                            { label: 'Audited Financial Accounts Yearly', pct: diagSummary.deep_analytics?.financial_health?.audited_accounts_pct || 0, color: '#162A3A' },
+                            { label: 'Statutory Tax Returns Filed (URA)', pct: diagSummary.deep_analytics?.financial_health?.statutory_tax_pct || 0, color: '#2E7D32' },
+                            { label: 'Emergency Cash Reserves Available', pct: diagSummary.deep_analytics?.financial_health?.cash_reserves_pct || 0, color: '#7B1FA2' },
+                            { label: 'CRB Financial Card Ownership', pct: diagSummary.deep_analytics?.financial_health?.crb_card_pct || 0, color: '#E65100' },
                           ].map((item, i) => (
                             <Box key={i} sx={{ mb: 1.5 }}>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                <Typography variant="body2" fontSize={12} fontWeight={600}>{item.label}</Typography>
+                                <Typography variant="body2" fontSize={12} fontWeight={500}>{item.label}</Typography>
                                 <Typography variant="body2" fontSize={12} fontWeight={700} color={item.color}>
-                                  {item.pct}% ({item.count || 0})
+                                  {item.pct}%
                                 </Typography>
                               </Box>
                               <LinearProgress
                                 variant="determinate"
                                 value={item.pct}
-                                sx={{ height: 7, borderRadius: 3.5, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: item.color } }}
+                                sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: item.color } }}
+                              />
+                            </Box>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    {/* Pillar 2: Decent Work, HR & Working Conditions */}
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#8E24AA' }}>
+                            Decent Work, HR &amp; Social Protection
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Contractual protection, worker safety, leave entitlements, and social benefits
+                          </Typography>
+                          {[
+                            { label: 'Written Employment Contracts', pct: diagSummary.deep_analytics?.decent_work?.written_contracts_pct || 0, color: '#8E24AA' },
+                            { label: 'Protective Wear & Equipment (PPE)', pct: diagSummary.deep_analytics?.decent_work?.protective_wear_pct || 0, color: '#1E88E5' },
+                            { label: 'Anti-Harassment Safeguards in Place', pct: diagSummary.deep_analytics?.decent_work?.harassment_policy_pct || 0, color: '#2E7D32' },
+                            { label: 'Worker Grievance / Complaint Channel', pct: diagSummary.deep_analytics?.decent_work?.grievance_mechanism_pct || 0, color: '#00695C' },
+                            { label: 'Entitled to Vacation / Annual Leave', pct: diagSummary.deep_analytics?.decent_work?.vacation_leave_pct || 0, color: '#D97706' },
+                            { label: 'NSSF Social Security Contributions', pct: diagSummary.deep_analytics?.decent_work?.nssf_pct || 0, color: '#C8102E' },
+                          ].map((item, i) => (
+                            <Box key={i} sx={{ mb: 1.5 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="body2" fontSize={12} fontWeight={500}>{item.label}</Typography>
+                                <Typography variant="body2" fontSize={12} fontWeight={700} color={item.color}>
+                                  {item.pct}%
+                                </Typography>
+                              </Box>
+                              <LinearProgress
+                                variant="determinate"
+                                value={item.pct}
+                                sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: item.color } }}
+                              />
+                            </Box>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
+
+                  {/* ── Row 2: Digitalization & Environmental Sustainability ── */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {/* Pillar 3: Technology & Digitalization */}
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1E88E5' }}>
+                            Digitalization &amp; Technology Adoption
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Hardware availability, connectivity, digital payment acceptance, and cloud tools
+                          </Typography>
+                          {[
+                            { label: 'Dedicated Business Internet', pct: diagSummary.deep_analytics?.technology_digital?.internet_connectivity_pct || 0, color: '#1E88E5' },
+                            { label: 'Accepts Digital Payments (Bank / MoMo)', pct: diagSummary.deep_analytics?.technology_digital?.accepts_digital_payments_pct || 0, color: '#00695C' },
+                            { label: 'Social Media Marketing Adoption', pct: diagSummary.deep_analytics?.technology_digital?.social_media_pct || 0, color: '#D97706' },
+                            { label: 'Cloud / Internet Data Storage', pct: diagSummary.deep_analytics?.technology_digital?.cloud_storage_pct || 0, color: '#7B1FA2' },
+                            { label: 'Computer Hardware Present', pct: diagSummary.deep_analytics?.technology_digital?.computer_hardware_pct || 0, color: '#162A3A' },
+                            { label: 'Dedicated IT / Digital Lead Staff', pct: diagSummary.deep_analytics?.technology_digital?.dedicated_it_pct || 0, color: '#2E7D32' },
+                          ].map((item, i) => (
+                            <Box key={i} sx={{ mb: 1.5 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="body2" fontSize={12} fontWeight={500}>{item.label}</Typography>
+                                <Typography variant="body2" fontSize={12} fontWeight={700} color={item.color}>
+                                  {item.pct}%
+                                </Typography>
+                              </Box>
+                              <LinearProgress
+                                variant="determinate"
+                                value={item.pct}
+                                sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: item.color } }}
+                              />
+                            </Box>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    {/* Pillar 4: Environmental & Quality Standards */}
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#2E7D32' }}>
+                            Environmental Sustainability &amp; Quality Standards
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Green management plans, resource efficiency, and certification readiness
+                          </Typography>
+                          {[
+                            { label: 'Green Enterprise Classification', pct: grn.green_pct || 0, color: '#2E7D32' },
+                            { label: 'Resource Monitoring (Water / Energy / Soil)', pct: diagSummary.deep_analytics?.environmental_sustainability?.resource_monitoring_pct || 0, color: '#00695C' },
+                            { label: 'Environmental Management Plan', pct: diagSummary.deep_analytics?.environmental_sustainability?.env_plan_pct || 0, color: '#162A3A' },
+                            { label: 'UNBS Product Certification', pct: form.has_unbs_pct || 0, color: '#D97706' },
+                            { label: 'Registered Trademark with URSB', pct: diagSummary.deep_analytics?.quality_and_standards?.ursb_trademark_pct || 0, color: '#8E24AA' },
+                            { label: 'Food Safety / Health Certification', pct: diagSummary.deep_analytics?.quality_and_standards?.food_health_cert_pct || 0, color: '#E65100' },
+                          ].map((item, i) => (
+                            <Box key={i} sx={{ mb: 1.5 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="body2" fontSize={12} fontWeight={500}>{item.label}</Typography>
+                                <Typography variant="body2" fontSize={12} fontWeight={700} color={item.color}>
+                                  {item.pct}%
+                                </Typography>
+                              </Box>
+                              <LinearProgress
+                                variant="determinate"
+                                value={item.pct}
+                                sx={{ height: 6, borderRadius: 3, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: item.color } }}
                               />
                             </Box>
                           ))}
