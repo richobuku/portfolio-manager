@@ -5051,6 +5051,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Typography>
                 </Box>
               )}
+            </Box>
+          );
+        })()}
+
         {/* ════════════════════════════════════════════════════════════════
             TAB 5 — Diagnostic Baselines & Cohorts Analytics
             ════════════════════════════════════════════════════════════════ */}
@@ -5089,7 +5093,6 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
           const wf = diagSummary.workforce || {};
           const form = diagSummary.formalization || {};
-          const dig = diagSummary.digitalization || {};
           const grn = diagSummary.green || {};
           const c1 = diagCohorts?.cohort_1 || {};
           const c2 = diagCohorts?.cohort_2 || {};
