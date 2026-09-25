@@ -23,6 +23,19 @@ logger = logging.getLogger(__name__)
 
 TBIP_CATEGORIES = [
     {
+        'id': 'governance',
+        'name': 'Governance & Strategy',
+        'icon': '🏛️',
+        'questions': [
+            {'id': 'gov_1', 'text': 'Does the business have a written business/strategic plan?'},
+            {'id': 'gov_2', 'text': 'Is the business actively implementing that plan (using it for decisions/investments)?'},
+            {'id': 'gov_3', 'text': 'Does the business have a Board of Directors/Advisors supporting decisions?'},
+            {'id': 'gov_4', 'text': 'Are minutes kept of board/advisor meetings (including BGE visits)?'},
+            {'id': 'gov_5', 'text': 'Does the business have segregated/independent management structures (e.g. finance and HR)?'},
+            {'id': 'gov_6', 'text': 'Does the business have HR and finance policies/manuals in place?'},
+        ]
+    },
+    {
         'id': 'finance',
         'name': 'Financial Management',
         'icon': '💰',
@@ -57,6 +70,43 @@ TBIP_CATEGORIES = [
             {'id': 'mkt_3', 'text': 'Is there a clear Value Proposition Canvas / statement (does the business understand exactly who their customers are)?'},
             {'id': 'mkt_4', 'text': 'Does the business maintain a partner database?'},
             {'id': 'mkt_5', 'text': 'Is there a dedicated sales team with clear targets?'},
+        ]
+    },
+    {
+        'id': 'digital',
+        'name': 'Digital & Technology',
+        'icon': '💻',
+        'questions': [
+            {'id': 'dig_1', 'text': 'Does the business own computer-related hardware (including smartphones and internet router)?'},
+            {'id': 'dig_2', 'text': 'Does the business have dedicated internet connectivity for operations?'},
+            {'id': 'dig_3', 'text': 'Does the business use digital tools (website, online booking/deliveries, stock, payroll, management systems)?'},
+            {'id': 'dig_4', 'text': 'Does the business use social media to promote products/services?'},
+            {'id': 'dig_5', 'text': 'Is the business registered on an online trading/procurement platform?'},
+            {'id': 'dig_6', 'text': 'Does the business make/receive digital payments (bank or mobile money)?'},
+            {'id': 'dig_7', 'text': 'Does the business store and refer to data to inform decisions?'},
+        ]
+    },
+    {
+        'id': 'env',
+        'name': 'Environmental Sustainability',
+        'icon': '🌱',
+        'questions': [
+            {'id': 'env_1', 'text': 'Has the business thought about its environmental impact?'},
+            {'id': 'env_2', 'text': 'Does the business have an environmental management plan, and is it implemented?'},
+            {'id': 'env_3', 'text': 'Does the business monitor its use of resources (water, energy, land, etc.)?'},
+            {'id': 'env_4', 'text': 'Does the business practice waste management/recycling or energy efficiency measures?'},
+            {'id': 'env_5', 'text': 'Does the business promote environmentally friendly practices among staff and suppliers?'},
+        ]
+    },
+    {
+        'id': 'regulatory',
+        'name': 'Regulatory Compliance & Quality',
+        'icon': '⚖️',
+        'questions': [
+            {'id': 'reg_1', 'text': 'Is the business able to meet applicable regulatory standards (e.g. Halal, Kosher, UNBS)?'},
+            {'id': 'reg_2', 'text': 'Does the business maintain necessary operating licenses and sector permits?'},
+            {'id': 'reg_3', 'text': 'Does the business have quality assurance or safety standards/certifications in place?'},
+            {'id': 'reg_4', 'text': 'Does the business conduct regular compliance and standards reviews?'},
         ]
     },
 ]
@@ -153,9 +203,9 @@ def calculate_diagnostic(answers):
 
     if total_applicable == 0:
         overall_priority = 'Low'
-    elif overall_pct < 50.0 or total_not_available >= 3:
+    elif overall_pct < 50.0 or total_not_available >= 6:
         overall_priority = 'High'
-    elif overall_pct < 75.0 or total_not_available >= 1 or total_needs_improvement >= 3:
+    elif overall_pct < 75.0 or total_not_available >= 3 or total_needs_improvement >= 6:
         overall_priority = 'Medium'
     else:
         overall_priority = 'Low'

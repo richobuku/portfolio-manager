@@ -24,8 +24,46 @@ import {
   TBIP_REJECT_URL,
 } from '../config';
 
-// ── 3 Core Diagnostic Pillars & Questions ──────────────────────────────────
+// ── All 7 Diagnostic Pillars & Questions ──────────────────────────────────
 export const TBIP_CATEGORIES = [
+  {
+    id: 'governance',
+    name: 'Governance & Strategy',
+    icon: '🏛️',
+    description: 'Strategic business plan, active implementation, Board of Directors/Advisors, minutes, independent structures, and policies.',
+    questions: [
+      {
+        id: 'gov_1',
+        text: 'Does the business have a written business/strategic plan?',
+        helpText: 'A formal written business or strategic plan that outlines objectives, target markets, and strategies.',
+      },
+      {
+        id: 'gov_2',
+        text: 'Is the business actively implementing that plan (using it for decisions/investments)?',
+        helpText: 'Business leadership references the plan to guide daily decisions, capital allocations, and expansion.',
+      },
+      {
+        id: 'gov_3',
+        text: 'Does the business have a Board of Directors/Advisors supporting decisions?',
+        helpText: 'An active board, advisory committee, or formal oversight body meeting regularly.',
+      },
+      {
+        id: 'gov_4',
+        text: 'Are minutes kept of board/advisor meetings (including BGE visits)?',
+        helpText: 'Written minutes and action items documented and retained for governance meetings and advisory sessions.',
+      },
+      {
+        id: 'gov_5',
+        text: 'Does the business have segregated/independent management structures (e.g. finance and HR)?',
+        helpText: 'Separation of duties and distinct leadership roles rather than centralized single-owner control.',
+      },
+      {
+        id: 'gov_6',
+        text: 'Does the business have HR and finance policies/manuals in place?',
+        helpText: 'Documented operational, financial, and personnel policy manuals on file.',
+      },
+    ],
+  },
   {
     id: 'finance',
     name: 'Financial Management',
@@ -63,7 +101,7 @@ export const TBIP_CATEGORIES = [
     id: 'hr',
     name: 'Human Resources (HR)',
     icon: '👥',
-    description: 'Written employment contracts, clear TORs, organogram, staff training, HR policies, and KPIs.',
+    description: 'Written employment contracts, performance-based contracts, TORs, organogram, staff training, and HR policies.',
     questions: [
       {
         id: 'hr_1',
@@ -130,10 +168,121 @@ export const TBIP_CATEGORIES = [
       },
     ],
   },
+  {
+    id: 'digital',
+    name: 'Digital & Technology',
+    icon: '💻',
+    description: 'Hardware, dedicated internet, digital operational tools, social media marketing, online platforms, digital payments, and data-driven decisions.',
+    questions: [
+      {
+        id: 'dig_1',
+        text: 'Does the business own computer-related hardware (including smartphones and internet router)?',
+        helpText: 'Computers, smartphones, tablets, or network equipment used for business operations.',
+      },
+      {
+        id: 'dig_2',
+        text: 'Does the business have dedicated internet connectivity for operations?',
+        helpText: 'Reliable office or mobile internet for real-time transactions, email, and digital workflows.',
+      },
+      {
+        id: 'dig_3',
+        text: 'Does the business use digital tools (website, online booking/deliveries, stock, payroll, management systems)?',
+        helpText: 'Software tools, inventory/POS systems, payroll software, or company website.',
+      },
+      {
+        id: 'dig_4',
+        text: 'Does the business use social media to promote products/services?',
+        helpText: 'Active business accounts on WhatsApp Business, Facebook, Instagram, LinkedIn, etc.',
+      },
+      {
+        id: 'dig_5',
+        text: 'Is the business registered on an online trading/procurement platform?',
+        helpText: 'e-Commerce portals, B2B marketplaces, or e-procurement registries.',
+      },
+      {
+        id: 'dig_6',
+        text: 'Does the business make/receive digital payments (bank or mobile money)?',
+        helpText: 'Mobile Money merchant codes, electronic bank transfers, or point-of-sale payment gateways.',
+      },
+      {
+        id: 'dig_7',
+        text: 'Does the business store and refer to data to inform decisions?',
+        helpText: 'Tracking performance data, sales records, and operational logs to steer business decisions.',
+      },
+    ],
+  },
+  {
+    id: 'env',
+    name: 'Environmental Sustainability',
+    icon: '🌱',
+    description: 'Environmental impact awareness, management plan, resource monitoring, waste management/efficiency, and eco-friendly practices.',
+    questions: [
+      {
+        id: 'env_1',
+        text: 'Has the business thought about its environmental impact?',
+        helpText: 'Awareness and assessment of how production, emissions, or waste affect the surrounding environment.',
+      },
+      {
+        id: 'env_2',
+        text: 'Does the business have an environmental management plan, and is it implemented?',
+        helpText: 'Documented green policies, conservation action plan, or mitigation strategies in active execution.',
+      },
+      {
+        id: 'env_3',
+        text: 'Does the business monitor its use of resources (water, energy, land, etc.)?',
+        helpText: 'Active tracking of electricity, fuel, water consumption, or raw material wastage.',
+      },
+      {
+        id: 'env_4',
+        text: 'Does the business practice waste management/recycling or energy efficiency measures?',
+        helpText: 'Separation of waste, circular recycling, solar/energy-saving equipment, or composting.',
+      },
+      {
+        id: 'env_5',
+        text: 'Does the business promote environmentally friendly practices among staff and suppliers?',
+        helpText: 'Green procurement standards, staff training on energy/water saving, and eco-conscious supplier selection.',
+      },
+    ],
+  },
+  {
+    id: 'regulatory',
+    name: 'Regulatory Compliance & Quality',
+    icon: '⚖️',
+    description: 'Meeting regulatory standards (UNBS/Halal/Kosher), operating licenses/permits, QA/safety standards, and compliance reviews.',
+    questions: [
+      {
+        id: 'reg_1',
+        text: 'Is the business able to meet applicable regulatory standards (e.g. Halal, Kosher, UNBS)?',
+        helpText: 'Compliance with national or international certification standards relevant to the industry.',
+      },
+      {
+        id: 'reg_2',
+        text: 'Does the business maintain necessary operating licenses and sector permits?',
+        helpText: 'Current trading licenses, local council permits, tax registration, and sector-specific clearances.',
+      },
+      {
+        id: 'reg_3',
+        text: 'Does the business have quality assurance or safety standards/certifications in place?',
+        helpText: 'Standard operating procedures (SOPs), quality inspection checklists, or formal certifications.',
+      },
+      {
+        id: 'reg_4',
+        text: 'Does the business conduct regular compliance and standards reviews?',
+        helpText: 'Periodic audits, legal compliance checks, and renewal tracking for all mandatory requirements.',
+      },
+    ],
+  },
 ];
 
 // ── Preset Help Needed Catalog grouped by Category ────────────────────────
 export const HELP_NEEDED_CATALOG = {
+  'Governance & Strategy': [
+    'Strategic Business Plan Formulation & Execution',
+    'Board of Directors / Advisory Board Setup',
+    'Board Governance & Meeting Minute Documentation',
+    'Segregated Management Structure & Delegation',
+    'Corporate Governance & Policy Manuals Development',
+  ],
   'Financial Management': [
     'Financial Management Guidelines & Approval Thresholds',
     '100% Revenue Banking Discipline & Cash Control',
@@ -156,26 +305,83 @@ export const HELP_NEEDED_CATALOG = {
     'Strategic Partner & Bulk Off-taker Directory',
     'Dedicated Sales Team Structure & Target Setting',
   ],
+  'Digital & Technology': [
+    'ICT Hardware & Infrastructure Upgrades',
+    'Dedicated Internet & Cloud Connectivity',
+    'Digital Business Tools & Management Software (POS/ERP)',
+    'Social Media Marketing & Online Branding',
+    'e-Commerce & Digital Procurement Platform Registration',
+    'Digital Payments Integration (Mobile Money & Bank Merchant)',
+    'Data-Driven Decision Making & Business Analytics',
+  ],
+  'Environmental Sustainability': [
+    'Environmental Impact Assessment & Mitigation',
+    'Environmental Management Plan Development',
+    'Resource Monitoring (Water, Energy, Material Auditing)',
+    'Waste Management, Recycling & Energy Efficiency',
+    'Eco-Friendly Workplace & Green Supply Chain Practices',
+  ],
+  'Regulatory Compliance & Quality': [
+    'UNBS, Halal, Kosher & Sector Product Certification',
+    'Operating Licenses & Statutory Permit Renewals',
+    'Quality Assurance SOPs & Food/Occupational Safety',
+    'Regular Compliance Audit & Standards Verification',
+  ],
 };
 
 // Map each question ID to its corresponding help topic for the 1-click Auto-Detect
 export const QUESTION_HELP_MAP = {
+  // Governance & Strategy
+  gov_1: 'Strategic Business Plan Formulation & Execution',
+  gov_2: 'Strategic Business Plan Formulation & Execution',
+  gov_3: 'Board of Directors / Advisory Board Setup',
+  gov_4: 'Board Governance & Meeting Minute Documentation',
+  gov_5: 'Segregated Management Structure & Delegation',
+  gov_6: 'Corporate Governance & Policy Manuals Development',
+
+  // Financial Management
   fin_1: 'Financial Management Guidelines & Approval Thresholds',
   fin_2: '100% Revenue Banking Discipline & Cash Control',
   fin_3: 'Accounting Processes (Purchase Orders, LPOs & Vouchers)',
   fin_4: '12-Month Financial Projections & Cash Flow Model',
   fin_5: 'Designated Bookkeeper / Finance Personnel Setup',
+
+  // Human Resources (HR)
   hr_1: 'Written Employment Contracts for Staff',
+  hr_6: 'Performance-Based Contracts & KPI Target Setting',
   hr_2: 'Clear Terms of Reference (TOR) & Job Descriptions',
   hr_3: 'Organizational Structure & Organogram Design',
   hr_4: 'Staff Technical & Operational Capacity Training',
   hr_5: 'Documented HR Policy Manual & Workplace Rules',
-  hr_6: 'Performance-Based Contracts & KPI Target Setting',
+
+  // Marketing & Sales
   mkt_1: 'Customer Database Setup & Profiling',
   mkt_2: 'Customer Database Utilization & CRM Follow-ups',
   mkt_3: 'Value Proposition Canvas & Customer Segmentation',
   mkt_4: 'Strategic Partner & Bulk Off-taker Directory',
   mkt_5: 'Dedicated Sales Team Structure & Target Setting',
+
+  // Digital & Technology
+  dig_1: 'ICT Hardware & Infrastructure Upgrades',
+  dig_2: 'Dedicated Internet & Cloud Connectivity',
+  dig_3: 'Digital Business Tools & Management Software (POS/ERP)',
+  dig_4: 'Social Media Marketing & Online Branding',
+  dig_5: 'e-Commerce & Digital Procurement Platform Registration',
+  dig_6: 'Digital Payments Integration (Mobile Money & Bank Merchant)',
+  dig_7: 'Data-Driven Decision Making & Business Analytics',
+
+  // Environmental Sustainability
+  env_1: 'Environmental Impact Assessment & Mitigation',
+  env_2: 'Environmental Management Plan Development',
+  env_3: 'Resource Monitoring (Water, Energy, Material Auditing)',
+  env_4: 'Waste Management, Recycling & Energy Efficiency',
+  env_5: 'Eco-Friendly Workplace & Green Supply Chain Practices',
+
+  // Regulatory Compliance & Quality
+  reg_1: 'UNBS, Halal, Kosher & Sector Product Certification',
+  reg_2: 'Operating Licenses & Statutory Permit Renewals',
+  reg_3: 'Quality Assurance SOPs & Food/Occupational Safety',
+  reg_4: 'Regular Compliance Audit & Standards Verification',
 };
 
 // ── Diagnostic Scoring Function with 3-tier Weighting ──────────────────────
@@ -251,8 +457,8 @@ export function computeLocalDiagnostic(answers) {
 
   let overallPriority = 'Low';
   if (totalApplicable > 0) {
-    if (overallScorePct < 50 || totalNotAvail >= 3) overallPriority = 'High';
-    else if (overallScorePct < 75 || totalNotAvail >= 1 || totalNeedsImp >= 3) overallPriority = 'Medium';
+    if (overallScorePct < 50 || totalNotAvail >= 6) overallPriority = 'High';
+    else if (overallScorePct < 75 || totalNotAvail >= 3 || totalNeedsImp >= 6) overallPriority = 'Medium';
     else overallPriority = 'Low';
   }
 
