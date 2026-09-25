@@ -2304,29 +2304,32 @@ def generate_enterprise_improvement_plan_pdf(plan):
     story.append(Spacer(1, 8))
 
     # Section 1: Diagnostic Snapshot Table
-    story.append(Paragraph("1. Diagnostic Snapshot — Category Status", p_sec_hdr))
+    story.append(Paragraph("1. Diagnostic Snapshot — Category Status & Capacity Scores", p_sec_hdr))
     snap_rows = [[
         Paragraph("Category", th_style),
         Paragraph("Status", th_style_c),
-        Paragraph("Gaps / Applicable", th_style_c),
-        Paragraph("BGE Note on Key Gap", th_style),
+        Paragraph("Score / Readiness", th_style_c),
+        Paragraph("Gaps (Missing / Needs Imp)", th_style_c),
+        Paragraph("BGE Diagnostic Note", th_style),
     ]]
 
     for cat in TBIP_CATEGORIES:
         cat_name = cat['name']
         cdata = categories_diag.get(cat_name, {})
-        c_status = cdata.get('status', 'N/A')
-        c_ratio = cdata.get('ratio', f"{cdata.get('gaps', 0)} / {cdata.get('applicable', 0)}")
+        c_status = cdata.get('status', 'Not Assessed')
+        score_pct = cdata.get('score_pct', 0.0)
+        c_ratio = cdata.get('ratio', f"{cdata.get('not_available', 0)} missing · {cdata.get('needs_improvement', 0)} needs imp")
         note = gap_notes.get(cat_name) or gap_notes.get(cat['id']) or '—'
 
         snap_rows.append([
             Paragraph(_safe_html(cat_name), td_bold),
             Paragraph(_safe_html(c_status), td_style_c),
+            Paragraph(f"<b>{score_pct}%</b>", td_style_c),
             Paragraph(_safe_html(c_ratio), td_style_c),
             Paragraph(_safe_html(note), td_style),
         ])
 
-    snap_table = Table(snap_rows, colWidths=[CW * 0.30, CW * 0.18, CW * 0.18, CW * 0.34])
+    snap_table = Table(snap_rows, colWidths=[CW * 0.25, CW * 0.16, CW * 0.14, CW * 0.20, CW * 0.25])
     snap_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), HexColor('#2A4365')),
         ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
@@ -2340,34 +2343,70 @@ def generate_enterprise_improvement_plan_pdf(plan):
     story.append(snap_table)
     story.append(Spacer(1, 8))
 
-    # Section 2: Priority Actions Table (TBIP)
-    story.append(Paragraph("2. Priority Actions — Technical Business Improvement Plan", p_sec_hdr))
+    # Section 2: MSME Targeted BDS Support & Capacity Needs
+    help_areas = plan.help_needed_areas or []
+    help_desc = plan.help_needed_description or ''
+    if help_areas or help_desc:
+        story.append(Paragraph("2. Targeted Areas Where MSME Needs BDS Support", p_sec_hdr))
+        areas_text = " · ".join([f"<b>• {a}</b>" for a in help_areas]) if help_areas else "None specifically checked."
+        help_data = [
+            [
+                Paragraph("<b>Priority Help Areas:</b>", td_style),
+                Paragraph(_safe_html(areas_text), td_style),
+            ],
+            [
+                Paragraph("<b>Specific Technical Assistance Needs:</b>", td_style),
+                Paragraph(_safe_html(help_desc or "—"), td_style),
+            ],
+        ]
+        help_table = Table(help_data, colWidths=[CW * 0.25, CW * 0.75])
+        help_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F8FAFC')),
+            ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#CBD5E1')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, HexColor('#E2E8F0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(help_table)
+        story.append(Spacer(1, 8))
+
+    # Section 3: Priority Actions Table (TBIP)
+    sec_num = "3" if (help_areas or help_desc) else "2"
+    story.append(Paragraph(f"{sec_num}. Priority Actions — Technical Business Improvement Plan (Roadmap)", p_sec_hdr))
     act_rows = [[
-        Paragraph("#", th_style_c),
+        Paragraph("Rank / Priority", th_style_c),
         Paragraph("Priority Action", th_style),
-        Paragraph("Linked Category", th_style),
-        Paragraph("Owner (BGE)", th_style),
-        Paragraph("Timeline", th_style_c),
-        Paragraph("Expected Outcome", th_style),
+        Paragraph("Category", th_style),
+        Paragraph("BGE Days", th_style_c),
+        Paragraph("Means of Verification", th_style),
+        Paragraph("Owner / Timeline", th_style),
         Paragraph("Status", th_style_c),
     ]]
 
     actions_list = plan.priority_actions or []
     if not actions_list:
-        actions_list = [{'id': 1, 'action': 'No priority actions recorded yet.', 'category': '—', 'owner': '—', 'timeline': '—', 'outcome': '—', 'status': 'Pending'}]
+        actions_list = [{'id': 1, 'ranking': 1, 'priority_level': 'High', 'action': 'No priority actions recorded yet.', 'category': '—', 'bge_support_days': '—', 'means_of_verification': '—', 'owner': '—', 'timeline': '—', 'outcome': '—', 'status': 'Pending'}]
 
     for idx, act in enumerate(actions_list):
+        ranking_val = act.get('ranking') or idx + 1
+        p_level = act.get('priority_level') or act.get('priority') or 'High'
+        bge_days = act.get('bge_support_days') or act.get('support_days') or '—'
+        mov = act.get('means_of_verification') or act.get('verification') or '—'
+        owner_timeline = f"{act.get('owner', 'BGE')} · {act.get('timeline', '30 days')}"
+
         act_rows.append([
-            Paragraph(str(act.get('id', idx + 1)), td_style_c),
+            Paragraph(f"<b>#{ranking_val}</b><br/>{p_level}", td_style_c),
             Paragraph(_safe_html(act.get('action', act.get('priority_action', '—'))), td_style),
             Paragraph(_safe_html(act.get('category', act.get('linked_category', '—'))), td_style),
-            Paragraph(_safe_html(act.get('owner', act.get('owner_bge', '—'))), td_style),
-            Paragraph(_safe_html(act.get('timeline', '—')), td_style_c),
-            Paragraph(_safe_html(act.get('outcome', act.get('expected_outcome', '—'))), td_style),
+            Paragraph(f"<b>{bge_days}</b>", td_style_c),
+            Paragraph(_safe_html(mov), td_style),
+            Paragraph(_safe_html(owner_timeline), td_style),
             Paragraph(_safe_html(act.get('status', 'Pending')), td_style_c),
         ])
 
-    act_table = Table(act_rows, colWidths=[CW * 0.05, CW * 0.26, CW * 0.17, CW * 0.13, CW * 0.11, CW * 0.18, CW * 0.10])
+    act_table = Table(act_rows, colWidths=[CW * 0.10, CW * 0.28, CW * 0.16, CW * 0.08, CW * 0.18, CW * 0.12, CW * 0.08])
     act_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), HexColor('#1A365D')),
         ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),

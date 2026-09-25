@@ -411,18 +411,20 @@ def generate_enterprise_improvement_plan_excel(plan):
     })
 
     # Set column widths
-    ws.set_column('A:A', 24)
-    ws.set_column('B:B', 65)
-    ws.set_column('C:C', 15)
-    ws.set_column('D:D', 20)
-    ws.set_column('E:E', 18)
-    ws.set_column('F:F', 30)
-    ws.set_column('G:G', 15)
+    ws.set_column('A:A', 22)
+    ws.set_column('B:B', 40)
+    ws.set_column('C:C', 18)
+    ws.set_column('D:D', 18)
+    ws.set_column('E:E', 16)
+    ws.set_column('F:F', 28)
+    ws.set_column('G:G', 18)
+    ws.set_column('H:H', 18)
+    ws.set_column('I:I', 14)
 
     # 1. Title Banner
-    ws.merge_range('A1:G1', 'PRUDEV II — MSME Business Assessment & Technical Business Improvement Plan', fmt_banner)
+    ws.merge_range('A1:I1', 'PRUDEV II — MSME Business Assessment & Technical Business Improvement Plan', fmt_banner)
     ws.set_row(0, 26)
-    ws.write('A2', 'Answer each question Yes / No / N/A during the visit. Category status and priority below calculate automatically.', fmt_subtitle)
+    ws.write('A2', 'Options: Available and complete | Needs improvement | Not available. Priority & Snapshot calculate automatically.', fmt_subtitle)
 
     # Metadata rows
     ws.write('A3', 'MSME Name:', fmt_meta_label)
@@ -431,12 +433,14 @@ def generate_enterprise_improvement_plan_excel(plan):
     ws.write('D3', str(plan.assessment_date), fmt_meta_val)
     ws.write('E3', 'Lead BGE:', fmt_meta_label)
     ws.write('F3', plan.bge.name if plan.bge else '—', fmt_meta_val)
+    ws.write('G3', 'Overall Priority:', fmt_meta_label)
+    ws.write('H3', plan.overall_priority or 'Low', fmt_meta_val)
 
     # Section 1: Business Assessment
-    ws.merge_range('A5:C5', 'Business Assessment', fmt_section_hdr)
+    ws.merge_range('A5:C5', 'Section 1: MSME Diagnostic Assessment', fmt_section_hdr)
     ws.write('A6', 'Category', fmt_tbl_hdr)
-    ws.write('B6', 'Question', fmt_tbl_hdr)
-    ws.write('C6', 'Answer', fmt_tbl_hdr_c)
+    ws.write('B6', 'Assessment Question', fmt_tbl_hdr)
+    ws.write('C6', 'Diagnostic Answer', fmt_tbl_hdr_c)
 
     from .views.enterprise_improvement_plan import TBIP_CATEGORIES, calculate_diagnostic
 
@@ -447,7 +451,7 @@ def generate_enterprise_improvement_plan_excel(plan):
     for cat in TBIP_CATEGORIES:
         cat_name = cat['name']
         for q in cat['questions']:
-            ans = answers.get(q['id']) or answers.get(q['text']) or 'N/A'
+            ans = answers.get(q['id']) or answers.get(q['text']) or 'Not available'
             ws.write(row_idx, 0, cat_name, fmt_cell_bold)
             ws.write(row_idx, 1, q['text'], fmt_cell)
             ws.write(row_idx, 2, ans, fmt_answer_cell)
@@ -456,12 +460,13 @@ def generate_enterprise_improvement_plan_excel(plan):
     row_idx += 1
     # Section 2: Diagnostic Snapshot
     snap_start = row_idx
-    ws.merge_range(snap_start, 0, snap_start, 3, 'Diagnostic Snapshot — Category Status (calculated automatically)', fmt_section_hdr)
+    ws.merge_range(snap_start, 0, snap_start, 4, 'Section 2: Diagnostic Snapshot & Capacity Scores (calculated automatically)', fmt_section_hdr)
     row_idx += 1
     ws.write(row_idx, 0, 'Category', fmt_tbl_hdr)
     ws.write(row_idx, 1, 'Status', fmt_tbl_hdr_c)
-    ws.write(row_idx, 2, 'Gaps / Applicable', fmt_tbl_hdr_c)
-    ws.write(row_idx, 3, 'BGE Note on Key Gap', fmt_tbl_hdr)
+    ws.write(row_idx, 2, 'Score %', fmt_tbl_hdr_c)
+    ws.write(row_idx, 3, 'Gaps Breakdown', fmt_tbl_hdr_c)
+    ws.write(row_idx, 4, 'BGE Diagnostic Note', fmt_tbl_hdr)
     row_idx += 1
 
     diag = plan.diagnostic_snapshot or calculate_diagnostic(answers)
@@ -470,53 +475,77 @@ def generate_enterprise_improvement_plan_excel(plan):
     for cat in TBIP_CATEGORIES:
         cat_name = cat['name']
         cdata = categories_diag.get(cat_name, {})
-        c_status = cdata.get('status', 'N/A')
-        c_ratio = cdata.get('ratio', f"{cdata.get('gaps', 0)} / {cdata.get('applicable', 0)}")
+        c_status = cdata.get('status', 'Not Assessed')
+        score_pct = cdata.get('score_pct', 0.0)
+        c_ratio = cdata.get('ratio', f"{cdata.get('not_available', 0)} missing · {cdata.get('needs_improvement', 0)} needs imp")
         note = gap_notes.get(cat_name) or gap_notes.get(cat['id']) or ''
 
         ws.write(row_idx, 0, cat_name, fmt_cell_bold)
         ws.write(row_idx, 1, c_status, fmt_cell_center)
-        ws.write(row_idx, 2, c_ratio, fmt_cell_center)
-        ws.write(row_idx, 3, note, fmt_cell)
+        ws.write(row_idx, 2, f"{score_pct}%", fmt_cell_center)
+        ws.write(row_idx, 3, c_ratio, fmt_cell_center)
+        ws.write(row_idx, 4, note, fmt_cell)
         row_idx += 1
 
-    # Overall Priority
+    # Overall Priority row
     ov_priority = plan.overall_priority or diag.get('overall_priority', 'Low')
     p_fmt = fmt_priority_high if ov_priority == 'High' else (fmt_priority_med if ov_priority == 'Medium' else fmt_priority_low)
-    ws.write(row_idx, 0, 'Overall Priority', fmt_cell_bold)
+    ws.write(row_idx, 0, 'Overall MSME Priority', fmt_cell_bold)
     ws.write(row_idx, 1, ov_priority, p_fmt)
-    ws.write(row_idx, 2, f"{diag.get('total_gaps', 0)} total gaps", fmt_cell_center)
-    ws.write(row_idx, 3, '', fmt_cell)
+    ws.write(row_idx, 2, f"{diag.get('overall_score_pct', 0.0)}% Overall", fmt_cell_center)
+    ws.write(row_idx, 3, f"{diag.get('total_gaps', 0)} total gaps", fmt_cell_center)
+    ws.write(row_idx, 4, '', fmt_cell)
     row_idx += 2
 
-    # Section 3: Priority Actions — Technical Business Improvement Plan (3–5 actions)
-    ws.merge_range(row_idx, 0, row_idx, 6, 'Priority Actions — Technical Business Improvement Plan (3–5 actions)', fmt_section_hdr)
+    # Section 3: Targeted Areas Where MSME Needs BDS Support
+    help_areas = plan.help_needed_areas or []
+    help_desc = plan.help_needed_description or ''
+    ws.merge_range(row_idx, 0, row_idx, 4, 'Section 3: Targeted Areas Where MSME Needs BDS Support & Coaching', fmt_section_hdr)
     row_idx += 1
-    ws.write(row_idx, 0, '#', fmt_tbl_hdr_c)
+    ws.write(row_idx, 0, 'Priority Help Areas:', fmt_meta_label)
+    ws.merge_range(row_idx, 1, row_idx, 4, ", ".join(help_areas) if help_areas else 'None recorded', fmt_cell)
+    row_idx += 1
+    ws.write(row_idx, 0, 'Specific BDS Needs:', fmt_meta_label)
+    ws.merge_range(row_idx, 1, row_idx, 4, help_desc or 'None recorded', fmt_cell)
+    row_idx += 2
+
+    # Section 4: Priority Actions — Technical Business Improvement Plan (Roadmap)
+    ws.merge_range(row_idx, 0, row_idx, 8, 'Section 4: Priority Actions — Technical Business Improvement Plan (Roadmap)', fmt_section_hdr)
+    row_idx += 1
+    ws.write(row_idx, 0, 'Rank', fmt_tbl_hdr_c)
     ws.write(row_idx, 1, 'Priority Action', fmt_tbl_hdr)
-    ws.write(row_idx, 2, 'Linked Category', fmt_tbl_hdr)
-    ws.write(row_idx, 3, 'Owner (BGE)', fmt_tbl_hdr)
-    ws.write(row_idx, 4, 'Timeline', fmt_tbl_hdr_c)
-    ws.write(row_idx, 5, 'Expected Outcome', fmt_tbl_hdr)
-    ws.write(row_idx, 6, 'Status', fmt_tbl_hdr_c)
+    ws.write(row_idx, 2, 'Category', fmt_tbl_hdr)
+    ws.write(row_idx, 3, 'Priority Level', fmt_tbl_hdr_c)
+    ws.write(row_idx, 4, 'BGE Days Needed', fmt_tbl_hdr_c)
+    ws.write(row_idx, 5, 'Means of Verification', fmt_tbl_hdr)
+    ws.write(row_idx, 6, 'Owner', fmt_tbl_hdr)
+    ws.write(row_idx, 7, 'Timeline', fmt_tbl_hdr_c)
+    ws.write(row_idx, 8, 'Status', fmt_tbl_hdr_c)
     row_idx += 1
 
     actions_list = plan.priority_actions or []
     if not actions_list:
-        actions_list = [{'id': i+1, 'action': '', 'category': '', 'owner': plan.bge.name if plan.bge else '', 'timeline': '', 'outcome': '', 'status': 'Pending'} for i in range(3)]
+        actions_list = [{'id': i+1, 'ranking': i+1, 'priority_level': 'High', 'action': '', 'category': '', 'bge_support_days': 2, 'means_of_verification': '', 'owner': plan.bge.name if plan.bge else '', 'timeline': '', 'outcome': '', 'status': 'Pending'} for i in range(3)]
 
     for idx, act in enumerate(actions_list):
-        ws.write(row_idx, 0, str(act.get('id', idx + 1)), fmt_cell_center)
+        ranking_val = act.get('ranking') or idx + 1
+        p_level = act.get('priority_level') or 'High'
+        bge_days = act.get('bge_support_days') or ''
+        mov = act.get('means_of_verification') or ''
+
+        ws.write(row_idx, 0, f"#{ranking_val}", fmt_cell_center)
         ws.write(row_idx, 1, act.get('action', act.get('priority_action', '')), fmt_cell)
         ws.write(row_idx, 2, act.get('category', act.get('linked_category', '')), fmt_cell)
-        ws.write(row_idx, 3, act.get('owner', act.get('owner_bge', '')), fmt_cell)
-        ws.write(row_idx, 4, act.get('timeline', ''), fmt_cell_center)
-        ws.write(row_idx, 5, act.get('outcome', act.get('expected_outcome', '')), fmt_cell)
-        ws.write(row_idx, 6, act.get('status', 'Pending'), fmt_cell_center)
+        ws.write(row_idx, 3, p_level, fmt_cell_center)
+        ws.write(row_idx, 4, str(bge_days), fmt_cell_center)
+        ws.write(row_idx, 5, mov, fmt_cell)
+        ws.write(row_idx, 6, act.get('owner', act.get('owner_bge', '')), fmt_cell)
+        ws.write(row_idx, 7, act.get('timeline', ''), fmt_cell_center)
+        ws.write(row_idx, 8, act.get('status', 'Pending'), fmt_cell_center)
         row_idx += 1
 
     row_idx += 1
-    # Section 4: Sign-offs
+    # Section 5: Sign-offs
     ws.write(row_idx, 0, 'BGE Sign-off:', fmt_meta_label)
     ws.write(row_idx, 1, plan.bge_sign_off_name or (plan.bge.name if plan.bge_signed else '—'), fmt_meta_val)
     ws.write(row_idx, 2, 'Date:', fmt_meta_label)

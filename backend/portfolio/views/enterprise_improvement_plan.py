@@ -23,149 +23,151 @@ logger = logging.getLogger(__name__)
 
 TBIP_CATEGORIES = [
     {
-        'id': 'governance',
-        'name': 'Governance & Strategy',
-        'questions': [
-            {'id': 'gov_1', 'text': 'Does the business have a written business/strategic plan?'},
-            {'id': 'gov_2', 'text': 'Is the business actively implementing that plan (using it for decisions/investments)?'},
-            {'id': 'gov_3', 'text': 'Does the business have a Board of Directors/Advisors supporting decisions?'},
-            {'id': 'gov_4', 'text': 'Are minutes kept of board/advisor meetings (including BGE visits)?'},
-            {'id': 'gov_5', 'text': 'Does the business have segregated/independent management structures (e.g. finance and HR)?'},
-            {'id': 'gov_6', 'text': 'Does the business have HR and finance policies/manuals in place?'},
-        ]
-    },
-    {
         'id': 'finance',
         'name': 'Financial Management',
+        'icon': '💰',
         'questions': [
-            {'id': 'fin_1', 'text': 'Does the business have a digital accounting system?'},
-            {'id': 'fin_2', 'text': 'Does the business have a bank account in the business’s own name?'},
-            {'id': 'fin_3', 'text': 'Does the business have cash reserves set aside for a crisis?'},
-            {'id': 'fin_4', 'text': 'Does the business keep financial accounts (paper or electronic)?'},
-            {'id': 'fin_5', 'text': 'Does the business file statutory tax returns?'},
+            {'id': 'fin_1', 'text': 'Does the business have financial management guidelines (approval process, cash movement)?'},
+            {'id': 'fin_2', 'text': 'Does the business bank all their income/revenue before spending it?'},
+            {'id': 'fin_3', 'text': 'Are there accounting processes defined, including purchase orders, LPOs, and payment requests?'},
+            {'id': 'fin_4', 'text': 'Does the business have financial projections / financial model for their business for the next 12 months?'},
+            {'id': 'fin_5', 'text': 'Is there a designated person to handle business cash/finances?'},
         ]
     },
     {
         'id': 'hr',
-        'name': 'HR & Decent Work',
+        'name': 'Human Resources (HR)',
+        'icon': '👥',
         'questions': [
-            {'id': 'hr_1', 'text': 'Are individual staff roles/targets documented in writing?'},
-            {'id': 'hr_2', 'text': 'Does the business have written employment contracts with employees?'},
-            {'id': 'hr_3', 'text': 'Are there arrangements to protect workers from harassment/unfair treatment?'},
-            {'id': 'hr_4', 'text': 'Does the business make NSSF contributions for staff?'},
-            {'id': 'hr_5', 'text': 'Does the business provide health insurance for employees?'},
+            {'id': 'hr_1', 'text': 'Does the business have contracts for employees?'},
+            {'id': 'hr_6', 'text': 'Are the contracts performance-based?'},
+            {'id': 'hr_2', 'text': 'Are the TOR / roles clear and written down?'},
+            {'id': 'hr_3', 'text': 'Is there an organogram?'},
+            {'id': 'hr_4', 'text': 'Is the staff trained?'},
+            {'id': 'hr_5', 'text': 'Is there an HR policy in place?'},
         ]
     },
     {
-        'id': 'market',
-        'name': 'Market & Customers',
+        'id': 'marketing',
+        'name': 'Marketing & Sales',
+        'icon': '📈',
         'questions': [
-            {'id': 'mkt_1', 'text': 'Is the business revenue growing month by month?'},
-            {'id': 'mkt_2', 'text': 'Does the business maintain a customer database or reward system?'},
-            {'id': 'mkt_3', 'text': 'Does the business have a diversified customer base (not reliant on a single buyer)?'},
-            {'id': 'mkt_4', 'text': "Has the business been involved in public procurement or supplies to government/institutions?"},
-            {'id': 'mkt_5', 'text': 'Is the business able to produce/deliver enough to meet current market demand?'},
-        ]
-    },
-    {
-        'id': 'digital',
-        'name': 'Digital & Technology',
-        'questions': [
-            {'id': 'dig_1', 'text': 'Does the business own computer-related hardware (including smartphones and internet router)?'},
-            {'id': 'dig_2', 'text': 'Does the business have dedicated internet connectivity for operations?'},
-            {'id': 'dig_3', 'text': 'Does the business use digital tools (website, online booking/deliveries, stock, payroll, management systems)?'},
-            {'id': 'dig_4', 'text': 'Does the business use social media to promote products/services?'},
-            {'id': 'dig_5', 'text': 'Is the business registered on an online trading/procurement platform?'},
-            {'id': 'dig_6', 'text': 'Does the business make/receive digital payments (bank or mobile money)?'},
-            {'id': 'dig_7', 'text': 'Does the business store and refer to data to inform decisions?'},
-        ]
-    },
-    {
-        'id': 'env',
-        'name': 'Environmental Sustainability',
-        'questions': [
-            {'id': 'env_1', 'text': 'Has the business thought about its environmental impact?'},
-            {'id': 'env_2', 'text': 'Does the business have an environmental management plan, and is it implemented?'},
-            {'id': 'env_3', 'text': 'Does the business monitor its use of resources (water, energy, land, etc.)?'},
-            {'id': 'env_4', 'text': 'Does the business practice waste management/recycling or energy efficiency measures?'},
-            {'id': 'env_5', 'text': 'Does the business promote environmentally friendly practices among staff and suppliers?'},
-        ]
-    },
-    {
-        'id': 'regulatory',
-        'name': 'Regulatory Compliance & Quality',
-        'questions': [
-            {'id': 'reg_1', 'text': 'Is the business able to meet applicable regulatory standards (e.g. Halal, Kosher, UNBS)?'},
-            {'id': 'reg_2', 'text': 'Does the business maintain necessary operating licenses and sector permits?'},
-            {'id': 'reg_3', 'text': 'Does the business have quality assurance or safety standards/certifications in place?'},
-            {'id': 'reg_4', 'text': 'Does the business conduct regular compliance and standards reviews?'},
+            {'id': 'mkt_1', 'text': 'Does the business maintain a customer database?'},
+            {'id': 'mkt_2', 'text': 'Does the business utilise their database?'},
+            {'id': 'mkt_3', 'text': 'Is there a clear Value Proposition Canvas / statement (does the business understand exactly who their customers are)?'},
+            {'id': 'mkt_4', 'text': 'Does the business maintain a partner database?'},
+            {'id': 'mkt_5', 'text': 'Is there a dedicated sales team with clear targets?'},
         ]
     },
 ]
 
 
+def normalize_answer(ans):
+    if not ans:
+        return None
+    ans_str = str(ans).strip()
+    if ans_str in ('Available and complete', 'Complete', 'Available', 'Yes'):
+        return 'Available and complete'
+    if ans_str in ('Needs improvement', 'Needs Improvement', 'Partial'):
+        return 'Needs improvement'
+    if ans_str in ('Not available', 'Not Available', 'Missing', 'No'):
+        return 'Not available'
+    return None
+
+
 def calculate_diagnostic(answers):
     """
-    Given answers dict { question_id: 'Yes' | 'No' | 'N/A' },
-    computes category metrics and overall priority.
+    Given answers dict { question_id: 'Available and complete' | 'Needs improvement' | 'Not available' },
+    computes weighted category scores, gap statistics, and overall MSME priority.
     """
     categories_snapshot = {}
-    total_gaps = 0
     total_applicable = 0
+    total_not_available = 0
+    total_needs_improvement = 0
+    total_available = 0
+    total_score_points = 0
+    total_max_points = 0
 
     for cat in TBIP_CATEGORIES:
         cat_name = cat['name']
         cat_questions = cat['questions']
         q_count = len(cat_questions)
         applicable = 0
-        gaps = 0
+        available_cnt = 0
+        needs_imp_cnt = 0
+        not_avail_cnt = 0
+        cat_score_pts = 0
 
         for q in cat_questions:
-            ans = answers.get(q['id']) or answers.get(q['text'])
-            if ans in ('Yes', 'No'):
+            raw_ans = answers.get(q['id']) or answers.get(q['text'])
+            norm_ans = normalize_answer(raw_ans)
+            if norm_ans:
                 applicable += 1
-                if ans == 'No':
-                    gaps += 1
+                if norm_ans == 'Available and complete':
+                    available_cnt += 1
+                    cat_score_pts += 2
+                elif norm_ans == 'Needs improvement':
+                    needs_imp_cnt += 1
+                    cat_score_pts += 1
+                elif norm_ans == 'Not available':
+                    not_avail_cnt += 1
 
+        cat_max_pts = applicable * 2
         if applicable == 0:
-            cat_status = 'N/A'
+            cat_status = 'Not Assessed'
+            score_pct = 0.0
             gap_pct = 0.0
         else:
-            gap_pct = round((gaps / applicable) * 100, 1)
-            if gaps == 0:
+            score_pct = round((cat_score_pts / cat_max_pts) * 100, 1)
+            gap_pct = round(100.0 - score_pct, 1)
+            if score_pct >= 80.0:
                 cat_status = 'Satisfactory'
-            elif gap_pct >= 50.0:
-                cat_status = 'Critical Gap'
-            else:
+            elif score_pct >= 50.0:
                 cat_status = 'Needs Improvement'
+            else:
+                cat_status = 'Critical Gap'
 
-        total_gaps += gaps
         total_applicable += applicable
+        total_available += available_cnt
+        total_needs_improvement += needs_imp_cnt
+        total_not_available += not_avail_cnt
+        total_score_points += cat_score_pts
+        total_max_points += cat_max_pts
 
         categories_snapshot[cat_name] = {
             'total_questions': q_count,
             'applicable': applicable,
-            'gaps': gaps,
+            'available': available_cnt,
+            'needs_improvement': needs_imp_cnt,
+            'not_available': not_avail_cnt,
+            'gaps': not_avail_cnt + needs_imp_cnt,
+            'critical_gaps': not_avail_cnt,
             'status': cat_status,
+            'score_pct': score_pct,
             'gap_pct': gap_pct,
-            'ratio': f"{gaps} / {applicable}",
+            'ratio': f"{not_avail_cnt} missing · {needs_imp_cnt} needs imp",
         }
+
+    total_gaps = total_not_available + total_needs_improvement
+    overall_pct = round((total_score_points / total_max_points) * 100, 1) if total_max_points > 0 else 0.0
 
     if total_applicable == 0:
         overall_priority = 'Low'
+    elif overall_pct < 50.0 or total_not_available >= 3:
+        overall_priority = 'High'
+    elif overall_pct < 75.0 or total_not_available >= 1 or total_needs_improvement >= 3:
+        overall_priority = 'Medium'
     else:
-        overall_pct = (total_gaps / total_applicable) * 100
-        if overall_pct >= 45.0 or total_gaps >= 8:
-            overall_priority = 'High'
-        elif overall_pct >= 20.0 or total_gaps >= 4:
-            overall_priority = 'Medium'
-        else:
-            overall_priority = 'Low'
+        overall_priority = 'Low'
 
     return {
         'categories': categories_snapshot,
         'total_gaps': total_gaps,
+        'total_not_available': total_not_available,
+        'total_needs_improvement': total_needs_improvement,
+        'total_available': total_available,
         'total_applicable': total_applicable,
+        'overall_score_pct': overall_pct,
         'overall_priority': overall_priority,
     }
 

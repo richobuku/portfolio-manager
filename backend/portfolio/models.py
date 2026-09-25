@@ -313,6 +313,10 @@ class MSME(models.Model):
 
     def __str__(self):
         return f"{self.business_name} - {self.business_type} ({self.sector})"
+
+    @property
+    def name(self):
+        return self.business_name
     
     def save(self, *args, **kwargs):
         # Generate unique MSME code if not already set.
@@ -1961,8 +1965,16 @@ class EnterpriseImprovementPlan(models.Model):
     gap_notes = models.JSONField(default=dict, blank=True)
     
     # Stores priority actions (list of dicts):
-    # [{ id: 1, action: str, category: str, owner: str, timeline: str, outcome: str, status: str }]
+    # [{ id: 1, ranking: 1, priority_level: str, action: str, category: str, bge_support_days: int, means_of_verification: str, owner: str, timeline: str, outcome: str, status: str }]
     priority_actions = models.JSONField(default=list, blank=True)
+    
+    # Specific areas and notes on where the MSME needs help
+    help_needed_areas = models.JSONField(
+        default=list, blank=True, help_text='List of assessment areas the MSME needs help with'
+    )
+    help_needed_description = models.TextField(
+        blank=True, help_text='Detailed description of specific help/BDS support needed by MSME'
+    )
     
     overall_priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='Low')
     
