@@ -15,6 +15,14 @@ class Command(BaseCommand):
     help = 'Create default superuser if none exists'
 
     def handle(self, *args, **kwargs):
+        # Ensure designated admin users like Jimmy Ouni have admin privileges
+        jimmy = User.objects.filter(username='jimmy.ouni').first()
+        if jimmy and (not jimmy.is_staff or not jimmy.is_superuser):
+            jimmy.is_staff = True
+            jimmy.is_superuser = True
+            jimmy.save(update_fields=['is_staff', 'is_superuser'])
+            self.stdout.write(self.style.SUCCESS('Ensured jimmy.ouni is staff and superuser.'))
+
         if User.objects.filter(is_superuser=True).exists():
             self.stdout.write('Superuser already exists — skipping.')
             return

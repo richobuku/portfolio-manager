@@ -23,12 +23,14 @@ MANAGERS = [
         'last_name': 'Ouni',
         'email': 'jimmy.ouni@gopa.eu',
         'username': 'jimmy.ouni',
+        'is_admin': True,
     },
     {
         'first_name': 'Gloria',
         'last_name': 'Arinaitwe',
         'email': 'gloria.arinaitwe@gopa.eu',
         'username': 'gloria.arinaitwe',
+        'is_admin': False,
     },
 ]
 
@@ -65,6 +67,7 @@ class Command(BaseCommand):
 
         # 2. User accounts + CohortAdmin profiles
         for mgr in MANAGERS:
+            is_admin = mgr.get('is_admin', False)
             user, user_created = User.objects.get_or_create(
                 username=mgr['username'],
                 defaults={
@@ -72,10 +75,15 @@ class Command(BaseCommand):
                     'first_name': mgr['first_name'],
                     'last_name': mgr['last_name'],
                     'is_active': True,
-                    'is_staff': False,
-                    'is_superuser': False,
+                    'is_staff': is_admin,
+                    'is_superuser': is_admin,
                 },
             )
+            if not user_created and is_admin:
+                if not user.is_staff or not user.is_superuser:
+                    user.is_staff = True
+                    user.is_superuser = True
+                    user.save(update_fields=['is_staff', 'is_superuser'])
             if user_created:
                 temp_pw = _random_password()
                 user.set_password(temp_pw)
