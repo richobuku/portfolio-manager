@@ -868,10 +868,10 @@ def render_work_order(work_order):
 
     story.append(Spacer(1, 8))
 
-    # Expected Outcomes — only for CSA Rapid Assessment
-    if work_order.work_order_type == 'csa_rapid_assessment':
+    # Expected Outcomes — CSA Rapid Assessment and CSA EOI Data Entry
+    if work_order.work_order_type in ('csa_rapid_assessment', 'csa_eoi_data_entry'):
         story.append(Paragraph('EXPECTED OUTCOMES OF THE ASSIGNMENT', s['sectiontitle']))
-        if 'demonstration' in (work_order.objective or '').lower() or 'data entry' in (work_order.key_tasks or '').lower():
+        if work_order.work_order_type == 'csa_eoi_data_entry':
             CSA_OUTCOMES = [
                 ('Data Accuracy & Consolidation', 'Data for all applicants accurately entered, consolidated, and shared in soft copy.'),
                 ('Applicant Distribution', 'A clear overview of the number and distribution of applicants by cooperative, district, and region.'),
@@ -1125,27 +1125,26 @@ def render_work_order(work_order):
             'Payment is made monthly upon submission and approval of all deliverables, a signed timesheet, and an approved invoice, validated by the Business Development Expert.',
             'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA Pro GmbH.',
         ]
+    elif work_order.work_order_type == 'csa_eoi_data_entry':
+        CONDITIONS = [
+            'BGE must use only the standardized PRUDEV II tools and templates and submit all reports in the provided formats.',
+            'All data and business information must be handled with strict confidentiality.',
+            'GOPA Pro retains ownership of all outputs produced under this Work Order.',
+            'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
+            'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
+            'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA Pro GmbH.',
+        ]
     elif work_order.work_order_type == 'csa_rapid_assessment':
-        if 'demonstration' in (work_order.objective or '').lower() or 'data entry' in (work_order.key_tasks or '').lower():
-            CONDITIONS = [
-                'BGE must use only the standardized PRUDEV II tools and templates and submit all reports in the provided formats.',
-                'All data and business information must be handled with strict confidentiality.',
-                'GOPA Pro retains ownership of all outputs produced under this Work Order.',
-                'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
-                'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
-                'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA Pro GmbH.',
-            ]
-        else:
-            CONDITIONS = [
-                'BGE must use only the standardised PRUDEV II tools and templates and submit all reports in the provided formats. The designated data collection tool for this assignment is the KoboToolbox form at: https://ee-eu.kobotoolbox.org/x/HFlLk5ba',
-                'Any farmer group that is unavailable or not interested in participating must be formally documented in the non-engagement register with the reason stated. Undocumented gaps in group engagement will be treated as a performance concern.',
-                'All group data and business information must be handled with strict confidentiality.',
-                'GOPA Pro retains ownership of all outputs, reports, and data produced under this Work Order.',
-                'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
-                'Transport costs will be refunded based on public transport rates upon attendance and submission of valid original receipts.',
-                'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
-                'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA Pro GmbH.',
-            ]
+        CONDITIONS = [
+            'BGE must use only the standardised PRUDEV II tools and templates and submit all reports in the provided formats. The designated data collection tool for this assignment is the KoboToolbox form at: https://ee-eu.kobotoolbox.org/x/HFlLk5ba',
+            'Any farmer group that is unavailable or not interested in participating must be formally documented in the non-engagement register with the reason stated. Undocumented gaps in group engagement will be treated as a performance concern.',
+            'All group data and business information must be handled with strict confidentiality.',
+            'GOPA Pro retains ownership of all outputs, reports, and data produced under this Work Order.',
+            'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance, data mishandling, or breach of any condition above.',
+            'Transport costs will be refunded based on public transport rates upon attendance and submission of valid original receipts.',
+            'Payment will be made within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed timesheet, and an approved invoice.',
+            'In line with Ugandan Income Tax laws, professional fees paid to consultants are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA Pro GmbH.',
+        ]
     elif work_order.work_order_type == 'permanent_assignee_support':
         CONDITIONS = [
             'The BGE shall conduct a minimum of three (3) on-site coaching visits per calendar month for each permanently assigned MSME, providing hands-on business growth advisory and implementation support.',

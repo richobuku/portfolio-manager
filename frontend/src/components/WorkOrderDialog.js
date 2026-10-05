@@ -1083,6 +1083,44 @@ PHASE 3 — POST-SESSION SYNTHESIS & REPORTING (1 Day)
       },
     ],
   },
+  csa_eoi_data_entry: {
+    objective:
+      'To establish farmer-led demonstration sites where selected technologies can be practically used, tested and demonstrated to other farmers. The technologies are intended to improve production efficiency, reduce post-harvest losses, improve produce quality and strengthen farmer incomes.',
+    key_tasks:
+      'The BGE is tasked to enter the raw data from applicants who are registered members of one of the PRUDEV II-listed cooperatives and must be located in the eligible PRUDEV II operational areas, including the Acholi and Lango sub-regions and Adjumani district.',
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Data entry of approximately 500 EOI application forms from applicants within the designated cooperatives.',
+        due_date: '100-150 applications per day for not more than 5 working days',
+        quantitative_result: 'Approximately 500 EOI application forms entered (100–150 applications/day for a maximum of 5 working days)',
+        qualitative_result: 'Accurate data capture of all applicant details, verified against eligible PRUDEV II cooperatives in Acholi, Lango and Adjumani',
+        means_of_verification: 'Consolidated soft-copy database / entered records and daily progress log',
+        unit_rate: '60000',
+        payment_condition: 'Payment processed upon verified data entry of all assigned application forms (up to 5 days maximum)',
+      },
+      {
+        task_num: 2,
+        description: 'Data entry report detailing name and details of applicants with their preferred technology they wish to cost-share for.',
+        due_date: 'Within 2 days after the completion of the assignment',
+        quantitative_result: '1 data entry report submitted within 2 days of assignment completion',
+        qualitative_result: 'Clear overview of applicants by cooperative, district and region, with the most demanded CSA technologies identified',
+        means_of_verification: 'Submitted and approved data entry report (soft copy)',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of the report',
+      },
+      {
+        task_num: 3,
+        description: 'Approved time sheets and signed invoices related to this assignment.',
+        due_date: 'Within 2 days after the completion of the assignment',
+        quantitative_result: '1 signed timesheet (max 5 days) and 1 approved invoice submitted',
+        qualitative_result: 'Documentation compliant with GOPA Pro and PRUDEV II financial guidelines',
+        means_of_verification: 'Approved invoice and countersigned timesheet',
+        unit_rate: '',
+        payment_condition: 'Payment processed upon approval of timesheet and invoice alongside all deliverables',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -1328,6 +1366,19 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_position = 'Team Leader';
       extra.start_date   = '2026-08-10';
       extra.end_date     = '2026-08-21';
+    }
+    if (type === 'csa_eoi_data_entry') {
+      extra.duration             = 'Maximum of 5 days';
+      extra.max_days             = 5;
+      extra.rate_per_day         = 60000;
+      extra.transport_reimbursed = false;
+      extra.location             = 'Northern Uganda (Gulu Office)';
+      extra.project_name         = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      extra.start_date           = '2026-10-05';
+      extra.end_date             = '2026-10-12';
+      extra.payment_notes        = `Rate: UGX 60,000 per day worked, maximum 5 days (total contract value UGX 300,000).\nTransport: N/A.\nPayment Terms: Paid within fourteen (14) days upon submission and approval of all deliverables listed above, a duly filled and signed time-sheet, and an approved invoice.\nIn accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA Pro GmbH.`;
     }
     if (type === 'bds_manual_module') {
       extra.duration             = '4 Aug – 26 Sep 2026';
@@ -1607,6 +1658,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
                 <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework — Training &amp; Field Implementation</MenuItem>
                 <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
+                <MenuItem value="csa_eoi_data_entry">CSA Demonstration Sites — EOI Data Entry</MenuItem>
                 <MenuItem value="bds_manual_module">BDS Manual — Additional Module</MenuItem>
                 <MenuItem value="bge_technical_co_assignment">BGE Technical Co-Assignment Support (Specialist Technical Capacity)</MenuItem>
                 <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation &amp; Tool Demonstration</MenuItem>

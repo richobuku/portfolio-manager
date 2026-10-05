@@ -1237,6 +1237,7 @@ class WorkOrder(models.Model):
         ('fi_mobilisation_bcp',   'BCP Tool - Field Implementation'),
         ('carbon_emissions_training', 'Carbon Emissions Measurement Framework — Training & Field Implementation'),
         ('csa_rapid_assessment',  'CSA Rapid Assessment — Resilience Activity'),
+        ('csa_eoi_data_entry',    'CSA Demonstration Sites — EOI Data Entry'),
         ('bds_manual_module',     'BDS Manual — Additional Module'),
         ('bge_technical_co_assignment', 'BGE Technical Co-Assignment Support (Specialist Technical Capacity)'),
         ('market_activation_mobilisation', 'Market Activation Event — MSME Mobilisation & Tool Demonstration'),

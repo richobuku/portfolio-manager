@@ -8439,6 +8439,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="fi_mobilisation_bcp">BCP Tool - Field Implementation</MenuItem>
             <MenuItem value="carbon_emissions_training">Carbon Emissions Measurement Framework</MenuItem>
             <MenuItem value="csa_rapid_assessment">CSA Rapid Assessment — Resilience Activity</MenuItem>
+            <MenuItem value="csa_eoi_data_entry">CSA Demonstration Sites — EOI Data Entry</MenuItem>
             <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation</MenuItem>
             <MenuItem value="bge_bankable_docs_training">Bankable Documents Workshop — Co-Facilitator</MenuItem>
             <MenuItem value="bge_bankable_docs_participant">Bankable Documents Workshop — BGE Participant</MenuItem>
