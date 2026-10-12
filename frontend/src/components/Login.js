@@ -57,8 +57,9 @@ export default function Login({ onLogin, sessionExpired }) {
     try {
       const res = await axios.post(API_ENDPOINTS.PASSWORD_RESET, { email: resetEmail });
       setResetMsg(res.data.message || 'Reset link sent. Check your email.');
-    } catch {
-      setResetError('Something went wrong. Please try again.');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.detail || err.response?.data?.error || 'Something went wrong. Please try again.';
+      setResetError(msg);
     } finally {
       setResetLoading(false);
     }
