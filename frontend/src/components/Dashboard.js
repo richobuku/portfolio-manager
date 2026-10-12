@@ -9446,6 +9446,60 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── Communications ────────────────────────────────────────────────────────
   const COMM_TEMPLATES = [
     {
+      key: 'bge_portal_login_resolution',
+      label: 'BGE & Reviewers — Portal Login & Access Resolution',
+      subject: 'Important Update: Resolution of Portal Login & Password Reset Issues — PRUDEV II Portfolio System',
+      body: `Dear {{name}},
+
+I hope this email finds you well.
+
+We would like to address the recent difficulties several of you experienced when trying to log into the PRUDEV II Portfolio Management Portal (https://bds.glowi.africa) or when attempting to reset your passwords.
+
+We sincerely apologize for any inconvenience this caused in submitting your visit reports and accessing programme materials.
+
+---
+
+1. WHAT WAS CAUSING THE ISSUE?
+
+Our technical team investigated and resolved the following factors:
+
+• Strict Username & Case-Sensitivity: Previously, the portal required an exact username match. Entering your email address, BGE code, or mobile auto-capitalization (e.g. John.doe instead of john.doe) resulted in an "Invalid username or password" error.
+• Trailing Whitespace: Copy-pasting credentials on mobile devices sometimes added trailing spaces that caused logins to fail.
+• Network & DNS Connectivity: Some local networks and mobile routers failed to resolve the backend API, triggering "Something went wrong. Please try again." during password resets.
+
+---
+
+2. WHAT HAS BEEN FIXED?
+
+• Flexible Sign-In: You can now sign in using any of the following:
+  - Your registered Email address
+  - Your Portal Username
+  - Your BGE Code (e.g. PRUDEV II-BGE-010T-01 or BGE-010T-01)
+• Case-Insensitive & Whitespace Forgiving: The system now automatically trims extra spaces and handles uppercase/lowercase variations.
+• Streamlined Password Reset: Password reset links have been updated to open reliably across all mobile and desktop browsers.
+
+---
+
+3. HOW TO ACCESS YOUR ACCOUNT NOW
+
+1. Visit the Portal: Open https://bds.glowi.africa (please refresh your browser if already open).
+2. Sign In:
+   - Identifier: Enter your Email address, Username, or BGE Code.
+   - Password: Enter your existing password. If your account was newly provisioned and you haven't set a personal password yet, use the default temporary password: bds123 (you will be prompted to change it upon login).
+3. Need to Reset Your Password?
+   - Click "Forgot password?" on the login screen.
+   - Enter your registered email address and click "Send Reset Link".
+   - Open the link received in your inbox to create your new password.
+
+If you encounter any difficulty logging in or accessing your assigned work orders and visit planner, please reply directly to this email or reach out to our BDS support team so we can assist you immediately.
+
+Thank you for your dedication to supporting MSMEs under the PRUDEV II Programme.
+
+Best regards,
+PRUDEV II BDS Team
+GOPA Pro · GIZ Uganda`,
+    },
+    {
       key: 'bge_tbip_rollout',
       label: 'BGE — Enterprise Improvement Plan (TBIP) Rollout & Coaching Roadmap',
       subject: 'Action Required: Enterprise Improvement Plan (TBIP) Rollout & Monthly Coaching Roadmap',
@@ -9877,6 +9931,11 @@ PRUDEV II BDS Team`
   }, [commChannel]);
 
   const SMS_TEMPLATES = [
+    {
+      key: 'bge_portal_login_resolution',
+      label: 'BGE — Portal Login & Access Resolution',
+      body: 'Dear {{name}}, portal login issues have been resolved. You can now log in at https://bds.glowi.africa using your Email, Username, or BGE Code. If you forgot your password, use the "Forgot password?" link on the login page. Default temp password for new accounts is bds123. — PRUDEV II BDS Team',
+    },
     {
       key: 'bge_tbip_reminder',
       label: 'BGE — Enterprise Improvement Plan (TBIP) Rollout',
