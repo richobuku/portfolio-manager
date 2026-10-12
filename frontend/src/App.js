@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
+import { Analytics } from '@vercel/analytics/react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import BGEDashboard from './components/BGEDashboard';
@@ -264,6 +265,7 @@ export default function App() {
         </Routes>
         <PWAInstallPrompt />
       </Router>
+      <Analytics />
     </ErrorBoundary>
   );
 }

@@ -38,6 +38,7 @@ export default function Login({ onLogin, sessionExpired }) {
         onLogin(res.data.token, res.data.user, res.data.session_expires_at);
       } else {
         setError('Login failed. Please try again.');
+      }
     } catch (err) {
       if (!err.response) {
         setError('Server is unreachable or waking up. Please wait a moment and try again.');
