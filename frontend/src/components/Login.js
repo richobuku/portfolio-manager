@@ -38,9 +38,12 @@ export default function Login({ onLogin, sessionExpired }) {
         onLogin(res.data.token, res.data.user, res.data.session_expires_at);
       } else {
         setError('Login failed. Please try again.');
-      }
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Invalid username or password.');
+      if (!err.response) {
+        setError('Server is unreachable or waking up. Please wait a moment and try again.');
+      } else {
+        setError(err.response?.data?.message || err.response?.data?.error || 'Invalid username or password.');
+      }
     } finally {
       setLoading(false);
     }
@@ -115,9 +118,10 @@ export default function Login({ onLogin, sessionExpired }) {
 
             <Box component="form" onSubmit={handleSubmit}>
               <TextField
-                fullWidth size="small" label="Username" name="username"
+                fullWidth size="small" label="Username, Email or BGE Code" name="username"
                 value={credentials.username} onChange={handleChange}
                 disabled={loading} autoComplete="username"
+                placeholder="e.g. your email, username, or BGE code"
                 sx={{ mb: 2 }}
               />
               <TextField

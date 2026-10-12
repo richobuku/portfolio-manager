@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import {
   Box, Card, CardContent, TextField, Button, Typography,
   InputAdornment, IconButton, Alert, CircularProgress,
@@ -9,10 +9,11 @@ import { API_ENDPOINTS } from '../config';
 import { BRAND } from '../theme';
 
 export default function ResetPassword() {
+  const { uid: routeUid, token: routeToken } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('token') || '';
-  const uid   = searchParams.get('uid')   || '';
+  const token = routeToken || searchParams.get('token') || '';
+  const uid   = routeUid   || searchParams.get('uid')   || '';
 
   const [password, setPassword]       = useState('');
   const [confirm, setConfirm]         = useState('');

@@ -190,6 +190,12 @@ class BGEUserViewSet(viewsets.ViewSet):
             return err
         user.set_password(new_password)
         user.save()
+        from ..models import UserSecurityProfile
+        from django.utils import timezone as _tz
+        sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
+        sec.must_change_password = False
+        sec.password_last_changed = _tz.now()
+        sec.save(update_fields=['must_change_password', 'password_last_changed'])
         return Response({'message': f'Password updated for {user.username}.'})
 
     @action(detail=True, methods=['patch'], url_path='link-bge')

@@ -174,17 +174,86 @@ def _try_auto_link_bge(user, google_name, google_email):
     return None
 
 
+def _authenticate_flexible(request, raw_identifier, raw_password):
+    """
+    Authenticate a user flexibly by:
+    1. Exact username
+    2. Case-insensitive username (handles mobile keyboard auto-capitalization)
+    3. Email (case-insensitive) - handles BGEs entering email in "Email or Username"
+    4. Email local-part (e.g. user entered full email where username is prefix)
+    5. BGE Code (e.g. PRUDEV II-BGE-010T-01, BGE-010T-01, etc.)
+    6. Trimming trailing/leading whitespace from password (common on mobile copy-paste)
+    """
+    if not raw_identifier or not raw_password:
+        return None
+
+    passwords_to_try = [raw_password]
+    stripped_pw = raw_password.strip()
+    if stripped_pw != raw_password and len(stripped_pw) > 0:
+        passwords_to_try.append(stripped_pw)
+
+    # 1. Exact authenticate
+    for pw in passwords_to_try:
+        user = authenticate(request=request, username=raw_identifier, password=pw)
+        if user is not None:
+            return user
+
+    # 2. Collect candidate User objects based on various identifiers
+    candidates = []
+
+    # 2a. Case-insensitive username match
+    for u in User.objects.filter(username__iexact=raw_identifier):
+        if u not in candidates:
+            candidates.append(u)
+
+    # 2b. Case-insensitive email match
+    for u in User.objects.filter(email__iexact=raw_identifier):
+        if u not in candidates:
+            candidates.append(u)
+
+    # 2c. If identifier contains '@', also try local part as username
+    if '@' in raw_identifier:
+        local_part = raw_identifier.split('@')[0].strip()
+        for u in User.objects.filter(username__iexact=local_part):
+            if u not in candidates:
+                candidates.append(u)
+
+    # 2d. BGE code match
+    try:
+        from .models import BusinessGrowthExpert
+        # Exact BGE code match
+        for bge in BusinessGrowthExpert.objects.filter(bge_code__iexact=raw_identifier, user__isnull=False).select_related('user'):
+            if bge.user and bge.user not in candidates:
+                candidates.append(bge.user)
+        # Suffix / partial BGE code match if not found
+        if not candidates:
+            for bge in BusinessGrowthExpert.objects.filter(bge_code__icontains=raw_identifier, user__isnull=False).select_related('user'):
+                if bge.user and bge.user not in candidates:
+                    candidates.append(bge.user)
+    except Exception:
+        pass
+
+    # 3. Try authenticating against all found candidate users
+    for candidate in candidates:
+        for pw in passwords_to_try:
+            user = authenticate(request=request, username=candidate.username, password=pw)
+            if user is not None:
+                return user
+
+    return None
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([LoginRateThrottle])
 def login_view(request):
-    username = request.data.get('username', '').strip()
-    password = request.data.get('password', '')
+    username = (request.data.get('username') or '').strip()
+    password = request.data.get('password') or ''
 
     if not username or not password:
         return Response({'message': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = authenticate(username=username, password=password)
+    user = _authenticate_flexible(request, username, password)
     if user is None:
         return Response({'message': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
 
