@@ -1,6 +1,6 @@
 /* PRUDEV II Portfolio Management System — PWA service worker */
 
-const VERSION = 'prudev2-pwa-v5';
+const VERSION = 'prudev2-pwa-v6';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -38,6 +38,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'FORCE_CACHE_PURGE') {
+    caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key))));
   }
 });
 

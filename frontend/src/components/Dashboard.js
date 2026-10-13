@@ -524,6 +524,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [roleDialog, setRoleDialog] = useState(false);
   const [roleUser, setRoleUser] = useState(null);
   const [roleForm, setRoleForm] = useState({ role: 'viewer', group_ids: [] });
+  const [bulkPwdDialog, setBulkPwdDialog] = useState(false);
+  const [bulkPwdValue, setBulkPwdValue] = useState('prudev123');
+  const [bulkPwdSendEmail, setBulkPwdSendEmail] = useState(false);
+  const [bulkPwdLoading, setBulkPwdLoading] = useState(false);
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   // Heavy initial load — runs once after login and after explicit refreshes
@@ -1737,6 +1741,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setNewPwd('');
     } catch (e) { notify(e.response?.data?.error || 'Failed to reset password', 'error'); }
     finally { setPwdLoading(false); }
+  };
+
+  const handleBulkResetPasswords = async () => {
+    if (!bulkPwdValue || bulkPwdValue.length < 8) {
+      notify('Password must be at least 8 characters.', 'error');
+      return;
+    }
+    setBulkPwdLoading(true);
+    try {
+      const res = await axios.post(`${API_ENDPOINTS.BGE_USERS}bulk-reset-passwords/`, {
+        password: bulkPwdValue,
+        send_email: bulkPwdSendEmail,
+        target: 'bge',
+      }, { headers });
+      notify(res.data.message || 'BGE passwords reset successfully.', 'success');
+      setBulkPwdDialog(false);
+      fetchAll();
+    } catch (e) {
+      notify(e.response?.data?.error || 'Failed to bulk reset passwords', 'error');
+    } finally {
+      setBulkPwdLoading(false);
+    }
   };
 
   const openRoleDialog = (u) => {
@@ -5663,6 +5689,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
     return (
     <Box>
       <SectionHeader title="User Accounts" subtitle={`${bgeUsers.length} account${bgeUsers.length !== 1 ? 's' : ''} — BGEs, Programme Managers, Viewers`}>
+        <Button variant="outlined" color="warning" size="small" sx={{ mr: 1 }} onClick={() => setBulkPwdDialog(true)} disabled={userLoading}>
+          Reset All BGE Passwords
+        </Button>
         {experts.some(e => !bgeUsers.some(u => u.bge_profile?.id === e.id)) && (
           <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={bulkCreateMissingAccounts} disabled={userLoading}>
             {userLoading ? 'Creating…' : 'Create Missing Accounts'}
@@ -12711,6 +12740,31 @@ PRUDEV II BDS Team`
             onClick={resetPassword}
             disabled={pwdLoading || newPwd.length < 6}>
             {pwdLoading ? <CircularProgress size={18} /> : 'Reset Password'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Bulk Reset All BGE Passwords ───────────────────────────────────── */}
+      <Dialog open={bulkPwdDialog} onClose={() => setBulkPwdDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Reset All BGE Passwords</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This will set the password for all Business Growth Experts (BGEs) to the temporary password below, clearing any forced-change locks.
+          </Typography>
+          <TextField
+            fullWidth size="small" label="New Password (min 8 chars)"
+            value={bulkPwdValue} onChange={e => setBulkPwdValue(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <FormControlLabel
+            control={<Checkbox checked={bulkPwdSendEmail} onChange={e => setBulkPwdSendEmail(e.target.checked)} size="small" />}
+            label={<Typography variant="body2">Send email notification with login credentials</Typography>}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkPwdDialog(false)}>Cancel</Button>
+          <Button variant="contained" color="warning" onClick={handleBulkResetPasswords} disabled={bulkPwdLoading}>
+            {bulkPwdLoading ? <CircularProgress size={18} /> : 'Reset All Passwords'}
           </Button>
         </DialogActions>
       </Dialog>

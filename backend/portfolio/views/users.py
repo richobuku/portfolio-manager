@@ -135,6 +135,55 @@ class BGEUserViewSet(viewsets.ViewSet):
                 skipped += 1
         return Response({'created': created, 'skipped': skipped, 'names': names})
 
+    @action(detail=False, methods=['post'], url_path='bulk-reset-passwords')
+    def bulk_reset_passwords(self, request):
+        """Reset passwords for all BGEs (or all non-admin users) to a uniform password.
+        Admin-only. Body: { password: '...', send_email: False, target: 'bge'|'all' }
+        """
+        self._require_admin(request)
+        password = (request.data.get('password') or 'prudev123').strip()
+        if len(password) < 8:
+            return Response({'error': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        send_email = bool(request.data.get('send_email', False))
+        target = request.data.get('target', 'bge')
+
+        from ..models import UserSecurityProfile
+        from django.utils import timezone as _tz
+
+        if target == 'all':
+            users = User.objects.filter(is_staff=False, is_superuser=False)
+        else:
+            users = User.objects.filter(is_staff=False, is_superuser=False, bge_profile__isnull=False)
+
+        count = 0
+        names = []
+        for u in users:
+            u.set_password(password)
+            u.save(update_fields=['password'])
+            sec, _ = UserSecurityProfile.objects.get_or_create(user=u)
+            sec.must_change_password = False
+            sec.password_last_changed = _tz.now()
+            sec.save(update_fields=['must_change_password', 'password_last_changed'])
+            count += 1
+            names.append(u.username)
+
+            if send_email and u.email:
+                try:
+                    from ..account_setup import send_welcome_email
+                    bge = getattr(u, 'bge_profile', None)
+                    if bge:
+                        send_welcome_email(bge, u.username, password)
+                except Exception as exc:
+                    logger.warning("Could not send reset email to %s: %s", u.email, exc)
+
+        return Response({
+            'message': f'Successfully reset passwords for {count} user(s).',
+            'count': count,
+            'default_password': password,
+            'users': names,
+        })
+
     @action(detail=True, methods=['patch'], url_path='set-role')
     def set_role(self, request, pk=None):
         """Set or clear a user's programme-manager role and managed groups.

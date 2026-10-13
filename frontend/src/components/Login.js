@@ -24,6 +24,26 @@ export default function Login({ onLogin, sessionExpired }) {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg, setResetMsg] = useState('');
   const [resetError, setResetError] = useState('');
+  const [clearingCache, setClearingCache] = useState(false);
+
+  const handleForceClearCache = async () => {
+    setClearingCache(true);
+    try {
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((name) => caches.delete(name)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.unregister();
+        }
+      }
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (_) {}
+    window.location.href = window.location.origin + '/?v=' + Date.now();
+  };
 
   const handleChange = (e) =>
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
@@ -166,6 +186,21 @@ export default function Login({ onLogin, sessionExpired }) {
               >
                 {loading ? <CircularProgress size={22} color="inherit" /> : 'Sign In'}
               </Button>
+
+              <Box sx={{ mt: 2.5, pt: 1.5, borderTop: '1px dashed #E7E5E4', textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontSize: '0.74rem' }}>
+                  Having trouble signing in or seeing old screens?
+                </Typography>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={handleForceClearCache}
+                  disabled={clearingCache}
+                  sx={{ textTransform: 'none', fontSize: '0.78rem', fontWeight: 600, color: BRAND.primaryMain }}
+                >
+                  {clearingCache ? 'Refreshing portal…' : '🔄 Tap here to clear cache & refresh portal'}
+                </Button>
+              </Box>
             </Box>
           </Paper>
 

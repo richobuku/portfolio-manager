@@ -19,7 +19,7 @@ from django.core.mail import EmailMultiAlternatives
 
 log = logging.getLogger(__name__)
 
-DEFAULT_PASSWORD = 'bds123'
+DEFAULT_PASSWORD = 'prudev123'
 
 def _generate_temp_password():
     """Generate a unique random temporary password for each account."""

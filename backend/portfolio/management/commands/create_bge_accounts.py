@@ -98,6 +98,12 @@ class Command(BaseCommand):
                         continue
                     bge.user.set_password(password)
                     bge.user.save(update_fields=['password'])
+                    from portfolio.models import UserSecurityProfile
+                    from django.utils import timezone as _tz
+                    sec, _ = UserSecurityProfile.objects.get_or_create(user=bge.user)
+                    sec.must_change_password = False
+                    sec.password_last_changed = _tz.now()
+                    sec.save(update_fields=['must_change_password', 'password_last_changed'])
                     rotated += 1
                     if send_email:
                         send_welcome_email(bge, bge.user.username, password)
