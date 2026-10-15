@@ -332,9 +332,9 @@ def change_password_view(request):
 @permission_classes([AllowAny])
 @throttle_classes([PasswordResetThrottle])
 def request_password_reset(request):
-    email = request.data.get('email', '').strip().lower()
-    if not email:
-        return Response({'message': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    raw_identifier = (request.data.get('email') or request.data.get('identifier') or '').strip()
+    if not raw_identifier:
+        return Response({'message': 'Email, username, or BGE code is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Check that SMTP is actually configured — if not, tell the admin rather than silently failing
     gmail_pw = getattr(settings, 'GMAIL_APP_PASSWORD', '')
@@ -349,8 +349,46 @@ def request_password_reset(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    user = User.objects.filter(email__iexact=email).first()
-    if user:
+    # 1. Look for user by email (preferring active and BGE-linked accounts to avoid stale duplicates)
+    user = None
+    target_email = None
+
+    candidates = list(User.objects.filter(email__iexact=raw_identifier, is_active=True))
+    if not candidates:
+        candidates = list(User.objects.filter(email__iexact=raw_identifier))
+
+    if candidates:
+        linked = [u for u in candidates if hasattr(u, 'bge_profile')]
+        user = linked[0] if linked else candidates[0]
+        target_email = user.email
+
+    # 2. Look by username
+    if not user:
+        user = User.objects.filter(username__iexact=raw_identifier, is_active=True).first()
+        if not user:
+            user = User.objects.filter(username__iexact=raw_identifier).first()
+        if user:
+            target_email = user.email
+
+    # 3. Look by BGE profile (by bge_code or bge email)
+    if not user or not target_email:
+        from .models import BusinessGrowthExpert
+        bge = BusinessGrowthExpert.objects.filter(
+            bge_code__iexact=raw_identifier, user__isnull=False
+        ).select_related('user').first()
+        if not bge:
+            bge = BusinessGrowthExpert.objects.filter(
+                email__iexact=raw_identifier, user__isnull=False
+            ).select_related('user').first()
+        if bge:
+            user = user or bge.user
+            target_email = target_email or bge.email or (bge.user and bge.user.email)
+
+    # Fallback to BGE profile email if user.email was blank
+    if user and not target_email and hasattr(user, 'bge_profile') and user.bge_profile.email:
+        target_email = user.bge_profile.email
+
+    if user and target_email:
         # Stateless token: validates against user.pk + password hash + last_login.
         # Carry the user id alongside so confirm_password_reset can look up.
         uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
@@ -372,22 +410,22 @@ def request_password_reset(request):
             subject='PRUDEV II — Password Reset',
             body=f'Reset your password: {reset_link}',
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user.email],
+            to=[target_email],
             reply_to=[reply_to],
         )
         msg.attach_alternative(html, 'text/html')
         try:
             msg.send()
-            logger.info("Password reset email sent to %s", user.email)
+            logger.info("Password reset email sent to %s for user %s", target_email, user.username)
         except Exception as exc:
-            logger.error("Failed to send password reset email to %s: %s", user.email, exc)
+            logger.error("Failed to send password reset email to %s: %s", target_email, exc)
             return Response(
                 {'message': 'Failed to send reset email. Please try again later or contact the administrator.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    # Always return success to avoid email enumeration
-    return Response({'message': 'If that email is registered, a reset link has been sent.'})
+    # Always return success to avoid enumeration
+    return Response({'message': 'If that account is registered, a reset link has been sent to your registered email address.'})
 
 
 @api_view(['POST'])
