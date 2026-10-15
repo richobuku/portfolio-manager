@@ -5,6 +5,7 @@ __pycache__/
 *oauth_client.json
 *credentials*.json
 .env*
+agro-satellite-monitor/
 
 # C extensions
 *.so
