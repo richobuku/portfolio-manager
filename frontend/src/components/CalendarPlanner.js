@@ -72,34 +72,34 @@ const STATUS_CONFIG = {
 };
 
 const MISSED_REASONS = [
-  { value: 'msme_unavailable',    label: 'MSME Owner / Contact Unavailable' },
-  { value: 'msme_closed',         'label': 'Business Premises Closed / Relocated' },
-  { value: 'bge_emergency',       label: 'BGE Illness / Personal Emergency' },
+  { value: 'msme_unavailable', label: 'MSME Owner / Contact Unavailable' },
+  { value: 'msme_closed', 'label': 'Business Premises Closed / Relocated' },
+  { value: 'bge_emergency', label: 'BGE Illness / Personal Emergency' },
   { value: 'transport_logistics', label: 'Transport / Road Impassable / Breakdown' },
-  { value: 'weather',             label: 'Adverse Weather / Heavy Rain / Floods' },
-  { value: 'rescheduled_msme',    label: 'Rescheduled at MSME Request' },
-  { value: 'rescheduled_bge',     label: 'Rescheduled by BGE' },
-  { value: 'security',            label: 'Safety / Security Concern in Area' },
-  { value: 'other',               label: 'Other Reason (specify in notes)' },
+  { value: 'weather', label: 'Adverse Weather / Heavy Rain / Floods' },
+  { value: 'rescheduled_msme', label: 'Rescheduled at MSME Request' },
+  { value: 'rescheduled_bge', label: 'Rescheduled by BGE' },
+  { value: 'security', label: 'Safety / Security Concern in Area' },
+  { value: 'other', label: 'Other Reason (specify in notes)' },
 ];
 
 const VISIT_TYPES = [
-  { value: 'one_on_one',    label: 'One-on-One Visit',       icon: <Person fontSize="small" /> },
-  { value: 'coaching',      label: 'Business Coaching',      icon: <Psychology fontSize="small" /> },
-  { value: 'data_update',   label: 'Data Collection Visit',  icon: <Assessment fontSize="small" /> },
-  { value: 'training',      label: 'Training Visit',         icon: <School fontSize="small" /> },
-  { value: 'annual_review', label: 'Annual Review',          icon: <QueryStats fontSize="small" /> },
+  { value: 'one_on_one', label: 'One-on-One Visit', icon: <Person fontSize="small" /> },
+  { value: 'coaching', label: 'Business Coaching', icon: <Psychology fontSize="small" /> },
+  { value: 'data_update', label: 'Data Collection Visit', icon: <Assessment fontSize="small" /> },
+  { value: 'training', label: 'Training Visit', icon: <School fontSize="small" /> },
+  { value: 'annual_review', label: 'Annual Review', icon: <QueryStats fontSize="small" /> },
   { value: 'bcp_facilitation', label: 'BCP Facilitation & Accountability', icon: <Flag fontSize="small" /> },
-  { value: 'followup',      label: 'Follow-up Visit',        icon: <Schedule fontSize="small" /> },
+  { value: 'followup', label: 'Follow-up Visit', icon: <Schedule fontSize="small" /> },
 ];
 
 const VENUES = [
   { value: 'msme_premises', label: 'MSME Business Premises' },
-  { value: 'farm_site',     label: 'Farm / Field / Production Site' },
-  { value: 'bge_base',      label: 'BGE Field Base / District Office' },
-  { value: 'trading_center',label: 'Trading Centre / Neutral Venue' },
-  { value: 'virtual',       label: 'Phone Call / Virtual Meeting' },
-  { value: 'other',         label: 'Other Venue' },
+  { value: 'farm_site', label: 'Farm / Field / Production Site' },
+  { value: 'bge_base', label: 'BGE Field Base / District Office' },
+  { value: 'trading_center', label: 'Trading Centre / Neutral Venue' },
+  { value: 'virtual', label: 'Phone Call / Virtual Meeting' },
+  { value: 'other', label: 'Other Venue' },
 ];
 
 const getGoogleCalendarUrl = (visit) => {
@@ -251,7 +251,7 @@ export default function CalendarPlanner({
         if (selectedBge) params.set('bge', selectedBge);
         if (selectedDistrict) params.set('district', selectedDistrict);
         if (statusFilter !== 'all') params.set('status', statusFilter);
-        
+
         if (viewMode === 'week') {
           // Compute start (Mon) and end (Sun) of active week
           const d = new Date(currentDate);
@@ -293,7 +293,7 @@ export default function CalendarPlanner({
     try {
       const cached = JSON.parse(localStorage.getItem('googleCalendarStatus') || 'null');
       if (cached && typeof cached.connected === 'boolean') return cached;
-    } catch {}
+    } catch { }
     return {
       connected: false,
       google_email: '',
@@ -311,11 +311,11 @@ export default function CalendarPlanner({
     try {
       const res = await axios.get(GOOGLE_CALENDAR_STATUS_URL, { headers: h(token) });
       setGoogleStatus(res.data);
-      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(res.data)); } catch {}
+      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(res.data)); } catch { }
     } catch (e) {
       if (e.response?.status === 401) {
         setGoogleStatus(prev => ({ ...prev, connected: false }));
-        try { localStorage.removeItem('googleCalendarStatus'); } catch {}
+        try { localStorage.removeItem('googleCalendarStatus'); } catch { }
       }
     }
   }, [token]);
@@ -332,7 +332,7 @@ export default function CalendarPlanner({
       const email = params.get('email');
       const updated = { connected: true, google_email: email || '', sync_enabled: true };
       setGoogleStatus(prev => ({ ...prev, ...updated }));
-      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(updated)); } catch {}
+      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(updated)); } catch { }
       setFeedback({
         type: 'success',
         text: `Google Calendar connected successfully${email ? ` (${email})` : ''}! Visits now auto-sync in real time.`,
@@ -379,7 +379,7 @@ export default function CalendarPlanner({
       await axios.post(GOOGLE_CALENDAR_DISCONNECT_URL, {}, { headers: h(token) });
       const disconnectedState = { connected: false, google_email: '', sync_enabled: false };
       setGoogleStatus(disconnectedState);
-      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(disconnectedState)); } catch {}
+      try { localStorage.setItem('googleCalendarStatus', JSON.stringify(disconnectedState)); } catch { }
       setFeedback({ type: 'info', text: 'Google Calendar disconnected.' });
       setGoogleMenuAnchor(null);
     } catch (e) {
@@ -810,10 +810,10 @@ export default function CalendarPlanner({
                     <CircularProgress size={14} color="inherit" />
                   ) : (
                     <svg width="15" height="15" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                     </svg>
                   )
                 }
@@ -2697,8 +2697,8 @@ export default function CalendarPlanner({
                         {selectedVisit.google_sync_status === 'synced'
                           ? `Synced to Google Calendar ${selectedVisit.google_last_synced_at ? `(${new Date(selectedVisit.google_last_synced_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}`
                           : selectedVisit.google_sync_status === 'failed'
-                          ? 'Google Calendar sync failed (will retry)'
-                          : 'Google Calendar sync ready'}
+                            ? 'Google Calendar sync failed (will retry)'
+                            : 'Google Calendar sync ready'}
                       </Typography>
                     </Box>
                     {selectedVisit.google_event_id && (
@@ -3237,10 +3237,10 @@ export default function CalendarPlanner({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
               </svg>
             </Box>
             <Box>
@@ -3330,11 +3330,11 @@ export default function CalendarPlanner({
           const hasConflict = conflictIds.size > 0;
           const formattedDate = dayDetailModal.date
             ? dayDetailModal.date.toLocaleDateString('en-GB', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })
             : '';
 
           return (
@@ -3671,10 +3671,10 @@ export default function CalendarPlanner({
           const popVisits = visitsByDate[popoverAnchor.isoDate] || popoverAnchor.visits || [];
           const formattedDate = popoverAnchor.date
             ? popoverAnchor.date.toLocaleDateString('en-GB', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-              })
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+            })
             : '';
 
           return (

@@ -1,4 +1,22 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+function getApiBaseUrl() {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL.replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    const { hostname, protocol } = window.location;
+    // Production deployments (custom domain or Vercel preview)
+    if (hostname === 'bds.glowi.africa' || hostname.endsWith('vercel.app')) {
+      return 'https://portfolio-manager-backend.onrender.com';
+    }
+    // Any HTTPS site cannot connect to insecure HTTP 127.0.0.1 due to Mixed Content
+    if (protocol === 'https:') {
+      return 'https://portfolio-manager-backend.onrender.com';
+    }
+  }
+  return 'http://127.0.0.1:8000';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const API_ENDPOINTS = {
   LOGIN:              `${API_BASE_URL}/api/auth/login/`,

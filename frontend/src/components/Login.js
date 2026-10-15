@@ -8,6 +8,8 @@ import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config';
 import { BRAND } from '../theme';
+import { parseDetailedError } from '../utils/error';
+import DiagnosticAlert from './DiagnosticAlert';
 
 const gizLogo = '/giz-logo.png';
 const gopaLogo = '/gopa-logo.png';
@@ -16,14 +18,14 @@ export default function Login({ onLogin, sessionExpired }) {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errorInfo, setErrorInfo] = useState(null);
 
   // Forgot password dialog
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg, setResetMsg] = useState('');
-  const [resetError, setResetError] = useState('');
+  const [resetError, setResetError] = useState(null);
   const [clearingCache, setClearingCache] = useState(false);
 
   const handleForceClearCache = async () => {
@@ -49,38 +51,57 @@ export default function Login({ onLogin, sessionExpired }) {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
-    setError('');
+    setErrorInfo(null);
     try {
       const res = await axios.post(API_ENDPOINTS.LOGIN, credentials);
       if (res.data.token) {
         onLogin(res.data.token, res.data.user, res.data.session_expires_at);
       } else {
-        setError('Login failed. Please try again.');
+        setErrorInfo({
+          title: 'Authentication Incomplete',
+          message: 'The server responded, but did not return a valid session authentication token.',
+          severity: 'error',
+          remediation: 'Please check your backend authentication token view configuration.',
+          targetUrl: API_ENDPOINTS.LOGIN,
+          method: 'POST',
+        });
       }
     } catch (err) {
-      if (!err.response) {
-        setError('Server is unreachable or waking up. Please wait a moment and try again.');
-      } else {
-        setError(err.response?.data?.message || err.response?.data?.error || 'Invalid username or password.');
-      }
+      const detailed = parseDetailedError(err, {
+        endpoint: API_ENDPOINTS.LOGIN,
+        method: 'POST',
+        username: credentials.username,
+      });
+      setErrorInfo(detailed);
     } finally {
       setLoading(false);
     }
   };
 
   const handleResetRequest = async () => {
-    if (!resetEmail.trim()) { setResetError('Please enter your email address.'); return; }
+    if (!resetEmail.trim()) {
+      setResetError({
+        title: 'Email Required',
+        message: 'Please enter your email address.',
+        severity: 'warning',
+      });
+      return;
+    }
     setResetLoading(true);
-    setResetError('');
+    setResetError(null);
     setResetMsg('');
     try {
       const res = await axios.post(API_ENDPOINTS.PASSWORD_RESET, { email: resetEmail });
       setResetMsg(res.data.message || 'Reset link sent. Check your email.');
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.detail || err.response?.data?.error || 'Something went wrong. Please try again.';
-      setResetError(msg);
+      const detailed = parseDetailedError(err, {
+        endpoint: API_ENDPOINTS.PASSWORD_RESET,
+        method: 'POST',
+        email: resetEmail,
+      });
+      setResetError(detailed);
     } finally {
       setResetLoading(false);
     }
@@ -168,7 +189,7 @@ export default function Login({ onLogin, sessionExpired }) {
                 <Typography
                   variant="caption" color="primary"
                   sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                  onClick={() => { setResetOpen(true); setResetEmail(''); setResetMsg(''); setResetError(''); }}
+                  onClick={() => { setResetOpen(true); setResetEmail(''); setResetMsg(''); setResetError(null); }}
                 >
                   Forgot password?
                 </Typography>
@@ -179,7 +200,13 @@ export default function Login({ onLogin, sessionExpired }) {
                   Your session has expired. Please log in again.
                 </Alert>
               )}
-              {error && <Alert severity="error" sx={{ mb: 2, py: 0.5 }}>{error}</Alert>}
+              {errorInfo && (
+                <DiagnosticAlert
+                  errorInfo={errorInfo}
+                  onRetry={() => handleSubmit()}
+                  sx={{ mb: 2 }}
+                />
+              )}
               <Button
                 type="submit" fullWidth variant="contained" size="large"
                 disabled={loading}
@@ -232,7 +259,13 @@ export default function Login({ onLogin, sessionExpired }) {
             disabled={resetLoading || !!resetMsg}
             autoFocus
           />
-          {resetError && <Alert severity="error" sx={{ mt: 2, py: 0.5 }}>{resetError}</Alert>}
+          {resetError && (
+            <DiagnosticAlert
+              errorInfo={resetError}
+              onRetry={handleResetRequest}
+              sx={{ mt: 2 }}
+            />
+          )}
           {resetMsg && <Alert severity="success" sx={{ mt: 2, py: 0.5 }}>{resetMsg}</Alert>}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
