@@ -1,6 +1,6 @@
 /* PRUDEV II Portfolio Management System — PWA service worker */
 
-const VERSION = 'prudev2-pwa-v6';
+const VERSION = 'prudev2-pwa-v7';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 

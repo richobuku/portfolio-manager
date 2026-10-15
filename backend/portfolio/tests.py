@@ -936,6 +936,56 @@ class MSMEReportOrderingTests(TestCase):
         self.assertEqual(ids, [self.r1.id, self.r3.id, self.r2.id])
 
 
+class AuthenticationResilienceTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from rest_framework.test import APIClient
+        from .models import BusinessGrowthExpert, UserSecurityProfile
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='denis.givo',
+            email='denis@glowi.africa',
+            password='SecretPassword123'
+        )
+        self.bge = BusinessGrowthExpert.objects.create(
+            name='Denis Givo',
+            bge_code='PRUDEV II-BGE-010T-01',
+            email='denis@glowi.africa',
+            user=self.user
+        )
+        UserSecurityProfile.objects.create(
+            user=self.user,
+            must_change_password=False,
+            viewer_approved=True
+        )
+
+    def test_flexible_login_by_username(self):
+        res = self.client.post('/api/auth/login/', {'username': 'denis.givo', 'password': 'SecretPassword123'})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('token', res.data)
+
+    def test_flexible_login_by_email(self):
+        res = self.client.post('/api/auth/login/', {'username': 'denis@glowi.africa', 'password': 'SecretPassword123'})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('token', res.data)
+
+    def test_flexible_login_by_bge_code(self):
+        res = self.client.post('/api/auth/login/', {'username': 'PRUDEV II-BGE-010T-01', 'password': 'SecretPassword123'})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('token', res.data)
+
+    def test_flexible_login_case_insensitivity(self):
+        res = self.client.post('/api/auth/login/', {'username': 'Denis.Givo', 'password': 'SecretPassword123'})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('token', res.data)
+
+    def test_request_password_reset_by_bge_code(self):
+        res = self.client.post('/api/auth/password-reset/', {'email': 'PRUDEV II-BGE-010T-01'})
+        # Should return 200 (or 503 if test env has no GMAIL_APP_PASSWORD)
+        self.assertIn(res.status_code, [200, 503])
+
+
+
 
 
 
