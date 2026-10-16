@@ -55,7 +55,11 @@ export default function Login({ onLogin, sessionExpired }) {
     setLoading(true);
     setErrorInfo(null);
     try {
-      const res = await axios.post(API_ENDPOINTS.LOGIN, credentials);
+      const payload = {
+        username: (credentials.username || '').trim(),
+        password: credentials.password || '',
+      };
+      const res = await axios.post(API_ENDPOINTS.LOGIN, payload);
       if (res.data.token) {
         onLogin(res.data.token, res.data.user, res.data.session_expires_at);
       } else {

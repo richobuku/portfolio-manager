@@ -1,8 +1,18 @@
 function getApiBaseUrl() {
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+    // Always use official custom domain when on bds.glowi.africa
+    if (hostname === 'bds.glowi.africa') {
+      return 'https://api.bds.glowi.africa';
+    }
+  }
+
   const envUrl = (process.env.REACT_APP_API_URL || '').trim().replace(/[\r\n\s]+/g, '').replace(/\/+$/, '');
-  if (envUrl) {
+  // Discard deprecated onrender.com URLs baked into Vercel build environment
+  if (envUrl && !envUrl.includes('onrender.com')) {
     return envUrl;
   }
+
   if (typeof window !== 'undefined') {
     const { hostname, protocol } = window.location;
     // Production deployments (custom domain or Vercel preview)
