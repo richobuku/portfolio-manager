@@ -41,9 +41,13 @@ SECRET_KEY = _secret_key
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# Add Render domain to allowed hosts
+# Add Render and custom domain hosts
 if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
+
+for host in ['.onrender.com', '.glowi.africa', 'api.bds.glowi.africa', 'bds.glowi.africa']:
+    if host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
 
 
 # Application definition
