@@ -15,7 +15,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://portfolio-manager-backend.onrender.com/api/:path*"
+      "destination": "https://portfolio-manager-kfu9.onrender.com/api/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

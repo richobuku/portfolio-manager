@@ -6,11 +6,11 @@ function getApiBaseUrl() {
     const { hostname, protocol } = window.location;
     // Production deployments (custom domain or Vercel preview)
     if (hostname === 'bds.glowi.africa' || hostname.endsWith('vercel.app')) {
-      return 'https://portfolio-manager-backend.onrender.com';
+      return 'https://portfolio-manager-kfu9.onrender.com';
     }
     // Any HTTPS site cannot connect to insecure HTTP 127.0.0.1 due to Mixed Content
     if (protocol === 'https:') {
-      return 'https://portfolio-manager-backend.onrender.com';
+      return 'https://portfolio-manager-kfu9.onrender.com';
     }
   }
   return 'http://127.0.0.1:8000';

@@ -60,7 +60,7 @@ export default function DiagnosticAlert({ errorInfo, onRetry, sx = {} }) {
     setPingResult(null);
     const start = Date.now();
     try {
-      // Ping the target URL or its origin with a fast HEAD/GET
+      // Ping the target URL or its origin with a fast GET
       let pingUrl = info.targetUrl;
       try {
         const parsed = new URL(info.targetUrl, window.location.origin);
@@ -68,19 +68,22 @@ export default function DiagnosticAlert({ errorInfo, onRetry, sx = {} }) {
       } catch (_) {}
 
       const res = await axios.get(pingUrl, {
-        timeout: 8000,
+        timeout: 45000, // Allow up to 45s for Render free-tier cold start
         validateStatus: () => true, // accept any HTTP status to verify connectivity
       });
       const latency = Date.now() - start;
+      const isOk = res.status < 500;
       setPingResult({
-        success: res.status < 500,
-        text: `Server responded: HTTP ${res.status} (${latency}ms)`,
+        success: isOk,
+        text: isOk
+          ? `Server is awake and ready! (${latency > 15000 ? 'Woke up in ' + Math.round(latency / 1000) + 's' : latency + 'ms'})`
+          : `Server responded with HTTP ${res.status} (${latency}ms)`,
       });
     } catch (err) {
       const latency = Date.now() - start;
       setPingResult({
         success: false,
-        text: `Unreachable (${err.code || 'Network Error'}, ${latency}ms)`,
+        text: `Still unreachable (${err.code || 'Network Error'}, ${Math.round(latency / 1000)}s). Please try again shortly.`,
       });
     } finally {
       setPinging(false);
@@ -250,7 +253,7 @@ export default function DiagnosticAlert({ errorInfo, onRetry, sx = {} }) {
             color: 'text.secondary',
           }}
         >
-          {pinging ? 'Testing...' : 'Test Connection'}
+          {pinging ? 'Waking up server (please wait)...' : 'Test Connection'}
         </Button>
 
         {/* Retry Button if provided */}
