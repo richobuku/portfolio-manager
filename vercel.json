@@ -45,7 +45,7 @@
       "destination": "https://portfolio-manager-kfu9.onrender.com/api/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

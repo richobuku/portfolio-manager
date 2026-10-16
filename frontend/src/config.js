@@ -1,6 +1,7 @@
 function getApiBaseUrl() {
-  if (process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL.replace(/\/+$/, '');
+  const envUrl = (process.env.REACT_APP_API_URL || '').trim().replace(/[\r\n\s]+/g, '').replace(/\/+$/, '');
+  if (envUrl) {
+    return envUrl;
   }
   if (typeof window !== 'undefined') {
     const { hostname, protocol } = window.location;
@@ -16,7 +17,7 @@ function getApiBaseUrl() {
   return 'http://127.0.0.1:8000';
 }
 
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = getApiBaseUrl().trim().replace(/[\r\n\s]+/g, '').replace(/\/+$/, '');
 
 export const API_ENDPOINTS = {
   LOGIN:              `${API_BASE_URL}/api/auth/login/`,
