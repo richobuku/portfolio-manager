@@ -2,16 +2,16 @@ databases:
   - name: portfolio-manager-db
     databaseName: portfolio_manager
     user: portfolio_manager_user
-    plan: free
+    plan: starter
 
 services:
   - type: web
     name: portfolio-manager-backend
     runtime: python
-    plan: free
+    plan: starter
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python manage.py collectstatic --noinput && python manage.py migrate && python manage.py init_admin && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --max-requests 200 --max-requests-jitter 20 --timeout 90
+    startCommand: python manage.py collectstatic --noinput && python manage.py migrate && python manage.py init_admin && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --worker-class gthread --max-requests 1000 --max-requests-jitter 100 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -45,7 +45,7 @@ services:
         sync: false
       - key: EMAIL_REPLY_TO
         value: richard.obuku@gopa.eu
-    healthCheckPath: /api/msmes/
+    healthCheckPath: /api/health/
     autoDeploy: true
 
   - type: cron

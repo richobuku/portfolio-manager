@@ -76,7 +76,7 @@ export default function DiagnosticAlert({ errorInfo, onRetry, sx = {} }) {
       setPingResult({
         success: isOk,
         text: isOk
-          ? `Server is awake and ready! (${latency > 15000 ? 'Woke up in ' + Math.round(latency / 1000) + 's' : latency + 'ms'})`
+          ? `Server is online & reachable (${latency}ms)`
           : `Server responded with HTTP ${res.status} (${latency}ms)`,
       });
     } catch (err) {
@@ -253,7 +253,7 @@ export default function DiagnosticAlert({ errorInfo, onRetry, sx = {} }) {
             color: 'text.secondary',
           }}
         >
-          {pinging ? 'Waking up server (please wait)...' : 'Test Connection'}
+          {pinging ? 'Checking connection...' : 'Test Connection'}
         </Button>
 
         {/* Retry Button if provided */}

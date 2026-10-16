@@ -25,7 +25,7 @@ from .views import (
     DiagnosticSummaryAnalyticsView, DiagnosticCohortComparisonView, MSMEProgressDetailView,
     DiagnosticExcelExportView,
 )
-from .auth_views import login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
+from .auth_views import health_check_view, login_view, logout_view, google_login_view, request_password_reset, confirm_password_reset, change_password_view
 from .views.smart_assign import smart_assign, smart_assign_export
 from .blockchain.api_views import (
     BlockchainTransactionViewSet, SmartContractViewSet, TokenViewSet,
@@ -78,6 +78,8 @@ urlpatterns = [
     path('api/msmes/smart-assign/export/', smart_assign_export, name='smart_assign_export'),
     path('api/msmes/smart-assign/',        smart_assign,        name='smart_assign'),
     path('api/', include(router.urls)),
+    path('api/health/', health_check_view, name='api_health_check'),
+    path('healthz/', health_check_view, name='healthz'),
     path('api/auth/login/', login_view, name='api_login'),
     path('api/auth/logout/', logout_view, name='api_logout'),
     path('api/auth/google/', google_login_view, name='api_google_login'),

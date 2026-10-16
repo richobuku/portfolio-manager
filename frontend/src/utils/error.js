@@ -120,23 +120,13 @@ export function parseDetailedError(err, context = {}) {
     remediation = 'Verify that all required form fields are correctly formatted.';
     adminNote = `Validation error: ${JSON.stringify(rawData || {})}`;
   }
-  // 11. No response received (Network error, CORS blocked, or server completely down / sleeping)
+  // 11. No response received (Network error, carrier connection drop, or server restarting)
   else if (!err?.response) {
     category = 'NO_RESPONSE';
-    const isRenderBackend = typeof targetUrl === 'string' && targetUrl.includes('onrender.com');
-
-    if (isRenderBackend) {
-      severity = 'warning';
-      title = 'Server Waking Up (Cold Start)';
-      message = 'The backend application is hosted on Render and is currently waking up after being idle.';
-      remediation = 'Free-tier cloud containers pause when inactive. Waking up takes approximately 30 to 45 seconds.\n\n👉 What to do: Wait 30 seconds and tap "Sign In" again, or click "Test Connection" below to wake the server immediately.';
-      adminNote = 'Render free-tier container cold-start delay. The container suspended due to 15min inactivity. First request wakes it up (~30s).';
-    } else {
-      title = 'Server Unreachable / Connection Failed';
-      message = `Unable to connect to the backend server at ${targetUrl}.`;
-      remediation = 'Possible reasons:\n1. The backend server is stopped or waking up.\n2. Cross-Origin (CORS) blocked the request from this domain.\n3. SSL certificate issue or domain DNS mismatch.';
-      adminNote = 'No HTTP response received by Axios. Inspect browser DevTools Console for CORS error, ERR_CONNECTION_REFUSED, or Mixed-Content warnings.';
-    }
+    title = 'Connection Failed / Network Error';
+    message = `Unable to establish a connection with the server at ${targetUrl}.`;
+    remediation = 'Possible reasons:\n1. Temporary cellular network (4G) fluctuation or DNS delay.\n2. Backend deployment or worker restart in progress.\n3. Request timed out before a response was received.\n\n👉 What to do: Tap "Test Connection" to verify server availability, then tap "Retry" or click "Sign In" again.';
+    adminNote = 'No HTTP response received by Axios. Inspect browser DevTools Console for CORS error, ERR_CONNECTION_REFUSED, or mobile socket reset.';
   } else {
     title = `[HTTP ${status}] Request Failed`;
     message = serverMessage || `Server responded with error status ${status} (${statusText || 'Error'}).`;

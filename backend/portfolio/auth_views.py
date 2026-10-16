@@ -243,6 +243,13 @@ def _authenticate_flexible(request, raw_identifier, raw_password):
     return None
 
 
+@api_view(['GET', 'HEAD'])
+@permission_classes([AllowAny])
+def health_check_view(request):
+    """Lightweight, unauthenticated health check for Render / reverse-proxy monitoring."""
+    return Response({'status': 'ok', 'service': 'portfolio-backend'})
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([LoginRateThrottle])
