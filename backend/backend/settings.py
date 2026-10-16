@@ -310,6 +310,13 @@ CORS_ALLOWED_ORIGIN_REGEXES = (
 
 CORS_ALLOW_CREDENTIALS = True
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://bds.glowi.africa',
+    'https://api.bds.glowi.africa',
+    'https://*.onrender.com',
+    'https://*.vercel.app',
+]
+
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
