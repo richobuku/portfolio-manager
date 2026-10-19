@@ -25,6 +25,14 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
         model = TrainingSession
         fields = '__all__'
 
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if data.get('end_date') == '':
+            data['end_date'] = None
+        if data.get('topic') == '':
+            data['topic'] = None
+        return super().to_internal_value(data)
+
     def get_attendance_count(self, obj):
         return obj.attendances.filter(present=True).count()
 
@@ -158,6 +166,7 @@ class TrainingReportSerializer(serializers.ModelSerializer):
     bge_name         = serializers.CharField(source='bge.name', read_only=True, allow_null=True)
     total_participants = serializers.IntegerField(read_only=True)
     attendance_list  = serializers.SerializerMethodField()
+    mentor_reports   = serializers.SerializerMethodField()
 
     class Meta:
         model  = TrainingReport
@@ -178,6 +187,23 @@ class TrainingReportSerializer(serializers.ModelSerializer):
                 'msme_name': a.msme.business_name if a.msme_id else '',
             }
             for a in obj.session.attendances.select_related('msme').order_by('attendance_date', 'attendee_name')
+        ]
+
+    def get_mentor_reports(self, obj):
+        return [
+            {
+                'id': mr.id,
+                'bge_id': mr.bge_id,
+                'bge_name': mr.bge.name if mr.bge else '',
+                'status': mr.status,
+                'mentoring_activities': mr.mentoring_activities,
+                'msmes_mentored': mr.msmes_mentored,
+                'key_observations': mr.key_observations,
+                'challenges': mr.challenges,
+                'recommendations': mr.recommendations,
+                'next_steps': mr.next_steps,
+            }
+            for mr in obj.session.mentor_reports.select_related('bge').all()
         ]
 
 

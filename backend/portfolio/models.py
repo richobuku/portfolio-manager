@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+import datetime
 from decimal import Decimal
 
 class Portfolio(models.Model):
@@ -2003,6 +2005,85 @@ class EnterpriseImprovementPlan(models.Model):
 
     def __str__(self):
         return f"TBIP: {self.msme.name} ({self.assessment_date}) - {self.get_status_display()}"
+
+
+class FinancialImprovementActionPlan(models.Model):
+    """
+    PRUDEV II — MSME Financial Improvement Action Plan (Access to Finance).
+    Diagnostic categorization and phased action roadmap conducted by BGEs.
+    """
+    CATEGORY_CHOICES = [
+        ('1_financial_records', '1. Financial Records & Documentation Strengthening'),
+        ('2_cash_flow', '2. Cash-Flow Management & Financial Discipline'),
+        ('3_business_plan', '3. Business Plan & Financial Projection Development'),
+        ('4_collateral', '4. Collateral & Alternative Security Solutions'),
+        ('5_banking_relationship', '5. Banking Relationship & Financial-Institution Linkage'),
+        ('6_financial_literacy', '6. Financial Literacy, Costing & Management Capacity Building'),
+        ('7_loan_readiness', '7. Loan Application & Investment Readiness (Finance-Ready)'),
+        ('8_debt_management', '8. Debt Management & Credit Growth'),
+        ('9_formalisation', '9. Formalisation, Audit & Certification'),
+    ]
+
+    PRIORITY_CHOICES = [
+        ('High', 'High'),
+        ('Medium', 'Medium'),
+        ('Low', 'Low'),
+    ]
+
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('approved', 'Approved'),
+    ]
+
+    msme = models.ForeignKey(
+        'MSME', on_delete=models.CASCADE, related_name='financial_improvement_plans'
+    )
+    bge = models.ForeignKey(
+        BusinessGrowthExpert, on_delete=models.CASCADE, related_name='financial_improvement_plans'
+    )
+    assessment_date = models.DateField(default=timezone.now, help_text='Date of diagnostic assessment')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    # Primary binding barrier category
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='1_financial_records')
+    category_name = models.CharField(max_length=255, blank=True)
+    category_addresses = models.TextField(blank=True, help_text='Description of what this category addresses')
+
+    # Specific diagnostic gaps identified (list of gap descriptions/tags)
+    gaps_identified = models.JSONField(default=list, blank=True, help_text='List of identified diagnostic gaps')
+    gap_notes = models.TextField(blank=True, help_text='BGE diagnostic narrative and enterprise context')
+
+    # Sequenced Phased Action Plan (list of steps)
+    action_plan_steps = models.JSONField(default=list, blank=True, help_text='Ordered roadmap steps with timelines')
+
+    # Financing Target & Institutional Linkage
+    financing_target = models.CharField(max_length=255, blank=True, help_text='e.g. Working Capital, Equipment Loan, First-time loan')
+    estimated_amount = models.CharField(max_length=100, blank=True, help_text='Target credit facility amount (UGX)')
+    preferred_fsp = models.CharField(max_length=150, blank=True, help_text='Target financial service provider (e.g. Centenary Bank)')
+    current_fsp = models.CharField(max_length=150, blank=True, help_text='Current FSP or SACCO in use')
+    has_active_loan = models.BooleanField(default=False)
+    support_priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='Medium')
+    data_source = models.CharField(max_length=100, default='Field Diagnostic & Mentorship', blank=True)
+
+    # Sign-offs & verification
+    owner_committed = models.BooleanField(default=False)
+    owner_name = models.CharField(max_length=255, blank=True)
+    bge_signed = models.BooleanField(default=False)
+    bge_signed_at = models.DateField(null=True, blank=True)
+    bge_signature_name = models.CharField(max_length=255, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-assessment_date', '-created_at']
+        verbose_name = "Financial Improvement Action Plan"
+        verbose_name_plural = "Financial Improvement Action Plans"
+
+    def __str__(self):
+        return f"FIAP: {self.msme.business_name} ({self.get_category_display()}) - {self.support_priority} Priority"
 
 
 

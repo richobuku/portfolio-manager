@@ -1,4 +1,5 @@
 import logging
+from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -41,13 +42,31 @@ class TrainingReportViewSet(ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin, 
             ).distinct()
         else:
             try:
-                qs = qs.filter(bge=user.bge_profile)
+                bge = user.bge_profile
+                qs = qs.filter(
+                    Q(bge=bge) |
+                    Q(session__facilitation_assignments__bge=bge, session__facilitation_assignments__role='lead')
+                ).distinct()
             except Exception:
                 return qs.none()
         bge_id = self.request.query_params.get('bge')
         if bge_id:
             qs = qs.filter(bge_id=bge_id)
+        session_id = self.request.query_params.get('session')
+        if session_id:
+            qs = qs.filter(session_id=session_id)
         return qs
+
+    def create(self, request, *args, **kwargs):
+        session_id = request.data.get('session')
+        if session_id:
+            existing = TrainingReport.objects.filter(session_id=session_id).first()
+            if existing:
+                serializer = self.get_serializer(existing, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                self.perform_update(serializer)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         bge = None

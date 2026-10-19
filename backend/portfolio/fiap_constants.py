@@ -1,0 +1,593 @@
+"""
+PRUDEV II — Financial Improvement Action Plan (FIAP) Standard Constants & Templates.
+Defines the 9 core categories, their descriptions, diagnostic gap checklists,
+and standardized, sequenced action plan roadmap templates.
+"""
+
+FIAP_CATEGORIES = [
+    {
+        'id': '1_financial_records',
+        'number': 1,
+        'name': 'Financial Records & Documentation Strengthening',
+        'what_it_addresses': (
+            'No or weak financial records; lenders cannot assess the business '
+            'without 6-12 months of reliable statements.'
+        ),
+        'default_priority': 'High',
+        'typical_gaps': [
+            'No financial records kept',
+            'Record keeping and documentation still need strengthening',
+            'Poor / unclear cash-flow management',
+            'Weak or no bankable business plan',
+            'No acceptable collateral available',
+            'No bank relationship',
+            'Low financial literacy',
+            'Loan documentation in progress / not started',
+            'Weak costing, budgeting, operational-cost management and internal controls',
+            'Has not yet visited the preferred financial service provider',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Set up a cashbook, sales/purchases register and receipt/invoice book; record every transaction daily and prepare a monthly income statement.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner / Cashier',
+                'verification': 'Verified daily cashbook entries & filed monthly P&L summaries',
+            },
+            {
+                'step': 2,
+                'action': 'Prepare a 12-month cash-flow projection and compare actual vs projected every month; pay the owner a fixed salary to separate personal and business money; follow up late-paying customers weekly; build a reserve of about one month of operating costs.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': '12-month cash-flow spreadsheet & separate salary voucher',
+            },
+            {
+                'step': 3,
+                'action': 'Develop or revise a bankable business plan (market, operations, 3-year financial projections, and a specific funding request stating amount, purpose and repayment source); have the mentor review it before submission.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Reviewed bankable business plan document',
+            },
+            {
+                'step': 4,
+                'action': 'List and document all assets (land agreement/title, equipment, stock, receivables) and discuss alternative security with the lender: movable-asset (chattel) security, group or personal guarantor, warehouse receipt, or guarantee-backed products; build regular savings as cash cover.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Asset schedule with supporting agreements/titles',
+            },
+            {
+                'step': 5,
+                'action': 'Open or activate a business account with the FSP the MSME intends to borrow from and route all business receipts through it for at least 6 months to build a statement history.',
+                'timeline': 'Months 1-6',
+                'responsible': 'Owner',
+                'verification': 'Bank account confirmation letter & 6-month bank statement',
+            },
+            {
+                'step': 6,
+                'action': 'Attend financial-literacy training on budgeting, costing, loan terms, interest and repayment, and apply it in monthly management reviews.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & Key Staff',
+                'verification': 'Training attendance record & monthly review minutes',
+            },
+            {
+                'step': 7,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Completed lender application dossier checklist',
+            },
+            {
+                'step': 8,
+                'action': 'Re-assess finance readiness with the mentor at Month 6 before submitting a loan application.',
+                'timeline': 'Month 6',
+                'responsible': 'BGE Mentor',
+                'verification': 'Signed Credit Readiness Re-assessment Scorecard',
+            },
+        ],
+    },
+    {
+        'id': '2_cash_flow',
+        'number': 2,
+        'name': 'Cash-Flow Management & Financial Discipline',
+        'what_it_addresses': (
+            'Records exist but cash flow is poorly managed, personal/business money is mixed, '
+            'or reserves are absent; repayment capacity is unclear.'
+        ),
+        'default_priority': 'Medium',
+        'typical_gaps': [
+            'Poor / unclear cash-flow management',
+            'Cash-flow tracking, cash reserves and separation of business/personal money need work',
+            'Weak or no bankable business plan',
+            'Low financial literacy',
+            'Loan documentation in progress',
+            'Active loan - repayment performance must be protected',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Prepare a 12-month cash-flow projection and compare actual vs projected every month; pay the owner a fixed salary to separate personal and business money; follow up late-paying customers weekly; build a reserve of about one month of operating costs.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Cash-flow projection sheet & monthly variance report',
+            },
+            {
+                'step': 2,
+                'action': 'Develop or revise a bankable business plan (market, operations, 3-year financial projections, and a specific funding request stating amount, purpose and repayment source); have the mentor review it before submission.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Business plan reviewed by BGE mentor',
+            },
+            {
+                'step': 3,
+                'action': 'Attend financial-literacy training on budgeting, costing, loan terms, interest and repayment, and apply it in monthly management reviews.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner',
+                'verification': 'Training completion record',
+            },
+            {
+                'step': 4,
+                'action': 'Calculate unit cost of production, review selling prices, compute the break-even point and set a monthly budget; track actual vs budget and hold monthly staff/partner finance meetings with basic internal controls.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & Accounts',
+                'verification': 'Costing model sheet & monthly budget review notes',
+            },
+            {
+                'step': 5,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Complete loan documentation pack on file',
+            },
+            {
+                'step': 6,
+                'action': 'Protect repayment performance: schedule instalments from monthly cash flow, avoid arrears, request a Credit Reference Bureau report and use the repayment history to negotiate a larger or cheaper facility after clearing the loan.',
+                'timeline': 'Ongoing',
+                'responsible': 'Owner',
+                'verification': 'Bank loan statement showing zero arrears / CRB report',
+            },
+            {
+                'step': 7,
+                'action': 'Re-assess finance readiness at Month 4, then submit the loan application to the target FSP.',
+                'timeline': 'Month 4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Formal loan submission receipt from FSP',
+            },
+        ],
+    },
+    {
+        'id': '3_business_plan',
+        'number': 3,
+        'name': 'Business Plan & Financial Projection Development',
+        'what_it_addresses': (
+            'Business plan is weak or missing; no bankable plan, forecast or clear funding request.'
+        ),
+        'default_priority': 'Low',
+        'typical_gaps': [
+            'Weak or no bankable business plan',
+            'Financial forecasting / planning is weak',
+            'No acceptable collateral available',
+            'Loan documentation in progress / not started',
+            'Record keeping and documentation still need strengthening',
+            'Weak costing, budgeting, operational-cost management and internal controls',
+            'Limited linkage to financial institutions and wider markets',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Develop or revise a bankable business plan (market, operations, 3-year financial projections, and a specific funding request stating amount, purpose and repayment source); have the mentor review it before submission.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Final validated business plan document',
+            },
+            {
+                'step': 2,
+                'action': 'List and document all assets (land agreement/title, equipment, stock, receivables) and discuss alternative security with the lender: movable-asset (chattel) security, group or personal guarantor, warehouse receipt, or guarantee-backed products; build regular savings as cash cover.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Asset schedule with supporting agreements/titles',
+            },
+            {
+                'step': 3,
+                'action': 'Open or activate a business account with the FSP the MSME intends to borrow from and route all business receipts through it for at least 6 months to build a statement history.',
+                'timeline': 'Months 1-6',
+                'responsible': 'Owner',
+                'verification': 'Bank statement history from preferred lender',
+            },
+            {
+                'step': 4,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Assembled loan application dossier',
+            },
+            {
+                'step': 5,
+                'action': 'Visit the preferred FSP, obtain its product requirements checklist and a named loan-officer contact.',
+                'timeline': 'Month 1',
+                'responsible': 'Owner & BGE',
+                'verification': 'FSP checklist & named loan officer details',
+            },
+            {
+                'step': 6,
+                'action': 'Re-assess finance readiness at Month 4, then submit the loan application to the target FSP.',
+                'timeline': 'Month 4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Submitted application pack confirmation',
+            },
+        ],
+    },
+    {
+        'id': '4_collateral',
+        'number': 4,
+        'name': 'Collateral & Alternative Security Solutions',
+        'what_it_addresses': (
+            'Otherwise able to borrow but lacks acceptable security; needs alternative '
+            'security structures and savings-based cover.'
+        ),
+        'default_priority': 'Medium',
+        'typical_gaps': [
+            'No acceptable collateral available',
+            'No bank relationship (mobile money only)',
+            'Loan documentation in progress',
+            'Record keeping and documentation still need strengthening',
+            'Limited linkage to financial institutions and wider markets',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'List and document all assets (land agreement/title, equipment, stock, receivables) and discuss alternative security with the lender: movable-asset (chattel) security, group or personal guarantor, warehouse receipt, or guarantee-backed products; build regular savings as cash cover.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Verified asset register & chattel pledge schedule',
+            },
+            {
+                'step': 2,
+                'action': 'Open or activate a business account with the FSP the MSME intends to borrow from and route all business receipts through it for at least 6 months to build a statement history.',
+                'timeline': 'Months 1-6',
+                'responsible': 'Owner',
+                'verification': '6-month active bank statement',
+            },
+            {
+                'step': 3,
+                'action': 'Organise linkage meetings with FSPs and buyers, share the product catalogue, and join trade fairs/exhibitions to widen markets and demonstrate customer demand to lenders.',
+                'timeline': 'Months 2-6',
+                'responsible': 'BGE & Owner',
+                'verification': 'Supply contracts / purchase orders from buyers',
+            },
+            {
+                'step': 4,
+                'action': 'Calculate unit cost of production, review selling prices, compute the break-even point and set a monthly budget; track actual vs budget and hold monthly staff/partner finance meetings with basic internal controls.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Costing spreadsheet and budget control log',
+            },
+            {
+                'step': 5,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Complete loan documentation pack ready for bank appraisal',
+            },
+            {
+                'step': 6,
+                'action': 'Re-assess finance readiness at Month 4, then submit the loan application to the target FSP.',
+                'timeline': 'Month 4',
+                'responsible': 'BGE Mentor',
+                'verification': 'Bank appraisal and loan submission receipt',
+            },
+        ],
+    },
+    {
+        'id': '5_banking_relationship',
+        'number': 5,
+        'name': 'Banking Relationship & Financial-Institution Linkage',
+        'what_it_addresses': (
+            'No bank relationship (mobile money/SACCO only) or limited linkage '
+            'to financial institutions and markets.'
+        ),
+        'default_priority': 'Low',
+        'typical_gaps': [
+            'No bank relationship (mobile money only)',
+            'Limited linkage to financial institutions and wider markets',
+            'Loan documentation in progress / not started',
+            'Has not yet visited the preferred financial service provider',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Open or activate a business account with the FSP the MSME intends to borrow from and route all business receipts through it for at least 6 months to build a statement history.',
+                'timeline': 'Months 1-6',
+                'responsible': 'Owner',
+                'verification': 'Bank account activation certificate & statement',
+            },
+            {
+                'step': 2,
+                'action': 'Organise linkage meetings with FSPs and buyers, share the product catalogue, and join trade fairs/exhibitions to widen markets and demonstrate customer demand to lenders.',
+                'timeline': 'Months 2-6',
+                'responsible': 'BGE & Owner',
+                'verification': 'FSP credit officer engagement log',
+            },
+            {
+                'step': 3,
+                'action': 'Visit the preferred FSP, obtain its product requirements checklist and a named loan-officer contact.',
+                'timeline': 'Month 1',
+                'responsible': 'Owner & BGE',
+                'verification': 'FSP requirements checklist & officer business card',
+            },
+            {
+                'step': 4,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Application dossier review report',
+            },
+            {
+                'step': 5,
+                'action': 'Submit the loan application to the target FSP within 1-3 months once the pack is complete.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Stamped loan submission receipt',
+            },
+        ],
+    },
+    {
+        'id': '6_financial_literacy',
+        'number': 6,
+        'name': 'Financial Literacy, Costing & Management Capacity Building',
+        'what_it_addresses': (
+            'Weak costing, pricing, budgeting, internal controls or financial literacy '
+            'that hold back credit readiness.'
+        ),
+        'default_priority': 'Low',
+        'typical_gaps': [
+            'Low financial literacy',
+            'Weak costing, budgeting, operational-cost management and internal controls',
+            'Record keeping and documentation still need strengthening',
+            'Financial forecasting / planning is weak',
+            'Limited linkage to financial institutions and wider markets',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Calculate unit cost of production, review selling prices, compute the break-even point and set a monthly budget; track actual vs budget and hold monthly staff/partner finance meetings with basic internal controls.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Production unit costing model & pricing schedule',
+            },
+            {
+                'step': 2,
+                'action': 'Attend financial-literacy training on budgeting, costing, loan terms, interest and repayment, and apply it in monthly management reviews.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & Team',
+                'verification': 'Training attendance certificate / log',
+            },
+            {
+                'step': 3,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Assembled loan application pack',
+            },
+            {
+                'step': 4,
+                'action': 'Visit the preferred FSP, obtain its product requirements checklist and a named loan-officer contact.',
+                'timeline': 'Month 1',
+                'responsible': 'Owner',
+                'verification': 'FSP credit officer engagement report',
+            },
+            {
+                'step': 5,
+                'action': 'Submit the loan application to the target FSP within 1-3 months once the pack is complete.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner',
+                'verification': 'Bank loan application receipt',
+            },
+        ],
+    },
+    {
+        'id': '7_loan_readiness',
+        'number': 7,
+        'name': 'Loan Application & Investment Readiness (Finance-Ready)',
+        'what_it_addresses': (
+            'Largely finance-ready; the next step is matching to the right product '
+            'and submitting a complete application.'
+        ),
+        'default_priority': 'Low',
+        'typical_gaps': [
+            'No major gap recorded; ready to apply, but a complete application pack and product match are still needed',
+            'Loan documentation in progress',
+            'Has not yet visited the preferred financial service provider',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Assemble a complete application pack (business plan, 6-12 months of statements, bank statements, registration documents, collateral papers) and match it to the preferred FSP\'s product.',
+                'timeline': 'Month 1',
+                'responsible': 'Owner & BGE',
+                'verification': 'Complete, verified loan application binder',
+            },
+            {
+                'step': 2,
+                'action': 'Confirm the loan size against monthly cash flow so repayments stay affordable.',
+                'timeline': 'Month 1',
+                'responsible': 'BGE & Owner',
+                'verification': 'Debt Service Coverage Ratio (DSCR) worksheet',
+            },
+            {
+                'step': 3,
+                'action': 'Submit the loan application to the target FSP within 1-3 months once the pack is complete.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Official bank submission acknowledgement',
+            },
+        ],
+    },
+    {
+        'id': '8_debt_management',
+        'number': 8,
+        'name': 'Debt Management & Credit Growth',
+        'what_it_addresses': (
+            'Has an active loan or credit history; priority is protecting repayment performance '
+            'and graduating to larger / cheaper finance.'
+        ),
+        'default_priority': 'Low',
+        'typical_gaps': [
+            'Active loan - repayment performance must be protected',
+            'Running loan balance - repayment performance must be protected',
+            'Relies on costly mobile-lender credit rather than a bank facility',
+            'Loan documentation in progress',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Protect repayment performance: schedule instalments from monthly cash flow, avoid arrears, request a Credit Reference Bureau report and use the repayment history to negotiate a larger or cheaper facility after clearing the loan.',
+                'timeline': 'Ongoing',
+                'responsible': 'Owner',
+                'verification': 'CRB clearance / clean loan statement history',
+            },
+            {
+                'step': 2,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Top-up / refinancing application dossier',
+            },
+            {
+                'step': 3,
+                'action': 'Submit the loan application to the target FSP within 1-3 months once the pack is complete.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner',
+                'verification': 'Bank acknowledgement of top-up / refinancing facility',
+            },
+        ],
+    },
+    {
+        'id': '9_formalisation',
+        'number': 9,
+        'name': 'Formalisation, Audit & Certification',
+        'what_it_addresses': (
+            'Registration, audit or product certification (e.g. UNBS) is the main barrier to formal finance.'
+        ),
+        'default_priority': 'High',
+        'typical_gaps': [
+            'Business is not formally registered',
+            'No financial records kept',
+            'Poor / unclear cash-flow management',
+            'Weak or no bankable business plan',
+            'No acceptable collateral available',
+            'No bank relationship',
+            'Low financial literacy',
+            'Product certification (UNBS) pending, delaying scale-up and market/finance access',
+            'Books of account not yet audited / independently reviewed',
+            'Loan documentation not started / in progress',
+        ],
+        'default_steps': [
+            {
+                'step': 1,
+                'action': 'Register the business with URSB, obtain a TIN (URA) and a trading licence; keep the certificates ready for the lender\'s KYC checks.',
+                'timeline': 'Months 1-2',
+                'responsible': 'Owner',
+                'verification': 'URSB certificate, URA TIN certificate, Trading licence',
+            },
+            {
+                'step': 2,
+                'action': 'Set up a cashbook, sales/purchases register and receipt/invoice book; record every transaction daily and prepare a monthly income statement.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner / Cashier',
+                'verification': 'Cashbook and monthly financial summaries',
+            },
+            {
+                'step': 3,
+                'action': 'Prepare a 12-month cash-flow projection and compare actual vs projected every month; pay the owner a fixed salary to separate personal and business money; follow up late-paying customers weekly; build a reserve of about one month of operating costs.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': '12-month cash-flow projection and salary policy',
+            },
+            {
+                'step': 4,
+                'action': 'Develop or revise a bankable business plan (market, operations, 3-year financial projections, and a specific funding request stating amount, purpose and repayment source); have the mentor review it before submission.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Reviewed business plan draft',
+            },
+            {
+                'step': 5,
+                'action': 'Complete product certification with UNBS (or commission an independent audit) so the product can be sold at scale and to formal buyers; add certificate/audit to the loan application.',
+                'timeline': 'Months 1-6',
+                'responsible': 'Owner & BGE',
+                'verification': 'UNBS Q-mark certification or independent audit report',
+            },
+            {
+                'step': 6,
+                'action': 'List and document all assets (land agreement/title, equipment, stock, receivables) and discuss alternative security with the lender: movable-asset (chattel) security, group or personal guarantor, warehouse receipt, or guarantee-backed products; build regular savings as cash cover.',
+                'timeline': 'Months 1-3',
+                'responsible': 'Owner & BGE',
+                'verification': 'Asset schedule with supporting agreements',
+            },
+            {
+                'step': 7,
+                'action': 'Open or activate a business account with the FSP the MSME intends to borrow from and route all business receipts through it for at least 6 months to build a statement history.',
+                'timeline': 'Months 1-6',
+                'responsible': 'Owner',
+                'verification': 'Bank account statement history',
+            },
+            {
+                'step': 8,
+                'action': 'Complete the loan documentation pack (application form, financial statements, business plan, ID/registration documents, collateral papers) and review progress with the mentor every two weeks.',
+                'timeline': 'Months 2-4',
+                'responsible': 'BGE & Owner',
+                'verification': 'Completed loan pack on file',
+            },
+            {
+                'step': 9,
+                'action': 'Re-assess finance readiness with the mentor at Month 6 before submitting a loan application.',
+                'timeline': 'Month 6',
+                'responsible': 'BGE Mentor',
+                'verification': 'Credit readiness scorecard at Month 6',
+            },
+        ],
+    },
+]
+
+# Standard checklist of all 14 diagnostic gaps
+STANDARD_GAPS = [
+    'No financial records kept',
+    'Record keeping and documentation still need strengthening',
+    'Poor / unclear cash-flow management',
+    'Weak or no bankable business plan',
+    'Financial forecasting / planning is weak',
+    'No acceptable collateral available',
+    'No bank relationship (mobile money or informal only)',
+    'Limited linkage to financial institutions and wider markets',
+    'Low financial literacy',
+    'Weak costing, budgeting, operational-cost management and internal controls',
+    'Business is not formally registered',
+    'Product certification (UNBS) pending, delaying scale-up and market/finance access',
+    'Books of account not yet audited / independently reviewed',
+    'Active loan - repayment performance must be protected',
+    'Has not yet visited the preferred financial service provider',
+]
+
+STANDARD_FSPS = [
+    'Centenary Bank',
+    'PostBank Uganda',
+    'Stanbic Bank',
+    'DFCU Bank',
+    'Equity Bank',
+    'Housing Finance Bank',
+    'ABSA Bank Uganda',
+    'Bank of Africa',
+    'KCB Bank Uganda',
+    'Local Licensed SACCO',
+    'Parish Development Model (PDM)',
+]
+
+STANDARD_FACILITIES = [
+    'Working Capital Loan',
+    'Equipment & Machinery Finance',
+    'First-time Working-Capital Loan (Bank/SACCO)',
+    'Top-up / Expansion Facility',
+    'First Small Loan: SACCO / PDM',
+    'Agricultural Value-Chain / Trade Finance',
+    'Matching Grant / Blended Finance',
+]

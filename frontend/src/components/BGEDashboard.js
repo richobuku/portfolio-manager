@@ -7,7 +7,8 @@ import {
   Snackbar, CircularProgress, Avatar, Divider, TablePagination,
   Card, CardContent, Grid, List, ListItemButton, ListItemIcon,
   ListItemText, AppBar, Toolbar, Tooltip, Checkbox, Badge,
-  Tabs, Tab, Drawer,
+  Tabs, Tab, Drawer, Accordion, AccordionSummary, AccordionDetails,
+  InputAdornment,
 } from '@mui/material';
 import {
   Business, Add, Visibility, Menu as MenuIcon,
@@ -15,17 +16,19 @@ import {
   Group as GroupIcon, Star, Description, Print, Download,
   Delete, School, People, CloudUpload,
   HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined, MyLocation,
-  Place, GpsFixed, GpsNotFixed, CalendarMonth,
+  Place, GpsFixed, GpsNotFixed, CalendarMonth, Search, ExpandMore,
+  AutoAwesome, AccountBalance,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
   API_ENDPOINTS, WORK_ORDER_SIGN_URL, WORK_ORDER_PDF_URL, MENTOR_REPORTS,
   PARTICIPANT_TRAINING_REPORTS, PARTICIPANT_TRAINING_REPORT_PDF_URL,
+  TRAINING_REPORT_PDF_URL,
   TSHIRT_ENTRY_SIGN_URL, TSHIRT_RECEIPT_PDF_URL,
   WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL,
   WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, WORK_ORDER_CONFIRM_PAYMENT_URL,
   REPORT_CONFIRM_PAYMENT_URL, GROUP_REPORT_CONFIRM_PAYMENT_URL,
-  TBIP_PDF_URL, TBIP_EXCEL_URL,
+  TBIP_PDF_URL, TBIP_EXCEL_URL, FIAP_PDF_URL,
 } from '../config';
 import { BRAND } from '../theme';
 import { subscribePush } from '../index';
@@ -34,6 +37,7 @@ import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
 import MSMEVisitSchedule from './MSMEVisitSchedule';
 import EnterpriseImprovementPlanDialog from './EnterpriseImprovementPlanDialog';
+import FinancialImprovementPlanDialog from './FinancialImprovementPlanDialog';
 import { getErrorMessage } from '../utils/error';
 
 const DRAWER_WIDTH = 220;
@@ -203,9 +207,29 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const EMPTY_TR = {
     training_title: '', training_dates: '', venue: '', district: '',
     facilitation_team: '', training_purpose: '', session_objectives: '',
-    activities_delivered: '', key_lessons: '', recommendations: '',
-    next_steps: '', status: 'draft',
+    activities_delivered: '', key_lessons: '', growth_support_areas: '',
+    key_findings: '', bge_contributions: '', bds_actions: '',
+    recommendations: '', next_steps: '', conclusion: '', status: 'draft',
   };
+
+  // Peer-to-Peer session creation dialog
+  const [p2pSessionDialog, setP2pSessionDialog] = useState(false);
+  const [p2pSessionSaving, setP2pSessionSaving] = useState(false);
+  const [allExperts, setAllExperts] = useState([]);
+  const [allTopics, setAllTopics] = useState([]);
+  const [p2pSearchMsme, setP2pSearchMsme] = useState('');
+  const [p2pForm, setP2pForm] = useState({
+    title: 'Peer-to-Peer Learning Session',
+    date: new Date().toISOString().slice(0, 10),
+    end_date: '',
+    location: '',
+    district: '',
+    topic: '',
+    lead_bge_id: '',
+    mentor_bge_ids: [],
+    msme_ids: [],
+    description: '',
+  });
 
   // Attendance dialog (lead — editable)
   const [attDialog, setAttDialog] = useState(false);
@@ -340,6 +364,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [tbipSearch, setTbipSearch] = useState('');
   const [tbipPage, setTbipPage] = useState(0);
   const [newTbipMsmePicker, setNewTbipMsmePicker] = useState(false);
+
+  // Financial Improvement Action Plans (FIAP / Access to Finance)
+  const [fiapPlans, setFiapPlans] = useState([]);
+  const [fiapDialog, setFiapDialog] = useState(false);
+  const [selectedFiap, setSelectedFiap] = useState(null);
+  const [selectedFiapMsme, setSelectedFiapMsme] = useState(null);
+  const [fiapFilterCategory, setFiapFilterCategory] = useState('all');
+  const [fiapFilterPriority, setFiapFilterPriority] = useState('all');
+  const [fiapFilterStatus, setFiapFilterStatus] = useState('all');
+  const [fiapSearch, setFiapSearch] = useState('');
+  const [fiapPage, setFiapPage] = useState(0);
+  const [newFiapMsmePicker, setNewFiapMsmePicker] = useState(false);
 
 
   // Full MSME list for training attendance (bypasses personal assignment scope)
@@ -753,6 +789,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
+  const fetchFiapPlans = useCallback(async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const res = await axios.get(API_ENDPOINTS.FINANCIAL_IMPROVEMENT_PLANS, { headers: h });
+      setFiapPlans(Array.isArray(res.data) ? res.data : res.data.results || []);
+    } catch {
+      // non-critical
+    }
+  }, [token]);
+
 
   const fetchSubmissions = useCallback(async () => {
     const h = { Authorization: `Bearer ${token}` };
@@ -810,9 +856,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         _mr: mrBySession[s.id] || null,
       }));
 
+      const leadSessionIds = new Set([
+        ...allAssignments.filter(a => a.role !== 'mentor' && a.session).map(a => a.session),
+        ...sessData.filter(s => (s.team || []).some(m => m.bge_id === myBgeId && m.role === 'lead')).map(s => s.id),
+      ]);
+      const mentorIds = new Set([
+        ...allAssignments.filter(a => a.role === 'mentor' && a.session).map(a => a.session),
+        ...sessData.filter(s => (s.team || []).some(m => m.bge_id === myBgeId && m.role === 'mentor')).map(s => s.id),
+      ]);
       const leadTopics = new Set(allAssignments.filter(a => a.role !== 'mentor' && a.topic).map(a => a.topic));
-      const mentorIds  = new Set(allAssignments.filter(a => a.role === 'mentor' && a.session).map(a => a.session));
-      setLeadSessions(enriched.filter(s => leadTopics.has(s.topic)));
+      setLeadSessions(enriched.filter(s => leadSessionIds.has(s.id) || (s.topic && leadTopics.has(s.topic))));
       setMentorSessions(enriched.filter(s => mentorIds.has(s.id)));
       setParticipantSessions(enriched.filter(s =>
         (s.bge_participants || []).includes(myBgeId)
@@ -928,14 +981,21 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     finally { setAttLoading(false); }
   };
 
-  const openTrReport = (session) => {
+  const openTrReport = async (session) => {
     setTrSession(session);
     const existing = session._tr;
     const stats = session.attendance_stats || {};
     if (existing) {
+      let fullTr = existing;
+      try {
+        const res = await axios.get(`${API_ENDPOINTS.TRAINING_REPORTS}${existing.id}/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        fullTr = res.data;
+      } catch { /* fallback to existing */ }
       const { id, session: _s, bge: _b, created_at, updated_at, submitted_at,
-              session_title, session_date, session_location, bge_name, total_participants, ...rest } = existing;
-      setTrData(existing);
+              session_title, session_date, session_location, bge_name, total_participants, ...rest } = fullTr;
+      setTrData(fullTr);
       setTrForm({ ...EMPTY_TR, ...rest });
     } else {
       setTrData(null);
@@ -944,7 +1004,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         training_title: session.title || '',
         training_dates: session.date || '',
         venue: session.location || '',
-        facilitation_team: (session.team || []).map(m => m.bge_name).filter(Boolean).join(', '),
+        district: session.location || '',
+        facilitation_team: (session.team || []).map(m => `${m.bge_name} (${m.role === 'lead' ? 'Lead' : 'Mentor'})`).filter(Boolean).join(', '),
         // Auto-fill demographics from attendance sheet
         ...(stats.total_present ? {
           participants_male_youth:   stats.youth_male   || 0,
@@ -955,6 +1016,74 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       });
     }
     setTrDialog(true);
+  };
+
+  const openTrPdf = (reportId, mode = 'view') => {
+    if (!reportId) return;
+    const url = `${TRAINING_REPORT_PDF_URL(reportId)}${mode === 'download' ? '?dl=1' : ''}`;
+    window.open(url, '_blank');
+  };
+
+  const openNewP2pSession = async () => {
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      if (allExperts.length === 0) {
+        const expRes = await axios.get(API_ENDPOINTS.EXPERTS, { headers: h });
+        setAllExperts(Array.isArray(expRes.data) ? expRes.data : expRes.data.results || []);
+      }
+      if (allTopics.length === 0) {
+        const topRes = await axios.get(API_ENDPOINTS.TRAINING_TOPICS, { headers: h });
+        setAllTopics(Array.isArray(topRes.data) ? topRes.data : topRes.data.results || []);
+      }
+    } catch { /* non-critical */ }
+    fetchTrainingMsmes();
+
+    setP2pForm({
+      title: 'Peer-to-Peer Learning Session',
+      date: new Date().toISOString().slice(0, 10),
+      end_date: '',
+      location: myBgeProfile?.district || 'Gulu / Lira',
+      district: myBgeProfile?.district || '',
+      topic: '',
+      lead_bge_id: myBgeId || '',
+      mentor_bge_ids: [],
+      msme_ids: [],
+      description: '',
+    });
+    setP2pSearchMsme('');
+    setP2pSessionDialog(true);
+  };
+
+  const saveP2pSession = async () => {
+    if (!p2pForm.title.trim()) { notify('Please enter a session title', 'error'); return; }
+    if (!p2pForm.date) { notify('Please select a session date', 'error'); return; }
+    if (!p2pForm.lead_bge_id) { notify('Please select a Lead BGE', 'error'); return; }
+
+    setP2pSessionSaving(true);
+    const h = { Authorization: `Bearer ${token}` };
+    const payload = {
+      title: p2pForm.title.trim(),
+      date: p2pForm.date,
+      end_date: p2pForm.end_date || null,
+      location: p2pForm.location.trim(),
+      topic: p2pForm.topic || null,
+      description: p2pForm.description.trim(),
+      businesses: p2pForm.msme_ids,
+      team: [
+        { bge_id: p2pForm.lead_bge_id, role: 'lead' },
+        ...p2pForm.mentor_bge_ids.map(id => ({ bge_id: id, role: 'mentor' })),
+      ],
+    };
+    try {
+      await axios.post(API_ENDPOINTS.TRAINING_SESSIONS, payload, { headers: h });
+      notify('Peer-to-Peer session created successfully!');
+      setP2pSessionDialog(false);
+      fetchSessions();
+    } catch (err) {
+      notify(getErrorMessage(err, 'Failed to create session'), 'error');
+    } finally {
+      setP2pSessionSaving(false);
+    }
   };
 
   const saveTrReport = async (submitNow = false) => {
@@ -973,6 +1102,37 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       fetchSessions();
     } catch (err) { notify(err.response?.data?.detail || 'Failed to save', 'error'); }
     finally { setTrSaving(false); }
+  };
+
+  const synthesizeMentorReports = () => {
+    if (!trData?.mentor_reports?.length) {
+      notify('No mentor reports found for this session yet.', 'info');
+      return;
+    }
+    const reports = trData.mentor_reports;
+    const mentorObs = reports.map(r =>
+      `• [${r.bge_name || 'Mentor'}]: ${r.key_observations || 'No observations recorded'}`
+    ).join('\n');
+    const mentorChallenges = reports.map(r =>
+      `• [${r.bge_name || 'Mentor'}]: ${r.challenges || 'No challenges noted'}`
+    ).join('\n');
+    const mentorContrib = reports.map(r =>
+      `• [${r.bge_name || 'Mentor'}]: Mentored: ${r.msmes_mentored || 'Assigned MSMEs'}. Activities: ${r.mentoring_activities || 'Syndicate breakout facilitation'}`
+    ).join('\n');
+
+    setTrForm(prev => ({
+      ...prev,
+      key_findings: prev.key_findings
+        ? `${prev.key_findings}\n\n[Syndicate Mentor Findings & Challenges]:\n${mentorChallenges}`
+        : `[Syndicate Mentor Findings & Challenges]:\n${mentorChallenges}`,
+      growth_support_areas: prev.growth_support_areas
+        ? `${prev.growth_support_areas}\n\n[Syndicate Diagnostic Observations]:\n${mentorObs}`
+        : `[Syndicate Diagnostic Observations]:\n${mentorObs}`,
+      bge_contributions: prev.bge_contributions
+        ? `${prev.bge_contributions}\n\n[Mentor Syndicate Facilitation]:\n${mentorContrib}`
+        : `[Mentor Syndicate Facilitation]:\n${mentorContrib}`,
+    }));
+    notify('Mentor syndicate observations synthesized into Questions 5, 6, and 7!');
   };
 
   const openMrReport = (session) => {
@@ -1092,12 +1252,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     fetchSessions();
     fetchPtReports();
     fetchTbipPlans();
+    fetchFiapPlans();
     // Request push notification permission once per session
     if (!pushAttempted.current) {
       pushAttempted.current = true;
       subscribePush(`Bearer ${token}`);
     }
-  }, [fetchMyProfile, fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, fetchPtReports, fetchTbipPlans, token]);
+  }, [fetchMyProfile, fetchMsmes, fetchReports, fetchGroups, fetchGroupReports, fetchWorkOrders, fetchSubmissions, fetchPayments, fetchAttachments, fetchSessions, fetchPtReports, fetchTbipPlans, fetchFiapPlans, token]);
 
   useEffect(() => {
     if (typeof window.gtag === 'function') {
@@ -1763,6 +1924,38 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   };
 
+  // ── Financial Improvement Action Plans (FIAP) ───────────────────────────
+  const handleDownloadFiapPdf = async (planObj) => {
+    try {
+      const res = await axios.get(FIAP_PDF_URL(planObj.id), {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `FIAP_${(planObj.msme_name || 'MSME').replace(/\s+/g, '_')}_${planObj.assessment_date || 'action_plan'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      notify('Failed to download Financial Action Plan PDF', 'error');
+    }
+  };
+
+  const deleteFiapPlan = async (planObj) => {
+    if (!window.confirm(`Delete draft Financial Action Plan for ${planObj.msme_name || 'this MSME'}?`)) return;
+    try {
+      await axios.delete(`${API_ENDPOINTS.FINANCIAL_IMPROVEMENT_PLANS}${planObj.id}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      notify('Draft Financial Action Plan deleted.', 'success');
+      fetchFiapPlans();
+    } catch {
+      notify('Failed to delete draft plan.', 'error');
+    }
+  };
+
 
   // ── sidebar ─────────────────────────────────────────────────────────────────
   const navItems = [
@@ -1773,6 +1966,8 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     { key: 'reports',     label: 'My Reports',     icon: <Assignment /> },
     { key: 'tbip',        label: 'Improvement Plan', icon: <TrendingUp />,
       badge: tbipPlans.filter(p => p.status === 'draft').length || undefined },
+    { key: 'fiap',        label: 'Financial Action Plans', icon: <AccountBalance />,
+      badge: fiapPlans.filter(p => p.status === 'draft').length || undefined },
     { key: 'workorders',  label: 'Work Orders',    icon: <Description /> },
     { key: 'training',   label: 'Training',       icon: <School />,
       badge: leadSessions.length + mentorSessions.length + participantSessions.length || undefined },
@@ -2180,6 +2375,21 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                         }}
                                       >
                                         <Assignment fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Financial Improvement Action Plan (FIAP)">
+                                      <IconButton
+                                        size="small"
+                                        sx={{ color: '#1E3A8A' }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const existing = fiapPlans.find(p => p.msme === m.id);
+                                          setSelectedFiapMsme(m);
+                                          setSelectedFiap(existing || null);
+                                          setFiapDialog(true);
+                                        }}
+                                      >
+                                        <AccountBalance fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
                                   </Box>
@@ -3114,6 +3324,333 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           );
         })()}
 
+        {/* ── Financial Improvement Action Plans (FIAP / Access to Finance) ── */}
+        {section === 'fiap' && (() => {
+          const filteredPlans = fiapPlans.filter(p => {
+            if (fiapFilterCategory !== 'all' && String(p.category) !== String(fiapFilterCategory)) return false;
+            if (fiapFilterPriority !== 'all' && p.support_priority !== fiapFilterPriority) return false;
+            if (fiapFilterStatus !== 'all' && p.status !== fiapFilterStatus) return false;
+            if (fiapSearch.trim()) {
+              const q = fiapSearch.toLowerCase();
+              const name = (p.msme_name || '').toLowerCase();
+              const code = (p.msme_code || '').toLowerCase();
+              const catName = (p.category_name || '').toLowerCase();
+              const sector = (p.msme_sector || '').toLowerCase();
+              if (!name.includes(q) && !code.includes(q) && !catName.includes(q) && !sector.includes(q)) return false;
+            }
+            return true;
+          });
+
+          const totalFiaps = fiapPlans.length;
+          const highPriorityCount = fiapPlans.filter(p => p.support_priority === 'High').length;
+          const mediumPriorityCount = fiapPlans.filter(p => p.support_priority === 'Medium').length;
+          const lowPriorityCount = fiapPlans.filter(p => p.support_priority === 'Low').length;
+
+          return (
+            <Box>
+              {/* Header */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: 'space-between',
+                alignItems: { xs: 'stretch', sm: 'center' },
+                gap: { xs: 1.5, sm: 2 },
+                mb: 3,
+              }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="h6" fontWeight={800} color="#1E3A8A">
+                    Financial Improvement Action Plans (FIAP)
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    PRUDEV II / GOPA Pro MSME Diagnostic & Credit Readiness Roadmap (Access to Finance)
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => setNewFiapMsmePicker(true)}
+                  sx={{
+                    bgcolor: '#1E3A8A',
+                    '&:hover': { bgcolor: '#172554' },
+                    whiteSpace: 'nowrap',
+                    fontWeight: 700,
+                    borderRadius: 2,
+                  }}
+                >
+                  New Financial Action Plan
+                </Button>
+              </Box>
+
+              {/* KPI Summary Cards */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>Total Action Plans</Typography>
+                    <Typography variant="h5" fontWeight={800} color="#1E3A8A">{totalFiaps}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #FCA5A5', bgcolor: '#FEF2F2' }}>
+                    <Typography variant="caption" color="error.main" fontWeight={700}>High Priority (Severe Gaps)</Typography>
+                    <Typography variant="h5" fontWeight={800} color="#991B1B">{highPriorityCount}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #FCD34D', bgcolor: '#FFFBEB' }}>
+                    <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 700 }}>Medium Priority (Few Gaps)</Typography>
+                    <Typography variant="h5" fontWeight={800} sx={{ color: '#B45309' }}>{mediumPriorityCount}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #A7F3D0', bgcolor: '#F0FDF4' }}>
+                    <Typography variant="caption" sx={{ color: '#047857', fontWeight: 700 }}>Low Priority (Finance Ready)</Typography>
+                    <Typography variant="h5" fontWeight={800} sx={{ color: '#047857' }}>{lowPriorityCount}</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Filter Bar */}
+              <Paper elevation={0} sx={{ p: 2, mb: 2.5, borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+                <Grid container spacing={1.5} alignItems="center">
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Search MSME, code, sector..."
+                      value={fiapSearch}
+                      onChange={(e) => { setFiapSearch(e.target.value); setFiapPage(0); }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Search fontSize="small" sx={{ color: '#94A3B8' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Category</InputLabel>
+                      <Select
+                        value={fiapFilterCategory}
+                        label="Category"
+                        onChange={(e) => { setFiapFilterCategory(e.target.value); setFiapPage(0); }}
+                      >
+                        <MenuItem value="all">All 9 Categories</MenuItem>
+                        <MenuItem value="1">1. Financial Records & Documentation</MenuItem>
+                        <MenuItem value="2">2. Cash-Flow & Financial Discipline</MenuItem>
+                        <MenuItem value="3">3. Business Plan & Projections</MenuItem>
+                        <MenuItem value="4">4. Collateral & Alternative Security</MenuItem>
+                        <MenuItem value="5">5. Banking Relationship & Linkage</MenuItem>
+                        <MenuItem value="6">6. Financial Literacy & Costing</MenuItem>
+                        <MenuItem value="7">7. Loan Application Readiness</MenuItem>
+                        <MenuItem value="8">8. Debt Management & Credit Growth</MenuItem>
+                        <MenuItem value="9">9. Formalisation, Audit & Certification</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={3} sm={2.5}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Priority</InputLabel>
+                      <Select
+                        value={fiapFilterPriority}
+                        label="Priority"
+                        onChange={(e) => { setFiapFilterPriority(e.target.value); setFiapPage(0); }}
+                      >
+                        <MenuItem value="all">All Priorities</MenuItem>
+                        <MenuItem value="High">High</MenuItem>
+                        <MenuItem value="Medium">Medium</MenuItem>
+                        <MenuItem value="Low">Low</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={3} sm={2.5}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Status</InputLabel>
+                      <Select
+                        value={fiapFilterStatus}
+                        label="Status"
+                        onChange={(e) => { setFiapFilterStatus(e.target.value); setFiapPage(0); }}
+                      >
+                        <MenuItem value="all">All Statuses</MenuItem>
+                        <MenuItem value="draft">Draft</MenuItem>
+                        <MenuItem value="submitted">Submitted</MenuItem>
+                        <MenuItem value="approved">Approved</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Table / List */}
+              {filteredPlans.length === 0 ? (
+                <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 2, border: '1px dashed #CBD5E1', bgcolor: '#F8FAFC' }}>
+                  <AccountBalance sx={{ fontSize: 48, color: '#94A3B8', mb: 1.5 }} />
+                  <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
+                    No Financial Improvement Action Plans Found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Formulate a credit readiness diagnostic and tailored roadmap for your assigned MSMEs.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setNewFiapMsmePicker(true)}
+                    sx={{ bgcolor: '#1E3A8A', '&:hover': { bgcolor: '#172554' }, fontWeight: 700 }}
+                  >
+                    Create Action Plan
+                  </Button>
+                </Paper>
+              ) : (
+                <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#1E3A8A' }}>
+                      <TableRow>
+                        <TableCell sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>MSME & Details</TableCell>
+                        <TableCell sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Action Plan Category</TableCell>
+                        <TableCell sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Gaps & Target Facility</TableCell>
+                        <TableCell align="center" sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Priority</TableCell>
+                        <TableCell align="center" sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Status</TableCell>
+                        <TableCell align="right" sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredPlans.slice(fiapPage * ROWS_PER_PAGE, fiapPage * ROWS_PER_PAGE + ROWS_PER_PAGE).map((p) => {
+                        const isHigh = p.support_priority === 'High';
+                        const isMed = p.support_priority === 'Medium';
+                        const gapsCount = (p.identified_gaps || []).length;
+                        const stepsCount = (p.action_plan_steps || []).length;
+
+                        return (
+                          <TableRow key={p.id} hover sx={{ '&:hover': { bgcolor: '#F8FAFC' } }}>
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Typography fontWeight={700} fontSize={13.5} color="#1E3A8A">
+                                {p.msme_name || `MSME #${p.msme}`}
+                              </Typography>
+                              <Typography fontSize={11} color="text.secondary">
+                                {p.msme_code ? `${p.msme_code} · ` : ''}{p.msme_sector || 'General'}
+                                {p.msme_district ? ` · ${p.msme_district}` : ''}
+                              </Typography>
+                              {p.assessment_date && (
+                                <Typography fontSize={10.5} color="text.secondary" sx={{ mt: 0.25 }}>
+                                  Assessed: {p.assessment_date}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ maxWidth: 260 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Chip
+                                  label={`#${p.category || '—'}`}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#EFF6FF',
+                                    color: '#1E3A8A',
+                                    fontWeight: 800,
+                                    fontSize: 11,
+                                    border: '1px solid #BFDBFE',
+                                    minWidth: 32,
+                                  }}
+                                />
+                                <Box>
+                                  <Typography fontSize={12.5} fontWeight={700} color="#1E293B">
+                                    {p.category_name || `Category ${p.category}`}
+                                  </Typography>
+                                  <Typography fontSize={11} color="text.secondary" sx={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 1,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                  }}>
+                                    {p.category_addresses}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            </TableCell>
+                            <TableCell sx={{ maxWidth: 240 }}>
+                              <Typography fontSize={12} fontWeight={600} color="#334155">
+                                {gapsCount} gap{gapsCount === 1 ? '' : 's'} identified · {stepsCount} step{stepsCount === 1 ? '' : 's'}
+                              </Typography>
+                              <Typography fontSize={11} color="text.secondary" sx={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 1,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}>
+                                {p.financing_target || 'Target financing not specified'}
+                                {p.preferred_fsp ? ` (${p.preferred_fsp})` : ''}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                label={p.support_priority || 'Low'}
+                                size="small"
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: 11,
+                                  bgcolor: isHigh ? '#FEE2E2' : isMed ? '#FEF3C7' : '#ECFDF5',
+                                  color: isHigh ? '#991B1B' : isMed ? '#92400E' : '#065F46',
+                                  border: '1px solid',
+                                  borderColor: isHigh ? '#F87171' : isMed ? '#FBBF24' : '#A7F3D0',
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                label={p.status || 'draft'}
+                                size="small"
+                                color={p.status === 'approved' ? 'success' : p.status === 'submitted' ? 'primary' : 'default'}
+                                sx={{ fontWeight: 700, fontSize: 10.5 }}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+                                <Tooltip title="View / Edit Action Plan">
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => {
+                                      const mTarget = msmes.find(m => m.id === p.msme);
+                                      setSelectedFiapMsme(mTarget || null);
+                                      setSelectedFiap(p);
+                                      setFiapDialog(true);
+                                    }}
+                                  >
+                                    <Edit fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download Official PRUDEV II PDF">
+                                  <IconButton size="small" color="error" onClick={() => handleDownloadFiapPdf(p)}>
+                                    <PictureAsPdf fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                {p.status === 'draft' && (
+                                  <Tooltip title="Delete draft">
+                                    <IconButton size="small" color="default" onClick={() => deleteFiapPlan(p)}>
+                                      <Delete fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  <TablePagination
+                    component="div"
+                    count={filteredPlans.length}
+                    page={fiapPage}
+                    rowsPerPage={ROWS_PER_PAGE}
+                    rowsPerPageOptions={[ROWS_PER_PAGE]}
+                    onPageChange={(_, page) => setFiapPage(page)}
+                  />
+                </TableContainer>
+              )}
+            </Box>
+          );
+        })()}
+
         {/* ── Work Orders (read-only — admin issues) ── */}
         {section === 'workorders' && (
           <Box>
@@ -3637,8 +4174,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         {/* ── Training tab ─────────────────────────────────────────────────── */}
         {section === 'training' && (
           <Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" fontWeight={700}>Training</Typography>
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>Training & Peer-to-Peer Sessions</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Facilitate peer learning sessions with mentor syndicates and participating MSMEs.
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                size="small"
+                onClick={openNewP2pSession}
+                sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark } }}
+              >
+                New Peer-to-Peer Session
+              </Button>
             </Box>
 
             <Tabs value={trainingTab} onChange={(_, v) => setTrainingTab(v)}
@@ -3653,10 +4204,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
             {leadSessions.length === 0 && mentorSessions.length === 0 ? (
               <Paper sx={{ p: 6, textAlign: 'center' }}>
                 <School sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-                <Typography color="text.secondary" gutterBottom>No training sessions yet.</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  You will appear here once the programme administrator assigns you to a session.
+                <Typography color="text.secondary" gutterBottom>No sessions found.</Typography>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                  Start a new Peer-to-Peer session with your mentor team and participating MSMEs.
                 </Typography>
+                <Button variant="contained" startIcon={<Add />} size="small" onClick={openNewP2pSession}>
+                  New Peer-to-Peer Session
+                </Button>
               </Paper>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -3673,6 +4227,7 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             </Box>
                             <Typography variant="caption" color="text.secondary">
                               {s.date}{s.location ? ` · ${s.location}` : ''}
+                              {s.topic_name ? ` · Topic: ${s.topic_name}` : ''}
                             </Typography>
                           </Box>
                         </Box>
@@ -3691,12 +4246,28 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark }, fontSize: 12 }}>
                             {s._tr ? 'Edit Report' : 'Write Report'}
                           </Button>
+                          {s._tr && (
+                            <Tooltip title="View / Download PDF">
+                              <IconButton size="small" onClick={() => openTrPdf(s._tr.id, 'view')}>
+                                <PictureAsPdf fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       </Box>
+                      {(s.team || []).filter(m => m.role === 'mentor').length > 0 && (
+                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Mentor BGEs:</Typography>
+                          {(s.team || []).filter(m => m.role === 'mentor').map(m => (
+                            <Chip key={m.id || m.bge_id} label={m.bge_name || 'Mentor'} size="small" sx={{ bgcolor: '#F3E5F5', color: '#7B1FA2', fontSize: 11, height: 22 }} />
+                          ))}
+                        </Box>
+                      )}
                       {(s.businesses_detail || []).length > 0 && (
-                        <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>MSMEs:</Typography>
                           {s.businesses_detail.map(m => (
-                            <Chip key={m.id} label={m.business_name} size="small" variant="outlined" />
+                            <Chip key={m.id} label={`${m.business_name}${m.owner_name ? ` (${m.owner_name})` : ''}`} size="small" variant="outlined" />
                           ))}
                         </Box>
                       )}
@@ -4045,46 +4616,692 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       {/* ── Training report dialog (lead sessions) ─────────────────────────── */}
       {trDialog && (
         <Dialog open onClose={() => setTrDialog(false)} maxWidth="md" fullWidth>
-          <DialogTitle sx={{ pb: 0.5 }}>
-            {trData ? 'Edit Training Report' : 'Write Training Report'}
-            <Typography variant="caption" display="block" color="text.secondary">
-              {trSession?.title} · {trSession?.date}
-              {trData?.status === 'submitted' && <Chip label="Submitted" size="small" color="success" sx={{ ml: 1, fontSize: 10 }} />}
-            </Typography>
+          <DialogTitle sx={{ pb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>
+                {trData ? 'Edit Peer-to-Peer Session Report' : 'Write Peer-to-Peer Session Report'}
+              </Typography>
+              <Typography variant="caption" display="block" color="text.secondary">
+                {trSession?.title} · {trSession?.date}
+                {trForm.venue ? ` · ${trForm.venue}` : ''}
+                {trData?.status === 'submitted' ? (
+                  <Chip label="Submitted" size="small" color="success" sx={{ ml: 1, fontSize: 10, height: 20 }} />
+                ) : (
+                  <Chip label="Draft" size="small" color="warning" sx={{ ml: 1, fontSize: 10, height: 20 }} />
+                )}
+              </Typography>
+            </Box>
+            {trData?.id && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<PictureAsPdf />}
+                onClick={() => openTrPdf(trData.id, 'view')}
+                sx={{ fontSize: 12 }}
+              >
+                View PDF
+              </Button>
+            )}
           </DialogTitle>
-          <DialogContent dividers sx={{ pt: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}><TextField fullWidth size="small" label="Training Title"
-                value={trForm.training_title || ''} onChange={e => setTrForm(f => ({ ...f, training_title: e.target.value }))} /></Grid>
-              <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="Date(s)" placeholder="e.g. 17–19 Feb 2026"
-                value={trForm.training_dates || ''} onChange={e => setTrForm(f => ({ ...f, training_dates: e.target.value }))} /></Grid>
-              <Grid item xs={12} sm={5}><TextField fullWidth size="small" label="Venue / Location"
-                value={trForm.venue || ''} onChange={e => setTrForm(f => ({ ...f, venue: e.target.value }))} /></Grid>
-              <Grid item xs={12} sm={3}><TextField fullWidth size="small" label="District"
-                value={trForm.district || ''} onChange={e => setTrForm(f => ({ ...f, district: e.target.value }))} /></Grid>
-              <Grid item xs={12}><TextField fullWidth size="small" label="Facilitation Team"
-                value={trForm.facilitation_team || ''} onChange={e => setTrForm(f => ({ ...f, facilitation_team: e.target.value }))} /></Grid>
-            </Grid>
-            <Divider sx={{ my: 2 }} />
-            {[
-              { key: 'training_purpose',    label: 'Purpose / Background' },
-              { key: 'session_objectives',  label: 'Session Objectives' },
-              { key: 'activities_delivered',label: 'Activities Delivered' },
-              { key: 'key_lessons',         label: 'Key Lessons Learned' },
-              { key: 'recommendations',     label: 'Recommendations' },
-              { key: 'next_steps',          label: 'Next Steps' },
-            ].map(({ key, label }) => (
-              <TextField key={key} fullWidth multiline minRows={2} size="small" label={label} sx={{ mb: 2 }}
-                value={trForm[key] || ''} onChange={e => setTrForm(f => ({ ...f, [key]: e.target.value }))} />
-            ))}
+          <DialogContent dividers sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* ── Session Metadata & Venue Log ── */}
+            <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="subtitle2" fontWeight={700} color={BRAND.primaryMain} sx={{ mb: 1.5 }}>
+                1. SESSION METADATA & FACILITATION TEAM
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={8}>
+                  <TextField fullWidth size="small" label="Training Title"
+                    value={trForm.training_title || ''} onChange={e => setTrForm(f => ({ ...f, training_title: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="Date(s)" placeholder="e.g. 17–19 Feb 2026"
+                    value={trForm.training_dates || ''} onChange={e => setTrForm(f => ({ ...f, training_dates: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="Venue / Location"
+                    value={trForm.venue || ''} onChange={e => setTrForm(f => ({ ...f, venue: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="District"
+                    value={trForm.district || ''} onChange={e => setTrForm(f => ({ ...f, district: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth size="small" label="Duration / Time Allocation" placeholder="e.g. 9:00 AM – 3:30 PM (6.5 hrs)"
+                    value={trForm.time_allocation || ''} onChange={e => setTrForm(f => ({ ...f, time_allocation: e.target.value }))} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth size="small" label="Facilitation Team (Lead & Mentor BGEs)"
+                    helperText="List names and roles of lead and syndicate mentor facilitators"
+                    value={trForm.facilitation_team || ''} onChange={e => setTrForm(f => ({ ...f, facilitation_team: e.target.value }))} />
+                </Grid>
+              </Grid>
+            </Box>
+
+            {/* ── Attendance & Participant Demographics ── */}
+            <Box sx={{ p: 2, bgcolor: '#F0FDF4', borderRadius: 2, border: '1px solid #BBF7D0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                <Typography variant="subtitle2" fontWeight={700} color="#166534">
+                  2. MSME ATTENDANCE REGISTER & DEMOGRAPHIC SUMMARY
+                </Typography>
+                <Chip
+                  label={`Total Attending: ${(Number(trForm.participants_male_youth || 0) + Number(trForm.participants_female_youth || 0) + Number(trForm.participants_adult_male || 0) + Number(trForm.participants_adult_female || 0))}`}
+                  color="success"
+                  size="small"
+                  sx={{ fontWeight: 700 }}
+                />
+              </Box>
+
+              {/* Attendance quick chips if recorded */}
+              {(() => {
+                const stats = trSession?.attendance_stats || {};
+                const list = trData?.attendance_list || trSession?.attendance_list || [];
+                return (
+                  <>
+                    {stats.total_present ? (
+                      <Box sx={{ mb: 1.5, display: 'flex', gap: 0.8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Chip label={`${stats.total_present} Recorded Present`} size="small" color="success" />
+                        <Chip label={`${stats.male ?? 0} Male · ${stats.female ?? 0} Female`} size="small" variant="outlined" />
+                        <Chip label={`${(stats.youth_male || 0) + (stats.youth_female || 0)} Youth`} size="small" variant="outlined" />
+                        <Chip label={`${stats.refugee ?? 0} Refugee · ${stats.host_community ?? 0} Host`} size="small" variant="outlined" />
+                      </Box>
+                    ) : null}
+
+                    {/* Attending MSMEs chips */}
+                    {list.length > 0 && (
+                      <Box sx={{ mb: 1.5 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}>
+                          Verified MSME Attendees:
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 80, overflowY: 'auto' }}>
+                          {list.map((a, idx) => (
+                            <Chip
+                              key={a.id || idx}
+                              label={`${a.attendee_name}${a.msme_name ? ` (${a.msme_name})` : ''}`}
+                              size="small"
+                              sx={{ fontSize: 11, bgcolor: '#DCFCE7', color: '#14532D' }}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                  </>
+                );
+              })()}
+
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={3}>
+                  <TextField fullWidth size="small" type="number" label="Male Youth (18–35)"
+                    value={trForm.participants_male_youth ?? 0}
+                    onChange={e => setTrForm(f => ({ ...f, participants_male_youth: parseInt(e.target.value) || 0 }))} />
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <TextField fullWidth size="small" type="number" label="Female Youth (18–35)"
+                    value={trForm.participants_female_youth ?? 0}
+                    onChange={e => setTrForm(f => ({ ...f, participants_female_youth: parseInt(e.target.value) || 0 }))} />
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <TextField fullWidth size="small" type="number" label="Adult Male (36+)"
+                    value={trForm.participants_adult_male ?? 0}
+                    onChange={e => setTrForm(f => ({ ...f, participants_adult_male: parseInt(e.target.value) || 0 }))} />
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <TextField fullWidth size="small" type="number" label="Adult Female (36+)"
+                    value={trForm.participants_adult_female ?? 0}
+                    onChange={e => setTrForm(f => ({ ...f, participants_adult_female: parseInt(e.target.value) || 0 }))} />
+                </Grid>
+              </Grid>
+            </Box>
+
+            {/* ── Syndicate Mentorship Reports & Synthesize Button ── */}
+            {trData?.mentor_reports && trData.mentor_reports.length > 0 && (
+              <Box sx={{ p: 2, bgcolor: '#FAF5FF', borderRadius: 2, border: '1px solid #E9D5FF' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} color="#7E22CE">
+                      3. SYNDICATE MENTOR OBSERVATIONS ({trData.mentor_reports.length} Reports Submitted)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Mentor BGEs have submitted small-group syndicate breakout observations for this session.
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<AutoAwesome />}
+                    onClick={synthesizeMentorReports}
+                    sx={{ bgcolor: '#7E22CE', '&:hover': { bgcolor: '#6B21A8' }, fontSize: 11 }}
+                  >
+                    Synthesize Mentor Insights
+                  </Button>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                  {trData.mentor_reports.map((mr, i) => (
+                    <Accordion key={mr.id || i} sx={{ boxShadow: 'none', border: '1px solid #E9D5FF', '&:before': { display: 'none' } }}>
+                      <AccordionSummary expandIcon={<ExpandMore />}>
+                        <Typography variant="body2" fontWeight={600} color="#6B21A8">
+                          {mr.bge_name || `Mentor #${i + 1}`} · {mr.status === 'submitted' ? 'Submitted' : 'Draft'}
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ pt: 0, fontSize: 12 }}>
+                        {mr.msmes_mentored && (
+                          <Typography variant="caption" display="block"><strong>MSMEs Mentored:</strong> {mr.msmes_mentored}</Typography>
+                        )}
+                        {mr.key_observations && (
+                          <Typography variant="caption" display="block" sx={{ mt: 0.5 }}><strong>Observations:</strong> {mr.key_observations}</Typography>
+                        )}
+                        {mr.challenges && (
+                          <Typography variant="caption" display="block" sx={{ mt: 0.5 }}><strong>Challenges:</strong> {mr.challenges}</Typography>
+                        )}
+                        {mr.recommendations && (
+                          <Typography variant="caption" display="block" sx={{ mt: 0.5 }}><strong>Recommendations:</strong> {mr.recommendations}</Typography>
+                        )}
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* ── Section 1: Session Purpose & Objectives ── */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} color="primary" sx={{ mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Section I: Purpose & Specific Objectives
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q1: Background & Purpose of the Session"
+                placeholder="Outline the core purpose of the peer-to-peer session, the thematic focus (e.g. cash flow, credit readiness, inventory), and why this group session was organized."
+                sx={{ mb: 2 }}
+                value={trForm.training_purpose || ''}
+                onChange={e => setTrForm(f => ({ ...f, training_purpose: e.target.value }))}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q2: Specific Session Objectives"
+                placeholder="What targeted competencies and practical takeaways were the participating MSME owners expected to gain from this session?"
+                sx={{ mb: 1 }}
+                value={trForm.session_objectives || ''}
+                onChange={e => setTrForm(f => ({ ...f, session_objectives: e.target.value }))}
+              />
+            </Box>
+
+            <Divider />
+
+            {/* ── Section 2: Delivery & Lessons Learned ── */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} color="primary" sx={{ mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Section II: Plenary Delivery & Peer Lessons
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q3: Plenary Activities Delivered & Concepts Introduced"
+                placeholder="Summarize plenary topics, interactive exercises delivered, tools and templates demonstrated (e.g., cash flow sheets, loan application packaging, inventory logs)."
+                sx={{ mb: 2 }}
+                value={trForm.activities_delivered || ''}
+                onChange={e => setTrForm(f => ({ ...f, activities_delivered: e.target.value }))}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q4: Key Lessons Learned & Peer Exchanges"
+                placeholder="How did enterprise owners interact, share failure experiences, cross-pollinate solutions, and engage in problem-solving?"
+                sx={{ mb: 1 }}
+                value={trForm.key_lessons || ''}
+                onChange={e => setTrForm(f => ({ ...f, key_lessons: e.target.value }))}
+              />
+            </Box>
+
+            <Divider />
+
+            {/* ── Section 3: Diagnostic Findings & Mentorship Dynamics ── */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} color="primary" sx={{ mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Section III: Diagnostic Findings & Mentorship Dynamics
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q5: Growth Support Areas & BDS Opportunities Discovered"
+                placeholder="Opportunities discovered for bulk purchasing, joint transport, cooperative branding, market linkages, or clustering."
+                sx={{ mb: 2 }}
+                value={trForm.growth_support_areas || ''}
+                onChange={e => setTrForm(f => ({ ...f, growth_support_areas: e.target.value }))}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q6: Key Diagnostic Findings & Systemic Bottlenecks"
+                placeholder="Top common operational, financial, and regulatory challenges identified across the participating MSMEs (e.g., bookkeeping, machinery power supply, packaging)."
+                sx={{ mb: 2 }}
+                value={trForm.key_findings || ''}
+                onChange={e => setTrForm(f => ({ ...f, key_findings: e.target.value }))}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q7: Mentorship Dynamics & BGE Contributions"
+                placeholder="Observations from small-group syndicate breakouts, mentor BGE facilitation effectiveness, and diagnostic capacity gaps observed."
+                sx={{ mb: 1 }}
+                value={trForm.bge_contributions || ''}
+                onChange={e => setTrForm(f => ({ ...f, bge_contributions: e.target.value }))}
+              />
+            </Box>
+
+            <Divider />
+
+            {/* ── Section 4: 30-Day Commitments, Recommendations & Sign-off ── */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} color="primary" sx={{ mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Section IV: 30-Day Action Commitments & Way Forward
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q8: Proposed BDS Actions & MSME 30-Day Commitments (Acid Test)"
+                placeholder="Tangible, measurable operational commitments made by MSME owners to execute within 30 days (e.g. open separate bank account, introduce inventory log, complete UNBS checklist)."
+                sx={{ mb: 2 }}
+                value={trForm.bds_actions || ''}
+                onChange={e => setTrForm(f => ({ ...f, bds_actions: e.target.value }))}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q9: Recommendations for Future Sessions & Management Support"
+                placeholder="Required specialist technical co-assignments, financial linkages, or programme inputs needed from PRUDEV II / GOPA Pro."
+                sx={{ mb: 2 }}
+                value={trForm.recommendations || ''}
+                onChange={e => setTrForm(f => ({ ...f, recommendations: e.target.value }))}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q10: Agreed Next Steps & Implementation Roadmap"
+                placeholder="Immediate follow-up actions to be verified by BGEs during 1-on-1 coaching visits over the next 4–6 weeks."
+                sx={{ mb: 2 }}
+                value={trForm.next_steps || ''}
+                onChange={e => setTrForm(f => ({ ...f, next_steps: e.target.value }))}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                label="Q11: Summary Conclusion & Lead Facilitator Declaration"
+                placeholder="Executive summary of session outcomes and certification of delivery according to PRUDEV II guidelines."
+                value={trForm.conclusion || ''}
+                onChange={e => setTrForm(f => ({ ...f, conclusion: e.target.value }))}
+              />
+            </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
             <Button onClick={() => setTrDialog(false)} disabled={trSaving}>Cancel</Button>
+            {trData?.id && (
+              <Button
+                variant="outlined"
+                startIcon={<PictureAsPdf />}
+                onClick={() => openTrPdf(trData.id, 'view')}
+                disabled={trSaving}
+              >
+                Download PDF
+              </Button>
+            )}
             <Button variant="outlined" onClick={() => saveTrReport(false)} disabled={trSaving}>
               {trSaving ? 'Saving…' : 'Save Draft'}
             </Button>
             <Button variant="contained" color="success" onClick={() => saveTrReport(true)} disabled={trSaving}>
               {trSaving ? 'Submitting…' : 'Submit Report'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* ── Create Peer-to-Peer Session Dialog ─────────────────────────────── */}
+      {p2pSessionDialog && (
+        <Dialog open onClose={() => setP2pSessionDialog(false)} maxWidth="md" fullWidth>
+          <DialogTitle sx={{ pb: 0.5 }}>
+            <Typography variant="h6" fontWeight={700}>
+              Create Peer-to-Peer Learning Session
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Configure session facilitation (Lead BGE & Mentor BGEs) and select participating MSMEs from the master database.
+            </Typography>
+          </DialogTitle>
+          <DialogContent dividers sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Session Details */}
+            <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="subtitle2" fontWeight={700} color={BRAND.primaryMain} sx={{ mb: 1.5 }}>
+                SESSION DETAILS & VENUE
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Session Title *"
+                    value={p2pForm.title}
+                    onChange={e => setP2pForm(f => ({ ...f, title: e.target.value }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="date"
+                    label="Start Date *"
+                    InputLabelProps={{ shrink: true }}
+                    value={p2pForm.date}
+                    onChange={e => setP2pForm(f => ({ ...f, date: e.target.value }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="date"
+                    label="End Date (Optional)"
+                    InputLabelProps={{ shrink: true }}
+                    value={p2pForm.end_date}
+                    onChange={e => setP2pForm(f => ({ ...f, end_date: e.target.value }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Venue / Location *"
+                    placeholder="e.g. Commercial Hall, Gulu"
+                    value={p2pForm.location}
+                    onChange={e => setP2pForm(f => ({ ...f, location: e.target.value }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="District"
+                    placeholder="e.g. Gulu / Lira / Arua"
+                    value={p2pForm.district}
+                    onChange={e => setP2pForm(f => ({ ...f, district: e.target.value }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Thematic Topic</InputLabel>
+                    <Select
+                      value={p2pForm.topic || ''}
+                      label="Thematic Topic"
+                      onChange={e => setP2pForm(f => ({ ...f, topic: e.target.value }))}
+                    >
+                      <MenuItem value=""><em>None / Custom</em></MenuItem>
+                      {allTopics.map(t => (
+                        <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Description / Key Focus"
+                    placeholder="e.g. Cash flow management & loan packaging"
+                    value={p2pForm.description}
+                    onChange={e => setP2pForm(f => ({ ...f, description: e.target.value }))}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            {/* Facilitation Team */}
+            <Box sx={{ p: 2, bgcolor: '#FAF5FF', borderRadius: 2, border: '1px solid #E9D5FF' }}>
+              <Typography variant="subtitle2" fontWeight={700} color="#7E22CE" sx={{ mb: 1.5 }}>
+                FACILITATION ROLES: LEAD BGE & MENTOR BGES
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Lead BGE *</InputLabel>
+                    <Select
+                      value={p2pForm.lead_bge_id || ''}
+                      label="Lead BGE *"
+                      onChange={e => {
+                        const newLead = e.target.value;
+                        setP2pForm(f => ({
+                          ...f,
+                          lead_bge_id: newLead,
+                          mentor_bge_ids: f.mentor_bge_ids.filter(id => id !== newLead)
+                        }));
+                      }}
+                    >
+                      {allExperts.map(exp => (
+                        <MenuItem key={exp.id} value={exp.id}>
+                          {exp.name} {exp.bge_code ? `(${exp.bge_code})` : ''} {exp.district ? `· ${exp.district}` : ''}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Mentor BGE(s)</InputLabel>
+                    <Select
+                      multiple
+                      value={p2pForm.mentor_bge_ids}
+                      label="Mentor BGE(s)"
+                      onChange={e => {
+                        const val = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
+                        setP2pForm(f => ({ ...f, mentor_bge_ids: val }));
+                      }}
+                      renderValue={selected => (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {selected.map(id => {
+                            const exp = allExperts.find(x => x.id === id);
+                            return (
+                              <Chip
+                                key={id}
+                                label={exp ? exp.name : id}
+                                size="small"
+                                sx={{ height: 22, fontSize: 11, bgcolor: '#F3E5F5', color: '#7B1FA2' }}
+                              />
+                            );
+                          })}
+                        </Box>
+                      )}
+                    >
+                      {allExperts
+                        .filter(exp => exp.id !== p2pForm.lead_bge_id)
+                        .map(exp => (
+                          <MenuItem key={exp.id} value={exp.id}>
+                            <Checkbox checked={p2pForm.mentor_bge_ids.indexOf(exp.id) > -1} size="small" />
+                            <ListItemText primary={`${exp.name}${exp.district ? ` (${exp.district})` : ''}`} />
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Box>
+
+            {/* MSME Participant Multi-Select (Wired to live database) */}
+            <Box sx={{ p: 2, bgcolor: '#F0FDF4', borderRadius: 2, border: '1px solid #BBF7D0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700} color="#166534">
+                    PARTICIPATING MSMES (LIVE DATABASE)
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Select enterprise participants to auto-populate the session roster, attendance register, and 30-day commitments.
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Chip
+                    label={`${p2pForm.msme_ids.length} Selected`}
+                    color="success"
+                    size="small"
+                    sx={{ fontWeight: 700 }}
+                  />
+                  {p2pForm.msme_ids.length > 0 && (
+                    <Button
+                      size="small"
+                      variant="text"
+                      color="inherit"
+                      onClick={() => setP2pForm(f => ({ ...f, msme_ids: [] }))}
+                      sx={{ fontSize: 11 }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+
+              {/* Search / Filter input */}
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search MSMEs by business name, owner, or district…"
+                value={p2pSearchMsme}
+                onChange={e => setP2pSearchMsme(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search fontSize="small" sx={{ color: 'text.secondary' }} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 1.5, bgcolor: '#fff' }}
+              />
+
+              {/* MSME List */}
+              {(() => {
+                const filtered = (trainingMsmes || []).filter(m => {
+                  if (!p2pSearchMsme) return true;
+                  const q = p2pSearchMsme.toLowerCase();
+                  return (
+                    (m.business_name || m.name || '').toLowerCase().includes(q) ||
+                    (m.owner_name || '').toLowerCase().includes(q) ||
+                    (m.district || '').toLowerCase().includes(q) ||
+                    (m.sector || '').toLowerCase().includes(q)
+                  );
+                });
+
+                return (
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Showing {filtered.length} of {trainingMsmes.length} MSMEs
+                      </Typography>
+                      {filtered.length > 0 && (
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => {
+                            const newIds = filtered.map(m => m.id);
+                            setP2pForm(f => ({
+                              ...f,
+                              msme_ids: Array.from(new Set([...f.msme_ids, ...newIds]))
+                            }));
+                          }}
+                          sx={{ fontSize: 11, color: '#166534', p: 0 }}
+                        >
+                          Select All Filtered
+                        </Button>
+                      )}
+                    </Box>
+
+                    <Paper variant="outlined" sx={{ maxHeight: 240, overflowY: 'auto', bgcolor: '#fff' }}>
+                      {filtered.length === 0 ? (
+                        <Box sx={{ p: 3, textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            {trainingMsmes.length === 0 ? 'Loading MSMEs from database…' : 'No MSMEs match your search.'}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <List dense disablePadding>
+                          {filtered.map(m => {
+                            const isSelected = p2pForm.msme_ids.includes(m.id);
+                            return (
+                              <ListItemButton
+                                key={m.id}
+                                onClick={() => {
+                                  setP2pForm(f => ({
+                                    ...f,
+                                    msme_ids: isSelected ? f.msme_ids.filter(x => x !== m.id) : [...f.msme_ids, m.id]
+                                  }));
+                                }}
+                                sx={{
+                                  borderBottom: '1px solid #F1F5F9',
+                                  bgcolor: isSelected ? '#DCFCE7' : 'transparent',
+                                  '&:hover': { bgcolor: isSelected ? '#BBF7D0' : '#F8FAFC' },
+                                }}
+                              >
+                                <ListItemIcon sx={{ minWidth: 36 }}>
+                                  <Checkbox edge="start" checked={isSelected} size="small" tabIndex={-1} disableRipple />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary={
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                      <Typography variant="body2" fontWeight={600}>
+                                        {m.business_name || m.name}
+                                      </Typography>
+                                      {m.district && (
+                                        <Chip label={m.district} size="small" sx={{ height: 18, fontSize: 10 }} />
+                                      )}
+                                      {m.sector && (
+                                        <Chip label={m.sector} size="small" variant="outlined" sx={{ height: 18, fontSize: 10 }} />
+                                      )}
+                                    </Box>
+                                  }
+                                  secondary={
+                                    <Typography variant="caption" color="text.secondary">
+                                      Owner: {m.owner_name || '—'} {m.contact_phone ? `· ${m.contact_phone}` : ''}
+                                      {m.assigned_bge_name ? ` · BGE: ${m.assigned_bge_name}` : ''}
+                                    </Typography>
+                                  }
+                                />
+                              </ListItemButton>
+                            );
+                          })}
+                        </List>
+                      )}
+                    </Paper>
+                  </Box>
+                );
+              })()}
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+            <Button onClick={() => setP2pSessionDialog(false)} disabled={p2pSessionSaving}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={saveP2pSession}
+              disabled={p2pSessionSaving}
+              sx={{ bgcolor: BRAND.primaryMain, '&:hover': { bgcolor: BRAND.primaryDark } }}
+            >
+              {p2pSessionSaving ? 'Creating…' : 'Create Session'}
             </Button>
           </DialogActions>
         </Dialog>
@@ -4978,10 +6195,33 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 )}
               </DialogContent>
 
-              <DialogActions>
+              <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1, flexWrap: 'wrap' }}>
                 <Button variant="outlined" size="small" color="success"
                   onClick={() => { setMsmeDetailDialog(false); openGrowthForm(m); }}>
-                  Record Growth Update
+                  Growth Update
+                </Button>
+                <Button variant="outlined" size="small"
+                  sx={{ borderColor: '#B45309', color: '#B45309' }}
+                  onClick={() => {
+                    setMsmeDetailDialog(false);
+                    const existing = tbipPlans.find(p => p.msme === m.id);
+                    setSelectedTbipMsme(m);
+                    setSelectedTbip(existing || null);
+                    setTbipDialog(true);
+                  }}>
+                  TBIP Plan
+                </Button>
+                <Button variant="contained" size="small"
+                  startIcon={<AccountBalance />}
+                  sx={{ bgcolor: '#1E3A8A', '&:hover': { bgcolor: '#172554' } }}
+                  onClick={() => {
+                    setMsmeDetailDialog(false);
+                    const existing = fiapPlans.find(p => p.msme === m.id);
+                    setSelectedFiapMsme(m);
+                    setSelectedFiap(existing || null);
+                    setFiapDialog(true);
+                  }}>
+                  Financial Action Plan
                 </Button>
                 <Button onClick={() => setMsmeDetailDialog(false)}>Close</Button>
               </DialogActions>
@@ -5696,6 +6936,60 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         </DialogContent>
         <DialogActions sx={{ p: 1.5 }}>
           <Button onClick={() => setNewTbipMsmePicker(false)} sx={{ textTransform: 'none', color: '#64748B' }}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Financial Improvement Action Plan (FIAP) Dialog ── */}
+      <FinancialImprovementPlanDialog
+        open={fiapDialog}
+        onClose={() => setFiapDialog(false)}
+        plan={selectedFiap}
+        msme={selectedFiapMsme || (selectedFiap ? msmes.find(m => m.id === selectedFiap.msme) : null)}
+        bge={currentUser?.bge_profile}
+        currentUser={currentUser}
+        token={token}
+        onSaved={(updated) => {
+          fetchFiapPlans();
+          setSelectedFiap(updated);
+        }}
+        notify={notify}
+      />
+
+      {/* ── MSME Picker for New FIAP ── */}
+      <Dialog open={newFiapMsmePicker} onClose={() => setNewFiapMsmePicker(false)} maxWidth="xs" fullWidth disableScrollLock>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: 16 }}>Select MSME for Financial Action Plan</DialogTitle>
+        <DialogContent dividers sx={{ p: 1.5 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, px: 0.5 }}>
+            Choose an assigned MSME to assess its credit readiness and formulate a Financial Improvement Action Plan (FIAP).
+          </Typography>
+          <List sx={{ pt: 0, maxHeight: 360, overflowY: 'auto' }}>
+            {msmes.map((m) => (
+              <ListItemButton
+                key={m.id}
+                onClick={() => {
+                  setSelectedFiapMsme(m);
+                  const existing = fiapPlans.find(p => p.msme === m.id);
+                  setSelectedFiap(existing || null);
+                  setNewFiapMsmePicker(false);
+                  setFiapDialog(true);
+                }}
+                sx={{
+                  borderRadius: 1.5,
+                  mb: 0.75,
+                  border: '1px solid #E2E8F0',
+                  '&:hover': { bgcolor: '#F1F5F9', borderColor: '#1E3A8A' },
+                }}
+              >
+                <ListItemText
+                  primary={<Typography fontWeight={700} fontSize={13.5} color="#1E3A8A">{m.name}</Typography>}
+                  secondary={<Typography fontSize={11} color="text.secondary">{m.msme_code || '—'} · {m.district || ''} · {m.sector || ''}</Typography>}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ p: 1.5 }}>
+          <Button onClick={() => setNewFiapMsmePicker(false)} sx={{ textTransform: 'none', color: '#64748B' }}>Cancel</Button>
         </DialogActions>
       </Dialog>
 

@@ -1073,14 +1073,34 @@ class MSMEViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
         # Total employees from the latest growth snapshot per MSME in scope.
         # 1) Find the most recent snapshot date per MSME.
         # 2) Pull employee columns from those rows and sum them.
+        from django.db import connection
         msme_ids = list(qs.values_list('id', flat=True))
-        latest_snapshot_ids = (
-            MSMEGrowthSnapshot.objects
-            .filter(msme_id__in=msme_ids)
-            .order_by('msme_id', '-snapshot_date')
-            .distinct('msme_id')
-            .values_list('id', flat=True)
-        )
+        if connection.vendor == 'postgresql':
+            latest_snapshot_ids = (
+                MSMEGrowthSnapshot.objects
+                .filter(msme_id__in=msme_ids)
+                .order_by('msme_id', '-snapshot_date')
+                .distinct('msme_id')
+                .values_list('id', flat=True)
+            )
+        else:
+            from django.db.models import Max
+            latest_dates = (
+                MSMEGrowthSnapshot.objects
+                .filter(msme_id__in=msme_ids)
+                .values('msme_id')
+                .annotate(max_date=Max('snapshot_date'))
+            )
+            latest_snapshot_ids = []
+            for item in latest_dates:
+                sid = (
+                    MSMEGrowthSnapshot.objects
+                    .filter(msme_id=item['msme_id'], snapshot_date=item['max_date'])
+                    .values_list('id', flat=True)
+                    .first()
+                )
+                if sid:
+                    latest_snapshot_ids.append(sid)
         snap_emp_agg = MSMEGrowthSnapshot.objects.filter(id__in=latest_snapshot_ids).aggregate(
             ft_male   = Sum('employees_ft_male'),
             ft_female = Sum('employees_ft_female'),

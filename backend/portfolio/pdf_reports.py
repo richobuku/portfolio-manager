@@ -10,6 +10,7 @@ embedded in the header band on every page.
 import io
 import os
 from xml.sax.saxutils import escape as xml_escape
+from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -1325,6 +1326,9 @@ def render_training_report(report):
     session = report.session
     bge = report.bge
 
+    mentor_names = [fa.bge.name for fa in session.facilitation_assignments.filter(role='mentor').select_related('bge') if fa.bge]
+    msme_count = session.businesses.count()
+
     story.append(Paragraph(_safe_html(f'Training Report — {session.title}'), s['h1']))
     story.append(Paragraph(f'Lead Training Report · {session.date}', s['sub']))
 
@@ -1333,6 +1337,8 @@ def render_training_report(report):
         ['Date',              str(session.date)],
         ['Location',          session.location or '—'],
         ['Lead BGE',          bge.name if bge else '—'],
+        ['Mentor BGEs',       ', '.join(mentor_names) if mentor_names else '—'],
+        ['Assigned MSMEs',    f'{msme_count} MSMEs registered' if msme_count else '—'],
         ['Training Dates',    report.training_dates or '—'],
         ['Venue',             report.venue or '—'],
         ['District',          report.district or '—'],
@@ -1390,6 +1396,28 @@ def render_training_report(report):
     for title, body in narrative_sections:
         story.extend(_section(s, title, body))
 
+    # ── Syndicate Breakout & Mentor Reports ──────────────────────────────────
+    mentor_reports = list(session.mentor_reports.select_related('bge').all())
+    if mentor_reports:
+        story.append(Paragraph('Syndicate Breakout & Mentor Reports', s['sectiontitle']))
+        for mr in mentor_reports:
+            mentor_title = f"Syndicate Mentor: {mr.bge.name if mr.bge else 'Mentor'}"
+            lines = []
+            if mr.msmes_mentored:
+                lines.append(f"<b>MSMEs Mentored:</b> {_safe_html(mr.msmes_mentored)}")
+            if mr.mentoring_activities:
+                lines.append(f"<b>Activities:</b> {_safe_html(mr.mentoring_activities)}")
+            if mr.key_observations:
+                lines.append(f"<b>Key Observations:</b> {_safe_html(mr.key_observations)}")
+            if mr.challenges:
+                lines.append(f"<b>Challenges:</b> {_safe_html(mr.challenges)}")
+            if mr.recommendations:
+                lines.append(f"<b>Recommendations:</b> {_safe_html(mr.recommendations)}")
+            if mr.next_steps:
+                lines.append(f"<b>Next Steps:</b> {_safe_html(mr.next_steps)}")
+            body = '<br/><br/>'.join(lines) if lines else 'No observations recorded.'
+            story.extend(_section(s, mentor_title, body))
+
     # ── Attendance sheet ──────────────────────────────────────────────────────
     attendances = list(
         session.attendances.select_related('msme').order_by('attendance_date', 'attendee_name')
@@ -1410,12 +1438,13 @@ def render_training_report(report):
                     s['sub'],
                 ))
 
-            att_header = ['#', 'Name', 'Phone', 'Sex', 'Age Group', 'Status', 'Signature']
+            att_header = ['#', 'Participant Name', 'Enterprise / MSME', 'Phone', 'Sex', 'Age', 'Status', 'Signature']
             att_data = [att_header]
             for i, a in enumerate(day_rows, 1):
                 att_data.append([
                     str(i),
                     a.attendee_name or '—',
+                    a.msme.business_name if a.msme else 'Walk-in',
                     a.attendee_phone or '—',
                     a.gender or '—',
                     a.age_group or '—',
@@ -1423,7 +1452,7 @@ def render_training_report(report):
                     '',
                 ])
 
-            col_widths = [20, 130, 80, 25, 55, 50, 80]
+            col_widths = [18, 95, 105, 75, 24, 42, 42, 65]
             att_table = Table(att_data, colWidths=col_widths, hAlign='LEFT', repeatRows=1)
             att_table.setStyle(TableStyle([
                 ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
@@ -2482,4 +2511,305 @@ def generate_enterprise_improvement_plan_pdf(plan):
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
     return buf.getvalue()
+
+
+def generate_financial_improvement_plan_pdf(plan):
+    """
+    Generate the official PRUDEV II MSME Financial Improvement Action Plan (FIAP) PDF.
+    Access to Finance, Credit Readiness & Financial Institution Linkage.
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=14 * mm,
+        rightMargin=14 * mm,
+        topMargin=26 * mm,
+        bottomMargin=16 * mm,
+    )
+
+    s = _styles()
+    CW = doc.width
+
+    p_title = ParagraphStyle(
+        'fiap_title',
+        parent=s['h1'],
+        fontSize=14,
+        leading=17,
+        textColor=HexColor('#9E0A1E'),
+        fontName='Helvetica-Bold',
+        spaceAfter=2,
+    )
+    p_sub = ParagraphStyle(
+        'fiap_sub',
+        parent=s['body'],
+        fontSize=8.5,
+        leading=11,
+        textColor=HexColor('#555555'),
+        spaceAfter=6,
+    )
+    p_sec_hdr = ParagraphStyle(
+        'fiap_sec_hdr',
+        parent=s['h2'],
+        fontSize=10,
+        leading=13,
+        textColor=HexColor('#9E0A1E'),
+        fontName='Helvetica-Bold',
+        spaceBefore=6,
+        spaceAfter=4,
+    )
+    td_style = ParagraphStyle('fiap_td', fontName='Helvetica', fontSize=8, leading=10.5, textColor=HexColor('#1E293B'))
+    td_bold = ParagraphStyle('fiap_td_bold', fontName='Helvetica-Bold', fontSize=8, leading=10.5, textColor=HexColor('#0F172A'))
+    td_muted = ParagraphStyle('fiap_td_muted', fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=HexColor('#64748B'))
+
+    story = []
+
+    # Title Banner
+    story.append(Paragraph("PRUDEV II — Promoting Rural Development II", p_title))
+    story.append(Paragraph("<b>MSME FINANCIAL IMPROVEMENT ACTION PLAN — ACCESS TO FINANCE</b><br/>"
+                           "Diagnostic Categorization, Phased Credit-Readiness Roadmap & FSP Linkage", p_sub))
+    story.append(HRFlowable(width='100%', thickness=1.5, color=HexColor('#9E0A1E'), spaceAfter=6))
+
+    # Priority styling
+    p_level = (plan.support_priority or 'Medium').capitalize()
+    p_colors = {
+        'High': ('#FEF2F2', '#DC2626', '#991B1B'),
+        'Medium': ('#FFFBEB', '#D97706', '#92400E'),
+        'Low': ('#F0FDF4', '#16A34A', '#166534'),
+    }
+    bg_p, border_p, text_p = p_colors.get(p_level, ('#F1F5F9', '#64748B', '#334155'))
+
+    # Metadata Table
+    m = plan.msme
+    loc_str = m.address or m.district or '—'
+    bge_str = f"{plan.bge.name} ({plan.bge.bge_code or '—'})" if plan.bge else "—"
+    
+    meta_data = [
+        [
+            Paragraph("<b>Enterprise Name:</b>", td_style),
+            Paragraph(f"<b>{_safe_html(m.business_name)}</b>", td_bold),
+            Paragraph("<b>MSME Code:</b>", td_style),
+            Paragraph(_safe_html(m.msme_code or '—'), td_style),
+        ],
+        [
+            Paragraph("<b>Business Sector:</b>", td_style),
+            Paragraph(_safe_html(m.sector or '—'), td_style),
+            Paragraph("<b>Assessment Date:</b>", td_style),
+            Paragraph(str(plan.assessment_date or '—'), td_style),
+        ],
+        [
+            Paragraph("<b>Enterprise Owner:</b>", td_style),
+            Paragraph(_safe_html(f"{m.owner_name or '—'} ({m.phone or '—'})"), td_style),
+            Paragraph("<b>Support Priority:</b>", td_style),
+            Paragraph(f"<font color='{text_p}'><b>{p_level} Priority</b></font>", td_bold),
+        ],
+        [
+            Paragraph("<b>Location:</b>", td_style),
+            Paragraph(_safe_html(loc_str), td_style),
+            Paragraph("<b>Assigned BGE:</b>", td_style),
+            Paragraph(_safe_html(bge_str), td_style),
+        ],
+    ]
+
+    meta_table = Table(meta_data, colWidths=[CW * 0.20, CW * 0.35, CW * 0.20, CW * 0.25])
+    meta_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#CBD5E1')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 6))
+
+    # Section 1: Primary Action Plan Category
+    story.append(Paragraph("1. PRIMARY ACTION PLAN CATEGORY (Most Binding Barrier to Finance)", p_sec_hdr))
+    cat_desc = plan.category_addresses or ''
+    if not cat_desc:
+        from .fiap_constants import FIAP_CATEGORIES
+        c_match = next((c for c in FIAP_CATEGORIES if c['id'] == plan.category), None)
+        if c_match:
+            cat_desc = c_match['what_it_addresses']
+
+    cat_data = [
+        [
+            Paragraph(f"<b>Primary Category:</b> {_safe_html(plan.get_category_display())}", td_bold),
+        ],
+        [
+            Paragraph(f"<b>What It Addresses:</b> {_safe_html(cat_desc)}", td_style),
+        ],
+    ]
+    cat_table = Table(cat_data, colWidths=[CW])
+    cat_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#EFF6FF')),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#93C5FD')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(cat_table)
+    story.append(Spacer(1, 6))
+
+    # Section 2: Diagnostic Gaps Identified
+    story.append(Paragraph("2. DIAGNOSTIC GAPS IDENTIFIED", p_sec_hdr))
+    gaps = plan.gaps_identified or []
+    gap_paragraphs = []
+    if gaps:
+        for g in gaps:
+            gap_paragraphs.append(Paragraph(f"• {_safe_html(str(g))}", td_style))
+    else:
+        gap_paragraphs.append(Paragraph("<i>No specific gaps logged.</i>", td_muted))
+
+    # Arrange gaps in two columns
+    half = (len(gap_paragraphs) + 1) // 2
+    col1 = gap_paragraphs[:half]
+    col2 = gap_paragraphs[half:]
+    while len(col2) < len(col1):
+        col2.append(Paragraph("", td_style))
+
+    gap_rows = []
+    for c1, c2 in zip(col1, col2):
+        gap_rows.append([c1, c2])
+
+    gap_table = Table(gap_rows, colWidths=[CW * 0.5, CW * 0.5])
+    gap_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#CBD5E1')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(gap_table)
+
+    if plan.gap_notes:
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"<b>Diagnostic Notes:</b> {_safe_html(plan.gap_notes)}", td_style))
+
+    story.append(Spacer(1, 6))
+
+    # Section 3: Sequenced Phased Action Plan
+    story.append(Paragraph("3. SEQUENCED FINANCIAL IMPROVEMENT ACTION PLAN (The Roadmap)", p_sec_hdr))
+    steps = plan.action_plan_steps or []
+    
+    act_data = [
+        [
+            Paragraph("<b>#</b>", td_bold),
+            Paragraph("<b>Action Plan Step Description</b>", td_bold),
+            Paragraph("<b>Timeline</b>", td_bold),
+            Paragraph("<b>Responsible</b>", td_bold),
+            Paragraph("<b>Means of Verification</b>", td_bold),
+        ]
+    ]
+
+    for idx, s_item in enumerate(steps):
+        num = s_item.get('step', idx + 1)
+        action_text = s_item.get('action', '')
+        timeline = s_item.get('timeline', '')
+        resp = s_item.get('responsible', 'Owner & BGE')
+        verif = s_item.get('verification', 'Verified by BGE')
+        act_data.append([
+            Paragraph(str(num), td_style),
+            Paragraph(_safe_html(action_text), td_style),
+            Paragraph(f"<b>{_safe_html(timeline)}</b>", td_style),
+            Paragraph(_safe_html(resp), td_muted),
+            Paragraph(_safe_html(verif), td_muted),
+        ])
+
+    act_table = Table(act_data, colWidths=[CW * 0.05, CW * 0.45, CW * 0.15, CW * 0.15, CW * 0.20])
+    act_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#9E0A1E')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#9E0A1E')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, HexColor('#CBD5E1')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, HexColor('#F8FAFC')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    # For header text color in table
+    for i in range(5):
+        act_table.setStyle(TableStyle([('TEXTCOLOR', (i, 0), (i, 0), colors.white)]))
+    story.append(act_table)
+    story.append(Spacer(1, 6))
+
+    # Section 4: Financing Target & Institutional Linkage
+    story.append(Paragraph("4. FINANCING TARGET & INSTITUTIONAL LINKAGE", p_sec_hdr))
+    fin_data = [
+        [
+            Paragraph("<b>Target Facility:</b>", td_style),
+            Paragraph(_safe_html(plan.financing_target or 'Working Capital / Asset Loan'), td_bold),
+            Paragraph("<b>Preferred FSP:</b>", td_style),
+            Paragraph(_safe_html(plan.preferred_fsp or 'Centenary Bank'), td_bold),
+        ],
+        [
+            Paragraph("<b>Target Amount:</b>", td_style),
+            Paragraph(_safe_html(plan.estimated_amount or 'To be determined from cash flow'), td_style),
+            Paragraph("<b>Current FSP in Use:</b>", td_style),
+            Paragraph(_safe_html(plan.current_fsp or 'Mobile Money / Informal'), td_style),
+        ],
+        [
+            Paragraph("<b>Active Loan Status:</b>", td_style),
+            Paragraph("Active loan — Repayment protection priority" if plan.has_active_loan else "No active commercial loan", td_style),
+            Paragraph("<b>Data Source:</b>", td_style),
+            Paragraph(_safe_html(plan.data_source or 'Field Diagnostic & Mentorship'), td_muted),
+        ],
+    ]
+    fin_table = Table(fin_data, colWidths=[CW * 0.22, CW * 0.33, CW * 0.20, CW * 0.25])
+    fin_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F1F5F9')),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#94A3B8')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(fin_table)
+    story.append(Spacer(1, 6))
+
+    # Section 5: Commitments & Sign-off
+    story.append(Paragraph("5. COMMITMENTS & VERIFICATION SIGN-OFF", p_sec_hdr))
+    sig_data = [
+        [
+            Paragraph("<b>Enterprise Owner Commitment:</b><br/>"
+                      "<i>I commit to implementing the record-keeping and operational changes specified in this plan.</i>", td_style),
+            Paragraph(f"<b>Name:</b> {_safe_html(plan.owner_name or m.owner_name or '—')}<br/>"
+                      f"<b>Status:</b> {'Committed & Signed' if plan.owner_committed else 'Pending Sign-off'}", td_style),
+        ],
+        [
+            Paragraph("<b>BGE Mentor Declaration:</b><br/>"
+                      "<i>I certify that I conducted this diagnostic, co-designed this roadmap, and will verify progress.</i>", td_style),
+            Paragraph(f"<b>BGE Name:</b> {_safe_html(plan.bge_signature_name or plan.bge.name)} ({plan.bge.bge_code or '—'})<br/>"
+                      f"<b>Verified Date:</b> {plan.bge_signed_at or plan.assessment_date}", td_style),
+        ],
+    ]
+    sig_table = Table(sig_data, colWidths=[CW * 0.6, CW * 0.4])
+    sig_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.75, HexColor('#94A3B8')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(KeepTogether([sig_table]))
+
+    story.append(Spacer(1, 8))
+    story.append(HRFlowable(width='100%', thickness=0.8, color=HexColor('#CBD5E1'), spaceAfter=4))
+    story.append(Paragraph(
+        f"Generated from PRUDEV II Portfolio Management System · Assessment Date: {plan.assessment_date} · Status: {plan.get_status_display()}",
+        ParagraphStyle('fiap_foot', fontName='Helvetica', fontSize=7, textColor=HexColor('#888888'), alignment=TA_CENTER),
+    ))
+
+    doc.build(story, onFirstPage=_header, onLaterPages=_header)
+    buf.seek(0)
+    return buf.getvalue()
+
 

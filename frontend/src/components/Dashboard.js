@@ -9,6 +9,7 @@ import {
   ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar,
   Badge, Accordion, AccordionSummary, AccordionDetails,
   Tab, Tabs, ListSubheader, Popover, TableSortLabel, InputAdornment,
+  Autocomplete,
 } from '@mui/material';
 import {
   Business, People, School, Assessment, ChevronRight,
@@ -39,6 +40,7 @@ import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
 import MSMEVisitSchedule from './MSMEVisitSchedule';
 import EnterpriseImprovementPlanDialog from './EnterpriseImprovementPlanDialog';
+import SelectSessionMsmesDialog from './SelectSessionMsmesDialog';
 import { Place } from '@mui/icons-material';
 import { getErrorMessage } from '../utils/error';
 
@@ -401,6 +403,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // ── training dialogs ───────────────────────────────────────────────────────
   const [sessionDialog, setSessionDialog] = useState(false);
   const [sessionEditing, setSessionEditing] = useState(null);
+  const [sessionMsmeListOpen, setSessionMsmeListOpen] = useState(false);
   // team = [{role:'lead'|'mentor', bge_id:'', work_order_id:'', _key: uniqueKey}]
   const EMPTY_SESSION_FORM = { title: '', date: '', end_date: '', location: '', description: '', topic: '', businesses: [], bge_participants: [], team: [] };
   const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
@@ -551,40 +554,55 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       if (reportFilterStatus) reportParams.append('status', reportFilterStatus);
       if (reportFilterVisitType) reportParams.append('visit_type', reportFilterVisitType);
 
+      const safeGet = (url, fallback = { data: [] }) =>
+        axios.get(url, { headers: h }).catch((err) => {
+          console.warn(`[fetchAll] Non-blocking fetch issue for ${url}:`, err?.message || err);
+          return fallback;
+        });
+
       const [mRes, allMRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes, tbipRes] = await Promise.all([
-        axios.get(`${API_ENDPOINTS.MSMES}?${params}`, { headers: h }),
-        axios.get(`${API_ENDPOINTS.MSMES}?all=1`, { headers: h }).catch(() => ({ data: [] })),
-        axios.get(`${API_ENDPOINTS.EXPERTS}?page_size=200`, { headers: h }),
-        axios.get(API_ENDPOINTS.COHORTS, { headers: h }),
-        axios.get(API_ENDPOINTS.BGE_GROUPS, { headers: h }),
-        axios.get(API_ENDPOINTS.TRAINING_SESSIONS, { headers: h }),
-        axios.get(API_ENDPOINTS.TRAINING_TOPICS, { headers: h }),
-        axios.get(`${API_ENDPOINTS.MSMES}analytics/`, { headers: h }),
+        safeGet(`${API_ENDPOINTS.MSMES}?${params}`),
+        safeGet(`${API_ENDPOINTS.MSMES}?all=1`),
+        safeGet(`${API_ENDPOINTS.EXPERTS}?page_size=200`),
+        safeGet(API_ENDPOINTS.COHORTS),
+        safeGet(API_ENDPOINTS.BGE_GROUPS),
+        safeGet(API_ENDPOINTS.TRAINING_SESSIONS),
+        safeGet(API_ENDPOINTS.TRAINING_TOPICS),
+        safeGet(`${API_ENDPOINTS.MSMES}analytics/`, { data: {} }),
         isStaff
-          ? axios.get(API_ENDPOINTS.BGE_USERS, { headers: h }).catch(() => ({ data: [] }))
+          ? safeGet(API_ENDPOINTS.BGE_USERS)
           : Promise.resolve({ data: [] }),
-        axios.get(`${API_ENDPOINTS.REPORTS}?${reportParams}`, { headers: h }),
-        axios.get(API_ENDPOINTS.GROUP_REPORTS, { headers: h }).catch(() => ({ data: [] })),
-        axios.get(API_ENDPOINTS.PROGRAMME_GROUPS, { headers: h }).catch(() => ({ data: [] })),
-        axios.get(API_ENDPOINTS.ENTERPRISE_IMPROVEMENT_PLANS, { headers: h }).catch(() => ({ data: [] })),
+        safeGet(`${API_ENDPOINTS.REPORTS}?${reportParams}`),
+        safeGet(API_ENDPOINTS.GROUP_REPORTS),
+        safeGet(API_ENDPOINTS.PROGRAMME_GROUPS),
+        safeGet(API_ENDPOINTS.ENTERPRISE_IMPROVEMENT_PLANS),
       ]);
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
-      setMsmes(toArr(mRes.data));
-      setAllMsmes(toArr(allMRes.data).length > 0 ? toArr(allMRes.data) : toArr(mRes.data));
-      setMsmeTotalCount(mRes.data?.count ?? toArr(mRes.data).length);
-      setExperts(toArr(eRes.data));
+      const msmeList = toArr(mRes.data);
+      const allMsmeList = toArr(allMRes.data);
+      const expertsList = toArr(eRes.data);
+
+      setMsmes(msmeList);
+      setAllMsmes(allMsmeList.length > 0 ? allMsmeList : msmeList);
+      setMsmeTotalCount(mRes.data?.count ?? (allMsmeList.length > 0 ? allMsmeList.length : msmeList.length));
+      setExperts(expertsList);
       setCohorts(toArr(cRes.data));
       setBgeGroups(toArr(gRes.data));
       setProgrammeGroups(toArr(pgRes.data));
       setTrainingSessions(toArr(sRes.data));
       setTrainingTopics(toArr(tRes.data));
-      setAnalytics(aRes.data);
+      setAnalytics(aRes.data || {});
       setBgeUsers(Array.isArray(uRes.data) ? uRes.data : []);
       setGroupReports(toArr(grRes.data));
       setReports(toArr(rRes.data));
       setTbipPlans(toArr(tbipRes.data));
-      setError('');
+
+      if (msmeList.length === 0 && expertsList.length === 0 && !navigator.onLine) {
+        setError('Failed to load data. Check your connection.');
+      } else {
+        setError('');
+      }
     } catch {
       setError('Failed to load data. Check your connection.');
     } finally {
@@ -1526,9 +1544,24 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const createSession = async () => {
     setSessionLoading(true);
     try {
-      // 1. Save the session itself (no team fields on TrainingSession any more)
-      const { team, ...sessionPayload } = sessionForm;
-      if (!sessionPayload.topic) delete sessionPayload.topic;
+      // 1. Prepare clean session payload
+      const cleanTeam = (sessionForm.team || []).filter(m => m.bge_id).map(m => ({
+        bge_id: m.bge_id,
+        role: m.role || 'mentor',
+        work_order_id: m.work_order_id || null,
+      }));
+      const sessionPayload = {
+        title: (sessionForm.title || '').trim(),
+        date: sessionForm.date,
+        end_date: sessionForm.end_date || null,
+        location: (sessionForm.location || '').trim(),
+        description: (sessionForm.description || '').trim(),
+        topic: sessionForm.topic || null,
+        businesses: sessionForm.businesses || [],
+        bge_participants: sessionForm.bge_participants || [],
+        team: cleanTeam,
+      };
+
       let sessionId = sessionEditing;
       if (sessionEditing) {
         await axios.put(`${API_ENDPOINTS.TRAINING_SESSIONS}${sessionEditing}/`, sessionPayload, { headers });
@@ -1539,29 +1572,33 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         notify('Session created');
       }
 
-      // 2. Sync team assignments: delete existing for this session, recreate
+      // 2. Ensure team assignments are synchronized
       const existingRes = await axios.get(`${API_ENDPOINTS.FACILITATION_ASSIGNMENTS}?session=${sessionId}`, { headers });
       const existing = existingRes.data.results || existingRes.data;
-      await Promise.all(existing.map(a => axios.delete(`${API_ENDPOINTS.FACILITATION_ASSIGNMENTS}${a.id}/`, { headers })));
-      await Promise.all(
-        team.filter(m => m.bge_id).map(m =>
-          axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, {
-            bge: m.bge_id,
-            topic: sessionPayload.topic || null,
-            session: sessionId,
-            role: m.role,
-            work_order: m.work_order_id || null,
-            assigned_date: sessionPayload.date,
-          }, { headers })
-        )
-      );
+      if (existing.length === 0 && cleanTeam.length > 0) {
+        await Promise.all(
+          cleanTeam.map(m =>
+            axios.post(API_ENDPOINTS.FACILITATION_ASSIGNMENTS, {
+              bge: m.bge_id,
+              topic: sessionPayload.topic || null,
+              session: sessionId,
+              role: m.role,
+              work_order: m.work_order_id || null,
+              assigned_date: sessionPayload.date,
+            }, { headers })
+          )
+        );
+      }
 
       setSessionDialog(false);
       setSessionEditing(null);
       setSessionForm(EMPTY_SESSION_FORM);
       fetchAll();
-    } catch (e) { notify(e.response?.data?.detail || 'Failed to save session', 'error'); }
-    finally { setSessionLoading(false); }
+    } catch (e) {
+      notify(getErrorMessage(e, 'Failed to save session'), 'error');
+    } finally {
+      setSessionLoading(false);
+    }
   };
 
   const EMPTY_ATTENDEE = (date = '') => ({
@@ -12513,40 +12550,108 @@ PRUDEV II BDS Team`
               ))}
             </Grid>
             <Grid item xs={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Attendee MSMEs</InputLabel>
-                <Select
-                  multiple value={sessionForm.businesses}
-                  onChange={e => setSessionForm({...sessionForm, businesses: e.target.value})}
-                  label="Attendee MSMEs"
-                  renderValue={sel => `${sel.length} MSME${sel.length !== 1 ? 's' : ''} selected`}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary">
+                  Attendee MSMEs ({sessionForm.businesses.length} selected)
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<ViewList />}
+                  onClick={() => setSessionMsmeListOpen(true)}
+                  sx={{ textTransform: 'none', py: 0.25, fontSize: 12, fontWeight: 600 }}
                 >
-                  {msmes.map(m => (
-                    <MenuItem key={m.id} value={m.id}>
-                      <Checkbox checked={sessionForm.businesses.includes(m.id)} size="small" />
-                      {m.business_name} {m.owner_name ? `· ${m.owner_name}` : ''}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  + Select from List / Groups
+                </Button>
+              </Box>
+              <Autocomplete
+                multiple
+                size="small"
+                options={allMsmes.length > 0 ? allMsmes : msmes}
+                getOptionLabel={(m) => `${m.business_name || ''} ${m.owner_name ? `· ${m.owner_name}` : ''} ${m.msme_code ? `(${m.msme_code})` : ''}`}
+                value={(allMsmes.length > 0 ? allMsmes : msmes).filter(m => sessionForm.businesses.includes(m.id))}
+                onChange={(_, selectedOptions) => {
+                  setSessionForm(f => ({ ...f, businesses: selectedOptions.map(m => m.id) }));
+                }}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                filterOptions={(options, state) => {
+                  const q = state.inputValue.toLowerCase().trim();
+                  if (!q) return options.slice(0, 50);
+                  return options.filter(m =>
+                    (m.business_name || '').toLowerCase().includes(q) ||
+                    (m.owner_name || '').toLowerCase().includes(q) ||
+                    (m.msme_code || '').toLowerCase().includes(q) ||
+                    (m.district || m.city || '').toLowerCase().includes(q) ||
+                    (m.sector || '').toLowerCase().includes(q)
+                  ).slice(0, 50);
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      key={option.id}
+                      label={option.business_name}
+                      size="small"
+                      {...getTagProps({ index })}
+                      sx={{ mr: 0.5, mb: 0.5, fontSize: 11 }}
+                    />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder={sessionForm.businesses.length === 0 ? "Search or select MSMEs…" : "Add more MSMEs…"}
+                    label="Attendee MSMEs"
+                    helperText={sessionForm.businesses.length > 0 ? `${sessionForm.businesses.length} MSME${sessionForm.businesses.length !== 1 ? 's' : ''} selected` : 'Search by name, owner, code, or click "+ Select from List / Groups"'}
+                  />
+                )}
+              />
             </Grid>
             <Grid item xs={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>BGE Participants</InputLabel>
-                <Select
-                  multiple value={sessionForm.bge_participants}
-                  onChange={e => setSessionForm({...sessionForm, bge_participants: e.target.value})}
-                  label="BGE Participants"
-                  renderValue={sel => `${sel.length} BGE${sel.length !== 1 ? 's' : ''} selected`}
-                >
-                  {experts.map(ex => (
-                    <MenuItem key={ex.id} value={ex.id}>
-                      <Checkbox checked={sessionForm.bge_participants.includes(ex.id)} size="small" />
-                      {ex.name}{ex.bge_code ? ` (${ex.bge_code})` : ''}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary">
+                  BGE Participants ({sessionForm.bge_participants.length} selected)
+                </Typography>
+              </Box>
+              <Autocomplete
+                multiple
+                size="small"
+                options={experts}
+                getOptionLabel={(ex) => `${ex.name || ''}${ex.bge_code ? ` (${ex.bge_code})` : ''}`}
+                value={experts.filter(ex => sessionForm.bge_participants.includes(ex.id))}
+                onChange={(_, selectedOptions) => {
+                  setSessionForm(f => ({ ...f, bge_participants: selectedOptions.map(ex => ex.id) }));
+                }}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                filterOptions={(options, state) => {
+                  const q = state.inputValue.toLowerCase().trim();
+                  if (!q) return options;
+                  return options.filter(ex =>
+                    (ex.name || '').toLowerCase().includes(q) ||
+                    (ex.bge_code || '').toLowerCase().includes(q) ||
+                    (ex.email || '').toLowerCase().includes(q) ||
+                    (ex.district || '').toLowerCase().includes(q)
+                  );
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      key={option.id}
+                      label={`${option.name}${option.bge_code ? ` (${option.bge_code})` : ''}`}
+                      size="small"
+                      {...getTagProps({ index })}
+                      sx={{ mr: 0.5, mb: 0.5, fontSize: 11 }}
+                    />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder={sessionForm.bge_participants.length === 0 ? "Search or select BGE participants…" : "Add more BGEs…"}
+                    label="BGE Participants"
+                    helperText={sessionForm.bge_participants.length > 0 ? `${sessionForm.bge_participants.length} BGE${sessionForm.bge_participants.length !== 1 ? 's' : ''} selected` : 'Select BGE experts attending as participants'}
+                  />
+                )}
+              />
             </Grid>
             <Grid item xs={12}><TextField fullWidth size="small" multiline rows={2} label="Description" value={sessionForm.description} onChange={e => setSessionForm({...sessionForm, description: e.target.value})} /></Grid>
           </Grid>
@@ -12558,6 +12663,18 @@ PRUDEV II BDS Team`
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ── Select MSMEs from List Dialog ─────────────────────────────────── */}
+      <SelectSessionMsmesDialog
+        open={sessionMsmeListOpen}
+        onClose={() => setSessionMsmeListOpen(false)}
+        selectedMsmeIds={sessionForm.businesses}
+        onApply={(newIds) => setSessionForm(f => ({ ...f, businesses: newIds }))}
+        msmes={allMsmes.length > 0 ? allMsmes : msmes}
+        cohorts={cohorts}
+        bgeGroups={bgeGroups}
+        programmeGroups={programmeGroups}
+      />
 
       {/* ── Attendance (per-person demographic sheet) ─────────────────────── */}
       <Dialog open={attendanceDialog} onClose={() => setAttendanceDialog(false)} maxWidth="xl" fullWidth>

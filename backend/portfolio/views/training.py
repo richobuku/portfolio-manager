@@ -55,6 +55,49 @@ class TrainingSessionViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             qs = qs.filter(facilitation_assignments__work_order_id=work_order_id)
         return qs
 
+    def perform_create(self, serializer):
+        session = serializer.save()
+        team_data = self.request.data.get('team')
+        if team_data and isinstance(team_data, list):
+            self._sync_team(session, team_data)
+        elif not session.facilitation_assignments.exists():
+            # If no team explicitly provided, and current user has a BGE profile, assign as lead
+            try:
+                bge = self.request.user.bge_profile
+                TrainingFacilitationAssignment.objects.create(
+                    session=session,
+                    bge=bge,
+                    role='lead',
+                    topic=session.topic,
+                    assigned_date=session.date,
+                    assigned_by=self.request.user if self.request.user.is_authenticated else None,
+                )
+            except Exception:
+                pass
+
+    def perform_update(self, serializer):
+        session = serializer.save()
+        team_data = self.request.data.get('team')
+        if team_data is not None and isinstance(team_data, list):
+            self._sync_team(session, team_data)
+
+    def _sync_team(self, session, team_data):
+        session.facilitation_assignments.all().delete()
+        for member in team_data:
+            bge_id = member.get('bge_id') or member.get('bge')
+            role = member.get('role', 'mentor')
+            work_order_id = member.get('work_order_id') or member.get('work_order')
+            if bge_id:
+                TrainingFacilitationAssignment.objects.create(
+                    session=session,
+                    bge_id=bge_id,
+                    role=role,
+                    topic=session.topic,
+                    work_order_id=work_order_id or None,
+                    assigned_date=session.date,
+                    assigned_by=self.request.user if self.request.user.is_authenticated else None,
+                )
+
     @action(detail=True, methods=['post'])
     def mark_attendance(self, request, pk=None):
         """Legacy single-MSME toggle kept for backward compat."""
@@ -385,19 +428,34 @@ class TrainingFacilitationAssignmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(assigned_by=self.request.user)
 
+    def _is_manager_or_session_lead(self, session_id=None):
+        user = self.request.user
+        if user.is_staff or user.is_superuser or hasattr(user, 'cohort_admin_profile'):
+            return True
+        if session_id:
+            try:
+                bge = user.bge_profile
+                return TrainingFacilitationAssignment.objects.filter(session_id=session_id, bge=bge, role='lead').exists()
+            except Exception:
+                pass
+        return False
+
     def create(self, request, *args, **kwargs):
-        if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
-            raise PermissionDenied("Only programme managers can create facilitation assignments.")
+        session_id = request.data.get('session')
+        if not self._is_manager_or_session_lead(session_id):
+            raise PermissionDenied("Only session lead facilitators or programme managers can create facilitation assignments.")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
-            raise PermissionDenied("Only programme managers can edit facilitation assignments.")
+        obj = self.get_object()
+        if not self._is_manager_or_session_lead(obj.session_id):
+            raise PermissionDenied("Only session lead facilitators or programme managers can edit facilitation assignments.")
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        if not (request.user.is_staff or request.user.is_superuser or hasattr(request.user, 'cohort_admin_profile')):
-            raise PermissionDenied("Only programme managers can remove facilitation assignments.")
+        obj = self.get_object()
+        if not self._is_manager_or_session_lead(obj.session_id):
+            raise PermissionDenied("Only session lead facilitators or programme managers can remove facilitation assignments.")
         return super().destroy(request, *args, **kwargs)
 
 

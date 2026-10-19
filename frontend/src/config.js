@@ -71,6 +71,7 @@ export const API_ENDPOINTS = {
   WORK_ORDER_ATTACHMENTS:    `${API_BASE_URL}/api/work-order-attachments/`,
   PLANNED_VISITS:            `${API_BASE_URL}/api/planned-visits/`,
   ENTERPRISE_IMPROVEMENT_PLANS: `${API_BASE_URL}/api/enterprise-improvement-plans/`,
+  FINANCIAL_IMPROVEMENT_PLANS:  `${API_BASE_URL}/api/financial-improvement-plans/`,
   DIAGNOSTIC_SUMMARY:        `${API_BASE_URL}/api/diagnostics/analytics/summary/`,
   DIAGNOSTIC_COHORTS:        `${API_BASE_URL}/api/diagnostics/analytics/cohorts/`,
   DIAGNOSTIC_EXPORT_EXCEL:   `${API_BASE_URL}/api/diagnostics/analytics/export-excel/`,
@@ -95,6 +96,11 @@ export const TBIP_EXCEL_URL            = (id) => `${API_BASE_URL}/api/enterprise
 export const TBIP_SUBMIT_URL           = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/submit/`;
 export const TBIP_APPROVE_URL          = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/approve/`;
 export const TBIP_REJECT_URL           = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/reject/`;
+
+export const FIAP_PDF_URL              = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/pdf/`;
+export const FIAP_SUBMIT_URL           = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/submit/`;
+export const FIAP_TEMPLATES_URL        = `${API_BASE_URL}/api/financial-improvement-plans/templates/`;
+export const FIAP_SUMMARY_URL          = `${API_BASE_URL}/api/financial-improvement-plans/summary/`;
 export const WORK_ORDER_SUBMISSION_TIMESHEET_URL = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-timesheet/`;
 export const WORK_ORDER_SUBMISSION_INVOICE_URL   = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-invoice/`;
 export const WORK_ORDER_PAYMENT_NOTIFY_URL  = (id) => `${API_BASE_URL}/api/work-order-payments/${id}/notify/`;

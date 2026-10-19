@@ -35,6 +35,7 @@ from .bge_photos import (
     download_bge_photo_view,
 )
 from .enterprise_improvement_plan import EnterpriseImprovementPlanViewSet
+from .financial_improvement_plan import FinancialImprovementActionPlanViewSet
 from .diagnostic_analytics import (
     DiagnosticSummaryAnalyticsView,
     DiagnosticCohortComparisonView,
