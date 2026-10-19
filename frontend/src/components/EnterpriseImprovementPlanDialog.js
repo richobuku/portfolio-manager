@@ -580,7 +580,8 @@ export default function EnterpriseImprovementPlanDialog({
 
   const isApproved = plan?.status === 'approved';
   const isSubmitted = plan?.status === 'submitted';
-  const isReadOnly = isApproved || (!isAdminOrManager && isSubmitted);
+  const isViewer = currentUser?.role === 'viewer';
+  const isReadOnly = isViewer || isApproved || (!isAdminOrManager && isSubmitted);
 
   // Sync state when plan changes
   useEffect(() => {

@@ -11139,18 +11139,20 @@ PRUDEV II BDS Team`
           count={totalPlans}
           subtitle="MSME Business Diagnostic Assessments & Technical Improvement Roadmap"
           action={
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => {
-                setSelectedTbip(null);
-                setSelectedTbipMsme(null);
-                setTbipDialog(true);
-              }}
-              sx={{ bgcolor: BRAND.gizRed, '&:hover': { bgcolor: BRAND.gizDarkRed }, fontWeight: 700, borderRadius: 2 }}
-            >
-              New Assessment / Plan
-            </Button>
+            !isViewer ? (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedTbip(null);
+                  setSelectedTbipMsme(null);
+                  setTbipDialog(true);
+                }}
+                sx={{ bgcolor: BRAND.gizRed, '&:hover': { bgcolor: BRAND.gizDarkRed }, fontWeight: 700, borderRadius: 2 }}
+              >
+                New Assessment / Plan
+              </Button>
+            ) : null
           }
         />
 
@@ -11332,7 +11334,7 @@ PRUDEV II BDS Team`
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
-                          <Tooltip title="Review / Approve / Edit Assessment">
+                          <Tooltip title={isViewer ? "View Assessment" : "Review / Approve / Edit Assessment"}>
                             <IconButton
                               size="small"
                               color="primary"
@@ -11343,7 +11345,7 @@ PRUDEV II BDS Team`
                                 setTbipDialog(true);
                               }}
                             >
-                              <Edit fontSize="small" />
+                              {isViewer ? <Visibility fontSize="small" /> : <Edit fontSize="small" />}
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Download Official PDF">
