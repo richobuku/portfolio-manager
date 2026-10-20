@@ -2403,6 +2403,21 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                         <AccountBalance fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
+                                    <Tooltip title="Request FIAP Approval Meeting with Rosemary or Harriet">
+                                      <IconButton
+                                        size="small"
+                                        sx={{ color: '#1E3A8A' }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const existing = fiapPlans.find(p => p.msme === m.id);
+                                          setFiapBookMeetingMsme(m);
+                                          setFiapBookMeetingPlan(existing || null);
+                                          setFiapBookMeetingOpen(true);
+                                        }}
+                                      >
+                                        <EventAvailable fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
                                   </Box>
                                 </Box>
 
@@ -3414,20 +3429,42 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     PRUDEV II / GOPA Pro MSME Diagnostic & Credit Readiness Roadmap (Access to Finance)
                   </Typography>
                 </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  onClick={() => setNewFiapMsmePicker(true)}
-                  sx={{
-                    bgcolor: '#1E3A8A',
-                    '&:hover': { bgcolor: '#172554' },
-                    whiteSpace: 'nowrap',
-                    fontWeight: 700,
-                    borderRadius: 2,
-                  }}
-                >
-                  New Financial Action Plan
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<EventAvailable />}
+                    onClick={() => {
+                      setFiapBookMeetingMsme(null);
+                      setFiapBookMeetingPlan(null);
+                      setFiapBookMeetingOpen(true);
+                    }}
+                    sx={{
+                      borderColor: '#1E3A8A',
+                      color: '#1E3A8A',
+                      bgcolor: '#FFFFFF',
+                      '&:hover': { bgcolor: '#EFF6FF' },
+                      whiteSpace: 'nowrap',
+                      fontWeight: 700,
+                      borderRadius: 2,
+                    }}
+                  >
+                    Request Approval Meeting
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setNewFiapMsmePicker(true)}
+                    sx={{
+                      bgcolor: '#1E3A8A',
+                      '&:hover': { bgcolor: '#172554' },
+                      whiteSpace: 'nowrap',
+                      fontWeight: 700,
+                      borderRadius: 2,
+                    }}
+                  >
+                    New Financial Action Plan
+                  </Button>
+                </Box>
               </Box>
 
               {/* KPI Summary Cards */}
@@ -6286,6 +6323,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     setFiapDialog(true);
                   }}>
                   Financial Action Plan
+                </Button>
+                <Button variant="outlined" size="small"
+                  startIcon={<EventAvailable />}
+                  sx={{ borderColor: '#1E3A8A', color: '#1E3A8A' }}
+                  onClick={() => {
+                    setMsmeDetailDialog(false);
+                    const existing = fiapPlans.find(p => p.msme === m.id);
+                    setFiapBookMeetingMsme(m);
+                    setFiapBookMeetingPlan(existing || null);
+                    setFiapBookMeetingOpen(true);
+                  }}>
+                  Request Approval Meeting
                 </Button>
                 <Button onClick={() => setMsmeDetailDialog(false)}>Close</Button>
               </DialogActions>

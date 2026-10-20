@@ -11551,7 +11551,25 @@ PRUDEV II BDS Team`
               PRUDEV II / GOPA Pro MSME Diagnostic & Credit Readiness Roadmap (Access to Finance)
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              variant="outlined"
+              startIcon={<EventAvailable />}
+              onClick={() => {
+                setSelectedFiap(null);
+                setSelectedFiapMsme(null);
+                setFiapBookMeetingOpen(true);
+              }}
+              sx={{
+                borderColor: '#1E3A8A',
+                color: '#1E3A8A',
+                bgcolor: '#FFFFFF',
+                '&:hover': { bgcolor: '#EFF6FF' },
+                fontWeight: 700,
+              }}
+            >
+              Request Approval Meeting
+            </Button>
             <Button
               variant="contained"
               startIcon={<Add />}

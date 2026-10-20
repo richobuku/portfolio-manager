@@ -437,25 +437,23 @@ export default function FinancialImprovementPlanDialog({
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {plan?.id && (
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<EventAvailable />}
-              onClick={() => setBookMeetingOpen(true)}
-              sx={{
-                fontSize: 12,
-                textTransform: 'none',
-                fontWeight: 700,
-                borderColor: '#1E3A8A',
-                color: '#1E3A8A',
-                bgcolor: '#EFF6FF',
-                '&:hover': { bgcolor: '#DBEAFE', borderColor: '#172554' },
-              }}
-            >
-              Request Approval Meeting
-            </Button>
-          )}
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<EventAvailable />}
+            onClick={() => setBookMeetingOpen(true)}
+            sx={{
+              fontSize: 12,
+              textTransform: 'none',
+              fontWeight: 700,
+              borderColor: '#1E3A8A',
+              color: '#1E3A8A',
+              bgcolor: '#EFF6FF',
+              '&:hover': { bgcolor: '#DBEAFE', borderColor: '#172554' },
+            }}
+          >
+            Request Approval Meeting
+          </Button>
           {plan?.id && (
             <Button
               size="small"
@@ -1064,24 +1062,22 @@ export default function FinancialImprovementPlanDialog({
             Download PDF
           </Button>
         )}
-        {plan?.id && (
-          <Button
-            variant="outlined"
-            startIcon={<EventAvailable />}
-            onClick={() => setBookMeetingOpen(true)}
-            disabled={saving || approving}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 700,
-              borderColor: '#1E3A8A',
-              color: '#1E3A8A',
-              bgcolor: '#EFF6FF',
-              '&:hover': { bgcolor: '#DBEAFE', borderColor: '#172554' },
-            }}
-          >
-            Request Approval Meeting
-          </Button>
-        )}
+        <Button
+          variant="outlined"
+          startIcon={<EventAvailable />}
+          onClick={() => setBookMeetingOpen(true)}
+          disabled={saving || approving}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 700,
+            borderColor: '#1E3A8A',
+            color: '#1E3A8A',
+            bgcolor: '#EFF6FF',
+            '&:hover': { bgcolor: '#DBEAFE', borderColor: '#172554' },
+          }}
+        >
+          Request Approval Meeting
+        </Button>
         {canApprove && form.status !== 'approved' && (
           <Button
             variant="contained"
@@ -1127,7 +1123,15 @@ export default function FinancialImprovementPlanDialog({
       <BookFIAPMeetingDialog
         open={bookMeetingOpen}
         onClose={() => setBookMeetingOpen(false)}
-        plan={plan}
+        plan={plan || {
+          msme: form.msme || (activeMsme?.id),
+          msme_name: activeMsme?.business_name,
+          category: form.category,
+          category_name: form.category_name,
+          financing_target: form.financing_target,
+          estimated_amount: form.estimated_amount,
+          identified_gaps: form.identified_gaps,
+        }}
         msme={activeMsme}
         msmes={allMsmes}
         currentUser={currentUser}
