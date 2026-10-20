@@ -8558,6 +8558,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation</MenuItem>
             <MenuItem value="bge_bankable_docs_training">Bankable Documents Workshop — Co-Facilitator</MenuItem>
             <MenuItem value="bge_bankable_docs_participant">Bankable Documents Workshop — BGE Participant</MenuItem>
+            <MenuItem value="bge_business_diagnostics">Business Diagnostics Assignment</MenuItem>
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
@@ -8599,6 +8600,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   ? { borderLeft: '4px solid #4A148C' }
                   : wo.work_order_type === 'bge_bankable_docs_participant'
                   ? { borderLeft: '4px solid #0D9488' }
+                  : wo.work_order_type === 'bge_business_diagnostics'
+                  ? { borderLeft: '4px solid #1E3A8A' }
                   : {}
               }>
               <CardContent>
@@ -8629,6 +8632,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                       {wo.work_order_type === 'bge_bankable_docs_participant' && (
                         <Chip label="Bankable Docs Participant" size="small"
                           sx={{ bgcolor: '#0D9488', color: '#fff', fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      {wo.work_order_type === 'bge_business_diagnostics' && (
+                        <Chip label="Business Diagnostics" size="small"
+                          sx={{ bgcolor: '#1E3A8A', color: '#fff', fontSize: 10, fontWeight: 700 }} />
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">

@@ -26,6 +26,15 @@ class WorkOrderTypeChoicesTests(TestCase):
             'BGE Technical Co-Assignment Support (Specialist Technical Capacity)',
         )
 
+    def test_bge_business_diagnostics_choice_exists(self):
+        choice_values = dict(WorkOrder.TYPE_CHOICES)
+
+        self.assertIn('bge_business_diagnostics', choice_values)
+        self.assertEqual(
+            choice_values['bge_business_diagnostics'],
+            'PRUDEV II Project – Business Diagnostics Assignment',
+        )
+
 
 class WorkOrderTechnicalCoAssignmentTests(TestCase):
     def setUp(self):
@@ -134,6 +143,42 @@ class WorkOrderTechnicalCoAssignmentTests(TestCase):
         self.assertEqual(resp2.status_code, 200)
         msme_ids_2 = [m['id'] for m in resp2.data]
         self.assertNotIn(self.msme.id, msme_ids_2)
+
+    def test_business_diagnostics_work_order_pdf_and_conditions(self):
+        from .pdf_reports import render_work_order
+        from datetime import date
+
+        wo = WorkOrder.objects.create(
+            bge=self.specialist,
+            work_order_type='bge_business_diagnostics',
+            issue_date=date(2026, 10, 20),
+            start_date=date(2026, 10, 20),
+            end_date=date(2026, 10, 30),
+            duration='Maximum of 10 days',
+            location='Northern Uganda – Specific MSMEs as assigned',
+            objective='To Increase access to financial products and services for assigned MSMEs using the official PRUDEV II tools.',
+            key_tasks='• Support MSMEs to develop financial improvement action plans\n• Support MSMEs in the preparation of bankable documents',
+            deliverables_json=[
+                {
+                    'task_num': 1,
+                    'description': 'Ensure the assigned MSMEs are supported to develop Financial Improvement Action plans',
+                    'due_date': 'Final day of each session',
+                },
+                {
+                    'task_num': 2,
+                    'description': 'Summary Report of activity (max 3 pages)',
+                    'due_date': 'Within 3 days after completing assignment',
+                },
+            ],
+            rate_per_day=60000,
+            max_days=10,
+        )
+
+        pdf_buf = render_work_order(wo)
+        pdf_bytes = pdf_buf.getvalue()
+        self.assertTrue(len(pdf_bytes) > 1000)
+        self.assertTrue(pdf_bytes.startswith(b'%PDF'))
+        self.assertEqual(wo.get_work_order_type_display(), 'PRUDEV II Project – Business Diagnostics Assignment')
 
     def test_admin_can_update_issued_work_order_and_clear_pdf_cache(self):
         from rest_framework.test import APIRequestFactory, force_authenticate

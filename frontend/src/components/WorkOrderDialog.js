@@ -1121,6 +1121,52 @@ PHASE 3 — POST-SESSION SYNTHESIS & REPORTING (1 Day)
       },
     ],
   },
+  bge_business_diagnostics: {
+    objective: 'To Increase access to financial products and services for assigned MSMEs using the official PRUDEV II tools.',
+    key_tasks: '• Support MSMEs to develop financial improvement action plans\n• Support MSMEs in the preparation of bankable documents',
+    deliverables_json: [
+      {
+        task_num: 1,
+        description: 'Ensure the assigned MSMEs are supported to develop Financial Improvement Action plans for the gaps identified from the previous activities (clustered as according to your specialization: Financial Records and Documentation; Cashflow management and Financial Discipline; Business Plan and Financial projection development; Collateral and alternative security Solutions; Banking Relationship and Financial institution Linkage; Financial Literacy, Costing and Management Capacity building; Loan application and Investment Readiness; Debt Management and credit growth and Formulation, Audit and Certification) and MSMEs are supported in the preparation of Bankable documents',
+        due_date: 'Final day of each session',
+        quantitative_result: '100% of assigned MSMEs supported with tailored Financial Improvement Action Plans and bankable documents.',
+        qualitative_result: 'Diagnostic gaps systematically addressed per specialization; bankable dossiers aligned with FSP lending criteria.',
+        means_of_verification: 'Approved Financial Improvement Action Plans (FIAP) and signed MSME confirmations.',
+        unit_rate: '',
+        payment_condition: 'Approved summary report and verified session delivery.',
+      },
+      {
+        task_num: 2,
+        description: 'Summary Report of activity (max 3 pages) highlighting major findings, challenges, and preliminary recommendations across the MSMEs',
+        due_date: 'Within 3 days after completing assignment',
+        quantitative_result: '1 comprehensive activity summary report (max 3 pages).',
+        qualitative_result: 'Actionable analytical insights covering major financial barriers, MSME response, and FSP linkage recommendations.',
+        means_of_verification: 'Approved activity summary report submitted via portal.',
+        unit_rate: '',
+        payment_condition: 'Submitted and validated within 3 days post-assignment.',
+      },
+      {
+        task_num: 3,
+        description: 'Signed attendance or confirmation from each MSME',
+        due_date: 'Per session',
+        quantitative_result: 'Signed attendance / confirmation forms for 100% of engaged MSMEs.',
+        qualitative_result: 'Verified on-site participation and MSME owner concurrence.',
+        means_of_verification: 'Original signed attendance sheets and portal verification logs.',
+        unit_rate: '',
+        payment_condition: 'Required verification supporting timesheet approval.',
+      },
+      {
+        task_num: 4,
+        description: 'Technical Report with summary of engagement days and MSMEs covered',
+        due_date: 'With invoice submission',
+        quantitative_result: '1 technical engagement report documenting all MSMEs covered across maximum 10 days.',
+        qualitative_result: 'Complete reconciliation of engagement days, visited enterprises, and technical outputs.',
+        means_of_verification: 'Approved technical report submitted alongside invoice and signed timesheet.',
+        unit_rate: '',
+        payment_condition: 'Condition for final invoice payment approval.',
+      },
+    ],
+  },
   other: { objective: '', key_tasks: '', deliverables_json: [] },
 };
 
@@ -1432,6 +1478,19 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
       extra.team_leader_position = 'Team Leader';
       extra.payment_notes        = `Total contract value: UGX 120,000 (2 days × UGX 60,000/day).\nPayment disbursed upon full attendance at the 2-day workshop, submission of signed attendance registers, completed simulation worksheets, and post-workshop action plan.\nIn accordance with Ugandan Income Tax regulations, professional fees are subject to 6% Withholding Tax (WHT), deducted at source by GOPA Pro GmbH.\nVerified travel expenses will be reimbursed in accordance with PRUDEV II approved transport rates.`;
     }
+    if (type === 'bge_business_diagnostics') {
+      extra.start_date           = '2026-10-20';
+      extra.end_date             = '2026-10-30';
+      extra.duration             = 'Maximum of 10 days';
+      extra.max_days             = 10;
+      extra.rate_per_day         = 60000;
+      extra.transport_reimbursed = true;
+      extra.location             = 'Northern Uganda – Specific MSMEs as assigned';
+      extra.project_name         = 'Promoting Rural Development II (PRUDEV II)';
+      extra.team_leader_name     = 'Stephen Maxi Opwonya';
+      extra.team_leader_position = 'Team Leader';
+      extra.payment_notes        = `• Rate: As per the agreed terms and conditions in the contract\n• Total Possible Sessions per day: 2\n• Transport: Only transport beyond 7 kilometers from the District/City headquarters will be reimbursed based on receipt.\n• Payment Terms: Paid upon submission and approval of:\n  o Approved summary report\n  o Approved Invoice and signed timesheet`;
+    }
     setWoForm(f => ({ ...f, work_order_type: type, objective: d.objective, key_tasks: d.key_tasks, deliverables_json: d.deliverables_json, ...extra }));
   }, [experts, selectedBges, woEditing, woForm.bge]);
 
@@ -1664,6 +1723,7 @@ const WorkOrderDialog = React.memo(function WorkOrderDialog({ open, onClose, woE
                 <MenuItem value="market_activation_mobilisation">Market Activation Event — MSME Mobilisation &amp; Tool Demonstration</MenuItem>
                 <MenuItem value="bge_bankable_docs_training">BGE Co-Facilitator — Bankable Documents &amp; Field Feedback Workshop</MenuItem>
                 <MenuItem value="bge_bankable_docs_participant">BGE Participant — Bankable Documents &amp; Field Feedback Workshop</MenuItem>
+                <MenuItem value="bge_business_diagnostics">PRUDEV II Project – Business Diagnostics Assignment</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>

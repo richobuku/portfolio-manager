@@ -7677,8 +7677,11 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                 PRUDEV II Project – {workOrderPreview.work_order_type_display}
               </Typography>
               <Typography variant="body2" align="center" sx={{ mb: 2 }}>
-                Pursuant to the Service Contract between GOPA Pro GmbH and{' '}
-                <strong>{workOrderPreview.bge_name}</strong>, this Work Order is issued under the PRUDEV II Project framework.
+                {workOrderPreview.work_order_type === 'bge_business_diagnostics' ? (
+                  <>Pursuant to the Service Contract dated 12th day of October 2026 between GOPA AFC and <strong>{workOrderPreview.bge_name}</strong>, this Work Order is issued under the PRUDEV II Project framework.</>
+                ) : (
+                  <>Pursuant to the Service Contract between GOPA Pro GmbH and <strong>{workOrderPreview.bge_name}</strong>, this Work Order is issued under the PRUDEV II Project framework.</>
+                )}
               </Typography>
               <Divider sx={{ mb: 2 }} />
 
@@ -7766,15 +7769,28 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
               </Typography>
 
               <Typography fontWeight={700} sx={{ mb: 0.5 }}>5. CONDITIONS</Typography>
-              {STANDARD_CONDITIONS.map((c, i) => (
-                <Typography key={i} variant="body2" sx={{ mb: 0.25 }}>• {c}</Typography>
-              ))}
+              {workOrderPreview.work_order_type === 'bge_business_diagnostics' ? (
+                [
+                  'BGE must use only the standardized PRUDEV II Diagnostic Tool and submit reports in provided formats.',
+                  'All data and business information must be handled confidentially.',
+                  'GOPA Pro retains ownership of all outputs.',
+                  'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance or breach of contract.',
+                ].map((c, i) => (
+                  <Typography key={i} variant="body2" sx={{ mb: 0.25 }}>• {c}</Typography>
+                ))
+              ) : (
+                STANDARD_CONDITIONS.map((c, i) => (
+                  <Typography key={i} variant="body2" sx={{ mb: 0.25 }}>• {c}</Typography>
+                ))
+              )}
 
               <Divider sx={{ my: 2 }} />
               <Typography fontWeight={700} sx={{ mb: 1 }}>SIGNATURES</Typography>
               <Grid container spacing={4}>
                 <Grid item xs={6}>
-                  <Typography variant="caption" fontWeight={700} display="block">On behalf of GOPA Pro GmbH</Typography>
+                  <Typography variant="caption" fontWeight={700} display="block">
+                    {workOrderPreview.work_order_type === 'bge_business_diagnostics' ? 'On behalf of GOPA AFC' : 'On behalf of GOPA Pro GmbH'}
+                  </Typography>
                   <Typography variant="caption" display="block">Name: {workOrderPreview.team_leader_name}</Typography>
                   <Typography variant="caption" display="block">Position: {workOrderPreview.team_leader_position}</Typography>
                   <Typography variant="caption" display="block" sx={{ mt: 3 }}>Signature: ____________________________</Typography>

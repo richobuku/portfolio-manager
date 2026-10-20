@@ -527,6 +527,13 @@ def render_work_order(work_order):
         f'{work_order.get_work_order_type_display()} · {work_order.work_order_number}',
         s['sub'],
     ))
+    if work_order.work_order_type == 'bge_business_diagnostics':
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(
+            f'Pursuant to the Service Contract dated 12th day of October 2026 between GOPA AFC and <b>{_safe_html(bge.name)}</b>, this Work Order is issued under the PRUDEV II Project framework.',
+            ParagraphStyle('pursuant', parent=s['body'], fontSize=9, leading=13, fontName='Helvetica-Oblique', textColor=HexColor('#333333')),
+        ))
+        story.append(Spacer(1, 4))
 
     meta_rows = [
         ['Work Order #',    work_order.work_order_number or '—'],
@@ -1223,6 +1230,13 @@ def render_work_order(work_order):
             'This work order is subject to the PRUDEV II Programme guidelines and GIZ contract conditions.',
             'In line with Ugandan Income Tax laws, professional fees are subject to 6% Withholding Tax (WHT), which will be deducted at the source of payment by GOPA Pro GmbH.',
         ]
+    elif work_order.work_order_type == 'bge_business_diagnostics':
+        CONDITIONS = [
+            'BGE must use only the standardized PRUDEV II Diagnostic Tool and submit reports in provided formats.',
+            'All data and business information must be handled confidentially.',
+            'GOPA Pro retains ownership of all outputs.',
+            'GOPA Pro reserves the right to terminate this Work Order in cases of non-performance or breach of contract.',
+        ]
     elif work_order.work_order_type in ('training_facilitation', 'biz_continuity_workshop'):
         CONDITIONS = [
             'The Senior BGE shall carry out all training facilitation duties with professionalism and in accordance with GOPA Pro and GIZ quality standards.',
@@ -1263,8 +1277,9 @@ def render_work_order(work_order):
     # Signature block: team leader left, BGE right — both sides use the same
     # fixed height (SIG_H) so the columns are visually equal even when the TL
     # signature image hasn't been applied yet.
+    tl_label = 'On behalf of GOPA AFC' if work_order.work_order_type == 'bge_business_diagnostics' else 'For GOPA Pro / PRUDEV II Programme'
     tl_col = [
-        Paragraph('For GOPA Pro / PRUDEV II Programme', s['label']),
+        Paragraph(tl_label, s['label']),
         Spacer(1, 4),               # same gap as BGE column before the sig area
         Spacer(1, SIG_H),           # equal-height placeholder, always
         Paragraph('_' * 35, s['body']),

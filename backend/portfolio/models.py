@@ -1245,6 +1245,7 @@ class WorkOrder(models.Model):
         ('market_activation_mobilisation', 'Market Activation Event — MSME Mobilisation & Tool Demonstration'),
         ('bge_bankable_docs_training', 'BGE Co-Facilitator — Bankable Documents & Field Feedback Workshop'),
         ('bge_bankable_docs_participant', 'BGE Participant — Bankable Documents & Field Feedback Workshop'),
+        ('bge_business_diagnostics', 'PRUDEV II Project – Business Diagnostics Assignment'),
         ('other',                 'Other'),
     ]
     STATUS_CHOICES = [
