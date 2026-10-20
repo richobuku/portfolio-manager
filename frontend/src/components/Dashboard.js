@@ -25,13 +25,14 @@ import {
   FormatBold, FormatListBulleted, CalendarToday, CalendarMonth,
   GpsFixed, GpsNotFixed, MyLocation,
   Clear, ViewList, ViewModule, GroupWork,
+  AccountBalance, EventAvailable,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_REVERT_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, SMART_ASSIGN_URL, SMART_ASSIGN_EXPORT_URL, WORK_ORDER_SUBMIT_PAYMENT_URL, WORK_ORDERS_CONFIRMED_PAYMENTS_URL, REPORTS_SUBMIT_PAYMENT_URL, GROUP_REPORTS_SUBMIT_PAYMENT_URL, TBIP_PDF_URL, TBIP_EXCEL_URL } from '../config';
+import { API_ENDPOINTS, EXPERT_SEND_EMAIL_URL, EXPERT_PREVIEW_EMAIL_URL, EXPERT_ROTATE_SIGNATURE_URL, EXPERT_CLEAN_SIGNATURE_URL, WORK_ORDER_ISSUE_URL, WORK_ORDER_PDF_URL, WORK_ORDER_WITHDRAW_URL, MSME_SET_GROUPS_URL, BULK_EMAIL, BULK_EMAIL_LOG, BULK_SMS, BULK_SMS_BALANCE, TRAINING_REPORT_PDF_URL, MENTOR_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_PDF_URL, PARTICIPANT_TRAINING_REPORT_REVERT_URL, REPORT_REVERT_URL, GROUP_REPORT_REVERT_URL, TRAINING_REPORT_REVERT_URL, MENTOR_REPORT_REVERT_URL, TSHIRT_RECEIPT_PDF_URL, TSHIRT_RECEIPT_BULK_SIGN, WORK_ORDER_SUBMISSION_TIMESHEET_URL, WORK_ORDER_SUBMISSION_INVOICE_URL, WORK_ORDER_PAYMENT_NOTIFY_URL, SCHEDULED_MESSAGES, SCHEDULED_MESSAGES_PROCESS, SCHEDULED_MESSAGE_CANCEL, REPORTS_BGE_SUMMARY_URL, REPORTS_QUARTERLY_PDF_URL, REPORTS_ACTIVITY_PDF_URL, REPORTS_ACTIVITY_EXCEL_URL, WORK_ORDER_ATTACHMENT_DOWNLOAD_URL, SMART_ASSIGN_URL, SMART_ASSIGN_EXPORT_URL, WORK_ORDER_SUBMIT_PAYMENT_URL, WORK_ORDERS_CONFIRMED_PAYMENTS_URL, REPORTS_SUBMIT_PAYMENT_URL, GROUP_REPORTS_SUBMIT_PAYMENT_URL, TBIP_PDF_URL, TBIP_EXCEL_URL, FIAP_PDF_URL, FIAP_SUMMARY_URL, FIAP_APPROVE_URL } from '../config';
 import { BRAND } from '../theme';
 import AssignMsmesDialog from './AssignMsmesDialog';
 import WorkOrderDialog from './WorkOrderDialog';
@@ -42,6 +43,10 @@ import MSMEVisitSchedule from './MSMEVisitSchedule';
 import EnterpriseImprovementPlanDialog from './EnterpriseImprovementPlanDialog';
 import BookTBIPMeetingDialog from './BookTBIPMeetingDialog';
 import SelectSessionMsmesDialog from './SelectSessionMsmesDialog';
+import FinancialImprovementPlanDialog from './FinancialImprovementPlanDialog';
+import BookFIAPMeetingDialog from './BookFIAPMeetingDialog';
+import { FIAP_CATEGORIES } from '../fiap_constants';
+
 
 import { Place } from '@mui/icons-material';
 import { getErrorMessage } from '../utils/error';
@@ -63,7 +68,9 @@ const NAV_ITEMS = [
   { key: 'participation',  label: 'Participation',  icon: <TrendingUp /> },
   { key: 'reports',        label: 'Reports',        icon: <PictureAsPdf /> },
   { key: 'tbip',           label: 'Improvement Plans', icon: <TrendingUp /> },
+  { key: 'fiap',           label: 'Financial Action Plans', icon: <AccountBalance /> },
   { key: 'workorders',     label: 'Work Orders',    icon: <Assignment /> },
+
   { key: 'bgeassignment',  label: 'BGE Assignment', icon: <LocationOn /> },
   { key: 'analytics',      label: 'Analytics',      icon: <Assessment /> },
   { key: 'communications', label: 'Communications', icon: <Campaign /> },
@@ -268,6 +275,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [tbipBookMeetingOpen, setTbipBookMeetingOpen] = useState(false);
   const [tbipBookMeetingMsme, setTbipBookMeetingMsme] = useState(null);
   const [tbipBookMeetingPlan, setTbipBookMeetingPlan] = useState(null);
+
+  // ── Financial Improvement Action Plans (FIAP / Access to Finance) ─────────
+  const [fiapPlans, setFiapPlans] = useState([]);
+  const [fiapSummary, setFiapSummary] = useState(null);
+  const [fiapDialog, setFiapDialog] = useState(false);
+  const [selectedFiap, setSelectedFiap] = useState(null);
+  const [selectedFiapMsme, setSelectedFiapMsme] = useState(null);
+  const [fiapFilterCategory, setFiapFilterCategory] = useState('all');
+  const [fiapFilterPriority, setFiapFilterPriority] = useState('all');
+  const [fiapFilterStatus, setFiapFilterStatus] = useState('all');
+  const [fiapSearch, setFiapSearch] = useState('');
+  const [fiapPage, setFiapPage] = useState(0);
+  const [fiapBookMeetingOpen, setFiapBookMeetingOpen] = useState(false);
+  const [fiapBookMeetingMsme, setFiapBookMeetingMsme] = useState(null);
+  const [fiapBookMeetingPlan, setFiapBookMeetingPlan] = useState(null);
+
 
 
   // ── work orders ───────────────────────────────────────────────────────────
@@ -566,7 +589,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           return fallback;
         });
 
-      const [mRes, allMRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes, tbipRes] = await Promise.all([
+      const [mRes, allMRes, eRes, cRes, gRes, sRes, tRes, aRes, uRes, rRes, grRes, pgRes, tbipRes, fiapRes, fiapSumRes] = await Promise.all([
         safeGet(`${API_ENDPOINTS.MSMES}?${params}`),
         safeGet(`${API_ENDPOINTS.MSMES}?all=1`),
         safeGet(`${API_ENDPOINTS.EXPERTS}?page_size=200`),
@@ -582,6 +605,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         safeGet(API_ENDPOINTS.GROUP_REPORTS),
         safeGet(API_ENDPOINTS.PROGRAMME_GROUPS),
         safeGet(API_ENDPOINTS.ENTERPRISE_IMPROVEMENT_PLANS),
+        safeGet(API_ENDPOINTS.FINANCIAL_IMPROVEMENT_PLANS),
+        safeGet(FIAP_SUMMARY_URL, { data: null }),
       ]);
 
       const toArr = (d) => (Array.isArray(d) ? d : d.results || []);
@@ -603,6 +628,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setGroupReports(toArr(grRes.data));
       setReports(toArr(rRes.data));
       setTbipPlans(toArr(tbipRes.data));
+      setFiapPlans(toArr(fiapRes.data));
+      setFiapSummary(fiapSumRes.data || null);
 
       if (msmeList.length === 0 && expertsList.length === 0 && !navigator.onLine) {
         setError('Failed to load data. Check your connection.');
@@ -625,6 +652,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setTbipPlans(Array.isArray(res.data) ? res.data : res.data.results || []);
     } catch {}
   }, [token]);
+
+  const fetchFiapPlans = useCallback(async () => {
+    try {
+      const [res, sumRes] = await Promise.all([
+        axios.get(API_ENDPOINTS.FINANCIAL_IMPROVEMENT_PLANS, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(FIAP_SUMMARY_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => ({ data: null })),
+      ]);
+      setFiapPlans(Array.isArray(res.data) ? res.data : res.data.results || []);
+      if (sumRes.data) setFiapSummary(sumRes.data);
+    } catch {}
+  }, [token]);
+
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -11422,6 +11465,464 @@ PRUDEV II BDS Team`
     );
   };
 
+  const handleDownloadFiapPdf = async (planObj) => {
+    try {
+      const res = await axios.get(FIAP_PDF_URL(planObj.id), {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `FIAP_${(planObj.msme_name || 'MSME').replace(/\s+/g, '_')}_${planObj.assessment_date || 'action_plan'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setError('Failed to download Financial Action Plan PDF.');
+    }
+  };
+
+  const renderFiap = () => {
+    const filtered = fiapPlans.filter(p => {
+      if (fiapFilterCategory !== 'all' && String(p.category) !== String(fiapFilterCategory)) return false;
+      if (fiapFilterPriority !== 'all' && p.support_priority !== fiapFilterPriority) return false;
+      if (fiapFilterStatus !== 'all' && p.status !== fiapFilterStatus) return false;
+      if (fiapSearch.trim()) {
+        const q = fiapSearch.toLowerCase();
+        const mName = (p.msme_name || '').toLowerCase();
+        const mCode = (p.msme_code || '').toLowerCase();
+        const cName = (p.category_name || '').toLowerCase();
+        const sector = (p.msme_sector || '').toLowerCase();
+        const dist = (p.msme_district || '').toLowerCase();
+        if (!mName.includes(q) && !mCode.includes(q) && !cName.includes(q) && !sector.includes(q) && !dist.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const totalPlans = fiapPlans.length;
+    const highPriorityCount = fiapPlans.filter(p => p.support_priority === 'High').length;
+    const mediumPriorityCount = fiapPlans.filter(p => p.support_priority === 'Medium').length;
+    const lowPriorityCount = fiapPlans.filter(p => p.support_priority === 'Low').length;
+    const approvedCount = fiapPlans.filter(p => p.status === 'approved').length;
+    const submittedCount = fiapPlans.filter(p => p.status === 'submitted').length;
+
+    const summaryMatrix = (FIAP_CATEGORIES || []).map(cat => {
+      const inCat = fiapPlans.filter(p => p.category === cat.id || String(p.category) === String(cat.number) || (p.category_name && p.category_name.toLowerCase().includes(cat.name.toLowerCase().slice(0, 15))));
+      const count = inCat.length;
+      const pct = totalPlans > 0 ? ((count / totalPlans) * 100).toFixed(1) : '0.0';
+      const high = inCat.filter(p => p.support_priority === 'High').length;
+      const med = inCat.filter(p => p.support_priority === 'Medium').length;
+      const low = inCat.filter(p => p.support_priority === 'Low').length;
+      return {
+        ...cat,
+        count,
+        pct,
+        high,
+        med,
+        low,
+      };
+    });
+
+    return (
+      <Box>
+        {/* Header */}
+        <Box sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: 2,
+          mb: 3,
+        }}>
+          <Box>
+            <Typography variant="h5" fontWeight={800} color="#1E3A8A">
+              Financial Improvement Action Plans (FIAP)
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              PRUDEV II / GOPA Pro MSME Diagnostic & Credit Readiness Roadmap (Access to Finance)
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => {
+                setSelectedFiap(null);
+                setSelectedFiapMsme(null);
+                setFiapDialog(true);
+              }}
+              sx={{ bgcolor: '#1E3A8A', '&:hover': { bgcolor: '#172554' }, fontWeight: 700 }}
+            >
+              New Action Plan
+            </Button>
+          </Box>
+        </Box>
+
+        {/* KPI Summary Cards */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={6} sm={2.4}>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={600}>Total Action Plans</Typography>
+              <Typography variant="h5" fontWeight={800} color="#1E3A8A">{totalPlans}</Typography>
+              <Typography variant="caption" color="text.secondary">{submittedCount} submitted</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={6} sm={2.4}>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #FCA5A5', bgcolor: '#FEF2F2' }}>
+              <Typography variant="caption" color="error.main" fontWeight={700}>High Priority (Severe Gaps)</Typography>
+              <Typography variant="h5" fontWeight={800} color="#991B1B">{highPriorityCount}</Typography>
+              <Typography variant="caption" color="error.main">Needs intensive coaching</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={6} sm={2.4}>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #FCD34D', bgcolor: '#FFFBEB' }}>
+              <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 700 }}>Medium Priority</Typography>
+              <Typography variant="h5" fontWeight={800} sx={{ color: '#B45309' }}>{mediumPriorityCount}</Typography>
+              <Typography variant="caption" sx={{ color: '#B45309' }}>Standard roadmap</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={6} sm={2.4}>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #A7F3D0', bgcolor: '#F0FDF4' }}>
+              <Typography variant="caption" sx={{ color: '#047857', fontWeight: 700 }}>Low Priority (Finance Ready)</Typography>
+              <Typography variant="h5" fontWeight={800} sx={{ color: '#047857' }}>{lowPriorityCount}</Typography>
+              <Typography variant="caption" sx={{ color: '#047857' }}>FSP application ready</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={6} sm={2.4}>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #BFDBFE', bgcolor: '#EFF6FF' }}>
+              <Typography variant="caption" sx={{ color: '#1E3A8A', fontWeight: 700 }}>Officially Approved</Typography>
+              <Typography variant="h5" fontWeight={800} color="#1E3A8A">{approvedCount}</Typography>
+              <Typography variant="caption" sx={{ color: '#1E3A8A' }}>Rosemary / Harriet endorsed</Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+
+        {/* ── Section 7: Portfolio Summary Reporting Matrix (Template Section 7) ── */}
+        <Paper elevation={0} sx={{ p: 2.5, mb: 3, borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} color="#1E3A8A" sx={{ letterSpacing: 0.3 }}>
+                SECTION 7: PORTFOLIO SUMMARY REPORTING MATRIX
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Project-Level Aggregation & Partner FSP Reporting Across Northern Uganda
+              </Typography>
+            </Box>
+            {fiapFilterCategory !== 'all' && (
+              <Button size="small" variant="text" onClick={() => { setFiapFilterCategory('all'); setFiapPage(0); }}>
+                Clear Category Filter ({fiapFilterCategory})
+              </Button>
+            )}
+          </Box>
+          <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 1.5 }}>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: '#F1F5F9' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 800, fontSize: 12, width: 40 }}>#</TableCell>
+                  <TableCell sx={{ fontWeight: 800, fontSize: 12 }}>Primary Action Plan Category</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 800, fontSize: 12, width: 110 }}>Total MSMEs</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 800, fontSize: 12, width: 100 }}>% of Total</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 800, fontSize: 12, width: 110, color: '#991B1B' }}>High Priority</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 800, fontSize: 12, width: 120, color: '#B45309' }}>Medium Priority</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 800, fontSize: 12, width: 110, color: '#047857' }}>Low Priority</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {summaryMatrix.map((catRow) => {
+                  const isSelected = String(fiapFilterCategory) === String(catRow.id);
+                  return (
+                    <TableRow
+                      key={catRow.id}
+                      hover
+                      onClick={() => {
+                        setFiapFilterCategory(isSelected ? 'all' : catRow.id);
+                        setFiapPage(0);
+                      }}
+                      sx={{
+                        cursor: 'pointer',
+                        bgcolor: isSelected ? '#EFF6FF' : 'inherit',
+                        '&:hover': { bgcolor: isSelected ? '#DBEAFE' : '#F8FAFC' },
+                      }}
+                    >
+                      <TableCell sx={{ fontWeight: 800, color: '#1E3A8A' }}>{catRow.number}</TableCell>
+                      <TableCell>
+                        <Typography fontSize={13} fontWeight={700} color="#0F172A">
+                          {catRow.name}
+                        </Typography>
+                        <Typography fontSize={11} color="text.secondary">
+                          {catRow.what_it_addresses}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800, color: '#1E3A8A' }}>
+                        {catRow.count}
+                      </TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 600 }}>
+                        {catRow.pct}%
+                      </TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: '#991B1B' }}>
+                        {catRow.high}
+                      </TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: '#B45309' }}>
+                        {catRow.med}
+                      </TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: '#047857' }}>
+                        {catRow.low}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                <TableRow sx={{ bgcolor: '#F8FAFC', borderTop: '2px solid #CBD5E1' }}>
+                  <TableCell sx={{ fontWeight: 900 }}>TOTAL</TableCell>
+                  <TableCell sx={{ fontWeight: 900 }}>Full Portfolio Aggregation</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 900, color: '#1E3A8A' }}>{totalPlans}</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 900 }}>100%</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 900, color: '#991B1B' }}>{highPriorityCount}</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 900, color: '#B45309' }}>{mediumPriorityCount}</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 900, color: '#047857' }}>{lowPriorityCount}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+
+        {/* Filter Bar */}
+        <Paper elevation={0} sx={{ p: 2, mb: 2.5, borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+          <Grid container spacing={1.5} alignItems="center">
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search MSME, code, sector, district..."
+                value={fiapSearch}
+                onChange={(e) => { setFiapSearch(e.target.value); setFiapPage(0); }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search fontSize="small" sx={{ color: '#94A3B8' }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={fiapFilterCategory}
+                  label="Category"
+                  onChange={(e) => { setFiapFilterCategory(e.target.value); setFiapPage(0); }}
+                >
+                  <MenuItem value="all">All 9 Categories</MenuItem>
+                  {FIAP_CATEGORIES.map(c => (
+                    <MenuItem key={c.id} value={c.id}>{c.number}. {c.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={3} sm={2.5}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  value={fiapFilterPriority}
+                  label="Priority"
+                  onChange={(e) => { setFiapFilterPriority(e.target.value); setFiapPage(0); }}
+                >
+                  <MenuItem value="all">All Priorities</MenuItem>
+                  <MenuItem value="High">High</MenuItem>
+                  <MenuItem value="Medium">Medium</MenuItem>
+                  <MenuItem value="Low">Low</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={3} sm={2.5}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={fiapFilterStatus}
+                  label="Status"
+                  onChange={(e) => { setFiapFilterStatus(e.target.value); setFiapPage(0); }}
+                >
+                  <MenuItem value="all">All Statuses</MenuItem>
+                  <MenuItem value="draft">Draft</MenuItem>
+                  <MenuItem value="submitted">Submitted</MenuItem>
+                  <MenuItem value="approved">Approved</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        {/* Table of Plans */}
+        {filtered.length === 0 ? (
+          <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 2, border: '1px dashed #CBD5E1', bgcolor: '#F8FAFC' }}>
+            <AccountBalance sx={{ fontSize: 48, color: '#94A3B8', mb: 1.5 }} />
+            <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
+              No Financial Improvement Action Plans Found
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Formulate a credit readiness diagnostic and tailored roadmap for assigned MSMEs.
+            </Typography>
+          </Paper>
+        ) : (
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: '1px solid #E2E8F0' }}>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: '#1E3A8A' }}>
+                <TableRow>
+                  <TableCell sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>MSME & Details</TableCell>
+                  <TableCell sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Action Plan Category</TableCell>
+                  <TableCell sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Gaps & Target Facility</TableCell>
+                  <TableCell align="center" sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Priority</TableCell>
+                  <TableCell align="center" sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Status</TableCell>
+                  <TableCell align="right" sx={{ color: '#FFFFFF', fontWeight: 800, fontSize: 12 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filtered.slice(fiapPage * ROWS_PER_PAGE, fiapPage * ROWS_PER_PAGE + ROWS_PER_PAGE).map((p) => {
+                  const isHigh = p.support_priority === 'High';
+                  const isMed = p.support_priority === 'Medium';
+                  const gapsCount = (p.identified_gaps || p.gaps_identified || []).length;
+                  const stepsCount = (p.action_plan_steps || []).length;
+
+                  return (
+                    <TableRow key={p.id} hover sx={{ '&:hover': { bgcolor: '#F8FAFC' } }}>
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Typography fontWeight={700} fontSize={13.5} color="#1E3A8A">
+                          {p.msme_name || `MSME #${p.msme}`}
+                        </Typography>
+                        <Typography fontSize={11} color="text.secondary">
+                          {p.msme_code ? `${p.msme_code} · ` : ''}{p.msme_sector || 'General'}
+                          {p.msme_district ? ` · ${p.msme_district}` : ''}
+                        </Typography>
+                        {p.bge_name && (
+                          <Typography fontSize={10.5} color="text.secondary">
+                            Coach: {p.bge_name}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 280 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip
+                            label={`#${p.category || '—'}`}
+                            size="small"
+                            sx={{
+                              bgcolor: '#EFF6FF',
+                              color: '#1E3A8A',
+                              fontWeight: 800,
+                              fontSize: 11,
+                              border: '1px solid #BFDBFE',
+                              minWidth: 32,
+                            }}
+                          />
+                          <Box>
+                            <Typography fontSize={12.5} fontWeight={700} color="#1E293B">
+                              {p.category_name || `Category ${p.category}`}
+                            </Typography>
+                            <Typography fontSize={11} color="text.secondary" sx={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 1,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}>
+                              {p.category_addresses}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 240 }}>
+                        <Typography fontSize={12} fontWeight={600} color="#334155">
+                          {gapsCount} gap{gapsCount === 1 ? '' : 's'} identified · {stepsCount} step{stepsCount === 1 ? '' : 's'}
+                        </Typography>
+                        <Typography fontSize={11} color="text.secondary" sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 1,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}>
+                          {p.financing_target || 'Target financing not specified'}
+                          {p.estimated_amount ? ` (UGX ${p.estimated_amount})` : ''}
+                          {p.preferred_fsp ? ` · ${p.preferred_fsp}` : ''}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={p.support_priority || 'Low'}
+                          size="small"
+                          sx={{
+                            fontWeight: 800,
+                            fontSize: 11,
+                            bgcolor: isHigh ? '#FEE2E2' : isMed ? '#FEF3C7' : '#ECFDF5',
+                            color: isHigh ? '#991B1B' : isMed ? '#92400E' : '#065F46',
+                            border: '1px solid',
+                            borderColor: isHigh ? '#F87171' : isMed ? '#FBBF24' : '#A7F3D0',
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={p.status === 'approved' ? `Approved${p.approved_by_name ? ` by ${p.approved_by_name.split(' ')[0]}` : ''}` : (p.status || 'draft')}
+                          size="small"
+                          color={p.status === 'approved' ? 'success' : p.status === 'submitted' ? 'primary' : 'default'}
+                          sx={{ fontWeight: 700, fontSize: 10.5 }}
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <Tooltip title="View / Review / Edit Action Plan">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => {
+                                const mTarget = msmes.find(m => m.id === p.msme) || allMsmes.find(m => m.id === p.msme);
+                                setSelectedFiapMsme(mTarget || null);
+                                setSelectedFiap(p);
+                                setFiapDialog(true);
+                              }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Request Approval Meeting with Rosemary or Harriet">
+                            <IconButton
+                              size="small"
+                              sx={{ color: '#1E3A8A' }}
+                              onClick={() => {
+                                const mTarget = msmes.find(m => m.id === p.msme) || allMsmes.find(m => m.id === p.msme);
+                                setFiapBookMeetingPlan(p);
+                                setFiapBookMeetingMsme(mTarget || null);
+                                setFiapBookMeetingOpen(true);
+                              }}
+                            >
+                              <EventAvailable fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download Official PRUDEV II PDF">
+                            <IconButton size="small" color="error" onClick={() => handleDownloadFiapPdf(p)}>
+                              <PictureAsPdf fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={fiapPage}
+              rowsPerPage={ROWS_PER_PAGE}
+              rowsPerPageOptions={[ROWS_PER_PAGE]}
+              onPageChange={(_, page) => setFiapPage(page)}
+            />
+          </TableContainer>
+        )}
+      </Box>
+    );
+  };
+
   const sectionMap = {
     overview: renderOverview,
     calendar: () => (
@@ -11444,12 +11945,14 @@ PRUDEV II BDS Team`
     participation: renderParticipation,
     reports: renderReports,
     tbip: renderTbip,
+    fiap: renderFiap,
     workorders: renderWorkOrders,
     bgeassignment: renderBgeAssignment,
     analytics: renderAnalytics,
     communications: renderCommunications,
     tshirts: renderTshirtReceipts,
   };
+
 
   // ── main render ────────────────────────────────────────────────────────────
   return (
@@ -14132,6 +14635,47 @@ PRUDEV II BDS Team`
           else setSuccess(msg);
         }}
       />
+
+      {/* ── Financial Improvement Plan (FIAP) Dialog ── */}
+      <FinancialImprovementPlanDialog
+        open={fiapDialog}
+        onClose={() => setFiapDialog(false)}
+        plan={selectedFiap}
+        msme={selectedFiapMsme || (selectedFiap ? msmes.find(m => m.id === selectedFiap.msme) || allMsmes.find(m => m.id === selectedFiap.msme) : null)}
+        allMsmes={allMsmes.length > 0 ? allMsmes : msmes}
+        bge={selectedFiap?.bge ? experts.find(e => e.id === selectedFiap.bge) : null}
+        currentUser={currentUser}
+        token={token}
+        onSaved={(updated) => {
+          fetchFiapPlans();
+          setSelectedFiap(updated);
+          setSuccess('Financial Improvement Plan updated.');
+        }}
+        notify={(msg, type) => {
+          if (type === 'error') setError(msg);
+          else setSuccess(msg);
+        }}
+      />
+
+      {/* ── Book FIAP Approval Meeting Dialog (Rosemary / Harriet) ── */}
+      <BookFIAPMeetingDialog
+        open={fiapBookMeetingOpen}
+        onClose={() => setFiapBookMeetingOpen(false)}
+        plan={fiapBookMeetingPlan}
+        msme={fiapBookMeetingMsme}
+        msmes={msmes.length > 0 ? msmes : allMsmes}
+        currentUser={currentUser}
+        token={token}
+        onBooked={(resData) => {
+          fetchFiapPlans();
+          setSuccess('Approval meeting request and calendar invite sent.');
+        }}
+        notify={(msg, type) => {
+          if (type === 'error') setError(msg);
+          else setSuccess(msg);
+        }}
+      />
+
 
 
 

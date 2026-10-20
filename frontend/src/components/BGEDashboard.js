@@ -17,7 +17,7 @@ import {
   Delete, School, People, CloudUpload,
   HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined, MyLocation,
   Place, GpsFixed, GpsNotFixed, CalendarMonth, Search, ExpandMore,
-  AutoAwesome, AccountBalance,
+  AutoAwesome, AccountBalance, EventAvailable,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -39,6 +39,8 @@ import MSMEVisitSchedule from './MSMEVisitSchedule';
 import EnterpriseImprovementPlanDialog from './EnterpriseImprovementPlanDialog';
 import BookTBIPMeetingDialog from './BookTBIPMeetingDialog';
 import FinancialImprovementPlanDialog from './FinancialImprovementPlanDialog';
+import BookFIAPMeetingDialog from './BookFIAPMeetingDialog';
+
 
 import { getErrorMessage } from '../utils/error';
 
@@ -381,6 +383,10 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [fiapSearch, setFiapSearch] = useState('');
   const [fiapPage, setFiapPage] = useState(0);
   const [newFiapMsmePicker, setNewFiapMsmePicker] = useState(false);
+  const [fiapBookMeetingOpen, setFiapBookMeetingOpen] = useState(false);
+  const [fiapBookMeetingPlan, setFiapBookMeetingPlan] = useState(null);
+  const [fiapBookMeetingMsme, setFiapBookMeetingMsme] = useState(null);
+
 
 
   // Full MSME list for training attendance (bypasses personal assignment scope)
@@ -3661,11 +3667,26 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                                     <Edit fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
+                                <Tooltip title="Request Approval Meeting with Rosemary or Harriet">
+                                  <IconButton
+                                    size="small"
+                                    sx={{ color: '#1E3A8A' }}
+                                    onClick={() => {
+                                      const mTarget = msmes.find(m => m.id === p.msme);
+                                      setFiapBookMeetingPlan(p);
+                                      setFiapBookMeetingMsme(mTarget || null);
+                                      setFiapBookMeetingOpen(true);
+                                    }}
+                                  >
+                                    <EventAvailable fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
                                 <Tooltip title="Download Official PRUDEV II PDF">
                                   <IconButton size="small" color="error" onClick={() => handleDownloadFiapPdf(p)}>
                                     <PictureAsPdf fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
+
                                 {p.status === 'draft' && (
                                   <Tooltip title="Delete draft">
                                     <IconButton size="small" color="default" onClick={() => deleteFiapPlan(p)}>
@@ -7010,6 +7031,22 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         }}
         notify={notify}
       />
+
+      {/* ── Book FIAP Approval Meeting Dialog (Rosemary / Harriet) ── */}
+      <BookFIAPMeetingDialog
+        open={fiapBookMeetingOpen}
+        onClose={() => setFiapBookMeetingOpen(false)}
+        plan={fiapBookMeetingPlan}
+        msme={fiapBookMeetingMsme}
+        msmes={msmes}
+        currentUser={currentUser}
+        token={token}
+        onBooked={(resData) => {
+          fetchFiapPlans();
+        }}
+        notify={notify}
+      />
+
 
       {/* ── MSME Picker for New FIAP ── */}
       <Dialog open={newFiapMsmePicker} onClose={() => setNewFiapMsmePicker(false)} maxWidth="xs" fullWidth disableScrollLock>

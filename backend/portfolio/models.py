@@ -2073,6 +2073,16 @@ class FinancialImprovementActionPlan(models.Model):
     bge_signed_at = models.DateField(null=True, blank=True)
     bge_signature_name = models.CharField(max_length=255, blank=True)
 
+    # Formal Approval by Access to Finance leads (Rosemary Laker / Harriet Daisy Amule)
+    approved_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='approved_fiap_plans',
+        help_text='User (e.g. Rosemary Laker or Harriet Daisy Amule) who approved the plan'
+    )
+    approved_by_name = models.CharField(max_length=255, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approval_notes = models.TextField(blank=True, help_text='Reviewer feedback or approval notes')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
@@ -2084,6 +2094,109 @@ class FinancialImprovementActionPlan(models.Model):
 
     def __str__(self):
         return f"FIAP: {self.msme.business_name} ({self.get_category_display()}) - {self.support_priority} Priority"
+
+
+class FinancialImprovementPlanMeeting(models.Model):
+    """
+    Review and approval meeting requested by BGE with Rosemary Laker or Harriet Daisy Amule
+    to evaluate and approve the MSME Financial Improvement Action Plan (Access to Finance / Credit Readiness).
+    """
+    STATUS_CHOICES = [
+        ('requested', 'Requested'),
+        ('confirmed', 'Confirmed'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    FORMAT_CHOICES = [
+        ('google_meet', 'Google Meet (Online)'),
+        ('teams', 'Microsoft Teams'),
+        ('in_person', 'In-Person (Office / Field)'),
+        ('phone', 'Phone Call'),
+    ]
+
+    REVIEWER_CHOICES = [
+        ('rosemary', 'Rosemary Laker'),
+        ('harriet', 'Harriet Daisy Amule'),
+        ('both', 'Both (Rosemary & Harriet)'),
+    ]
+
+    plan = models.ForeignKey(
+        'FinancialImprovementActionPlan',
+        on_delete=models.CASCADE,
+        related_name='meetings',
+        help_text='Financial Improvement Plan for which approval meeting is requested',
+    )
+    msme = models.ForeignKey(
+        'MSME',
+        on_delete=models.CASCADE,
+        related_name='fiap_meetings',
+        help_text='MSME enterprise under review',
+    )
+    bge = models.ForeignKey(
+        BusinessGrowthExpert,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='fiap_meetings',
+        help_text='Assigned BGE specialist requesting review',
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='requested_fiap_meetings',
+    )
+
+    requester_name = models.CharField(max_length=255)
+    requester_email = models.EmailField()
+    requester_phone = models.CharField(max_length=50, blank=True)
+
+    reviewer_target = models.CharField(
+        max_length=50,
+        choices=REVIEWER_CHOICES,
+        default='both',
+        help_text='Primary reviewer(s) invited: Rosemary, Harriet, or both',
+    )
+
+    topic = models.CharField(
+        max_length=255,
+        default='Financial Action Plan Review & Credit Readiness Approval',
+        help_text='Primary meeting objective / topic',
+    )
+    scheduled_date = models.DateField(help_text='Proposed meeting date')
+    start_time = models.TimeField(help_text='Proposed start time')
+    end_time = models.TimeField(help_text='Proposed end time', null=True, blank=True)
+    duration_minutes = models.PositiveIntegerField(default=45, help_text='Duration in minutes')
+
+    meeting_format = models.CharField(
+        max_length=50,
+        choices=FORMAT_CHOICES,
+        default='google_meet',
+    )
+    meeting_link = models.CharField(max_length=500, blank=True, help_text='Online meeting link or venue details')
+    agenda_notes = models.TextField(blank=True, help_text='Summary of diagnostic gaps, financing target, and questions for Rosemary & Harriet')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='requested')
+    calendar_event_uid = models.CharField(max_length=255, blank=True)
+
+    # Email notification tracking
+    email_sent = models.BooleanField(default=False)
+    email_sent_at = models.DateTimeField(null=True, blank=True)
+    email_error = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-scheduled_date', '-start_time', '-created_at']
+        verbose_name = "Financial Action Plan Review Meeting"
+        verbose_name_plural = "Financial Action Plan Review Meetings"
+
+    def __str__(self):
+        return f"FIAP Review Meeting: {self.msme.business_name} on {self.scheduled_date} with {self.get_reviewer_target_display()}"
+
 
 
 class EnterpriseImprovementPlanMeeting(models.Model):

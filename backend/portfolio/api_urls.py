@@ -16,6 +16,7 @@ from .views import (
     EnterpriseImprovementPlanViewSet,
     EnterpriseImprovementPlanMeetingViewSet,
     FinancialImprovementActionPlanViewSet,
+    FinancialImprovementPlanMeetingViewSet,
     push_subscribe, push_unsubscribe, push_vapid_key,
     bulk_email_view, bulk_email_log_view,
     bulk_sms_view, bulk_sms_log_view, bulk_sms_balance_view,
@@ -69,6 +70,7 @@ router.register(r'planned-visits', PlannedVisitViewSet, basename='planned-visit'
 router.register(r'enterprise-improvement-plans', EnterpriseImprovementPlanViewSet, basename='enterprise-improvement-plan')
 router.register(r'tbip-meetings', EnterpriseImprovementPlanMeetingViewSet, basename='tbip-meeting')
 router.register(r'financial-improvement-plans', FinancialImprovementActionPlanViewSet, basename='financial-improvement-plan')
+router.register(r'fiap-meetings', FinancialImprovementPlanMeetingViewSet, basename='fiap-meeting')
 
 router.register(r'blockchain/transactions', BlockchainTransactionViewSet)
 router.register(r'blockchain/contracts', SmartContractViewSet)

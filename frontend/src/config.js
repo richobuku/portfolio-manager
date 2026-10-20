@@ -107,8 +107,12 @@ export const TBIP_MEETINGS             = `${API_BASE_URL}/api/tbip-meetings/`;
 
 export const FIAP_PDF_URL              = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/pdf/`;
 export const FIAP_SUBMIT_URL           = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/submit/`;
+export const FIAP_APPROVE_URL          = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/approve/`;
+export const FIAP_BOOK_MEETING_URL     = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/book-meeting/`;
 export const FIAP_TEMPLATES_URL        = `${API_BASE_URL}/api/financial-improvement-plans/templates/`;
 export const FIAP_SUMMARY_URL          = `${API_BASE_URL}/api/financial-improvement-plans/summary/`;
+export const FIAP_MEETINGS             = `${API_BASE_URL}/api/fiap-meetings/`;
+
 export const WORK_ORDER_SUBMISSION_TIMESHEET_URL = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-timesheet/`;
 export const WORK_ORDER_SUBMISSION_INVOICE_URL   = (id) => `${API_BASE_URL}/api/work-order-submissions/${id}/download-invoice/`;
 export const WORK_ORDER_PAYMENT_NOTIFY_URL  = (id) => `${API_BASE_URL}/api/work-order-payments/${id}/notify/`;

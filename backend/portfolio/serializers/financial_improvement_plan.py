@@ -24,3 +24,19 @@ class FinancialImprovementActionPlanSerializer(serializers.ModelSerializer):
     def get_msme_location(self, obj):
         m = obj.msme
         return m.address or m.district or '—'
+
+
+class FinancialImprovementPlanMeetingSerializer(serializers.ModelSerializer):
+    msme_name = serializers.CharField(source='msme.business_name', read_only=True)
+    msme_code = serializers.CharField(source='msme.msme_code', read_only=True)
+    bge_name = serializers.CharField(source='bge.name', read_only=True)
+    plan_category_name = serializers.CharField(source='plan.category_name', read_only=True)
+    plan_support_priority = serializers.CharField(source='plan.support_priority', read_only=True)
+    reviewer_target_display = serializers.CharField(source='get_reviewer_target_display', read_only=True)
+
+    class Meta:
+        from ..models import FinancialImprovementPlanMeeting
+        model = FinancialImprovementPlanMeeting
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at', 'calendar_event_uid', 'email_sent', 'email_sent_at', 'email_error']
+
