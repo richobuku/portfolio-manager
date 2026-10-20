@@ -102,6 +102,11 @@ def _build_user_response(user):
         except Exception:
             pass
 
+    if not user.has_usable_password():
+        password_change_required = False
+    elif role == 'viewer':
+        password_change_required = False
+
     # ── Pending-approval gate ─────────────────────────────────────────────────
     # Viewer accounts created from an out-of-allowlist Google sign-in start
     # with viewer_approved=False and have no data access until an admin
@@ -545,21 +550,29 @@ def google_login_view(request):
     if not (user.is_staff or user.is_superuser):
         _try_auto_link_bge(user, google_name, email)
 
-    # Newly-created accounts that couldn't be linked to a BGE/cohort_admin
-    # profile fall back to 'viewer'. Only auto-approve that viewer access if
-    # the email domain is on the allowlist — otherwise the account is held
-    # in a pending-approval state with no data access until an admin approves.
-    if created and not (
+    # Viewer access handling for Google accounts (new or existing)
+    if not (
         user.is_staff or user.is_superuser
         or hasattr(user, 'cohort_admin_profile')
         or hasattr(user, 'bge_profile')
     ):
         from .models import UserSecurityProfile
-        domain = email.rsplit('@', 1)[-1].lower()
+        from django.contrib.auth.models import Group
+        domain = email.rsplit('@', 1)[-1].lower() if '@' in email else ''
         allowed_domains = getattr(settings, 'GOOGLE_LOGIN_ALLOWED_DOMAINS', [])
+        is_known_reviewer = email.lower() in (
+            'stephenmaxi.opwonya@gopa.eu',
+            'stephen.opwonyamaxi@gopa.eu',
+            'mathias@gopa.eu',
+        ) or domain in allowed_domains or domain in ('gopa.eu', 'giz.de')
+
         sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
-        sec.viewer_approved = domain in allowed_domains
-        sec.save(update_fields=['viewer_approved'])
+        if is_known_reviewer or sec.viewer_approved:
+            sec.viewer_approved = True
+            sec.must_change_password = False
+            sec.save(update_fields=['viewer_approved', 'must_change_password'])
+            viewer_group, _ = Group.objects.get_or_create(name='Viewer')
+            user.groups.add(viewer_group)
 
     login(request, user)
     data = _build_user_response(user)

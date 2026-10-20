@@ -37,7 +37,9 @@ import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
 import MSMEVisitSchedule from './MSMEVisitSchedule';
 import EnterpriseImprovementPlanDialog from './EnterpriseImprovementPlanDialog';
+import BookTBIPMeetingDialog from './BookTBIPMeetingDialog';
 import FinancialImprovementPlanDialog from './FinancialImprovementPlanDialog';
+
 import { getErrorMessage } from '../utils/error';
 
 const DRAWER_WIDTH = 220;
@@ -364,6 +366,9 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
   const [tbipSearch, setTbipSearch] = useState('');
   const [tbipPage, setTbipPage] = useState(0);
   const [newTbipMsmePicker, setNewTbipMsmePicker] = useState(false);
+  const [tbipBookMeetingOpen, setTbipBookMeetingOpen] = useState(false);
+  const [tbipBookMeetingMsme, setTbipBookMeetingMsme] = useState(null);
+  const [tbipBookMeetingPlan, setTbipBookMeetingPlan] = useState(null);
 
   // Financial Improvement Action Plans (FIAP / Access to Finance)
   const [fiapPlans, setFiapPlans] = useState([]);
@@ -3094,21 +3099,44 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                     PRUDEV II MSME Diagnostic Assessments & Technical Improvement Plans
                   </Typography>
                 </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  onClick={() => setNewTbipMsmePicker(true)}
-                  sx={{
-                    bgcolor: BRAND.gizRed,
-                    '&:hover': { bgcolor: BRAND.gizDarkRed },
-                    whiteSpace: 'nowrap',
-                    fontWeight: 700,
-                    borderRadius: 2,
-                  }}
-                >
-                  New Assessment / TBIP
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CalendarMonth />}
+                    onClick={() => {
+                      setTbipBookMeetingMsme(null);
+                      setTbipBookMeetingPlan(null);
+                      setTbipBookMeetingOpen(true);
+                    }}
+                    sx={{
+                      borderColor: BRAND.primaryMain,
+                      color: BRAND.primaryMain,
+                      bgcolor: '#FFFFFF',
+                      '&:hover': { bgcolor: '#F1F5F9' },
+                      whiteSpace: 'nowrap',
+                      fontWeight: 700,
+                      borderRadius: 2,
+                    }}
+                  >
+                    Book Meeting with Richard & Stephen
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setNewTbipMsmePicker(true)}
+                    sx={{
+                      bgcolor: BRAND.gizRed,
+                      '&:hover': { bgcolor: BRAND.gizDarkRed },
+                      whiteSpace: 'nowrap',
+                      fontWeight: 700,
+                      borderRadius: 2,
+                    }}
+                  >
+                    New Assessment / TBIP
+                  </Button>
+                </Box>
               </Box>
+
 
               {/* KPI Summary Cards */}
               <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -3272,10 +3300,25 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                             </TableCell>
                             <TableCell align="right">
                               <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+                                <Tooltip title="Book Meeting with Richard & Stephen">
+                                  <IconButton
+                                    size="small"
+                                    sx={{ color: '#0F172A' }}
+                                    onClick={() => {
+                                      const mTarget = msmes.find(m => m.id === p.msme);
+                                      setTbipBookMeetingMsme(mTarget || null);
+                                      setTbipBookMeetingPlan(p);
+                                      setTbipBookMeetingOpen(true);
+                                    }}
+                                  >
+                                    <CalendarMonth fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
                                 <Tooltip title="View / Edit Assessment">
                                   <IconButton
                                     size="small"
                                     color="primary"
+
                                     onClick={() => {
                                       const mTarget = msmes.find(m => m.id === p.msme);
                                       setSelectedTbipMsme(mTarget || null);
@@ -6901,6 +6944,19 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
         }}
         notify={notify}
       />
+
+      {/* ── Book Meeting with Richard & Stephen Dialog ── */}
+      <BookTBIPMeetingDialog
+        open={tbipBookMeetingOpen}
+        onClose={() => setTbipBookMeetingOpen(false)}
+        plan={tbipBookMeetingPlan}
+        msme={tbipBookMeetingMsme}
+        msmes={msmes}
+        currentUser={currentUser}
+        token={token}
+        notify={notify}
+      />
+
 
       {/* ── MSME Picker for New TBIP ── */}
       <Dialog open={newTbipMsmePicker} onClose={() => setNewTbipMsmePicker(false)} maxWidth="xs" fullWidth disableScrollLock>

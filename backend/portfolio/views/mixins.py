@@ -15,12 +15,29 @@ def _managed_groups(user):
 
 
 def _is_viewer(user):
-    """True only for accounts explicitly in the 'Viewer' Django group.
-    Unlinked accounts (no bge_profile, no cohort_admin_profile) fall through to
-    see NOTHING — they must be linked to a BGE profile or added to Viewer to gain access."""
+    """True for accounts in the 'Viewer' Django group, approved viewer accounts,
+    or designated reviewer accounts (like Stephen and Mathias)."""
+    if not user or not user.is_authenticated:
+        return False
     if user.is_staff or user.is_superuser:
         return False
-    return user.groups.filter(name='Viewer').exists()
+    if user.groups.filter(name='Viewer').exists():
+        return True
+    if hasattr(user, 'cohort_admin_profile') or hasattr(user, 'bge_profile'):
+        return False
+    try:
+        sec = user.security_profile
+        if getattr(sec, 'viewer_approved', False):
+            return True
+    except Exception:
+        pass
+    uname = (user.username or '').lower()
+    uemail = (user.email or '').lower()
+    if uname in ('stephen', 'stephen.opwonya', 'mathias') or uemail in (
+        'stephenmaxi.opwonya@gopa.eu', 'stephen.opwonyamaxi@gopa.eu', 'mathias@gopa.eu'
+    ):
+        return True
+    return False
 
 
 def _is_programme_manager(user):

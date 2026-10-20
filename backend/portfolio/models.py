@@ -2086,5 +2086,106 @@ class FinancialImprovementActionPlan(models.Model):
         return f"FIAP: {self.msme.business_name} ({self.get_category_display()}) - {self.support_priority} Priority"
 
 
+class EnterpriseImprovementPlanMeeting(models.Model):
+    """
+    Coaching and review meeting requested with Richard Obuku (BDS Manager)
+    and Stephen Maxi Opwonya (Team Leader) to guide, formulate, or review
+    the Enterprise Improvement Plan (TBIP).
+    """
+    STATUS_CHOICES = [
+        ('requested', 'Requested'),
+        ('confirmed', 'Confirmed'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    FORMAT_CHOICES = [
+        ('google_meet', 'Google Meet (Online)'),
+        ('teams', 'Microsoft Teams'),
+        ('in_person', 'In-Person (Office / Field)'),
+        ('phone', 'Phone Call'),
+    ]
+
+    TOPIC_CHOICES = [
+        ('tbip_formulation', 'Formulating Priority Actions Roadmap (3–5 Actions)'),
+        ('diagnostic_guidance', '7-Dimension Diagnostic Assessment & Gap Analysis Guidance'),
+        ('review_endorsement', 'Pre-submission TBIP Review & Endorsement'),
+        ('msme_intervention', 'MSME Specific BDS Intervention & Coaching Strategy'),
+        ('other', 'Other / Custom Advisory'),
+    ]
+
+    plan = models.ForeignKey(
+        'EnterpriseImprovementPlan',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='meetings',
+        help_text='Associated Enterprise Improvement Plan if already drafted',
+    )
+    msme = models.ForeignKey(
+        'MSME',
+        on_delete=models.CASCADE,
+        related_name='tbip_meetings',
+        help_text='MSME for which the improvement plan is being created',
+    )
+    bge = models.ForeignKey(
+        'BusinessGrowthExpert',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tbip_meetings',
+        help_text='Assigned BGE requesting or participating in the meeting',
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='requested_tbip_meetings',
+    )
+
+    requester_name = models.CharField(max_length=255)
+    requester_email = models.EmailField()
+    requester_phone = models.CharField(max_length=50, blank=True)
+
+    topic = models.CharField(
+        max_length=255,
+        default='Formulating Priority Actions Roadmap (3–5 Actions)',
+        help_text='Primary meeting objective / topic',
+    )
+    scheduled_date = models.DateField(help_text='Proposed meeting date')
+    start_time = models.TimeField(help_text='Proposed start time')
+    end_time = models.TimeField(help_text='Proposed end time', null=True, blank=True)
+    duration_minutes = models.PositiveIntegerField(default=45, help_text='Duration in minutes')
+
+    meeting_format = models.CharField(
+        max_length=50,
+        choices=FORMAT_CHOICES,
+        default='google_meet',
+    )
+    meeting_link = models.CharField(max_length=500, blank=True, help_text='Online meeting link or venue details')
+    agenda_notes = models.TextField(blank=True, help_text='Specific areas, challenges, or questions for Richard & Stephen')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='requested')
+    calendar_event_uid = models.CharField(max_length=255, blank=True)
+
+    # Email notification tracking
+    email_sent = models.BooleanField(default=False)
+    email_sent_at = models.DateTimeField(null=True, blank=True)
+    email_error = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-scheduled_date', '-start_time', '-created_at']
+        verbose_name = "Enterprise Improvement Plan Meeting"
+        verbose_name_plural = "Enterprise Improvement Plan Meetings"
+
+    def __str__(self):
+        return f"TBIP Meeting: {self.msme.name} on {self.scheduled_date} ({self.get_status_display()})"
+
+
+
 
 

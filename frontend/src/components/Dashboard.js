@@ -40,7 +40,9 @@ import MSMEMap from './MSMEMap';
 import CalendarPlanner from './CalendarPlanner';
 import MSMEVisitSchedule from './MSMEVisitSchedule';
 import EnterpriseImprovementPlanDialog from './EnterpriseImprovementPlanDialog';
+import BookTBIPMeetingDialog from './BookTBIPMeetingDialog';
 import SelectSessionMsmesDialog from './SelectSessionMsmesDialog';
+
 import { Place } from '@mui/icons-material';
 import { getErrorMessage } from '../utils/error';
 
@@ -263,6 +265,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [tbipFilterBge, setTbipFilterBge] = useState('all');
   const [tbipSearch, setTbipSearch] = useState('');
   const [tbipPage, setTbipPage] = useState(0);
+  const [tbipBookMeetingOpen, setTbipBookMeetingOpen] = useState(false);
+  const [tbipBookMeetingMsme, setTbipBookMeetingMsme] = useState(null);
+  const [tbipBookMeetingPlan, setTbipBookMeetingPlan] = useState(null);
+
 
   // ── work orders ───────────────────────────────────────────────────────────
   const [workOrders, setWorkOrders] = useState([]);
@@ -11140,21 +11146,43 @@ PRUDEV II BDS Team`
           subtitle="MSME Business Diagnostic Assessments & Technical Improvement Roadmap"
           action={
             !isViewer ? (
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => {
-                  setSelectedTbip(null);
-                  setSelectedTbipMsme(null);
-                  setTbipDialog(true);
-                }}
-                sx={{ bgcolor: BRAND.gizRed, '&:hover': { bgcolor: BRAND.gizDarkRed }, fontWeight: 700, borderRadius: 2 }}
-              >
-                New Assessment / Plan
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<CalendarMonth />}
+                  onClick={() => {
+                    setTbipBookMeetingMsme(null);
+                    setTbipBookMeetingPlan(null);
+                    setTbipBookMeetingOpen(true);
+                  }}
+                  sx={{
+                    borderColor: BRAND.primaryMain,
+                    color: BRAND.primaryMain,
+                    bgcolor: '#FFFFFF',
+                    '&:hover': { bgcolor: '#F1F5F9' },
+                    fontWeight: 700,
+                    borderRadius: 2,
+                  }}
+                >
+                  Book Meeting with Richard & Stephen
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => {
+                    setSelectedTbip(null);
+                    setSelectedTbipMsme(null);
+                    setTbipDialog(true);
+                  }}
+                  sx={{ bgcolor: BRAND.gizRed, '&:hover': { bgcolor: BRAND.gizDarkRed }, fontWeight: 700, borderRadius: 2 }}
+                >
+                  New Assessment / Plan
+                </Button>
+              </Box>
             ) : null
           }
         />
+
 
         {/* KPI Cards */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -11334,10 +11362,25 @@ PRUDEV II BDS Team`
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <Tooltip title="Book Meeting with Richard & Stephen">
+                            <IconButton
+                              size="small"
+                              sx={{ color: '#0F172A' }}
+                              onClick={() => {
+                                const mTarget = msmes.find(m => m.id === p.msme) || allMsmes.find(m => m.id === p.msme);
+                                setTbipBookMeetingMsme(mTarget || null);
+                                setTbipBookMeetingPlan(p);
+                                setTbipBookMeetingOpen(true);
+                              }}
+                            >
+                              <CalendarMonth fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title={isViewer ? "View Assessment" : "Review / Approve / Edit Assessment"}>
                             <IconButton
                               size="small"
                               color="primary"
+
                               onClick={() => {
                                 const mTarget = msmes.find(m => m.id === p.msme) || allMsmes.find(m => m.id === p.msme);
                                 setSelectedTbipMsme(mTarget || null);
@@ -14074,6 +14117,22 @@ PRUDEV II BDS Team`
           else setSuccess(msg);
         }}
       />
+
+      {/* ── Book Meeting with Richard & Stephen Dialog ── */}
+      <BookTBIPMeetingDialog
+        open={tbipBookMeetingOpen}
+        onClose={() => setTbipBookMeetingOpen(false)}
+        plan={tbipBookMeetingPlan}
+        msme={tbipBookMeetingMsme}
+        msmes={msmes.length > 0 ? msmes : allMsmes}
+        currentUser={currentUser}
+        token={token}
+        notify={(msg, type) => {
+          if (type === 'error') setError(msg);
+          else setSuccess(msg);
+        }}
+      />
+
 
 
       {/* ── Notifications ─────────────────────────────────────────────────── */}

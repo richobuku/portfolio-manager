@@ -71,6 +71,7 @@ export const API_ENDPOINTS = {
   WORK_ORDER_ATTACHMENTS:    `${API_BASE_URL}/api/work-order-attachments/`,
   PLANNED_VISITS:            `${API_BASE_URL}/api/planned-visits/`,
   ENTERPRISE_IMPROVEMENT_PLANS: `${API_BASE_URL}/api/enterprise-improvement-plans/`,
+  TBIP_MEETINGS:              `${API_BASE_URL}/api/tbip-meetings/`,
   FINANCIAL_IMPROVEMENT_PLANS:  `${API_BASE_URL}/api/financial-improvement-plans/`,
   DIAGNOSTIC_SUMMARY:        `${API_BASE_URL}/api/diagnostics/analytics/summary/`,
   DIAGNOSTIC_COHORTS:        `${API_BASE_URL}/api/diagnostics/analytics/cohorts/`,
@@ -96,6 +97,13 @@ export const TBIP_EXCEL_URL            = (id) => `${API_BASE_URL}/api/enterprise
 export const TBIP_SUBMIT_URL           = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/submit/`;
 export const TBIP_APPROVE_URL          = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/approve/`;
 export const TBIP_REJECT_URL           = (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/reject/`;
+export const TBIP_PLAN_BOOK_MEETING_URL= (id) => `${API_BASE_URL}/api/enterprise-improvement-plans/${id}/book-meeting/`;
+export const TBIP_MEETING_ICS_URL      = (id) => `${API_BASE_URL}/api/tbip-meetings/${id}/export-ics/`;
+export const TBIP_MEETING_RESEND_URL   = (id) => `${API_BASE_URL}/api/tbip-meetings/${id}/resend-invite/`;
+export const TBIP_MEETING_CANCEL_URL   = (id) => `${API_BASE_URL}/api/tbip-meetings/${id}/cancel/`;
+export const TBIP_MEETINGS             = `${API_BASE_URL}/api/tbip-meetings/`;
+
+
 
 export const FIAP_PDF_URL              = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/pdf/`;
 export const FIAP_SUBMIT_URL           = (id) => `${API_BASE_URL}/api/financial-improvement-plans/${id}/submit/`;

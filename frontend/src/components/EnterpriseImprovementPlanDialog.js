@@ -12,6 +12,7 @@ import {
   Add, Delete, Assignment,
   TrendingUp, FactCheck, ArrowForward, ArrowBack, Verified,
   AutoAwesome, ArrowUpward, ArrowDownward,
+  CalendarMonth, EventAvailable,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { BRAND } from '../theme';
@@ -23,6 +24,8 @@ import {
   TBIP_APPROVE_URL,
   TBIP_REJECT_URL,
 } from '../config';
+import BookTBIPMeetingDialog from './BookTBIPMeetingDialog';
+
 
 // ── All 7 Diagnostic Pillars & Questions ──────────────────────────────────
 export const TBIP_CATEGORIES = [
@@ -491,6 +494,7 @@ export default function EnterpriseImprovementPlanDialog({
   const [submitting, setSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [bookMeetingOpen, setBookMeetingOpen] = useState(false);
 
   // Form State
   const [assessmentDate, setAssessmentDate] = useState(() =>
@@ -955,7 +959,26 @@ export default function EnterpriseImprovementPlanDialog({
               MSME Diagnostic Assessment & Technical Business Improvement Plan (TBIP) · <b>{msme?.business_name || msme?.name || plan?.msme_name}</b> ({msme?.msme_code || plan?.msme_code || '—'})
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Tooltip title="Book a meeting with Richard Obuku and Stephen Maxi Opwonya on this Enterprise Improvement Plan">
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<CalendarMonth />}
+                onClick={() => setBookMeetingOpen(true)}
+                sx={{
+                  fontSize: 12,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  bgcolor: '#0F172A',
+                  '&:hover': { bgcolor: '#1E293B' },
+                  borderRadius: 1.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Book Meeting with Richard & Stephen
+              </Button>
+            </Tooltip>
             {plan?.id && (
               <>
                 <Tooltip title="Download official PRUDEV II branded PDF">
@@ -973,6 +996,7 @@ export default function EnterpriseImprovementPlanDialog({
             <IconButton size="small" onClick={onClose}><Close /></IconButton>
           </Box>
         </Box>
+
 
         {/* Diagnostic Overview Strip */}
         <Box
@@ -2044,8 +2068,49 @@ export default function EnterpriseImprovementPlanDialog({
 
               {/* Sign-off & Actions Right Column */}
               <Grid item xs={12} md={5}>
+                {/* Coaching & Review Meeting Card with Richard & Stephen */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2.2,
+                    borderRadius: 2,
+                    border: '1.5px solid #CBD5E1',
+                    bgcolor: '#F8FAFC',
+                    mb: 2.5,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <CalendarMonth sx={{ color: BRAND.gizRed, fontSize: 22 }} />
+                    <Typography variant="subtitle2" fontWeight={800} color={BRAND.primaryMain}>
+                      Coaching & Review with Richard & Stephen
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5, mb: 1.5, lineHeight: 1.5 }}>
+                    Need to walk through the 7-dimension diagnostic gaps, prioritize high-impact actions, or review this TBIP before submission? Book an interactive review meeting with <b>Richard Obuku</b> and <b>Stephen Maxi Opwonya</b>.
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    startIcon={<EventAvailable />}
+                    onClick={() => setBookMeetingOpen(true)}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      borderColor: BRAND.primaryMain,
+                      color: BRAND.primaryMain,
+                      bgcolor: '#FFFFFF',
+                      '&:hover': { bgcolor: '#F1F5F9' },
+                      py: 0.9,
+                    }}
+                  >
+                    Book Meeting & Send Calendar Invite
+                  </Button>
+                </Paper>
+
                 {/* BGE Sign-off Block */}
                 <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1.5px solid #CBD5E1', bgcolor: '#FFFFFF', mb: 2.5 }}>
+
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                     <FactCheck color="primary" />
                     <Typography variant="subtitle1" fontWeight={800} color={BRAND.primaryMain}>
@@ -2194,6 +2259,18 @@ export default function EnterpriseImprovementPlanDialog({
           )}
         </Box>
       </DialogActions>
+
+      {/* Book Meeting Dialog */}
+      <BookTBIPMeetingDialog
+        open={bookMeetingOpen}
+        onClose={() => setBookMeetingOpen(false)}
+        plan={plan}
+        msme={msme}
+        currentUser={currentUser}
+        token={token}
+        notify={notify}
+      />
     </Dialog>
   );
 }
+

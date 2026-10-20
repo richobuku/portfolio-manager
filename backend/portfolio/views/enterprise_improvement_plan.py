@@ -1,22 +1,32 @@
 import logging
 import io
+import uuid
 import datetime
 from django.utils import timezone
 from django.http import HttpResponse
+from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from ..models import EnterpriseImprovementPlan, MSME, BusinessGrowthExpert
-from ..serializers import EnterpriseImprovementPlanSerializer
+from ..models import EnterpriseImprovementPlan, EnterpriseImprovementPlanMeeting, MSME, BusinessGrowthExpert
+from ..serializers import EnterpriseImprovementPlanSerializer, EnterpriseImprovementPlanMeetingSerializer
 from .mixins import (
     ProgrammeManagerReadOnlyMixin, ViewerReadOnlyMixin,
     _managed_groups, _is_viewer, _is_programme_manager, _safe_filename,
 )
 from ..pdf_reports import generate_enterprise_improvement_plan_pdf
 from ..excel_reports import generate_enterprise_improvement_plan_excel
+from ..tbip_meeting_service import (
+    build_tbip_meeting_ics,
+    send_tbip_meeting_invite,
+    get_coach_recipients,
+    build_google_calendar_url,
+)
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -373,3 +383,177 @@ class EnterpriseImprovementPlanViewSet(ProgrammeManagerReadOnlyMixin, ViewerRead
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+
+    @action(detail=True, methods=['post'], url_path='book-meeting')
+    def book_meeting(self, request, pk=None):
+        """Action to book a coaching/review meeting for this Enterprise Improvement Plan."""
+        plan = self.get_object()
+        user = request.user
+        data = request.data.copy()
+        data['plan'] = plan.id
+        data['msme'] = plan.msme_id
+        if plan.bge_id and 'bge' not in data:
+
+            data['bge'] = plan.bge_id
+        if not data.get('requester_name'):
+            data['requester_name'] = user.get_full_name() or user.username or 'BGE Specialist'
+        if not data.get('requester_email'):
+            data['requester_email'] = user.email or getattr(getattr(user, 'bge_profile', None), 'email', None) or 'requester@prudev.org'
+
+
+        serializer = EnterpriseImprovementPlanMeetingSerializer(data=data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+
+        s_date = serializer.validated_data['scheduled_date']
+        s_time = serializer.validated_data['start_time']
+        duration = serializer.validated_data.get('duration_minutes', 45)
+        e_time = serializer.validated_data.get('end_time')
+        if not e_time:
+            dt_start = datetime.datetime.combine(s_date, s_time)
+            e_time = (dt_start + datetime.timedelta(minutes=duration)).time()
+
+        req_name = serializer.validated_data.get('requester_name') or user.get_full_name() or user.username
+        req_email = serializer.validated_data.get('requester_email') or user.email
+
+        bge = serializer.validated_data.get('bge') or plan.bge
+        meeting = serializer.save(
+            plan=plan,
+            msme=plan.msme,
+            bge=bge,
+            requested_by=user,
+            requester_name=req_name,
+            requester_email=req_email,
+            end_time=e_time,
+            calendar_event_uid=f"tbip-meeting-{uuid.uuid4().hex[:12]}@prudev.gopa.eu",
+        )
+
+        sent, msg = send_tbip_meeting_invite(meeting)
+        result_data = EnterpriseImprovementPlanMeetingSerializer(meeting).data
+        result_data['invite_status_message'] = msg
+        return Response(result_data, status=status.HTTP_201_CREATED)
+
+
+class EnterpriseImprovementPlanMeetingViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for booking, listing, managing, and synchronizing
+    Enterprise Improvement Plan (TBIP) coaching meetings with
+    Richard Obuku and Stephen Maxi Opwonya.
+    """
+    queryset = EnterpriseImprovementPlanMeeting.objects.all()
+    serializer_class = EnterpriseImprovementPlanMeetingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = EnterpriseImprovementPlanMeeting.objects.all().select_related(
+            'msme', 'bge', 'plan', 'requested_by'
+        )
+
+        if not (user.is_staff or user.is_superuser or _is_programme_manager(user) or _is_viewer(user)):
+            # BGE only sees their own meetings or meetings for their assigned MSMEs
+            qs = qs.filter(
+                Q(requested_by=user) |
+                Q(bge__user=user) |
+                Q(msme__assigned_bge__user=user)
+            ).distinct()
+
+        msme_id = self.request.query_params.get('msme') or self.request.query_params.get('msme_id')
+        if msme_id:
+            qs = qs.filter(msme_id=msme_id)
+
+        plan_id = self.request.query_params.get('plan') or self.request.query_params.get('plan_id')
+        if plan_id:
+            qs = qs.filter(plan_id=plan_id)
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param)
+
+        return qs.order_by('-scheduled_date', '-start_time')
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        s_date = serializer.validated_data['scheduled_date']
+        s_time = serializer.validated_data['start_time']
+        duration = serializer.validated_data.get('duration_minutes', 45)
+        e_time = serializer.validated_data.get('end_time')
+        if not e_time:
+            dt_start = datetime.datetime.combine(s_date, s_time)
+            e_time = (dt_start + datetime.timedelta(minutes=duration)).time()
+
+        req_name = serializer.validated_data.get('requester_name') or user.get_full_name() or user.username
+        req_email = serializer.validated_data.get('requester_email') or user.email
+
+        bge = serializer.validated_data.get('bge')
+        if not bge:
+            if hasattr(user, 'bge_profile'):
+                bge = user.bge_profile
+            else:
+                msme = serializer.validated_data.get('msme')
+                if msme and msme.assigned_bge:
+                    bge = msme.assigned_bge
+
+        meeting = serializer.save(
+            requested_by=user,
+            bge=bge,
+            requester_name=req_name,
+            requester_email=req_email,
+            end_time=e_time,
+            calendar_event_uid=f"tbip-meeting-{uuid.uuid4().hex[:12]}@prudev.gopa.eu",
+        )
+
+        # Trigger email & calendar invite dispatch
+        send_tbip_meeting_invite(meeting)
+
+    @action(detail=False, methods=['get'])
+    def coaches(self, request):
+        """Returns the list and details of meeting coaches (Richard & Stephen)."""
+        return Response({
+            'coaches': get_coach_recipients(),
+            'default_topics': [
+                {'id': 'tbip_formulation', 'label': 'Formulating Priority Actions Roadmap (3–5 Actions)'},
+                {'id': 'diagnostic_guidance', 'label': '7-Dimension Diagnostic Assessment & Gap Analysis Guidance'},
+                {'id': 'review_endorsement', 'label': 'Pre-submission TBIP Review & Endorsement'},
+                {'id': 'msme_intervention', 'label': 'MSME Specific BDS Intervention & Coaching Strategy'},
+                {'id': 'other', 'label': 'Other / Custom Advisory'},
+            ],
+            'formats': [
+                {'id': 'google_meet', 'label': 'Google Meet (Online Video Call)'},
+                {'id': 'teams', 'label': 'Microsoft Teams (Online Video Call)'},
+                {'id': 'in_person', 'label': 'In-Person (Office / Enterprise Location)'},
+                {'id': 'phone', 'label': 'Phone Call'},
+            ]
+        })
+
+    @action(detail=True, methods=['get'], url_path='export-ics')
+    def export_ics(self, request, pk=None):
+        """Exports an RFC 5545 iCalendar (.ics) file for this meeting."""
+        meeting = self.get_object()
+        ics_content = build_tbip_meeting_ics(meeting)
+        msme_code = getattr(meeting.msme, 'msme_code', '') or f"MSME_{meeting.msme_id}"
+        filename = f"tbip_meeting_{msme_code}_{meeting.scheduled_date}.ics"
+        response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=True, methods=['post'], url_path='resend-invite')
+    def resend_invite(self, request, pk=None):
+        """Re-dispatches the email and calendar invitation to Richard, Stephen, and requester."""
+        meeting = self.get_object()
+        sent, msg = send_tbip_meeting_invite(meeting)
+        data = self.get_serializer(meeting).data
+        data['invite_status_message'] = msg
+        return Response(data)
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel_meeting(self, request, pk=None):
+        """Cancels the meeting."""
+        meeting = self.get_object()
+        user = request.user
+        if not (user.is_staff or user.is_superuser or meeting.requested_by == user or getattr(user, 'bge_profile', None) == meeting.bge):
+            raise PermissionDenied("You do not have permission to cancel this meeting.")
+        meeting.status = 'cancelled'
+        meeting.save(update_fields=['status', 'updated_at'])
+        return Response(self.get_serializer(meeting).data)
+

@@ -70,9 +70,13 @@ class BGEUserViewSet(viewsets.ViewSet):
         if err is not None:
             return err
         from ..models import UserSecurityProfile
+        from django.contrib.auth.models import Group
         sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
         sec.viewer_approved = True
-        sec.save(update_fields=['viewer_approved'])
+        sec.must_change_password = False
+        sec.save(update_fields=['viewer_approved', 'must_change_password'])
+        viewer_group, _ = Group.objects.get_or_create(name='Viewer')
+        user.groups.add(viewer_group)
         return Response({'message': f'{user.username} approved for viewer access.'})
 
     @action(detail=True, methods=['post'], url_path='reject')
@@ -200,7 +204,11 @@ class BGEUserViewSet(viewsets.ViewSet):
         role = request.data.get('role', 'viewer')
         group_ids = request.data.get('group_ids', [])
 
+        from django.contrib.auth.models import Group
+        viewer_group, _ = Group.objects.get_or_create(name='Viewer')
+
         if role == 'cohort_admin':
+            user.groups.remove(viewer_group)
             ca, _ = CohortAdmin.objects.get_or_create(user=user)
             ca.managed_groups.set(ProgrammeGroup.objects.filter(id__in=group_ids))
             ca.save()
@@ -209,6 +217,12 @@ class BGEUserViewSet(viewsets.ViewSet):
         else:
             # viewer — remove cohort_admin if it exists
             CohortAdmin.objects.filter(user=user).delete()
+            user.groups.add(viewer_group)
+            from ..models import UserSecurityProfile
+            sec, _ = UserSecurityProfile.objects.get_or_create(user=user)
+            sec.viewer_approved = True
+            sec.must_change_password = False
+            sec.save(update_fields=['viewer_approved', 'must_change_password'])
             return Response({'role': 'viewer'})
 
     def _get_target_non_admin_user(self, pk, request):
