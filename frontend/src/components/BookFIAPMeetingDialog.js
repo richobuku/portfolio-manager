@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Typography, Button, TextField, Chip, IconButton,
+  Box, Typography, Button, TextField, IconButton,
   Grid, Divider, FormControl, InputLabel, Select, MenuItem,
   CircularProgress, Avatar, Paper, Stack, RadioGroup,
   FormControlLabel, Radio,
 } from '@mui/material';
 import {
-  Close, EventAvailable, Send, Download, CheckCircle,
-  CalendarMonth, Business, AccountBalance,
+  Close, Send, CheckCircle,
+  CalendarMonth, AccountBalance,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { BRAND } from '../theme';
 import {
   FIAP_MEETINGS,
   FIAP_BOOK_MEETING_URL,
@@ -116,6 +115,7 @@ export default function BookFIAPMeetingDialog({
         `Dear Rosemary and Harriet, please review our diagnostic findings and phased roadmap for approval.`
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, plan, msme, msmes, currentUser]);
 
   const activeMsme = msme || msmes.find(m => m.id === selectedMsmeId) || (plan?.msme ? { id: plan.msme, business_name: plan.msme_name } : null);

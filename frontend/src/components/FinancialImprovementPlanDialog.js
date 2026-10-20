@@ -5,11 +5,10 @@ import {
   Grid, Alert, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Select, MenuItem,
   FormControl, InputLabel, Checkbox, FormControlLabel,
-  Tooltip, Divider,
 } from '@mui/material';
 import {
   Close, Save, Send, PictureAsPdf, Add, Delete,
-  AutoAwesome, PlaylistAdd, Visibility, EventAvailable, CheckCircle,
+  AutoAwesome, Visibility, EventAvailable, CheckCircle,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { BRAND } from '../theme';
@@ -99,7 +98,6 @@ export default function FinancialImprovementPlanDialog({
 
   const [bookMeetingOpen, setBookMeetingOpen] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [approvalNotes, setApprovalNotes] = useState('');
 
   const canApprove =
     Boolean(plan?.id) &&
@@ -114,12 +112,18 @@ export default function FinancialImprovementPlanDialog({
 
   const handleApprove = async () => {
     if (!plan?.id) return;
+    const notesPrompt = window.prompt(
+      'Enter any approval notes or feedback for this Financial Improvement Plan (optional):',
+      form.approval_notes || ''
+    );
+    if (notesPrompt === null) return; // user cancelled prompt
+
     setApproving(true);
     try {
       const authToken = token || sessionStorage.getItem('token') || localStorage.getItem('token');
       const res = await axios.post(
         FIAP_APPROVE_URL(plan.id),
-        { approval_notes: approvalNotes || form.approval_notes || '' },
+        { approval_notes: notesPrompt },
         { headers: { Authorization: `Bearer ${authToken}` } }
       );
       setForm((prev) => ({
