@@ -58,8 +58,14 @@ class WorkOrderViewSet(ViewerReadOnlyMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Work order management requires administrator or Programme Manager access.")
 
     def get_queryset(self):
+        from django.db.models import Sum
         user = self.request.user
-        qs = WorkOrder.objects.select_related('bge', 'group', 'supported_bge')
+        qs = (
+            WorkOrder.objects
+            .select_related('bge', 'group', 'supported_bge', 'created_by', 'payment_submitted_by')
+            .defer('signed_pdf_data')
+            .annotate(annotated_total_paid=Sum('payments__amount'))
+        )
         # Common filters regardless of role
         status_filter = self.request.query_params.get('status')
         type_filter   = self.request.query_params.get('work_order_type')

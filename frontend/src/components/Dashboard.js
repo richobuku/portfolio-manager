@@ -700,25 +700,34 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, trReportsLoaded, token]);
 
-  const fetchWorkOrders = useCallback(async (isRetry = false) => {
+  const fetchWorkOrders = useCallback(async (retryCount = 0) => {
     if (!token) return;
     const h = { Authorization: `Bearer ${token}` };
     const params = {};
     if (woFilterBge) params.bge = woFilterBge;
     if (woFilterStatus) params.status = woFilterStatus;
     if (woFilterType) params.work_order_type = woFilterType;
-    if (!isRetry) {
+    if (retryCount === 0) {
       setWoLoading(true);
       setWoError('');
     }
     try {
-      const res = await axios.get(API_ENDPOINTS.WORK_ORDERS, { headers: h, params });
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDERS, {
+        headers: h,
+        params,
+        timeout: 60000,
+      });
       setWorkOrders(Array.isArray(res.data) ? res.data : res.data.results || []);
       setWoLoading(false);
+      setWoError('');
     } catch (err) {
-      if (!isRetry && (!err.response || err.message === 'Network Error' || err.response?.status >= 500)) {
-        // Backend may be waking up from sleep on Render — auto-retry once after 2.5s
-        setTimeout(() => fetchWorkOrders(true), 2500);
+      const isNetworkOrColdStart = !err.response || err.message === 'Network Error' || err.code === 'ECONNABORTED' || err.response?.status >= 500;
+      if (retryCount < 3 && isNetworkOrColdStart) {
+        // Render free/starter tiers take up to 60-70s on cold boot. Progressive backoff: 3s, 7s, 12s
+        const backoffMs = [3000, 7000, 12000][retryCount] || 5000;
+        setWoLoading(true);
+        setWoError(`Connecting to server (waking up backend, attempt ${retryCount + 1} of 3)...`);
+        setTimeout(() => fetchWorkOrders(retryCount + 1), backoffMs);
         return;
       }
       setWorkOrders([]);
@@ -8567,7 +8576,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       {woLoading ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <CircularProgress size={32} sx={{ mb: 1.5 }} />
-          <Typography color="text.secondary">Loading work orders…</Typography>
+          <Typography color="text.secondary">
+            {woError && woError.includes('waking up') ? woError : 'Loading work orders…'}
+          </Typography>
         </Paper>
       ) : woError && filteredWorkOrders.length === 0 ? (
         <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', bgcolor: '#FFF5F5', borderColor: '#FFCDD2' }}>

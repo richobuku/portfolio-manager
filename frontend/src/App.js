@@ -6,7 +6,7 @@ import Dashboard from './components/Dashboard';
 import BGEDashboard from './components/BGEDashboard';
 import ResetPassword from './components/ResetPassword';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
-import { CHANGE_PASSWORD_URL } from './config';
+import { CHANGE_PASSWORD_URL, API_ENDPOINTS } from './config';
 
 // ── Forced password change modal ─────────────────────────────────────────────
 function PasswordChangeModal({ token, onSuccess }) {
@@ -200,6 +200,21 @@ export default function App() {
     const t = setTimeout(() => handleLogout(true), msUntilExpiry);
     return () => clearTimeout(t);
   }, [token, handleLogout]);
+
+  // Keep-alive heartbeat: ping /api/health/ periodically while user is logged in
+  // to prevent Render cold starts (spins down after 15m idle)
+  useEffect(() => {
+    if (!token) return;
+    const pingHealth = () => {
+      if (typeof document !== 'undefined' && document.hidden) return; // Don't ping if tab is hidden
+      axios.get(API_ENDPOINTS.HEALTH, { timeout: 15000 }).catch(() => {});
+    };
+    // Initial ping on login/mount
+    pingHealth();
+    // Repeat every 6 minutes
+    const interval = setInterval(pingHealth, 6 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   const isAdmin = !!(currentUser?.is_staff || currentUser?.is_superuser ||
                      currentUser?.role === 'admin' ||

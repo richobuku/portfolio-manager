@@ -72,6 +72,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             return 0
 
     def get_total_paid(self, obj):
+        if hasattr(obj, 'annotated_total_paid') and obj.annotated_total_paid is not None:
+            return float(obj.annotated_total_paid or 0)
         from django.db.models import Sum
         try:
             total = obj.payments.aggregate(total=Sum('amount'))['total']

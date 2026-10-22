@@ -780,13 +780,16 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
     }
   }, [token]);
 
-  const fetchWorkOrders = useCallback(async () => {
+  const fetchWorkOrders = useCallback(async (retryCount = 0) => {
     const h = { Authorization: `Bearer ${token}` };
     try {
-      const res = await axios.get(API_ENDPOINTS.WORK_ORDERS, { headers: h });
+      const res = await axios.get(API_ENDPOINTS.WORK_ORDERS, { headers: h, timeout: 60000 });
       setWorkOrders(Array.isArray(res.data) ? res.data : res.data.results || []);
-    } catch {
-      // silent
+    } catch (err) {
+      const isNetworkOrColdStart = !err.response || err.message === 'Network Error' || err.code === 'ECONNABORTED' || err.response?.status >= 500;
+      if (retryCount < 2 && isNetworkOrColdStart) {
+        setTimeout(() => fetchWorkOrders(retryCount + 1), (retryCount + 1) * 3500);
+      }
     }
   }, [token]);
 

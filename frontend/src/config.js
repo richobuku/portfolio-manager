@@ -30,6 +30,7 @@ function getApiBaseUrl() {
 const API_BASE_URL = getApiBaseUrl().trim().replace(/[\r\n\s]+/g, '').replace(/\/+$/, '');
 
 export const API_ENDPOINTS = {
+  HEALTH:             `${API_BASE_URL}/api/health/`,
   LOGIN:              `${API_BASE_URL}/api/auth/login/`,
   LOGOUT:             `${API_BASE_URL}/api/auth/logout/`,
   GOOGLE_LOGIN:       `${API_BASE_URL}/api/auth/google/`,
