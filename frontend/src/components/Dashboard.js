@@ -468,6 +468,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
   // ── reports ────────────────────────────────────────────────────────────────
   const [reports, setReports] = useState([]);
+  const [allReports, setAllReports] = useState([]);
   const [groupReports, setGroupReports] = useState([]);
   const [reportFilterBge, setReportFilterBge] = useState('');
   const [reportFilterStatus, setReportFilterStatus] = useState('');
@@ -475,7 +476,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
   const [reportSortDir, setReportSortDir] = useState('desc');
   const [reportSearch, setReportSearch] = useState('');
   const [reportFilterVisitType, setReportFilterVisitType] = useState('');
-  const [reportViewMode, setReportViewMode] = useState('table'); // 'table' | 'cards' | 'grouped_bge'
+  const [reportViewMode, setReportViewMode] = useState('grouped_bge'); // 'grouped_bge' | 'table' | 'cards'
+  const [reportBgeSubView, setReportBgeSubView] = useState('by_msme'); // 'by_msme' | 'table'
   const [reportRowsPerPage, setReportRowsPerPage] = useState(15);
   const [reportExpandedBges, setReportExpandedBges] = useState({});
   const [viewReport, setViewReport] = useState(null);
@@ -625,8 +627,10 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       setTrainingTopics(toArr(tRes.data));
       setAnalytics(aRes.data || {});
       setBgeUsers(Array.isArray(uRes.data) ? uRes.data : []);
+      const fetchedReports = toArr(rRes.data);
       setGroupReports(toArr(grRes.data));
-      setReports(toArr(rRes.data));
+      setReports(fetchedReports);
+      setAllReports(fetchedReports);
       setTbipPlans(toArr(tbipRes.data));
       setFiapPlans(toArr(fiapRes.data));
       setFiapSummary(fiapSumRes.data || null);
@@ -868,7 +872,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
         const r = await axios.get(`${API_ENDPOINTS.REPORTS}?${params}`, {
           headers: h, signal: controller.signal,
         });
-        setReports(Array.isArray(r.data) ? r.data : (r.data.results || []));
+        const data = Array.isArray(r.data) ? r.data : (r.data.results || []);
+        setReports(data);
+        if (!reportFilterBge && !reportFilterStatus && !reportFilterVisitType) {
+          setAllReports(data);
+        }
       } catch (e) {
         if (!axios.isCancel(e) && e.name !== 'CanceledError') {
           setError('Failed to refresh reports.');
@@ -6203,173 +6211,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       <Divider sx={{ my: 3 }} />
 
-      <SectionHeader title="Visit Reports" subtitle={`${reports.length} total reports`}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Button
-            size="small"
-            variant={reportViewMode === 'table' ? 'contained' : 'outlined'}
-            startIcon={<ViewList fontSize="small" />}
-            onClick={() => setReportViewMode('table')}
-            sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
-          >
-            Table View
-          </Button>
-          <Button
-            size="small"
-            variant={reportViewMode === 'cards' ? 'contained' : 'outlined'}
-            startIcon={<ViewModule fontSize="small" />}
-            onClick={() => setReportViewMode('cards')}
-            sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
-          >
-            Cards View
-          </Button>
-          <Button
-            size="small"
-            variant={reportViewMode === 'grouped_bge' ? 'contained' : 'outlined'}
-            startIcon={<GroupWork fontSize="small" />}
-            onClick={() => setReportViewMode('grouped_bge')}
-            sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
-          >
-            Grouped by BGE
-          </Button>
-        </Box>
-      </SectionHeader>
-
-      {/* ── Filters & Sort Toolbar ──────────────────────────────────────── */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: '#FAFBFD' }}>
-        <Grid container spacing={1.5} alignItems="center">
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth size="small" placeholder="Search MSME, BGE, notes, code..."
-              value={reportSearch}
-              onChange={e => { setReportSearch(e.target.value); setReportPage(0); }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search fontSize="small" sx={{ color: 'text.secondary' }} />
-                  </InputAdornment>
-                ),
-                endAdornment: reportSearch ? (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => { setReportSearch(''); setReportPage(0); }}>
-                      <Clear fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ) : null,
-              }}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2.5}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Sort Order</InputLabel>
-              <Select
-                value={`${reportSortBy}:${reportSortDir}`}
-                label="Sort Order"
-                onChange={e => {
-                  const [col, dir] = e.target.value.split(':');
-                  setReportSortBy(col);
-                  setReportSortDir(dir);
-                  setReportPage(0);
-                }}
-              >
-                <MenuItem value="visit_date:desc">Newest Visit First (Date ↓)</MenuItem>
-                <MenuItem value="visit_date:asc">Oldest Visit First (Date ↑)</MenuItem>
-                <MenuItem value="created_at:desc">Recently Added (Created ↓)</MenuItem>
-                <MenuItem value="msme:asc">MSME Name (A → Z)</MenuItem>
-                <MenuItem value="msme:desc">MSME Name (Z → A)</MenuItem>
-                <MenuItem value="bge:asc">BGE Expert (A → Z)</MenuItem>
-                <MenuItem value="visit_type:asc">Visit Type</MenuItem>
-                <MenuItem value="status:asc">Status &amp; Payment</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6} sm={4} md={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Filter by BGE</InputLabel>
-              <Select value={reportFilterBge} label="Filter by BGE"
-                onChange={e => { setReportFilterBge(e.target.value); setReportPage(0); }}>
-                <MenuItem value="">All BGEs</MenuItem>
-                {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6} sm={4} md={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Visit Type</InputLabel>
-              <Select value={reportFilterVisitType} label="Visit Type"
-                onChange={e => { setReportFilterVisitType(e.target.value); setReportPage(0); }}>
-                <MenuItem value="">All Visit Types</MenuItem>
-                {Object.entries(VISIT_LABELS).map(([k, v]) => (
-                  <MenuItem key={k} value={k}>{v}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6} sm={4} md={1.25}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select value={reportFilterStatus} label="Status"
-                onChange={e => { setReportFilterStatus(e.target.value); setReportPage(0); }}>
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="draft">Draft</MenuItem>
-                <MenuItem value="submitted">Submitted</MenuItem>
-                <MenuItem value="reviewed">Reviewed</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6} sm={4} md={1.25}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Payment</InputLabel>
-              <Select value={reportFilterPaymentStatus} label="Payment"
-                onChange={e => { setReportFilterPaymentStatus(e.target.value); setReportPage(0); }}>
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="unsubmitted">Unsubmitted</MenuItem>
-                <MenuItem value="submitted">Submitted</MenuItem>
-                <MenuItem value="confirmed">Confirmed ✓</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        {(Boolean(reportSearch) || Boolean(reportFilterBge) || Boolean(reportFilterStatus) ||
-          Boolean(reportFilterPaymentStatus) || Boolean(reportFilterVisitType) ||
-          reportSortBy !== 'visit_date' || reportSortDir !== 'desc') && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, pt: 1, borderTop: '1px dashed #E2E8F0', flexWrap: 'wrap' }}>
-            <Typography variant="caption" color="text.secondary">Active filters applied:</Typography>
-            {reportSearch && <Chip size="small" label={`Search: "${reportSearch}"`} onDelete={() => setReportSearch('')} />}
-            {reportFilterBge && <Chip size="small" label={`BGE: ${experts.find(e => e.id === reportFilterBge)?.name || reportFilterBge}`} onDelete={() => setReportFilterBge('')} />}
-            {reportFilterVisitType && <Chip size="small" label={`Type: ${VISIT_LABELS[reportFilterVisitType] || reportFilterVisitType}`} onDelete={() => setReportFilterVisitType('')} />}
-            {reportFilterStatus && <Chip size="small" label={`Status: ${reportFilterStatus}`} onDelete={() => setReportFilterStatus('')} />}
-            {reportFilterPaymentStatus && <Chip size="small" label={`Payment: ${reportFilterPaymentStatus}`} onDelete={() => setReportFilterPaymentStatus('')} />}
-            {(reportSortBy !== 'visit_date' || reportSortDir !== 'desc') && (
-              <Chip size="small" variant="outlined" label={`Sorted by: ${reportSortBy} (${reportSortDir})`} onDelete={() => { setReportSortBy('visit_date'); setReportSortDir('desc'); }} />
-            )}
-            <Button
-              size="small" color="inherit"
-              onClick={() => {
-                setReportSearch('');
-                setReportFilterBge('');
-                setReportFilterStatus('');
-                setReportFilterPaymentStatus('');
-                setReportFilterVisitType('');
-                setReportSortBy('visit_date');
-                setReportSortDir('desc');
-                setReportPage(0);
-              }}
-              sx={{ textTransform: 'none', fontSize: 11, ml: 'auto' }}
-            >
-              Reset All Filters
-            </Button>
-          </Box>
-        )}
-      </Paper>
-
       {(() => {
+        // Source reports: fallback to allReports if available
+        const sourceReports = (allReports.length > 0 && (!reportFilterBge || reports.length === 0)) ? allReports : reports;
+
+        // BGE report counts computed across all reports
+        const bgeReportCounts = {};
+        sourceReports.forEach(r => {
+          if (r.bge) {
+            bgeReportCounts[r.bge] = (bgeReportCounts[r.bge] || 0) + 1;
+          }
+        });
+
+        // Sorted experts for the quick-filter bar
+        const sortedExpertsForFilter = [...experts].sort((a, b) => {
+          const ca = bgeReportCounts[a.id] || 0;
+          const cb = bgeReportCounts[b.id] || 0;
+          if (cb !== ca) return cb - ca;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+
+        const selectedBgeObj = reportFilterBge ? experts.find(e => String(e.id) === String(reportFilterBge)) : null;
+
         const handleReportSort = (col) => {
           if (reportSortBy === col) {
             setReportSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -6437,15 +6300,21 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           </Box>
         );
 
-        // Filter reports
-        const filteredReports = reports.filter(r => {
+        // Filter reports comprehensively
+        const filteredReports = sourceReports.filter(r => {
+          if (reportFilterBge && String(r.bge) !== String(reportFilterBge)) {
+            return false;
+          }
+          if (reportFilterStatus && r.status !== reportFilterStatus) {
+            return false;
+          }
+          if (reportFilterVisitType && r.visit_type !== reportFilterVisitType) {
+            return false;
+          }
           if (reportFilterPaymentStatus) {
             if (reportFilterPaymentStatus === 'confirmed' && !(r.payment_status === 'confirmed' || r.payment_confirmed_by_bge)) return false;
             if (reportFilterPaymentStatus === 'submitted' && r.payment_status !== 'submitted') return false;
             if (reportFilterPaymentStatus === 'unsubmitted' && !(!r.payment_status || r.payment_status === 'unsubmitted')) return false;
-          }
-          if (reportFilterVisitType && r.visit_type !== reportFilterVisitType) {
-            return false;
           }
           if (reportSearch.trim()) {
             const q = reportSearch.toLowerCase().trim();
@@ -6454,6 +6323,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             const msmeName = (r.msme_name || msmeObj.business_name || '').toLowerCase();
             const msmeCode = (r.msme_code || msmeObj.msme_code || '').toLowerCase();
             const bgeName  = (r.bge_name || bgeObj.name || '').toLowerCase();
+            const bgeCode  = (bgeObj.bge_code || '').toLowerCase();
             const vType    = (VISIT_LABELS[r.visit_type] || r.visit_type || '').toLowerCase();
             const takeaway = (r.concrete_takeaway || '').toLowerCase();
             const ach      = (r.key_achievement || '').toLowerCase();
@@ -6464,6 +6334,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             if (!msmeName.includes(q) &&
                 !msmeCode.includes(q) &&
                 !bgeName.includes(q) &&
+                !bgeCode.includes(q) &&
                 !vType.includes(q) &&
                 !takeaway.includes(q) &&
                 !ach.includes(q) &&
@@ -6476,7 +6347,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           return true;
         });
 
-        // Sort reports (defaults to visit_date desc, with id desc tiebreaker)
+        // Sort reports
         const sortedReports = [...filteredReports].sort((a, b) => {
           let cmp = 0;
           if (reportSortBy === 'visit_date') {
@@ -6512,10 +6383,564 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
         const pagedReports = paginate(sortedReports, reportPage);
 
+        // Compute stats for selected BGE
+        const selectedBgeMsmes = new Set(filteredReports.map(r => r.msme)).size;
+        const selectedBgeSubmitted = filteredReports.filter(r => r.status === 'submitted' || r.status === 'reviewed').length;
+        const selectedBgePaid = filteredReports.filter(r => r.payment_status === 'confirmed' || r.payment_confirmed_by_bge).length;
+        const selectedBgeVisitTypesMap = {};
+        filteredReports.forEach(r => {
+          if (r.visit_type) {
+            selectedBgeVisitTypesMap[r.visit_type] = (selectedBgeVisitTypesMap[r.visit_type] || 0) + 1;
+          }
+        });
+        const selectedBgeVisitTypes = Object.entries(selectedBgeVisitTypesMap).sort((a, b) => b[1] - a[1]);
+
         return (
           <Box>
-            {/* View Mode 1: Table View */}
-            {reportViewMode === 'table' && (
+            <SectionHeader
+              title="Visit Reports"
+              subtitle={
+                selectedBgeObj
+                  ? `${filteredReports.length} report${filteredReports.length === 1 ? '' : 's'} for ${selectedBgeObj.name} · ${sourceReports.length} total across all BGEs`
+                  : `${filteredReports.length} of ${sourceReports.length} total reports filed`
+              }
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  variant={reportViewMode === 'grouped_bge' ? 'contained' : 'outlined'}
+                  startIcon={<GroupWork fontSize="small" />}
+                  onClick={() => setReportViewMode('grouped_bge')}
+                  sx={{
+                    textTransform: 'none',
+                    fontSize: 12,
+                    borderRadius: 1.5,
+                    bgcolor: reportViewMode === 'grouped_bge' ? '#162A3A' : undefined,
+                    '&:hover': { bgcolor: reportViewMode === 'grouped_bge' ? '#2B5278' : undefined },
+                  }}
+                >
+                  By BGE (Separated)
+                </Button>
+                <Button
+                  size="small"
+                  variant={reportViewMode === 'table' ? 'contained' : 'outlined'}
+                  startIcon={<ViewList fontSize="small" />}
+                  onClick={() => setReportViewMode('table')}
+                  sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
+                >
+                  Table View
+                </Button>
+                <Button
+                  size="small"
+                  variant={reportViewMode === 'cards' ? 'contained' : 'outlined'}
+                  startIcon={<ViewModule fontSize="small" />}
+                  onClick={() => setReportViewMode('cards')}
+                  sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
+                >
+                  Cards View
+                </Button>
+              </Box>
+            </SectionHeader>
+
+            {/* ── Quick BGE Switcher Strip ────────────────────────────────────── */}
+            <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: '#FAFBFD', borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10 }}>
+                  Quick Filter by BGE Expert:
+                </Typography>
+                {reportFilterBge && (
+                  <Button
+                    size="small"
+                    color="primary"
+                    onClick={() => { setReportFilterBge(''); setReportPage(0); }}
+                    sx={{ textTransform: 'none', fontSize: 11, py: 0 }}
+                  >
+                    Clear BGE Selection (Show All)
+                  </Button>
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', overflowX: 'auto', pb: 0.5, '&::-webkit-scrollbar': { height: 5 } }}>
+                <Chip
+                  label={`All BGEs (${sourceReports.length})`}
+                  color={!reportFilterBge ? 'primary' : 'default'}
+                  variant={!reportFilterBge ? 'filled' : 'outlined'}
+                  onClick={() => { setReportFilterBge(''); setReportPage(0); }}
+                  sx={{
+                    fontWeight: !reportFilterBge ? 700 : 500,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    bgcolor: !reportFilterBge ? '#162A3A !important' : '#fff',
+                    color: !reportFilterBge ? '#fff' : '#334155',
+                    fontSize: 12,
+                    height: 28,
+                  }}
+                />
+                {sortedExpertsForFilter.map(e => {
+                  const count = bgeReportCounts[e.id] || 0;
+                  const isSelected = String(reportFilterBge) === String(e.id);
+                  return (
+                    <Chip
+                      key={e.id}
+                      avatar={
+                        <Avatar sx={{ width: 20, height: 20, fontSize: 10, bgcolor: isSelected ? '#fff' : '#162A3A', color: isSelected ? '#162A3A' : '#fff' }}>
+                          {e.name?.slice(0, 2).toUpperCase()}
+                        </Avatar>
+                      }
+                      label={`${e.name} (${count})`}
+                      color={isSelected ? 'primary' : 'default'}
+                      variant={isSelected ? 'filled' : 'outlined'}
+                      onClick={() => {
+                        setReportFilterBge(isSelected ? '' : String(e.id));
+                        setReportPage(0);
+                      }}
+                      sx={{
+                        fontWeight: isSelected ? 700 : (count > 0 ? 500 : 400),
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        bgcolor: isSelected ? '#162A3A !important' : (count > 0 ? '#fff' : '#F8FAFC'),
+                        color: isSelected ? '#fff' : '#334155',
+                        borderColor: isSelected ? '#162A3A' : (count > 0 ? '#CBD5E1' : '#E2E8F0'),
+                        fontSize: 12,
+                        height: 28,
+                        '&:hover': { bgcolor: isSelected ? '#2B5278 !important' : '#F1F5F9' },
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </Paper>
+
+            {/* ── Focused BGE Banner (when a single BGE is selected) ──────────── */}
+            {selectedBgeObj && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2.5,
+                  mb: 2.5,
+                  borderRadius: 2,
+                  bgcolor: '#F8FAFC',
+                  borderLeft: '5px solid #162A3A',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ width: 52, height: 52, bgcolor: '#162A3A', fontSize: 18, fontWeight: 700 }}>
+                      {selectedBgeObj.name?.slice(0, 2).toUpperCase()}
+                    </Avatar>
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography variant="h6" fontWeight={700} sx={{ color: '#0F172A' }}>
+                          {selectedBgeObj.name}
+                        </Typography>
+                        {selectedBgeObj.bge_code && (
+                          <Chip label={selectedBgeObj.bge_code} size="small" sx={{ fontWeight: 600, bgcolor: '#E2E8F0', fontSize: 11 }} />
+                        )}
+                        <Chip label="BGE Focus Active" size="small" color="primary" sx={{ fontSize: 10, height: 20 }} />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedBgeObj.primary_area ? `Operational Area: ${selectedBgeObj.primary_area}` : 'Business Growth Expert'}
+                        {selectedBgeObj.email ? ` · ${selectedBgeObj.email}` : ''}
+                        {selectedBgeObj.phone ? ` · ${selectedBgeObj.phone}` : ''}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* KPI cards for selected BGE */}
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Paper variant="outlined" sx={{ px: 2, py: 1, bgcolor: '#fff', textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" fontWeight={700} color="#162A3A">{filteredReports.length}</Typography>
+                      <Typography variant="caption" color="text.secondary">Total Visits</Typography>
+                    </Paper>
+                    <Paper variant="outlined" sx={{ px: 2, py: 1, bgcolor: '#fff', textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" fontWeight={700} color="#0D9488">{selectedBgeMsmes}</Typography>
+                      <Typography variant="caption" color="text.secondary">MSMEs Reached</Typography>
+                    </Paper>
+                    <Paper variant="outlined" sx={{ px: 2, py: 1, bgcolor: '#fff', textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" fontWeight={700} color="#2563EB">{selectedBgeSubmitted}</Typography>
+                      <Typography variant="caption" color="text.secondary">Submitted</Typography>
+                    </Paper>
+                    <Paper variant="outlined" sx={{ px: 2, py: 1, bgcolor: '#fff', textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" fontWeight={700} color="#16A34A">{selectedBgePaid}</Typography>
+                      <Typography variant="caption" color="text.secondary">Paid ✓</Typography>
+                    </Paper>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="inherit"
+                      onClick={() => { setReportFilterBge(''); setReportPage(0); }}
+                      sx={{ height: 40, alignSelf: 'center', textTransform: 'none', ml: 1, fontSize: 12 }}
+                    >
+                      Show All BGEs
+                    </Button>
+                  </Box>
+                </Box>
+
+                {/* Visit type badges & sub-view switcher */}
+                <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: 10 }}>
+                      Visit Types:
+                    </Typography>
+                    {selectedBgeVisitTypes.length === 0 ? (
+                      <Typography variant="caption" color="text.secondary">None filed</Typography>
+                    ) : selectedBgeVisitTypes.map(([vType, count]) => {
+                      const isTypeActive = reportFilterVisitType === vType;
+                      return (
+                        <Chip
+                          key={vType}
+                          label={`${VISIT_LABELS[vType] || vType}: ${count}`}
+                          size="small"
+                          onClick={() => {
+                            setReportFilterVisitType(isTypeActive ? '' : vType);
+                            setReportPage(0);
+                          }}
+                          sx={{
+                            bgcolor: isTypeActive ? (VISIT_TYPE_COLORS[vType] || '#162A3A') : '#fff',
+                            color: isTypeActive ? '#fff' : (VISIT_TYPE_COLORS[vType] || '#334155'),
+                            borderColor: VISIT_TYPE_COLORS[vType] || '#CBD5E1',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            fontSize: 11,
+                          }}
+                          variant="outlined"
+                        />
+                      );
+                    })}
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="caption" fontWeight={600} color="text.secondary">Organize by:</Typography>
+                    <Button
+                      size="small"
+                      variant={reportBgeSubView === 'by_msme' ? 'contained' : 'outlined'}
+                      onClick={() => setReportBgeSubView('by_msme')}
+                      sx={{
+                        textTransform: 'none',
+                        fontSize: 11,
+                        py: 0.25,
+                        px: 1,
+                        bgcolor: reportBgeSubView === 'by_msme' ? '#162A3A' : undefined,
+                      }}
+                    >
+                      Grouped by MSME
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={reportBgeSubView === 'table' ? 'contained' : 'outlined'}
+                      onClick={() => setReportBgeSubView('table')}
+                      sx={{
+                        textTransform: 'none',
+                        fontSize: 11,
+                        py: 0.25,
+                        px: 1,
+                        bgcolor: reportBgeSubView === 'table' ? '#162A3A' : undefined,
+                      }}
+                    >
+                      Visit List
+                    </Button>
+                  </Box>
+                </Box>
+              </Paper>
+            )}
+
+            {/* ── Filters & Sort Toolbar ──────────────────────────────────────── */}
+            <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: '#FAFBFD' }}>
+              <Grid container spacing={1.5} alignItems="center">
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth size="small" placeholder="Search MSME, BGE, notes, code..."
+                    value={reportSearch}
+                    onChange={e => { setReportSearch(e.target.value); setReportPage(0); }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Search fontSize="small" sx={{ color: 'text.secondary' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: reportSearch ? (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => { setReportSearch(''); setReportPage(0); }}>
+                            <Clear fontSize="small" />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.5}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Sort Order</InputLabel>
+                    <Select
+                      value={`${reportSortBy}:${reportSortDir}`}
+                      label="Sort Order"
+                      onChange={e => {
+                        const [col, dir] = e.target.value.split(':');
+                        setReportSortBy(col);
+                        setReportSortDir(dir);
+                        setReportPage(0);
+                      }}
+                    >
+                      <MenuItem value="visit_date:desc">Newest Visit First (Date ↓)</MenuItem>
+                      <MenuItem value="visit_date:asc">Oldest Visit First (Date ↑)</MenuItem>
+                      <MenuItem value="created_at:desc">Recently Added (Created ↓)</MenuItem>
+                      <MenuItem value="msme:asc">MSME Name (A → Z)</MenuItem>
+                      <MenuItem value="msme:desc">MSME Name (Z → A)</MenuItem>
+                      <MenuItem value="bge:asc">BGE Expert (A → Z)</MenuItem>
+                      <MenuItem value="visit_type:asc">Visit Type</MenuItem>
+                      <MenuItem value="status:asc">Status &amp; Payment</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={6} sm={4} md={2}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Filter by BGE</InputLabel>
+                    <Select
+                      value={reportFilterBge}
+                      label="Filter by BGE"
+                      onChange={e => { setReportFilterBge(e.target.value); setReportPage(0); }}
+                    >
+                      <MenuItem value="">All BGEs ({sourceReports.length})</MenuItem>
+                      {sortedExpertsForFilter.map(e => (
+                        <MenuItem key={e.id} value={String(e.id)}>
+                          {e.name} ({bgeReportCounts[e.id] || 0})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={6} sm={4} md={2}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Visit Type</InputLabel>
+                    <Select
+                      value={reportFilterVisitType}
+                      label="Visit Type"
+                      onChange={e => { setReportFilterVisitType(e.target.value); setReportPage(0); }}
+                    >
+                      <MenuItem value="">All Visit Types</MenuItem>
+                      {Object.entries(VISIT_LABELS).map(([k, v]) => (
+                        <MenuItem key={k} value={k}>{v}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={6} sm={4} md={1.25}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={reportFilterStatus}
+                      label="Status"
+                      onChange={e => { setReportFilterStatus(e.target.value); setReportPage(0); }}
+                    >
+                      <MenuItem value="">All</MenuItem>
+                      <MenuItem value="draft">Draft</MenuItem>
+                      <MenuItem value="submitted">Submitted</MenuItem>
+                      <MenuItem value="reviewed">Reviewed</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={6} sm={4} md={1.25}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Payment</InputLabel>
+                    <Select
+                      value={reportFilterPaymentStatus}
+                      label="Payment"
+                      onChange={e => { setReportFilterPaymentStatus(e.target.value); setReportPage(0); }}
+                    >
+                      <MenuItem value="">All</MenuItem>
+                      <MenuItem value="unsubmitted">Unsubmitted</MenuItem>
+                      <MenuItem value="submitted">Submitted</MenuItem>
+                      <MenuItem value="confirmed">Confirmed ✓</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              {(Boolean(reportSearch) || Boolean(reportFilterBge) || Boolean(reportFilterStatus) ||
+                Boolean(reportFilterPaymentStatus) || Boolean(reportFilterVisitType) ||
+                reportSortBy !== 'visit_date' || reportSortDir !== 'desc') && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, pt: 1, borderTop: '1px dashed #E2E8F0', flexWrap: 'wrap' }}>
+                  <Typography variant="caption" color="text.secondary">Active filters applied:</Typography>
+                  {reportSearch && <Chip size="small" label={`Search: "${reportSearch}"`} onDelete={() => setReportSearch('')} />}
+                  {reportFilterBge && (
+                    <Chip
+                      size="small"
+                      color="primary"
+                      label={`BGE: ${experts.find(e => String(e.id) === String(reportFilterBge))?.name || reportFilterBge}`}
+                      onDelete={() => setReportFilterBge('')}
+                    />
+                  )}
+                  {reportFilterVisitType && <Chip size="small" label={`Type: ${VISIT_LABELS[reportFilterVisitType] || reportFilterVisitType}`} onDelete={() => setReportFilterVisitType('')} />}
+                  {reportFilterStatus && <Chip size="small" label={`Status: ${reportFilterStatus}`} onDelete={() => setReportFilterStatus('')} />}
+                  {reportFilterPaymentStatus && <Chip size="small" label={`Payment: ${reportFilterPaymentStatus}`} onDelete={() => setReportFilterPaymentStatus('')} />}
+                  {(reportSortBy !== 'visit_date' || reportSortDir !== 'desc') && (
+                    <Chip size="small" variant="outlined" label={`Sorted by: ${reportSortBy} (${reportSortDir})`} onDelete={() => { setReportSortBy('visit_date'); setReportSortDir('desc'); }} />
+                  )}
+                  <Button
+                    size="small" color="inherit"
+                    onClick={() => {
+                      setReportSearch('');
+                      setReportFilterBge('');
+                      setReportFilterStatus('');
+                      setReportFilterPaymentStatus('');
+                      setReportFilterVisitType('');
+                      setReportSortBy('visit_date');
+                      setReportSortDir('desc');
+                      setReportPage(0);
+                    }}
+                    sx={{ textTransform: 'none', fontSize: 11, ml: 'auto' }}
+                  >
+                    Reset All Filters
+                  </Button>
+                </Box>
+              )}
+            </Paper>
+
+            {/* If BGE is selected and Sub-view is 'by_msme': render clean enterprise dossier */}
+            {selectedBgeObj && reportBgeSubView === 'by_msme' && (() => {
+              const msmeMap = {};
+              sortedReports.forEach(r => {
+                const mid = r.msme || 'unknown';
+                if (!msmeMap[mid]) {
+                  const msmeObj = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || {};
+                  msmeMap[mid] = {
+                    msmeId: mid,
+                    name: r.msme_name || msmeObj.business_name || 'Enterprise',
+                    code: r.msme_code || msmeObj.msme_code || '',
+                    sector: msmeObj.sector || '',
+                    district: msmeObj.district || '',
+                    reports: [],
+                  };
+                }
+                msmeMap[mid].reports.push(r);
+              });
+              const msmeList = Object.values(msmeMap);
+
+              if (msmeList.length === 0) {
+                return (
+                  <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                    No visits match the current filters for {selectedBgeObj.name}.
+                  </Paper>
+                );
+              }
+
+              return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary">
+                      Showing {msmeList.length} MSMEs supported by {selectedBgeObj.name} ({sortedReports.length} total visits)
+                    </Typography>
+                  </Box>
+                  {msmeList.map(item => {
+                    const bge = selectedBgeObj;
+                    return (
+                      <Paper key={item.msmeId} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                        <Box sx={{ p: 2, bgcolor: '#FAFBFD', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Avatar sx={{ bgcolor: '#2B5278', width: 34, height: 34, fontSize: 13, fontWeight: 700 }}>
+                              {item.name.slice(0, 2).toUpperCase()}
+                            </Avatar>
+                            <Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="subtitle2" fontWeight={700}>
+                                  {item.name}
+                                </Typography>
+                                {item.code && (
+                                  <Chip label={item.code} size="small" sx={{ fontWeight: 600, fontSize: 10, height: 20 }} />
+                                )}
+                              </Box>
+                              {(item.sector || item.district) && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {item.sector ? `Sector: ${item.sector}` : ''}
+                                  {item.sector && item.district ? ' · ' : ''}
+                                  {item.district ? `District: ${item.district}` : ''}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                          <Chip
+                            label={`${item.reports.length} visit${item.reports.length === 1 ? '' : 's'}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </Box>
+                        <Table size="small">
+                          <TableHead sx={{ bgcolor: '#fff' }}>
+                            <TableRow>
+                              <TableCell>Visit Type</TableCell>
+                              <TableCell>Date</TableCell>
+                              <TableCell>Takeaway / Key Achievement</TableCell>
+                              <TableCell>Status &amp; Payment</TableCell>
+                              <TableCell align="right">Actions</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {item.reports.map(r => {
+                              const msme = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
+                              return (
+                                <TableRow key={r.id} hover>
+                                  <TableCell>
+                                    <Chip
+                                      label={VISIT_LABELS[r.visit_type] || r.visit_type}
+                                      size="small"
+                                      variant="outlined"
+                                      sx={{
+                                        borderColor: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                        color: VISIT_TYPE_COLORS[r.visit_type] || '#7F8C8D',
+                                        fontWeight: 600,
+                                        fontSize: 11,
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                    {r.visit_date}
+                                  </TableCell>
+                                  <TableCell sx={{ maxWidth: 350 }}>
+                                    {r.concrete_takeaway ? (
+                                      <Typography variant="body2" sx={{ fontSize: 12, color: '#0F172A', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                        <span style={{ fontWeight: 600, color: '#00695C' }}>Acid Test: </span>
+                                        {r.concrete_takeaway}
+                                      </Typography>
+                                    ) : r.key_achievement ? (
+                                      <Typography variant="body2" sx={{ fontSize: 12, color: '#0F172A', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                        <span style={{ fontWeight: 600, color: '#2B5278' }}>Achievement: </span>
+                                        {r.key_achievement}
+                                      </Typography>
+                                    ) : r.stated_purpose ? (
+                                      <Typography variant="body2" sx={{ fontSize: 12, color: '#64748B' }} noWrap>
+                                        {r.stated_purpose}
+                                      </Typography>
+                                    ) : (
+                                      <Typography variant="caption" color="text.secondary">—</Typography>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {renderReportStatusChips(r)}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    {renderReportActions(r, msme, bge)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </Paper>
+                    );
+                  })}
+                </Box>
+              );
+            })()}
+
+            {/* View Mode 1: Table View (or if BGE is selected with table subview) */}
+            {(reportViewMode === 'table' || (selectedBgeObj && reportBgeSubView === 'table')) && (
               <TableContainer component={Paper} variant="outlined">
                 <Table size="small">
                   <TableHead sx={{ bgcolor: '#f5f5f5' }}>
@@ -6585,7 +7010,22 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             {(r.msme_code || msme.msme_code) &&
                               <Typography variant="caption" color="text.secondary">{r.msme_code || msme.msme_code}</Typography>}
                           </TableCell>
-                          <TableCell>{r.bge_name || bge.name}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body2">{r.bge_name || bge.name}</Typography>
+                              {!reportFilterBge && r.bge && (
+                                <Tooltip title={`Filter to ${r.bge_name || bge.name}`}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => { setReportFilterBge(String(r.bge)); setReportPage(0); }}
+                                    sx={{ p: 0.25, opacity: 0.6, '&:hover': { opacity: 1 } }}
+                                  >
+                                    <Search sx={{ fontSize: 13 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </Box>
+                          </TableCell>
                           <TableCell>
                             <Chip
                               label={VISIT_LABELS[r.visit_type] || r.visit_type}
@@ -6628,7 +7068,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             )}
 
             {/* View Mode 2: Cards View */}
-            {reportViewMode === 'cards' && (
+            {!selectedBgeObj && reportViewMode === 'cards' && (
               <Box>
                 {pagedReports.length === 0 ? (
                   <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
@@ -6734,15 +7174,16 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               </Box>
             )}
 
-            {/* View Mode 3: Grouped by BGE */}
-            {reportViewMode === 'grouped_bge' && (() => {
+            {/* View Mode 3: Grouped by BGE (when viewing All BGEs) */}
+            {!selectedBgeObj && reportViewMode === 'grouped_bge' && (() => {
               const bgeGroups = {};
               sortedReports.forEach(r => {
                 const bgeId = r.bge || 'unassigned';
                 const bgeObj = experts.find(e => e.id === r.bge);
                 const bgeName = r.bge_name || (bgeObj ? bgeObj.name : 'Unassigned');
+                const bgeCode = bgeObj ? bgeObj.bge_code : '';
                 if (!bgeGroups[bgeId]) {
-                  bgeGroups[bgeId] = { bgeId, bgeName, reports: [] };
+                  bgeGroups[bgeId] = { bgeId, bgeName, bgeCode, reports: [] };
                 }
                 bgeGroups[bgeId].reports.push(r);
               });
@@ -6757,37 +7198,125 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 );
               }
 
+              const handleExpandAll = () => {
+                const exp = {};
+                bgeList.forEach(g => { exp[g.bgeId] = true; });
+                setReportExpandedBges(exp);
+              };
+
+              const handleCollapseAll = () => {
+                const exp = {};
+                bgeList.forEach(g => { exp[g.bgeId] = false; });
+                setReportExpandedBges(exp);
+              };
+
               return (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5, py: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                      Showing {bgeList.length} BGEs ({sortedReports.length} reports)
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button size="small" variant="text" onClick={handleExpandAll} sx={{ textTransform: 'none', fontSize: 12 }}>
+                        Expand All
+                      </Button>
+                      <Button size="small" variant="text" onClick={handleCollapseAll} sx={{ textTransform: 'none', fontSize: 12 }}>
+                        Collapse All
+                      </Button>
+                    </Box>
+                  </Box>
+
                   {bgeList.map(group => {
                     const submittedCount = group.reports.filter(r => r.status === 'submitted' || r.status === 'reviewed').length;
                     const confirmedCount = group.reports.filter(r => r.payment_status === 'confirmed' || r.payment_confirmed_by_bge).length;
+                    const msmesCount = new Set(group.reports.map(r => r.msme)).size;
                     const isExpanded = reportExpandedBges[group.bgeId] ?? (bgeList.length <= 3);
+
+                    // Breakdown of visit types for this BGE
+                    const vtCounts = {};
+                    group.reports.forEach(r => {
+                      if (r.visit_type) vtCounts[r.visit_type] = (vtCounts[r.visit_type] || 0) + 1;
+                    });
+
                     return (
                       <Accordion
                         key={group.bgeId}
                         variant="outlined"
                         expanded={isExpanded}
                         onChange={() => setReportExpandedBges(prev => ({ ...prev, [group.bgeId]: !isExpanded }))}
-                        sx={{ borderRadius: '8px !important', '&:before': { display: 'none' } }}
+                        sx={{
+                          borderRadius: '8px !important',
+                          borderLeft: '4px solid #162A3A',
+                          '&:before': { display: 'none' },
+                        }}
                       >
                         <AccordionSummary expandIcon={<ExpandMore />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', width: '100%', pr: 2 }}>
-                            <Avatar sx={{ width: 32, height: 32, bgcolor: '#162A3A', fontSize: 13, fontWeight: 700 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', width: '100%', pr: 1.5 }}>
+                            <Avatar sx={{ width: 34, height: 34, bgcolor: '#162A3A', fontSize: 13, fontWeight: 700 }}>
                               {group.bgeName.slice(0, 2).toUpperCase()}
                             </Avatar>
-                            <Typography variant="subtitle2" fontWeight={700} sx={{ minWidth: 160 }}>
-                              {group.bgeName}
-                            </Typography>
-                            <Chip label={`${group.reports.length} reports`} size="small" sx={{ fontWeight: 600, bgcolor: '#EEF2FF', color: '#3730A3' }} />
+                            <Box sx={{ minWidth: 160 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="subtitle2" fontWeight={700}>
+                                  {group.bgeName}
+                                </Typography>
+                                {group.bgeCode && (
+                                  <Chip label={group.bgeCode} size="small" sx={{ fontSize: 10, height: 18 }} />
+                                )}
+                              </Box>
+                              <Typography variant="caption" color="text.secondary">
+                                {msmesCount} {msmesCount === 1 ? 'MSME' : 'MSMEs'} reached
+                              </Typography>
+                            </Box>
+
+                            <Chip label={`${group.reports.length} reports`} size="small" sx={{ fontWeight: 700, bgcolor: '#EEF2FF', color: '#3730A3' }} />
                             <Chip label={`${submittedCount} submitted`} size="small" variant="outlined" color="primary" sx={{ fontSize: 11 }} />
                             {confirmedCount > 0 && (
                               <Chip label={`${confirmedCount} paid ✓`} size="small" variant="outlined" color="success" sx={{ fontSize: 11 }} />
                             )}
+
+                            {/* Visit breakdown pills */}
+                            <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 0.5, flexWrap: 'wrap', ml: 1 }}>
+                              {Object.entries(vtCounts).slice(0, 3).map(([vt, count]) => (
+                                <Chip
+                                  key={vt}
+                                  label={`${VISIT_LABELS[vt] || vt} (${count})`}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#F1F5F9',
+                                    color: VISIT_TYPE_COLORS[vt] || '#334155',
+                                    fontSize: 10,
+                                    height: 20,
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              ))}
+                              {Object.keys(vtCounts).length > 3 && (
+                                <Chip label={`+${Object.keys(vtCounts).length - 3} more`} size="small" sx={{ fontSize: 10, height: 20 }} />
+                              )}
+                            </Box>
+
                             <Box sx={{ flexGrow: 1 }} />
-                            <Typography variant="caption" color="text.secondary">
-                              Latest: {group.reports[0]?.visit_date || '—'}
-                            </Typography>
+
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReportFilterBge(String(group.bgeId));
+                                setReportPage(0);
+                              }}
+                              sx={{
+                                textTransform: 'none',
+                                fontSize: 11,
+                                py: 0.25,
+                                px: 1,
+                                borderColor: '#CBD5E1',
+                                color: '#162A3A',
+                              }}
+                            >
+                              Isolate BGE
+                            </Button>
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails sx={{ p: 0 }}>
@@ -6797,8 +7326,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                 <TableCell>MSME</TableCell>
                                 <TableCell>Visit Type</TableCell>
                                 <TableCell>Visit Date</TableCell>
+                                <TableCell>Acid Test Takeaway / Objective</TableCell>
                                 <TableCell>Status &amp; Payment</TableCell>
-                                <TableCell>Actions</TableCell>
+                                <TableCell align="right">Actions</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -6825,9 +7355,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                                         }}
                                       />
                                     </TableCell>
-                                    <TableCell>{r.visit_date}</TableCell>
+                                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{r.visit_date}</TableCell>
+                                    <TableCell sx={{ maxWidth: 320 }}>
+                                      {r.concrete_takeaway ? (
+                                        <Typography variant="body2" sx={{ fontSize: 12, color: '#0F172A', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                          <span style={{ fontWeight: 600, color: '#00695C' }}>Acid Test: </span>
+                                          {r.concrete_takeaway}
+                                        </Typography>
+                                      ) : r.key_achievement ? (
+                                        <Typography variant="body2" sx={{ fontSize: 12, color: '#0F172A', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                          <span style={{ fontWeight: 600, color: '#2B5278' }}>Achievement: </span>
+                                          {r.key_achievement}
+                                        </Typography>
+                                      ) : r.stated_purpose ? (
+                                        <Typography variant="body2" sx={{ fontSize: 12, color: '#64748B' }} noWrap>
+                                          {r.stated_purpose}
+                                        </Typography>
+                                      ) : (
+                                        <Typography variant="caption" color="text.secondary">—</Typography>
+                                      )}
+                                    </TableCell>
                                     <TableCell>{renderReportStatusChips(r)}</TableCell>
-                                    <TableCell>{renderReportActions(r, msme, bge)}</TableCell>
+                                    <TableCell align="right">{renderReportActions(r, msme, bge)}</TableCell>
                                   </TableRow>
                                 );
                               })}
@@ -6846,27 +7395,49 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       {/* ── Group Reports panel (admin approval) ─────────────────────── */}
       <Box sx={{ mt: 4 }}>
-        <SectionHeader title="Group Reports" subtitle={`${groupReports.length} group report${groupReports.length === 1 ? '' : 's'} filed`} />
-        {groupReports.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
-            No group reports yet. Team leads file these from the BGE dashboard.
-          </Paper>
-        ) : (
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell>Group</TableCell>
-                  <TableCell>Team Lead</TableCell>
-                  <TableCell>Session</TableCell>
-                  <TableCell>Visit Date</TableCell>
-                  <TableCell>MSMEs</TableCell>
-                  <TableCell>Status &amp; Payment</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {[...groupReports].sort((a, b) => new Date(b.visit_date || 0) - new Date(a.visit_date || 0) || ((b.id || 0) - (a.id || 0))).map(g => (
+        {(() => {
+          const selectedBgeObj = reportFilterBge ? experts.find(e => String(e.id) === String(reportFilterBge)) : null;
+          const filteredGroupReports = groupReports.filter(g => {
+            if (!reportFilterBge) return true;
+            const bgeId = Number(reportFilterBge);
+            const bgeName = selectedBgeObj?.name;
+            return g.team_lead === bgeId ||
+                   (g.team_lead_name && g.team_lead_name === bgeName) ||
+                   (Array.isArray(g.contributions) && g.contributions.some(c => c.bge === bgeId));
+          });
+
+          return (
+            <Box>
+              <SectionHeader
+                title="Group Reports"
+                subtitle={
+                  selectedBgeObj
+                    ? `${filteredGroupReports.length} group report${filteredGroupReports.length === 1 ? '' : 's'} involving ${selectedBgeObj.name} · ${groupReports.length} total`
+                    : `${groupReports.length} group report${groupReports.length === 1 ? '' : 's'} filed`
+                }
+              />
+              {filteredGroupReports.length === 0 ? (
+                <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+                  {selectedBgeObj
+                    ? `No group reports filed by or involving ${selectedBgeObj.name}.`
+                    : 'No group reports yet. Team leads file these from the BGE dashboard.'}
+                </Paper>
+              ) : (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableRow>
+                        <TableCell>Group</TableCell>
+                        <TableCell>Team Lead</TableCell>
+                        <TableCell>Session</TableCell>
+                        <TableCell>Visit Date</TableCell>
+                        <TableCell>MSMEs</TableCell>
+                        <TableCell>Status &amp; Payment</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {[...filteredGroupReports].sort((a, b) => new Date(b.visit_date || 0) - new Date(a.visit_date || 0) || ((b.id || 0) - (a.id || 0))).map(g => (
                   <TableRow key={g.id} hover>
                     <TableCell>
                       <Typography variant="body2" fontWeight={500}>{g.group_name}</Typography>
@@ -6934,6 +7505,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </Table>
           </TableContainer>
         )}
+            </Box>
+          );
+        })()}
       </Box>
 
       {/* ── Training & Mentor Reports ───────────────────────────────────── */}
