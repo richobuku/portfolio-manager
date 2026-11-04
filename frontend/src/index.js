@@ -6,10 +6,6 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme, { BRAND } from './theme';
 import API_BASE_URL from './config';
-import { GoogleOAuthProvider } from '@react-oauth/google';
-
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID ||
-  '296347546684-er0uttrr3uvh6om0f3l13ojg5ll2bo5g.apps.googleusercontent.com';
 
 // ── Service Worker & Push Notifications ───────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -93,10 +89,8 @@ if (metaThemeColor) {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
-  </GoogleOAuthProvider>
+  <ThemeProvider theme={theme}>
+    <CssBaseline />
+    <App />
+  </ThemeProvider>
 );
