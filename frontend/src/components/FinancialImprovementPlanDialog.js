@@ -70,13 +70,14 @@ export default function FinancialImprovementPlanDialog({
   // Form State
   const [form, setForm] = useState({
     category: '1_financial_records',
+    secondary_categories: [],
     category_name: 'Financial Records & Documentation Strengthening',
     category_addresses: FIAP_CATEGORIES[0].what_it_addresses,
     category_key_indicators: FIAP_CATEGORIES[0].key_indicators,
     assessment_date: new Date().toISOString().slice(0, 10),
     gaps_identified: [...FIAP_CATEGORIES[0].typical_gaps],
     gap_notes: '',
-    action_plan_steps: FIAP_CATEGORIES[0].default_steps.map((s) => ({ ...s })),
+    action_plan_steps: FIAP_CATEGORIES[0].default_steps.map((s) => ({ ...s, area: FIAP_CATEGORIES[0].name })),
     financing_target: 'Working Capital Loan',
     estimated_amount: '',
     preferred_fsp: 'Centenary Bank',
@@ -190,7 +191,7 @@ export default function FinancialImprovementPlanDialog({
       category_key_indicators: cat.key_indicators || '',
       support_priority: cat.default_priority || prev.support_priority,
       gaps_identified: cat.typical_gaps ? [...cat.typical_gaps] : prev.gaps_identified,
-      action_plan_steps: cat.default_steps ? cat.default_steps.map((s) => ({ ...s })) : prev.action_plan_steps,
+      action_plan_steps: cat.default_steps ? cat.default_steps.map((s) => ({ ...s, area: s.area || cat.name })) : prev.action_plan_steps,
       owner_name: currentMsme?.owner_name || prev.owner_name,
       bge_signature_name: bge?.name || prev.bge_signature_name,
     }));
@@ -208,15 +209,23 @@ export default function FinancialImprovementPlanDialog({
         (c) => c.id === plan.category
       );
 
+      const parsedSteps = Array.isArray(plan.action_plan_steps)
+        ? plan.action_plan_steps.map((s) => ({
+            ...s,
+            area: s.area || plan.category_name || catMeta?.name || 'Primary Area',
+          }))
+        : [];
+
       setForm({
         category: plan.category || '1_financial_records',
+        secondary_categories: Array.isArray(plan.secondary_categories) ? plan.secondary_categories : [],
         category_name: plan.category_name || catMeta?.name || '',
         category_addresses: plan.category_addresses || catMeta?.what_it_addresses || '',
         category_key_indicators: catMeta?.key_indicators || '',
         assessment_date: plan.assessment_date || new Date().toISOString().slice(0, 10),
         gaps_identified: Array.isArray(plan.gaps_identified) ? plan.gaps_identified : [],
         gap_notes: plan.gap_notes || '',
-        action_plan_steps: Array.isArray(plan.action_plan_steps) ? plan.action_plan_steps : [],
+        action_plan_steps: parsedSteps,
         financing_target: plan.financing_target || 'Working Capital Loan',
         estimated_amount: plan.estimated_amount || '',
         preferred_fsp: plan.preferred_fsp || 'Centenary Bank',
@@ -298,6 +307,7 @@ export default function FinancialImprovementPlanDialog({
         ...prev.action_plan_steps,
         {
           step: prev.action_plan_steps.length + 1,
+          area: prev.category_name || 'Primary Area',
           action: '',
           timeline: 'Months 1–3',
           responsible: 'Owner & BGE',
@@ -307,7 +317,7 @@ export default function FinancialImprovementPlanDialog({
     }));
   };
 
-  const addPredefinedStep = (stepItem) => {
+  const addPredefinedStep = (stepItem, targetArea = null) => {
     if (!stepItem || isReadOnly) return;
     setForm((prev) => ({
       ...prev,
@@ -315,6 +325,7 @@ export default function FinancialImprovementPlanDialog({
         ...prev.action_plan_steps,
         {
           step: prev.action_plan_steps.length + 1,
+          area: targetArea || stepItem.area || prev.category_name || 'General Milestone',
           action: stepItem.action,
           timeline: stepItem.timeline,
           responsible: stepItem.responsible,
@@ -594,66 +605,142 @@ export default function FinancialImprovementPlanDialog({
           </Grid>
         </Box>
 
-        {/* ── Section 2: Primary Action Plan Category ── */}
+        {/* ── Section 2: Primary & Additional Action Plan Categories ── */}
         <Box sx={{ p: 2, bgcolor: '#EFF6FF', borderRadius: 2, border: '1px solid #93C5FD' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
             <Box>
               <Typography variant="subtitle2" fontWeight={800} color="#1D4ED8" sx={{ fontSize: 14 }}>
-                2. PRIMARY ACTION PLAN CATEGORY (Single Most Restrictive Binding Barrier)
+                2. ACTION PLAN FOCUS & BINDING BARRIER AREAS
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Rule: Each MSME is placed in <strong>ONE primary category</strong> representing its primary barrier to obtaining finance.
+                Select the <strong>Primary Binding Barrier</strong> (lead area) and optionally any <strong>Additional Action Point Areas</strong> to target across your phased roadmap.
               </Typography>
             </Box>
             <Chip
-              label={`Category ${currentCategory?.number || '1'} of 9`}
+              label={`Primary: Category ${currentCategory?.number || '1'} of 9`}
               size="small"
               sx={{ bgcolor: '#DBEAFE', color: '#1E40AF', fontWeight: 700, fontSize: 11 }}
             />
           </Box>
 
-          <FormControl fullWidth size="small" sx={{ mb: 1.5, mt: 1, bgcolor: '#fff' }}>
-            <InputLabel id="primary-category-select-label">Primary Action Plan Category *</InputLabel>
-            <Select
-              labelId="primary-category-select-label"
-              value={form.category}
-              label="Primary Action Plan Category *"
-              disabled={isReadOnly}
-              onChange={handleCategoryChange}
-            >
-              {categoriesList.map((cat) => (
-                <MenuItem key={cat.id} value={cat.id}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
-                    <Typography variant="body2" fontWeight={600}>
-                      {cat.number}. {cat.name}
-                    </Typography>
-                    <Chip
-                      label={cat.default_priority}
-                      size="small"
-                      sx={{
-                        fontSize: 10,
-                        height: 20,
-                        fontWeight: 700,
-                        bgcolor: priorityColors[cat.default_priority]?.bg,
-                        color: priorityColors[cat.default_priority]?.text,
-                      }}
-                    />
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Grid container spacing={1.5} sx={{ mt: 0.5, mb: 1.5 }}>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth size="small" sx={{ bgcolor: '#fff' }}>
+                <InputLabel id="primary-category-select-label">Primary Action Plan Category *</InputLabel>
+                <Select
+                  labelId="primary-category-select-label"
+                  value={form.category}
+                  label="Primary Action Plan Category *"
+                  disabled={isReadOnly}
+                  onChange={handleCategoryChange}
+                >
+                  {categoriesList.map((cat) => (
+                    <MenuItem key={cat.id} value={cat.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {cat.number}. {cat.name}
+                        </Typography>
+                        <Chip
+                          label={cat.default_priority}
+                          size="small"
+                          sx={{
+                            fontSize: 10,
+                            height: 20,
+                            fontWeight: 700,
+                            bgcolor: priorityColors[cat.default_priority]?.bg,
+                            color: priorityColors[cat.default_priority]?.text,
+                          }}
+                        />
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth size="small" sx={{ bgcolor: '#fff' }}>
+                <InputLabel id="secondary-categories-select-label">Additional Action Point Areas (Multi-Select)</InputLabel>
+                <Select
+                  labelId="secondary-categories-select-label"
+                  multiple
+                  value={form.secondary_categories || []}
+                  label="Additional Action Point Areas (Multi-Select)"
+                  disabled={isReadOnly}
+                  onChange={(e) => {
+                    const val = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
+                    // Do not allow primary category in secondaries
+                    const filtered = val.filter((id) => id !== form.category);
+                    setForm((prev) => ({ ...prev, secondary_categories: filtered }));
+                  }}
+                  renderValue={(selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {selected.length === 0 ? (
+                        <Typography variant="caption" color="text.secondary">None (Single focus)</Typography>
+                      ) : (
+                        selected.map((val) => {
+                          const c = categoriesList.find((cat) => cat.id === val);
+                          return (
+                            <Chip
+                              key={val}
+                              label={c ? `${c.number}. ${c.name}` : val}
+                              size="small"
+                              sx={{ fontSize: 10.5, height: 22, bgcolor: '#EEF2FF', color: '#4338CA', fontWeight: 600 }}
+                            />
+                          );
+                        })
+                      )}
+                    </Box>
+                  )}
+                >
+                  {categoriesList
+                    .filter((cat) => cat.id !== form.category)
+                    .map((cat) => {
+                      const isChecked = (form.secondary_categories || []).includes(cat.id);
+                      return (
+                        <MenuItem key={cat.id} value={cat.id}>
+                          <Checkbox checked={isChecked} size="small" sx={{ mr: 0.5, p: 0.5 }} />
+                          <Typography variant="body2" sx={{ fontSize: 12.5 }}>
+                            {cat.number}. {cat.name}
+                          </Typography>
+                        </MenuItem>
+                      );
+                    })}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
 
           {/* Category Description Banner */}
           <Box sx={{ p: 2, bgcolor: '#fff', borderRadius: 1.5, border: '1px solid #93C5FD', display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Box>
               <Typography variant="caption" color="#1E40AF" fontWeight={800} display="block">
-                WHAT THIS CATEGORY ADDRESSES:
+                PRIMARY FOCUS: {currentCategory?.name?.toUpperCase()}
               </Typography>
               <Typography variant="body2" color="#0F172A" sx={{ mt: 0.3, fontWeight: 500, fontSize: 13 }}>
                 {form.category_addresses || currentCategory?.what_it_addresses || 'Select a category to view diagnostic focus.'}
               </Typography>
             </Box>
+            {form.secondary_categories && form.secondary_categories.length > 0 && (
+              <Box sx={{ pt: 1, borderTop: '1px dashed #BFDBFE' }}>
+                <Typography variant="caption" color="#4338CA" fontWeight={800} display="block">
+                  ADDITIONAL ACTION POINT AREAS INCLUDED IN THIS PLAN:
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }}>
+                  {form.secondary_categories.map((catId) => {
+                    const c = categoriesList.find((item) => item.id === catId);
+                    return (
+                      <Chip
+                        key={catId}
+                        label={c ? `${c.number}. ${c.name}` : catId}
+                        size="small"
+                        sx={{ bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700, fontSize: 11 }}
+                      />
+                    );
+                  })}
+                </Box>
+              </Box>
+            )}
             {currentCategory?.key_indicators && (
               <Box sx={{ pt: 1, borderTop: '1px dashed #BFDBFE' }}>
                 <Typography variant="caption" color="#475569" fontWeight={800} display="block">
@@ -742,7 +829,7 @@ export default function FinancialImprovementPlanDialog({
                 4. SEQUENCED FINANCIAL IMPROVEMENT ACTION PLAN (The Phased Roadmap)
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Concrete, time-bound milestones (Months 1–3, Months 2–4, or Months 1–6) tied to verification evidence.
+                Concrete, time-bound milestones spanning your Primary Category and any Additional Action Point Areas.
               </Typography>
             </Box>
             {!isReadOnly && (
@@ -755,7 +842,7 @@ export default function FinancialImprovementPlanDialog({
                     label="+ Insert Standard Step"
                     onChange={(e) => {
                       const selectedStep = STANDARD_ROADMAP_STEPS.find((s) => s.step === Number(e.target.value));
-                      if (selectedStep) addPredefinedStep(selectedStep);
+                      if (selectedStep) addPredefinedStep(selectedStep, currentCategory?.name);
                     }}
                     sx={{ fontSize: 12, height: 32 }}
                   >
@@ -763,6 +850,48 @@ export default function FinancialImprovementPlanDialog({
                     {STANDARD_ROADMAP_STEPS.map((s) => (
                       <MenuItem key={s.step} value={s.step} sx={{ fontSize: 12 }}>
                         Step {s.step}: {s.title} ({s.timeline})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {/* Import Steps from any Category */}
+                <FormControl size="small" sx={{ minWidth: 200, bgcolor: '#fff' }}>
+                  <InputLabel sx={{ fontSize: 12 }}>+ Add Steps from Area…</InputLabel>
+                  <Select
+                    value=""
+                    label="+ Add Steps from Area…"
+                    onChange={(e) => {
+                      const catId = e.target.value;
+                      if (!catId) return;
+                      const cat = categoriesList.find((c) => c.id === catId);
+                      if (cat?.default_steps) {
+                        setForm((prev) => ({
+                          ...prev,
+                          action_plan_steps: [
+                            ...prev.action_plan_steps,
+                            ...cat.default_steps.map((st, i) => ({
+                              ...st,
+                              step: prev.action_plan_steps.length + i + 1,
+                              area: cat.name,
+                            })),
+                          ],
+                        }));
+                        // Also automatically add to secondary categories if not present
+                        if (cat.id !== form.category && !(form.secondary_categories || []).includes(cat.id)) {
+                          setForm((prev) => ({
+                            ...prev,
+                            secondary_categories: [...(prev.secondary_categories || []), cat.id],
+                          }));
+                        }
+                      }
+                    }}
+                    sx={{ fontSize: 12, height: 32 }}
+                  >
+                    <MenuItem value=""><em>Import template steps from…</em></MenuItem>
+                    {categoriesList.map((cat) => (
+                      <MenuItem key={cat.id} value={cat.id} sx={{ fontSize: 12 }}>
+                        {cat.number}. {cat.name} ({cat.default_steps?.length || 0} steps)
                       </MenuItem>
                     ))}
                   </Select>
@@ -776,13 +905,13 @@ export default function FinancialImprovementPlanDialog({
                     if (cat?.default_steps) {
                       setForm((prev) => ({
                         ...prev,
-                        action_plan_steps: cat.default_steps.map((s) => ({ ...s })),
+                        action_plan_steps: cat.default_steps.map((s) => ({ ...s, area: cat.name })),
                       }));
                     }
                   }}
                   sx={{ fontSize: 11, color: '#B45309', textTransform: 'none' }}
                 >
-                  Reset Default Steps
+                  Reset Primary Steps
                 </Button>
                 <Button
                   size="small"
@@ -802,24 +931,46 @@ export default function FinancialImprovementPlanDialog({
               <TableHead sx={{ bgcolor: '#FEF3C7' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, width: 45, fontSize: 12 }}>Step</TableCell>
+                  <TableCell sx={{ fontWeight: 800, width: 170, fontSize: 12 }}>Action Area</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 12 }}>Action Description</TableCell>
-                  <TableCell sx={{ fontWeight: 800, width: 140, fontSize: 12 }}>Milestone Window</TableCell>
-                  <TableCell sx={{ fontWeight: 800, width: 150, fontSize: 12 }}>Responsible Person</TableCell>
-                  <TableCell sx={{ fontWeight: 800, width: 180, fontSize: 12 }}>Verification Evidence</TableCell>
+                  <TableCell sx={{ fontWeight: 800, width: 130, fontSize: 12 }}>Milestone Window</TableCell>
+                  <TableCell sx={{ fontWeight: 800, width: 140, fontSize: 12 }}>Responsible Person</TableCell>
+                  <TableCell sx={{ fontWeight: 800, width: 160, fontSize: 12 }}>Verification Evidence</TableCell>
                   {!isReadOnly && <TableCell sx={{ width: 40 }} />}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {form.action_plan_steps.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isReadOnly ? 5 : 6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                      No action steps configured. Click "Reset Default Steps" or "Insert Standard Step".
+                    <TableCell colSpan={isReadOnly ? 6 : 7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                      No action steps configured. Click "Reset Primary Steps", "Insert Standard Step", or "Add Steps from Area…".
                     </TableCell>
                   </TableRow>
                 ) : (
                   form.action_plan_steps.map((s, idx) => (
                     <TableRow key={idx} hover>
                       <TableCell sx={{ fontWeight: 800, fontSize: 12 }}>{idx + 1}</TableCell>
+                      <TableCell>
+                        <Select
+                          size="small"
+                          fullWidth
+                          value={s.area || currentCategory?.name || 'Primary Area'}
+                          disabled={isReadOnly}
+                          onChange={(e) => handleStepChange(idx, 'area', e.target.value)}
+                          sx={{ fontSize: 11.5, height: 36, bgcolor: '#FFFBEB' }}
+                        >
+                          <MenuItem value={currentCategory?.name || 'Primary Area'} sx={{ fontSize: 11.5, fontWeight: 700 }}>
+                            ★ Primary: {currentCategory?.name}
+                          </MenuItem>
+                          {categoriesList
+                            .filter((c) => c.id !== form.category)
+                            .map((c) => (
+                              <MenuItem key={c.id} value={c.name} sx={{ fontSize: 11.5 }}>
+                                {c.number}. {c.name}
+                              </MenuItem>
+                            ))}
+                        </Select>
+                      </TableCell>
                       <TableCell>
                         <TextField
                           fullWidth
@@ -829,7 +980,7 @@ export default function FinancialImprovementPlanDialog({
                           disabled={isReadOnly}
                           onChange={(e) => handleStepChange(idx, 'action', e.target.value)}
                           placeholder="Action plan description…"
-                          InputProps={{ style: { fontSize: 13 } }}
+                          InputProps={{ style: { fontSize: 12.5 } }}
                         />
                       </TableCell>
                       <TableCell>
@@ -840,7 +991,7 @@ export default function FinancialImprovementPlanDialog({
                           disabled={isReadOnly}
                           onChange={(e) => handleStepChange(idx, 'timeline', e.target.value)}
                           placeholder="e.g. Months 1–3"
-                          InputProps={{ style: { fontSize: 12 } }}
+                          InputProps={{ style: { fontSize: 11.5 } }}
                         />
                       </TableCell>
                       <TableCell>
@@ -851,7 +1002,7 @@ export default function FinancialImprovementPlanDialog({
                           disabled={isReadOnly}
                           onChange={(e) => handleStepChange(idx, 'responsible', e.target.value)}
                           placeholder="e.g. Owner & BGE"
-                          InputProps={{ style: { fontSize: 12 } }}
+                          InputProps={{ style: { fontSize: 11.5 } }}
                         />
                       </TableCell>
                       <TableCell>
@@ -861,8 +1012,8 @@ export default function FinancialImprovementPlanDialog({
                           value={s.verification}
                           disabled={isReadOnly}
                           onChange={(e) => handleStepChange(idx, 'verification', e.target.value)}
-                          placeholder="e.g. Inspected cashbook entries"
-                          InputProps={{ style: { fontSize: 12 } }}
+                          placeholder="e.g. Inspected cashbook"
+                          InputProps={{ style: { fontSize: 11.5 } }}
                         />
                       </TableCell>
                       {!isReadOnly && (

@@ -2051,6 +2051,9 @@ class FinancialImprovementActionPlan(models.Model):
     category_name = models.CharField(max_length=255, blank=True)
     category_addresses = models.TextField(blank=True, help_text='Description of what this category addresses')
 
+    # Additional action point areas / secondary categories addressed
+    secondary_categories = models.JSONField(default=list, blank=True, help_text='Additional action point areas addressed by this plan')
+
     # Specific diagnostic gaps identified (list of gap descriptions/tags)
     gaps_identified = models.JSONField(default=list, blank=True, help_text='List of identified diagnostic gaps')
     gap_notes = models.TextField(blank=True, help_text='BGE diagnostic narrative and enterprise context')

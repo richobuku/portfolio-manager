@@ -2656,6 +2656,15 @@ def generate_financial_improvement_plan_pdf(plan):
             Paragraph(f"<b>What It Addresses:</b> {_safe_html(cat_desc)}", td_style),
         ],
     ]
+    sec_cats = getattr(plan, 'secondary_categories', None) or []
+    if sec_cats:
+        from .fiap_constants import FIAP_CATEGORIES
+        cat_map = {c['id']: f"{c['number']}. {c['name']}" for c in FIAP_CATEGORIES}
+        sec_names = [cat_map.get(sid, sid) for sid in sec_cats]
+        if sec_names:
+            cat_data.append([
+                Paragraph(f"<b>Additional Action Point Areas:</b> {_safe_html(' • '.join(sec_names))}", td_style)
+            ])
     cat_table = Table(cat_data, colWidths=[CW])
     cat_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), HexColor('#EFF6FF')),
@@ -2724,12 +2733,15 @@ def generate_financial_improvement_plan_pdf(plan):
     for idx, s_item in enumerate(steps):
         num = s_item.get('step', idx + 1)
         action_text = s_item.get('action', '')
+        step_area = s_item.get('area') or s_item.get('category') or ''
         timeline = s_item.get('timeline', '')
         resp = s_item.get('responsible', 'Owner & BGE')
         verif = s_item.get('verification', 'Verified by BGE')
+        
+        step_desc_html = f"<font color='#1D4ED8'><b>[{_safe_html(step_area)}]</b></font><br/>{_safe_html(action_text)}" if step_area else _safe_html(action_text)
         act_data.append([
             Paragraph(str(num), td_style),
-            Paragraph(_safe_html(action_text), td_style),
+            Paragraph(step_desc_html, td_style),
             Paragraph(f"<b>{_safe_html(timeline)}</b>", td_style),
             Paragraph(_safe_html(resp), td_muted),
             Paragraph(_safe_html(verif), td_muted),
