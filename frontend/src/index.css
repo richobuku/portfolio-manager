@@ -62,3 +62,34 @@ code {
   /* Avoid page-breaks inside narrative paragraphs */
   p, li { page-break-inside: avoid; }
 }
+
+/* ── Leaflet Map Enhancements & Fixes ──────────────────────────────────────────
+   1. Strip default white box & grey border from custom divIcon pins.
+   2. Modernize popup cards and smooth map container transitions. */
+.leaflet-div-icon,
+.custom-msme-pin,
+.custom-bge-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-container {
+  font-family: inherit !important;
+  background-color: #f1f5f9 !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  padding: 4px !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px !important;
+  line-height: 1.45 !important;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15) !important;
+}
+

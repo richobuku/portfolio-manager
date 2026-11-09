@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -38,6 +38,12 @@ import {
   Business,
   People,
   PersonPin,
+  Layers,
+  Map as MapIcon,
+  ExpandMore,
+  ExpandLess,
+  Public,
+  SatelliteAlt,
 } from '@mui/icons-material';
 
 // Center of Northern Uganda (Gulu / Acholi / Lango / West Nile central axis)
@@ -62,6 +68,34 @@ export const NORTHERN_UGANDA_TOWNS = [
   { name: 'Adjumani Town', district: 'Adjumani', region: 'West Nile', lat: 3.377800, lng: 31.790900 },
   { name: 'Moyo Town', district: 'Moyo', region: 'West Nile', lat: 3.650000, lng: 31.720000 },
 ];
+
+// High quality tile layer providers
+const TILE_PROVIDERS = {
+  voyager: {
+    name: 'Carto Voyager',
+    label: 'Street',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>',
+    maxZoom: 19,
+    subdomains: 'abcd',
+  },
+  osm: {
+    name: 'OpenStreetMap',
+    label: 'OSM Standard',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+    subdomains: 'abc',
+  },
+  satellite: {
+    name: 'Esri Satellite',
+    label: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
+    maxZoom: 18,
+    subdomains: 'abc',
+  },
+};
 
 // Sector Color Palette for MSMEs
 const SECTOR_COLORS = {
@@ -91,6 +125,65 @@ const getSectorColor = (sector) => {
   return SECTOR_COLORS.default;
 };
 
+/**
+ * Robust GPS parser: cleans whitespace, degree symbols, handles comma-delimited strings,
+ * and automatically detects/reverses accidentally swapped latitude & longitude for Uganda.
+ */
+export const parseGpsCoordinate = (latRaw, lngRaw, locationRaw) => {
+  let lat = null;
+  let lng = null;
+
+  const tryPair = (val) => {
+    if (typeof val === 'string' && val.includes(',')) {
+      const parts = val.split(',').map((p) => {
+        const clean = p.replace(/[^\d.-]/g, '');
+        return clean ? parseFloat(clean) : NaN;
+      });
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return [parts[0], parts[1]];
+      }
+    }
+    return null;
+  };
+
+  const pairFromLat = tryPair(latRaw);
+  const pairFromLoc = tryPair(locationRaw);
+
+  if (pairFromLat) {
+    [lat, lng] = pairFromLat;
+  } else if (pairFromLoc && (latRaw === null || latRaw === undefined || latRaw === '')) {
+    [lat, lng] = pairFromLoc;
+  } else {
+    if (latRaw !== null && latRaw !== undefined && latRaw !== '') {
+      const cleanLat = String(latRaw).trim().replace(/[^\d.-]/g, '');
+      if (cleanLat) lat = parseFloat(cleanLat);
+    }
+    if (lngRaw !== null && lngRaw !== undefined && lngRaw !== '') {
+      const cleanLng = String(lngRaw).trim().replace(/[^\d.-]/g, '');
+      if (cleanLng) lng = parseFloat(cleanLng);
+    }
+  }
+
+  if (lat === null || lng === null || isNaN(lat) || isNaN(lng)) {
+    return { lat: null, lng: null, hasValidGps: false };
+  }
+
+  // Auto-detect swapped coordinates:
+  // Uganda is bounded roughly by Lat: -1.5 to 4.5, Lng: 29.5 to 35.5
+  if (lat >= 28.0 && lat <= 36.0 && lng >= -2.0 && lng <= 5.0) {
+    const temp = lat;
+    lat = lng;
+    lng = temp;
+  }
+
+  const hasValidGps = lat >= -1.5 && lat <= 4.5 && lng >= 29.5 && lng <= 35.5;
+  return {
+    lat: hasValidGps ? lat : null,
+    lng: hasValidGps ? lng : null,
+    hasValidGps,
+  };
+};
+
 // Create custom MSME Leaflet DivIcon
 const createMsmeMarkerIcon = (msme) => {
   const color = getSectorColor(msme.sector);
@@ -99,8 +192,8 @@ const createMsmeMarkerIcon = (msme) => {
   const ringColor = isCoAssigned ? '#7B1FA2' : isAssigned ? '#2E7D32' : '#9E9E9E';
 
   const html = `
-    <div style="position: relative; width: 34px; height: 42px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-      <svg viewBox="0 0 24 32" width="34" height="42" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));">
+    <div style="position: relative; width: 34px; height: 42px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+      <svg viewBox="0 0 24 32" width="34" height="42" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.32)); transition: transform 0.15s ease;">
         <path d="M12 0 C5.37 0 0 5.37 0 12 C0 21 12 32 12 32 C12 32 24 21 24 12 C24 5.37 18.63 0 12 0 Z" fill="${color}"/>
         <circle cx="12" cy="12" r="7" fill="#ffffff"/>
         <circle cx="12" cy="12" r="4.5" fill="${ringColor}"/>
@@ -120,8 +213,8 @@ const createMsmeMarkerIcon = (msme) => {
 // Create custom BGE Expert Leaflet DivIcon
 const createBgeMarkerIcon = (expert) => {
   const html = `
-    <div style="position: relative; width: 38px; height: 46px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-      <svg viewBox="0 0 24 32" width="38" height="46" style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));">
+    <div style="position: relative; width: 38px; height: 46px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+      <svg viewBox="0 0 24 32" width="38" height="46" style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.38)); transition: transform 0.15s ease;">
         <path d="M12 0 C5.37 0 0 5.37 0 12 C0 21 12 32 12 32 C12 32 24 21 24 12 C24 5.37 18.63 0 12 0 Z" fill="#262523"/>
         <circle cx="12" cy="12" r="8" fill="#F3BB36"/>
         <circle cx="12" cy="12" r="5" fill="#262523"/>
@@ -151,8 +244,13 @@ export default function MSMEMap({
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const tileLayerRef = useRef(null);
   const msmeLayerRef = useRef(null);
   const bgeLayerRef = useRef(null);
+
+  // Map Tile & Layout States
+  const [baseTile, setBaseTile] = useState('voyager'); // 'voyager' | 'osm' | 'satellite'
+  const [legendOpen, setLegendOpen] = useState(true);
 
   // Filter & Display States
   const [displayLayer, setDisplayLayer] = useState('all'); // 'all' | 'msmes' | 'experts'
@@ -185,18 +283,15 @@ export default function MSMEMap({
     return Array.from(set).sort();
   }, [msmes]);
 
-  // Valid GPS MSMEs calculation
+  // Valid GPS MSMEs calculation with robust parsing and auto-correction
   const parsedMsmes = useMemo(() => {
     return msmes.map((m) => {
-      const lat = m.latitude !== null && m.latitude !== undefined && m.latitude !== '' ? parseFloat(m.latitude) : null;
-      const lng = m.longitude !== null && m.longitude !== undefined && m.longitude !== '' ? parseFloat(m.longitude) : null;
-      const hasValidGps = lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && lat >= -1.5 && lat <= 4.5 && lng >= 29.5 && lng <= 35.5;
-
+      const parsed = parseGpsCoordinate(m.latitude, m.longitude, m.city || m.district);
       return {
         ...m,
-        parsedLat: hasValidGps ? lat : null,
-        parsedLng: hasValidGps ? lng : null,
-        hasValidGps,
+        parsedLat: parsed.lat,
+        parsedLng: parsed.lng,
+        hasValidGps: parsed.hasValidGps,
       };
     });
   }, [msmes]);
@@ -204,15 +299,12 @@ export default function MSMEMap({
   // Valid GPS BGE Experts calculation
   const parsedExperts = useMemo(() => {
     return experts.map((e) => {
-      const lat = e.latitude !== null && e.latitude !== undefined && e.latitude !== '' ? parseFloat(e.latitude) : null;
-      const lng = e.longitude !== null && e.longitude !== undefined && e.longitude !== '' ? parseFloat(e.longitude) : null;
-      const hasValidGps = lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && lat >= -1.5 && lat <= 4.5 && lng >= 29.5 && lng <= 35.5;
-
+      const parsed = parseGpsCoordinate(e.latitude, e.longitude, e.location);
       return {
         ...e,
-        parsedLat: hasValidGps ? lat : null,
-        parsedLng: hasValidGps ? lng : null,
-        hasValidGps,
+        parsedLat: parsed.lat,
+        parsedLng: parsed.lng,
+        hasValidGps: parsed.hasValidGps,
       };
     });
   }, [experts]);
@@ -220,28 +312,24 @@ export default function MSMEMap({
   // Filtered MSMEs
   const filteredMsmes = useMemo(() => {
     return parsedMsmes.filter((m) => {
-      // Search
       if (searchTerm) {
         const q = searchTerm.toLowerCase();
         const matchName = (m.business_name || '').toLowerCase().includes(q);
         const matchCode = (m.msme_code || '').toLowerCase().includes(q);
         const matchOwner = (m.owner_name || m.contact_name || '').toLowerCase().includes(q);
-        const matchCity = (m.city || m.district || m.state || '').toLowerCase().includes(q);
+        const matchCity = (m.city || m.district || m.diag_district || m.state || '').toLowerCase().includes(q);
         if (!matchName && !matchCode && !matchOwner && !matchCity) return false;
       }
 
-      // District
       if (selectedDistrict !== 'all') {
         const d = (m.district || m.diag_district || m.state || m.city || '').toLowerCase();
         if (!d.includes(selectedDistrict.toLowerCase())) return false;
       }
 
-      // Sector
       if (selectedSector !== 'all') {
         if ((m.sector || '') !== selectedSector) return false;
       }
 
-      // BGE
       if (selectedBge !== 'all') {
         if (selectedBge === 'unassigned') {
           if (m.assigned_bge) return false;
@@ -255,12 +343,10 @@ export default function MSMEMap({
         }
       }
 
-      // Cohort
       if (selectedCohort !== 'all') {
         if (m.cohort !== parseInt(selectedCohort, 10)) return false;
       }
 
-      // Group
       if (selectedGroup !== 'all') {
         const hasGrp = (m.programme_groups || []).includes(parseInt(selectedGroup, 10));
         if (!hasGrp) return false;
@@ -277,7 +363,7 @@ export default function MSMEMap({
         const q = searchTerm.toLowerCase();
         const matchName = (e.name || '').toLowerCase().includes(q);
         const matchCode = (e.bge_code || '').toLowerCase().includes(q);
-        const matchLoc  = (e.location || '').toLowerCase().includes(q);
+        const matchLoc = (e.location || '').toLowerCase().includes(q);
         if (!matchName && !matchCode && !matchLoc) return false;
       }
       if (selectedDistrict !== 'all') {
@@ -302,6 +388,13 @@ export default function MSMEMap({
     return { totalMsmes, withGpsMsmes, withoutGpsMsmes, totalExperts, withGpsExperts };
   }, [msmes, parsedMsmes, experts, parsedExperts]);
 
+  // Safe invalidation helper
+  const triggerMapInvalidate = useCallback(() => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.invalidateSize();
+    }
+  }, []);
+
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -315,11 +408,14 @@ export default function MSMEMap({
       zoomControl: true,
     });
 
-    // Clean OpenStreetMap Tile Layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
+    // Default Carto Voyager base layer
+    const cfg = TILE_PROVIDERS.voyager;
+    const tileLayer = L.tileLayer(cfg.url, {
+      attribution: cfg.attribution,
+      maxZoom: cfg.maxZoom,
+      subdomains: cfg.subdomains || 'abc',
     }).addTo(map);
+    tileLayerRef.current = tileLayer;
 
     // Layer Groups
     const msmeLayer = L.layerGroup().addTo(map);
@@ -328,13 +424,58 @@ export default function MSMEMap({
     bgeLayerRef.current = bgeLayer;
     mapInstanceRef.current = map;
 
+    // Staggered size invalidation to fix Leaflet rendering in dynamically sized React containers
+    const t0 = requestAnimationFrame(triggerMapInvalidate);
+    const t1 = setTimeout(triggerMapInvalidate, 80);
+    const t2 = setTimeout(triggerMapInvalidate, 300);
+    const t3 = setTimeout(triggerMapInvalidate, 800);
+
+    const handleWinResize = () => triggerMapInvalidate();
+    window.addEventListener('resize', handleWinResize);
+
     return () => {
+      cancelAnimationFrame(t0);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener('resize', handleWinResize);
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, []);
+  }, [triggerMapInvalidate]);
 
-  // Update MSME Markers on Map
+  // Observe container size changes (e.g. tab switches, window changes)
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+
+    const ro = new ResizeObserver(() => {
+      triggerMapInvalidate();
+    });
+    ro.observe(el);
+
+    return () => ro.disconnect();
+  }, [triggerMapInvalidate]);
+
+  // Switch Base Tile Layer
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const cfg = TILE_PROVIDERS[baseTile] || TILE_PROVIDERS.voyager;
+
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    }
+
+    const newLayer = L.tileLayer(cfg.url, {
+      attribution: cfg.attribution,
+      maxZoom: cfg.maxZoom,
+      subdomains: cfg.subdomains || 'abc',
+    }).addTo(mapInstanceRef.current);
+
+    tileLayerRef.current = newLayer;
+  }, [baseTile]);
+
+  // Update MSME Markers on Map with Spatial Dispersion for Duplicate Coordinates
   useEffect(() => {
     if (!mapInstanceRef.current || !msmeLayerRef.current) return;
 
@@ -344,35 +485,50 @@ export default function MSMEMap({
     if (displayLayer === 'experts') return;
     if (plottedMsmes.length === 0) return;
 
+    // Spatial dispersion: prevents markers at exact identical coordinates from stacking
+    const coordUsage = new Map();
+
     plottedMsmes.forEach((msme) => {
-      const lat = msme.parsedLat;
-      const lng = msme.parsedLng;
-      const latLng = [lat, lng];
+      const coordKey = `${msme.parsedLat.toFixed(5)},${msme.parsedLng.toFixed(5)}`;
+      const count = coordUsage.get(coordKey) || 0;
+      coordUsage.set(coordKey, count + 1);
+
+      let displayLat = msme.parsedLat;
+      let displayLng = msme.parsedLng;
+
+      // Disperse points on a small spiral ring if more than 1 point shares the exact spot (~25m radius)
+      if (count > 0) {
+        const ring = Math.ceil(count / 6);
+        const angle = (count % 6) * ((2 * Math.PI) / 6) + ring * 0.4;
+        const radius = 0.00028 * ring;
+        displayLat = msme.parsedLat + radius * Math.cos(angle);
+        displayLng = msme.parsedLng + (radius * Math.sin(angle)) / Math.cos((msme.parsedLat * Math.PI) / 180);
+      }
 
       const icon = createMsmeMarkerIcon(msme);
-      const marker = L.marker(latLng, { icon });
+      const marker = L.marker([displayLat, displayLng], { icon });
 
       // Popup HTML content
       const sectorColor = getSectorColor(msme.sector);
       const coNames = (msme.co_assigned_bge_names || []).map((b) => b.name).join(', ');
 
       const popupHtml = `
-        <div style="font-family: inherit; font-size: 13px; line-height: 1.4; min-width: 240px; max-width: 300px;">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.45; min-width: 250px; max-width: 320px; padding: 2px;">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
-            <strong style="font-size: 14px; color: #1E293B;">${msme.business_name || 'Unnamed Business'}</strong>
+            <strong style="font-size: 14px; color: #0F172A; font-weight: 700;">${msme.business_name || 'Unnamed Business'}</strong>
             <span style="font-size: 10px; font-weight: 700; background: #F1F5F9; color: #475569; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
               ${msme.msme_code || 'PRUDEV2'}
             </span>
           </div>
 
-          <div style="margin-bottom: 8px;">
-            <span style="display: inline-block; font-size: 11px; font-weight: 600; color: #fff; background: ${sectorColor}; padding: 2px 8px; border-radius: 12px; margin-right: 4px;">
+          <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
+            <span style="display: inline-block; font-size: 11px; font-weight: 600; color: #fff; background: ${sectorColor}; padding: 2px 8px; border-radius: 12px;">
               ${msme.sector || 'General'}
             </span>
             ${msme.business_type ? `<span style="display: inline-block; font-size: 11px; color: #475569; background: #F8FAFC; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 12px;">${msme.business_type}</span>` : ''}
           </div>
 
-          <div style="border-top: 1px solid #E2E8F0; padding-top: 6px; margin-bottom: 8px; font-size: 12px; color: #334155;">
+          <div style="border-top: 1px solid #E2E8F0; padding-top: 6px; margin-bottom: 8px; font-size: 12px; color: #334155; display: flex; flexDirection: column; gap: 3px;">
             <div>📍 <strong>Location:</strong> ${[msme.city, msme.district || msme.diag_district || msme.state].filter(Boolean).join(', ') || 'Northern Uganda'}</div>
             ${msme.phone ? `<div>📞 <strong>Phone:</strong> ${msme.phone}</div>` : ''}
             <div>👨‍💼 <strong>Primary BGE:</strong> ${msme.assigned_bge_name ? `<span style="color: #2E7D32; font-weight: 600;">${msme.assigned_bge_name}</span>` : '<span style="color: #94A3B8; font-style: italic;">Unassigned</span>'}</div>
@@ -381,7 +537,7 @@ export default function MSMEMap({
           </div>
 
           <div style="text-align: right; border-top: 1px solid #F1F5F9; padding-top: 6px;">
-            <button id="btn-msme-${msme.id}" style="background: #1B5E20; color: #ffffff; border: none; padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <button id="btn-msme-${msme.id}" style="background: #1B5E20; color: #ffffff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
               Manage Business →
             </button>
           </div>
@@ -401,7 +557,9 @@ export default function MSMEMap({
 
       marker.addTo(layer);
     });
-  }, [plottedMsmes, displayLayer, onOpenMsme]);
+
+    triggerMapInvalidate();
+  }, [plottedMsmes, displayLayer, onOpenMsme, triggerMapInvalidate]);
 
   // Update BGE Expert Markers on Map
   useEffect(() => {
@@ -422,9 +580,9 @@ export default function MSMEMap({
       const marker = L.marker(latLng, { icon });
 
       const popupHtml = `
-        <div style="font-family: inherit; font-size: 13px; line-height: 1.4; min-width: 240px; max-width: 300px;">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.45; min-width: 250px; max-width: 320px; padding: 2px;">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
-            <strong style="font-size: 14px; color: #262523;">${expert.name || 'BGE Expert'}</strong>
+            <strong style="font-size: 14px; color: #262523; font-weight: 700;">${expert.name || 'BGE Expert'}</strong>
             <span style="font-size: 10px; font-weight: 700; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
               ${expert.bge_code || 'BGE'}
             </span>
@@ -432,12 +590,12 @@ export default function MSMEMap({
 
           <div style="margin-bottom: 8px;">
             <span style="display: inline-block; font-size: 11px; font-weight: 700; color: #F3BB36; background: #262523; padding: 2px 8px; border-radius: 12px; margin-right: 4px;">
-              ★ BGE Expert
+              ★ BGE Expert Base
             </span>
             ${expert.location ? `<span style="display: inline-block; font-size: 11px; color: #475569; background: #F8FAFC; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 12px;">${expert.location}</span>` : ''}
           </div>
 
-          <div style="border-top: 1px solid #E2E8F0; padding-top: 6px; margin-bottom: 8px; font-size: 12px; color: #334155;">
+          <div style="border-top: 1px solid #E2E8F0; padding-top: 6px; margin-bottom: 8px; font-size: 12px; color: #334155; display: flex; flexDirection: column; gap: 3px;">
             ${expert.phone ? `<div>📞 <strong>Phone:</strong> ${expert.phone}</div>` : ''}
             ${expert.email ? `<div>✉️ <strong>Email:</strong> ${expert.email}</div>` : ''}
             <div>🏢 <strong>Assigned MSMEs:</strong> <span style="color: #2E7D32; font-weight: 700;">${expert.assigned_msme_count || 0} MSMEs</span></div>
@@ -445,7 +603,7 @@ export default function MSMEMap({
           </div>
 
           <div style="text-align: right; border-top: 1px solid #F1F5F9; padding-top: 6px;">
-            <button id="btn-expert-${expert.id}" style="background: #262523; color: #ffffff; border: none; padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <button id="btn-expert-${expert.id}" style="background: #262523; color: #ffffff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
               View Expert Profile →
             </button>
           </div>
@@ -465,7 +623,9 @@ export default function MSMEMap({
 
       marker.addTo(layer);
     });
-  }, [plottedExperts, displayLayer, onOpenExpert]);
+
+    triggerMapInvalidate();
+  }, [plottedExperts, displayLayer, onOpenExpert, triggerMapInvalidate]);
 
   // Focus on a specific preset town
   const handleJumpToTown = (townName) => {
@@ -560,7 +720,7 @@ export default function MSMEMap({
 
             <Chip
               icon={<CheckCircle sx={{ fontSize: '16px !important' }} />}
-              label={`${stats.withGpsMsmes} MSMEs with Location`}
+              label={`${stats.withGpsMsmes} Plotted on Map`}
               color="success"
               variant="outlined"
               size="small"
@@ -598,24 +758,24 @@ export default function MSMEMap({
             <TextField
               size="small"
               fullWidth
-              placeholder="Search name, code, contact…"
+              placeholder="Search business, code, city..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
-                startAdornment: <Search fontSize="small" sx={{ color: 'text.secondary', mr: 0.5 }} />,
+                startAdornment: <Search sx={{ fontSize: 18, color: 'text.secondary', mr: 0.5 }} />,
               }}
             />
           </Grid>
 
-          {/* Quick Jump Town */}
+          {/* Quick Town Zoom */}
           <Grid item xs={6} sm={3} md={2}>
             <FormControl size="small" fullWidth>
-              <InputLabel>Zoom to Town</InputLabel>
-              <Select defaultValue="" label="Zoom to Town" onChange={(e) => handleJumpToTown(e.target.value)}>
-                <MenuItem value=""><em>-- Select Town --</em></MenuItem>
-                {NORTHERN_UGANDA_TOWNS.map((p) => (
-                  <MenuItem key={p.name} value={p.name}>
-                    {p.name} ({p.region})
+              <InputLabel>Jump to Town</InputLabel>
+              <Select defaultValue="" label="Jump to Town" onChange={(e) => handleJumpToTown(e.target.value)}>
+                <MenuItem value="" disabled>Select Town</MenuItem>
+                {NORTHERN_UGANDA_TOWNS.map((t) => (
+                  <MenuItem key={t.name} value={t.name}>
+                    {t.name} ({t.region})
                   </MenuItem>
                 ))}
               </Select>
@@ -623,11 +783,11 @@ export default function MSMEMap({
           </Grid>
 
           {/* District Filter */}
-          <Grid item xs={6} sm={3} md={1.75}>
+          <Grid item xs={6} sm={3} md={2}>
             <FormControl size="small" fullWidth>
-              <InputLabel>District / Location</InputLabel>
-              <Select value={selectedDistrict} label="District / Location" onChange={(e) => setSelectedDistrict(e.target.value)}>
-                <MenuItem value="all">All Locations</MenuItem>
+              <InputLabel>District</InputLabel>
+              <Select value={selectedDistrict} label="District" onChange={(e) => setSelectedDistrict(e.target.value)}>
+                <MenuItem value="all">All Districts ({distinctDistricts.length})</MenuItem>
                 {distinctDistricts.map((d) => (
                   <MenuItem key={d} value={d}>
                     {d}
@@ -638,14 +798,17 @@ export default function MSMEMap({
           </Grid>
 
           {/* Sector Filter */}
-          <Grid item xs={6} sm={3} md={1.75}>
+          <Grid item xs={6} sm={3} md={2}>
             <FormControl size="small" fullWidth>
               <InputLabel>Sector</InputLabel>
               <Select value={selectedSector} label="Sector" onChange={(e) => setSelectedSector(e.target.value)}>
-                <MenuItem value="all">All Sectors</MenuItem>
+                <MenuItem value="all">All Sectors ({distinctSectors.length})</MenuItem>
                 {distinctSectors.map((s) => (
                   <MenuItem key={s} value={s}>
-                    {s}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: getSectorColor(s) }} />
+                      <span>{s}</span>
+                    </Box>
                   </MenuItem>
                 ))}
               </Select>
@@ -653,13 +816,13 @@ export default function MSMEMap({
           </Grid>
 
           {/* BGE Filter */}
-          <Grid item xs={6} sm={3} md={2}>
+          <Grid item xs={6} sm={3} md={1.5}>
             <FormControl size="small" fullWidth>
               <InputLabel>BGE Expert</InputLabel>
               <Select value={selectedBge} label="BGE Expert" onChange={(e) => setSelectedBge(e.target.value)}>
                 <MenuItem value="all">All BGEs</MenuItem>
                 <MenuItem value="unassigned">Unassigned Only</MenuItem>
-                <MenuItem value="co_assigned">Joint / Co-assigned Only</MenuItem>
+                <MenuItem value="co_assigned">Co-assigned Only</MenuItem>
                 {experts.map((e) => (
                   <MenuItem key={e.id} value={String(e.id)}>
                     {e.name}
@@ -688,70 +851,144 @@ export default function MSMEMap({
           borderColor: 'divider',
           height: '640px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+          bgcolor: '#f1f5f9',
         }}
       >
         <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 
-        {/* Legend Overlay */}
+        {/* Tile Layer & View Mode Switcher (Top Left) */}
         <Paper
           elevation={3}
           sx={{
             position: 'absolute',
-            bottom: 16,
-            left: 16,
-            zIndex: 1000,
-            p: 1.5,
+            top: 16,
+            left: 56, // to the right of standard Leaflet zoom buttons
+            zIndex: 900,
+            p: 0.5,
             borderRadius: 2,
             bgcolor: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(4px)',
-            maxWidth: 280,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
           }}
         >
-          <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.75, color: '#262523' }}>
-            MAP KEY & DEPLOYMENT
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
-              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#262523', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F3BB36', fontSize: 8, fontWeight: 900 }}>★</Box>
-              <strong style={{ color: '#262523' }}>BGE Expert Pin (Field Base)</strong>
-            </Box>
-            <Divider sx={{ my: 0.5 }} />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
-              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#2E7D32' }} />
-              <span>MSME: Agriculture / Agribusiness</span>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
-              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#E65100' }} />
-              <span>MSME: Manufacturing</span>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
-              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#8D5B4C' }} />
-              <span>MSME: Trade & Commerce</span>
-            </Box>
-            <Divider sx={{ my: 0.5 }} />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid #7B1FA2' }} />
-              <span>Purple Ring = Joint / Co-assigned</span>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid #2E7D32' }} />
-              <span>Green Ring = Primary BGE Assigned</span>
-            </Box>
-          </Box>
+          <ToggleButtonGroup
+            size="small"
+            value={baseTile}
+            exclusive
+            onChange={(_, val) => val && setBaseTile(val)}
+            sx={{
+              '& .MuiToggleButton-root': {
+                py: 0.2,
+                px: 1,
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: 'none',
+                border: 'none',
+              },
+            }}
+          >
+            <ToggleButton value="voyager">
+              <MapIcon sx={{ fontSize: 14, mr: 0.4, color: '#1B5E20' }} />
+              Street
+            </ToggleButton>
+            <ToggleButton value="osm">
+              <Public sx={{ fontSize: 14, mr: 0.4, color: '#0284C7' }} />
+              Clean OSM
+            </ToggleButton>
+            <ToggleButton value="satellite">
+              <SatelliteAlt sx={{ fontSize: 14, mr: 0.4, color: '#E65100' }} />
+              Satellite
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Paper>
 
-        {/* Counter Overlay */}
+        {/* Legend Overlay (Collapsible, Bottom Left) */}
+        <Paper
+          elevation={3}
+          sx={{
+            position: 'absolute',
+            bottom: 24,
+            left: 16,
+            zIndex: 900,
+            p: 1.5,
+            borderRadius: 2,
+            bgcolor: 'rgba(255, 255, 255, 0.96)',
+            backdropFilter: 'blur(6px)',
+            maxWidth: 290,
+            boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+            onClick={() => setLegendOpen((prev) => !prev)}
+          >
+            <Typography variant="caption" fontWeight={700} sx={{ color: '#262523', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Layers sx={{ fontSize: 14, color: '#1B5E20' }} />
+              MAP KEY & DEPLOYMENT
+            </Typography>
+            <IconButton size="small" sx={{ p: 0.2 }}>
+              {legendOpen ? <ExpandMore sx={{ fontSize: 18 }} /> : <ExpandLess sx={{ fontSize: 18 }} />}
+            </IconButton>
+          </Box>
+
+          {legendOpen && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
+                <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#262523', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F3BB36', fontSize: 8, fontWeight: 900 }}>★</Box>
+                <strong style={{ color: '#262523' }}>BGE Expert Pin (Field Base)</strong>
+              </Box>
+              <Divider sx={{ my: 0.5 }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
+                <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#2E7D32' }} />
+                <span>MSME: Agriculture / Agribusiness</span>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
+                <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#E65100' }} />
+                <span>MSME: Manufacturing</span>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
+                <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#8D5B4C' }} />
+                <span>MSME: Trade & Commerce</span>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
+                <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#6A6E6B' }} />
+                <span>MSME: Services & Others</span>
+              </Box>
+              <Divider sx={{ my: 0.5 }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid #7B1FA2' }} />
+                <span>Purple Ring = Joint / Co-assigned</span>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid #2E7D32' }} />
+                <span>Green Ring = Primary BGE Assigned</span>
+              </Box>
+            </Box>
+          )}
+        </Paper>
+
+        {/* Counter Overlay (Top Right) */}
         <Paper
           elevation={3}
           sx={{
             position: 'absolute',
             top: 16,
             right: 16,
-            zIndex: 1000,
+            zIndex: 900,
             py: 0.75,
             px: 1.5,
             borderRadius: 2,
             bgcolor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
