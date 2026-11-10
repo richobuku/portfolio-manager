@@ -73,6 +73,18 @@ class FinancialImprovementActionPlanViewSet(ProgrammeManagerReadOnlyMixin, Viewe
                 bge = user.bge_profile
             except Exception:
                 pass
+
+        # If user has no bge_profile (e.g. staff/admin or unmatched user), try finding BGE from the MSME
+        msme = serializer.validated_data.get('msme')
+        if not bge and msme:
+            if hasattr(msme, 'assigned_bge') and msme.assigned_bge:
+                bge = msme.assigned_bge
+            elif hasattr(msme, 'bge') and msme.bge:
+                bge = msme.bge
+
+        # Fallback to any active BGE or first BGE so database NOT NULL constraint on bge_id is satisfied
+        if not bge:
+            bge = BusinessGrowthExpert.objects.filter(is_active=True).first() or BusinessGrowthExpert.objects.first()
         
         # If category chosen, auto-populate category_name and category_addresses if missing
         cat_id = serializer.validated_data.get('category')

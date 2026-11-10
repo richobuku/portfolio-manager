@@ -355,9 +355,15 @@ export default function FinancialImprovementPlanDialog({
     setErrorMsg('');
     setSaving(true);
 
+    const bgeId = bge?.id || activeMsme?.assigned_bge || activeMsme?.bge || form.bge || null;
+
     const payload = {
       ...form,
       msme: selectedMsmeId,
+      ...(bgeId ? { bge: bgeId } : {}),
+      bge_signed_at: form.bge_signed_at || null,
+      approved_at: form.approved_at || null,
+      approved_by: form.approved_by || null,
       status: submitNow ? 'submitted' : (form.status || 'draft'),
       submitted_at: submitNow ? new Date().toISOString() : null,
     };
@@ -385,7 +391,24 @@ export default function FinancialImprovementPlanDialog({
       if (onSaved) onSaved(savedResult);
       onClose();
     } catch (err) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to save Financial Improvement Action Plan.');
+      const respData = err.response?.data;
+      let msg = 'Failed to save Financial Improvement Action Plan.';
+      if (respData) {
+        if (typeof respData === 'string') {
+          msg = respData;
+        } else if (respData.detail) {
+          msg = respData.detail;
+        } else {
+          // Format validation errors (e.g. { bge: ['This field is required.'] })
+          msg = Object.entries(respData)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`)
+            .join(' | ');
+        }
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setErrorMsg(msg);
+      if (notify) notify(msg, 'error');
     } finally {
       setSaving(false);
     }

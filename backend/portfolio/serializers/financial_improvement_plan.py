@@ -20,6 +20,12 @@ class FinancialImprovementActionPlanSerializer(serializers.ModelSerializer):
         model = FinancialImprovementActionPlan
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at', 'submitted_at']
+        extra_kwargs = {
+            'bge': {'required': False, 'allow_null': True},
+            'bge_signed_at': {'required': False, 'allow_null': True},
+            'approved_at': {'required': False, 'allow_null': True},
+            'approved_by': {'required': False, 'allow_null': True},
+        }
 
     def get_msme_location(self, obj):
         m = obj.msme
