@@ -455,15 +455,18 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
       };
       await axios.post(API_ENDPOINTS.GROWTH_SNAPSHOTS, snapshotPayload, { headers: h });
 
-      // Also update the MSME's own GPS pin if we captured a location
+      // Also update the MSME's own GPS pin if we captured a location on-site
       if (quickUpdateForm.gpsStatus === 'ok') {
         const newLat = parseFloat(quickUpdateForm.latitude);
         const newLng = parseFloat(quickUpdateForm.longitude);
-        await axios.patch(`${API_ENDPOINTS.MSMES}${quickUpdateMsme.id}/`, {
-          latitude:  newLat,
-          longitude: newLng,
-        }, { headers: h });
-        setMsmes(prev => prev.map(m => m.id === quickUpdateMsme.id ? { ...m, latitude: newLat, longitude: newLng } : m));
+        const isNorthernMsme = NORTHERN_UGANDA_DISTRICTS.some(d => (quickUpdateMsme.district || '').toLowerCase().includes(d.toLowerCase()));
+        if (!isNorthernMsme || newLat >= 1.5) {
+          await axios.patch(`${API_ENDPOINTS.MSMES}${quickUpdateMsme.id}/`, {
+            latitude:  newLat,
+            longitude: newLng,
+          }, { headers: h });
+          setMsmes(prev => prev.map(m => m.id === quickUpdateMsme.id ? { ...m, latitude: newLat, longitude: newLng } : m));
+        }
       }
 
       notify('Visit data saved ✓');
@@ -5840,6 +5843,13 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
                       setEditMsmeForm(f => ({ ...f, _gpsLoading: true }));
                       navigator.geolocation.getCurrentPosition(
                         (pos) => {
+                          const lat = pos.coords.latitude;
+                          const isNorthern = NORTHERN_UGANDA_DISTRICTS.some(d => (editMsmeForm.district || '').toLowerCase().includes(d.toLowerCase()));
+                          if (isNorthern && lat < 1.5) {
+                            setEditMsmeForm(f => ({ ...f, _gpsLoading: false }));
+                            notify('Captured device location is in Central Uganda (Kampala). Did not overwrite Northern Uganda MSME location.', 'warning');
+                            return;
+                          }
                           setEditMsmeForm(f => ({
                             ...f,
                             latitude:  pos.coords.latitude.toFixed(6),

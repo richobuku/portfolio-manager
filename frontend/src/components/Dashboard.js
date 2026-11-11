@@ -13077,12 +13077,22 @@ PRUDEV II BDS Team`
                         }
                         setEditForm(f => ({ ...f, _gpsLoading: true }));
                         navigator.geolocation.getCurrentPosition(
-                          (pos) => setEditForm(f => ({
-                            ...f,
-                            latitude:  pos.coords.latitude.toFixed(6),
-                            longitude: pos.coords.longitude.toFixed(6),
-                            _gpsLoading: false,
-                          })),
+                          (pos) => {
+                            const lat = pos.coords.latitude;
+                            const d = (editForm.district || '').toLowerCase();
+                            const isNorthern = ['amuru', 'adjumani', 'gulu', 'lira', 'kitgum', 'nwoya', 'oyam', 'apac', 'dokolo', 'pader', 'agago', 'alebtong', 'otuke', 'omoro', 'kole', 'lamwo', 'arua', 'koboko', 'nebbi', 'yumbe', 'moyo'].some(k => d.includes(k));
+                            if (isNorthern && lat < 1.5) {
+                              setEditForm(f => ({ ...f, _gpsLoading: false }));
+                              notify('Captured device location is in Central Uganda (Kampala). Did not overwrite Northern Uganda MSME location.', 'warning');
+                              return;
+                            }
+                            setEditForm(f => ({
+                              ...f,
+                              latitude:  pos.coords.latitude.toFixed(6),
+                              longitude: pos.coords.longitude.toFixed(6),
+                              _gpsLoading: false,
+                            }));
+                          },
                           () => {
                             notify('Unable to retrieve device GPS location. Please ensure location permissions are granted.', 'error');
                             setEditForm(f => ({ ...f, _gpsLoading: false }));
@@ -13175,12 +13185,22 @@ PRUDEV II BDS Team`
                         }
                         setEditForm(f => ({ ...f, _gpsLoading: true }));
                         navigator.geolocation.getCurrentPosition(
-                          (pos) => setEditForm(f => ({
-                            ...f,
-                            latitude:  pos.coords.latitude.toFixed(6),
-                            longitude: pos.coords.longitude.toFixed(6),
-                            _gpsLoading: false,
-                          })),
+                          (pos) => {
+                            const lat = pos.coords.latitude;
+                            const d = (editForm.district || '').toLowerCase();
+                            const isNorthern = ['amuru', 'adjumani', 'gulu', 'lira', 'kitgum', 'nwoya', 'oyam', 'apac', 'dokolo', 'pader', 'agago', 'alebtong', 'otuke', 'omoro', 'kole', 'lamwo', 'arua', 'koboko', 'nebbi', 'yumbe', 'moyo'].some(k => d.includes(k));
+                            if (isNorthern && lat < 1.5) {
+                              setEditForm(f => ({ ...f, _gpsLoading: false }));
+                              notify('Captured device location is in Central Uganda (Kampala). Did not overwrite Northern Uganda MSME location.', 'warning');
+                              return;
+                            }
+                            setEditForm(f => ({
+                              ...f,
+                              latitude:  pos.coords.latitude.toFixed(6),
+                              longitude: pos.coords.longitude.toFixed(6),
+                              _gpsLoading: false,
+                            }));
+                          },
                           () => {
                             notify('Unable to retrieve device GPS location. Please ensure location permissions are granted.', 'error');
                             setEditForm(f => ({ ...f, _gpsLoading: false }));

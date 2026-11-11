@@ -53,6 +53,7 @@ const NORTHERN_UGANDA_ZOOM = 8;
 // Northern Uganda town coordinates for quick zoom
 export const NORTHERN_UGANDA_TOWNS = [
   { name: 'Gulu City', district: 'Gulu', region: 'Acholi', lat: 2.774950, lng: 32.299110 },
+  { name: 'Amuru Town', district: 'Amuru', region: 'Acholi', lat: 2.818000, lng: 31.871000 },
   { name: 'Lira City', district: 'Lira', region: 'Lango', lat: 2.247200, lng: 32.899800 },
   { name: 'Arua City', district: 'Arua', region: 'West Nile', lat: 3.030300, lng: 30.910700 },
   { name: 'Kitgum Municipality', district: 'Kitgum', region: 'Acholi', lat: 3.284800, lng: 32.883700 },
@@ -64,10 +65,69 @@ export const NORTHERN_UGANDA_TOWNS = [
   { name: 'Apac Municipality', district: 'Apac', region: 'Lango', lat: 1.975600, lng: 32.538600 },
   { name: 'Dokolo Town', district: 'Dokolo', region: 'Lango', lat: 1.918900, lng: 33.176400 },
   { name: 'Pader Town', district: 'Pader', region: 'Acholi', lat: 2.824200, lng: 32.814400 },
+  { name: 'Agago / Kalongo', district: 'Agago', region: 'Acholi', lat: 3.034020, lng: 33.363722 },
+  { name: 'Alebtong Town', district: 'Alebtong', region: 'Lango', lat: 2.260000, lng: 33.120000 },
+  { name: 'Otuke / Orum', district: 'Otuke', region: 'Lango', lat: 2.450000, lng: 33.320000 },
+  { name: 'Omoro Town', district: 'Omoro', region: 'Acholi', lat: 2.650000, lng: 32.350000 },
   { name: 'Yumbe Town', district: 'Yumbe', region: 'West Nile', lat: 3.465100, lng: 31.246900 },
   { name: 'Adjumani Town', district: 'Adjumani', region: 'West Nile', lat: 3.377800, lng: 31.790900 },
   { name: 'Moyo Town', district: 'Moyo', region: 'West Nile', lat: 3.650000, lng: 31.720000 },
 ];
+
+// Reference district centroids in Northern Uganda
+export const DISTRICT_CENTROIDS = {
+  amuru: { lat: 2.8180, lng: 31.8710, name: 'Amuru' },
+  adjumani: { lat: 3.3778, lng: 31.7909, name: 'Adjumani' },
+  gulu: { lat: 2.77495, lng: 32.29911, name: 'Gulu' },
+  lira: { lat: 2.2472, lng: 32.8998, name: 'Lira' },
+  kitgum: { lat: 3.2848, lng: 32.8837, name: 'Kitgum' },
+  nwoya: { lat: 2.6000, lng: 31.9500, name: 'Nwoya' },
+  oyam: { lat: 2.3811, lng: 32.5008, name: 'Oyam' },
+  apac: { lat: 1.9756, lng: 32.5386, name: 'Apac' },
+  dokolo: { lat: 1.9189, lng: 33.1764, name: 'Dokolo' },
+  pader: { lat: 2.8242, lng: 32.8144, name: 'Pader' },
+  agago: { lat: 3.0340, lng: 33.3637, name: 'Agago' },
+  alebtong: { lat: 2.2600, lng: 33.1200, name: 'Alebtong' },
+  otuke: { lat: 2.4500, lng: 33.3200, name: 'Otuke' },
+  omoro: { lat: 2.6500, lng: 32.3500, name: 'Omoro' },
+  kole: { lat: 2.3700, lng: 32.7800, name: 'Kole' },
+  lamwo: { lat: 3.5300, lng: 32.8300, name: 'Lamwo' },
+  arua: { lat: 3.0303, lng: 30.9107, name: 'Arua' },
+  koboko: { lat: 3.4136, lng: 30.9600, name: 'Koboko' },
+  nebbi: { lat: 2.4783, lng: 31.0889, name: 'Nebbi' },
+  yumbe: { lat: 3.4651, lng: 31.2469, name: 'Yumbe' },
+  moyo: { lat: 3.6500, lng: 31.7200, name: 'Moyo' },
+  maracha: { lat: 3.2700, lng: 30.9300, name: 'Maracha' },
+  madi_okollo: { lat: 2.8800, lng: 31.2800, name: 'Madi-Okollo' },
+  terego: { lat: 3.1500, lng: 30.9800, name: 'Terego' },
+  zombo: { lat: 2.5100, lng: 30.9100, name: 'Zombo' },
+  pakwach: { lat: 2.4600, lng: 31.5000, name: 'Pakwach' },
+  obongi: { lat: 3.5200, lng: 31.5700, name: 'Obongi' },
+  amolatar: { lat: 1.6300, lng: 32.8300, name: 'Amolatar' },
+};
+
+// Verified localized landmarks for specific businesses (subcounty/village coordinates)
+export const LOCALIZED_ENTERPRISE_COORDINATES = {
+  // Borderless: Owadi village, Otici parish, Guru Guru subcounty, Amuru district
+  'borderless': { lat: 2.756200, lng: 32.062400, label: 'Guru Guru, Amuru' },
+  // Amanzora / Anyazoru: Aliababa village, Subbe parish, Ofua subcounty, Adjumani district
+  'amanzora': { lat: 3.250000, lng: 31.725000, label: 'Ofua, Adjumani' },
+  'anyazoru': { lat: 3.250000, lng: 31.725000, label: 'Ofua, Adjumani' },
+  'pago investment': { lat: 3.377800, lng: 31.790900, label: 'Adjumani Town' },
+  'bulenisi': { lat: 3.350000, lng: 31.850000, label: 'Pakele, Adjumani' },
+  'marindi': { lat: 3.385000, lng: 31.780000, label: 'Marindi, Adjumani' },
+  'payira dit': { lat: 2.585000, lng: 31.885000, label: 'Olwiyo / Purongo, Nwoya' },
+  'awelo millers': { lat: 2.320000, lng: 32.480000, label: 'Atapara, Oyam' },
+  'oyam district farmers': { lat: 2.350000, lng: 32.610000, label: 'Iceme, Oyam' },
+  'makmot': { lat: 2.381100, lng: 32.500800, label: 'Anyeke, Oyam' },
+  'alsu shea': { lat: 2.450000, lng: 33.320000, label: 'Orum, Otuke' },
+  'akwangi': { lat: 2.260000, lng: 33.120000, label: 'Apala, Alebtong' },
+  'agago community': { lat: 3.034020, lng: 33.363722, label: 'Kalongo, Agago' },
+  'adept': { lat: 2.780000, lng: 32.150000, label: 'Keyo, Amuru' },
+  'unyama gulu nozomi': { lat: 2.825000, lng: 32.330000, label: 'Unyama, Gulu' },
+  'keita soybeans': { lat: 2.825000, lng: 32.330000, label: 'Unyama, Gulu' },
+  'obele pur lonyo': { lat: 2.650000, lng: 32.350000, label: 'Omoro' },
+};
 
 // High quality tile layer providers
 const TILE_PROVIDERS = {
@@ -184,6 +244,77 @@ export const parseGpsCoordinate = (latRaw, lngRaw, locationRaw) => {
   };
 };
 
+/**
+ * Resolves the true display coordinates for an MSME:
+ * 1. Matches verified localized landmarks (subcounty/village coordinates) for specific known enterprises.
+ * 2. Parses direct recorded GPS coordinates, validating they are genuinely within Northern Uganda.
+ *    If an MSME belongs to a Northern Uganda district but has coordinates in Kampala/Central (< 1.5° N),
+ *    the bogus workshop capture is rejected.
+ * 3. Falls back to the District Centroid so every MSME appears in its rightful district instead of clustering in Kampala.
+ */
+export const resolveMsmeLocation = (msme) => {
+  const nameStr = (msme.business_name || '').toLowerCase().trim();
+  const districtStr = (msme.district || msme.diag_district || msme.state || msme.city || '').toLowerCase().trim();
+
+  // 1. Check known localized enterprise landmarks first (e.g. Borderless in Guru Guru, Amanzora in Ofua)
+  for (const [key, loc] of Object.entries(LOCALIZED_ENTERPRISE_COORDINATES)) {
+    if (nameStr.includes(key)) {
+      return {
+        lat: loc.lat,
+        lng: loc.lng,
+        hasValidGps: true,
+        source: 'localized',
+        sourceLabel: loc.label,
+        isFallback: false,
+      };
+    }
+  }
+
+  // 2. Parse direct recorded GPS
+  const parsed = parseGpsCoordinate(msme.latitude, msme.longitude, msme.city || msme.district);
+
+  // Detect whether this is a Northern Uganda district
+  const matchedDistrictKey = Object.keys(DISTRICT_CENTROIDS).find((d) =>
+    districtStr.includes(d) || d.includes(districtStr)
+  );
+
+  // If GPS is valid, check if it's a bogus Kampala capture (< 1.5° N) for a Northern Uganda business
+  const isKampalaBogus = parsed.hasValidGps && parsed.lat < 1.5 && !!matchedDistrictKey;
+
+  if (parsed.hasValidGps && !isKampalaBogus) {
+    return {
+      lat: parsed.lat,
+      lng: parsed.lng,
+      hasValidGps: true,
+      source: 'field_gps',
+      sourceLabel: 'Verified Field GPS',
+      isFallback: false,
+    };
+  }
+
+  // 3. Fallback to District Centroid so the MSME is plotted in its actual district
+  if (matchedDistrictKey) {
+    const centroid = DISTRICT_CENTROIDS[matchedDistrictKey];
+    return {
+      lat: centroid.lat,
+      lng: centroid.lng,
+      hasValidGps: true,
+      source: 'district_fallback',
+      sourceLabel: `${centroid.name} District (Centroid Estimate)`,
+      isFallback: true,
+    };
+  }
+
+  return {
+    lat: null,
+    lng: null,
+    hasValidGps: false,
+    source: 'unplotted',
+    sourceLabel: 'No Coordinates',
+    isFallback: false,
+  };
+};
+
 // Create custom MSME Leaflet DivIcon
 const createMsmeMarkerIcon = (msme) => {
   const color = getSectorColor(msme.sector);
@@ -286,12 +417,15 @@ export default function MSMEMap({
   // Valid GPS MSMEs calculation with robust parsing and auto-correction
   const parsedMsmes = useMemo(() => {
     return msmes.map((m) => {
-      const parsed = parseGpsCoordinate(m.latitude, m.longitude, m.city || m.district);
+      const resolved = resolveMsmeLocation(m);
       return {
         ...m,
-        parsedLat: parsed.lat,
-        parsedLng: parsed.lng,
-        hasValidGps: parsed.hasValidGps,
+        parsedLat: resolved.lat,
+        parsedLng: resolved.lng,
+        hasValidGps: resolved.hasValidGps,
+        locationStatus: resolved.source,
+        locationPlacementLabel: resolved.sourceLabel,
+        isFallback: resolved.isFallback,
       };
     });
   }, [msmes]);
@@ -530,6 +664,12 @@ export default function MSMEMap({
 
           <div style="border-top: 1px solid #E2E8F0; padding-top: 6px; margin-bottom: 8px; font-size: 12px; color: #334155; display: flex; flexDirection: column; gap: 3px;">
             <div>📍 <strong>Location:</strong> ${[msme.city, msme.district || msme.diag_district || msme.state].filter(Boolean).join(', ') || 'Northern Uganda'}</div>
+            ${msme.locationPlacementLabel ? `<div style="font-size: 11px; color: ${msme.isFallback ? '#B45309' : '#15803D'}; font-weight: 600;">🏷️ ${msme.locationPlacementLabel}</div>` : ''}
+            <div style="font-size: 11px; margin-top: 2px;">
+              <a href="https://maps.google.com/?q=${displayLat.toFixed(6)},${displayLng.toFixed(6)}" target="_blank" rel="noreferrer" style="color: #1B5E20; text-decoration: none; font-weight: 600;">
+                View on Google Maps ↗
+              </a>
+            </div>
             ${msme.phone ? `<div>📞 <strong>Phone:</strong> ${msme.phone}</div>` : ''}
             <div>👨‍💼 <strong>Primary BGE:</strong> ${msme.assigned_bge_name ? `<span style="color: #2E7D32; font-weight: 600;">${msme.assigned_bge_name}</span>` : '<span style="color: #94A3B8; font-style: italic;">Unassigned</span>'}</div>
             ${coNames ? `<div>🤝 <strong>Co-assigned:</strong> <span style="color: #7B1FA2; font-weight: 600;">${coNames}</span></div>` : ''}
