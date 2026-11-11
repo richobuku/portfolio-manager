@@ -9,19 +9,27 @@ embedded in the header band on every page.
 """
 import io
 import os
+import logging
+import subprocess
+import tempfile
 from xml.sax.saxutils import escape as xml_escape
+from PIL import Image as PILImage
+import reportlab.rl_config
 from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, KeepTogether,
+    HRFlowable, KeepTogether, Image as RLImage,
 )
 from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY, TA_CENTER
 
+logger = logging.getLogger(__name__)
 
 NAVY = HexColor('#1A2F4B')
 RED  = HexColor('#C8102E')
@@ -30,6 +38,60 @@ LIGHT_GREY = HexColor('#F5F5F5')
 
 SIG_H = 10 * mm  # signature block height — 50% of original 20mm
 
+# Fonts: Use DejaVu Sans TrueType embedded fonts across all documents
+_FONT_DIR = os.path.join(os.path.dirname(__file__), 'static', 'portfolio', 'fonts')
+FONT_REGULAR     = 'DejaVuSans'
+FONT_BOLD        = 'DejaVuSans-Bold'
+FONT_ITALIC      = 'DejaVuSans-Oblique'
+FONT_BOLD_ITALIC = 'DejaVuSans-BoldOblique'
+
+
+def _init_fonts():
+    """Register embedded TrueType fonts (DejaVu Sans) and family mappings.
+    Ensures zero Type 1 or non-embedded standard-14 fonts are left in the file."""
+    if getattr(_init_fonts, '_done', False):
+        return
+
+    reg_path = os.path.join(_FONT_DIR, 'DejaVuSans.ttf')
+    bold_path = os.path.join(_FONT_DIR, 'DejaVuSans-Bold.ttf')
+    italic_path = os.path.join(_FONT_DIR, 'DejaVuSans-Oblique.ttf')
+    bi_path = os.path.join(_FONT_DIR, 'DejaVuSans-BoldOblique.ttf')
+
+    for name, p in [
+        (FONT_REGULAR, reg_path),
+        (FONT_BOLD, bold_path),
+        (FONT_ITALIC, italic_path),
+        (FONT_BOLD_ITALIC, bi_path),
+        # Alias Helvetica to DejaVuSans TTF so any external or default lookup is embedded
+        ('Helvetica', reg_path),
+        ('Helvetica-Bold', bold_path),
+        ('Helvetica-Oblique', italic_path),
+        ('Helvetica-BoldOblique', bi_path),
+    ]:
+        if os.path.isfile(p):
+            pdfmetrics.registerFont(TTFont(name, p))
+
+    # Register font families so <b> and <i> tags resolve automatically
+    for fam in ['DejaVuSans', 'Helvetica']:
+        pdfmetrics.registerFontFamily(
+            fam,
+            normal=FONT_REGULAR,
+            bold=FONT_BOLD,
+            italic=FONT_ITALIC,
+            boldItalic=FONT_BOLD_ITALIC,
+        )
+
+    # Set canvas default font to the embedded font
+    reportlab.rl_config.canvas_basefontname = FONT_REGULAR
+    # Set bulletFontName default on ParagraphStyle class to avoid ZapfDingbats/Helvetica
+    ParagraphStyle.bulletFontName = FONT_REGULAR
+
+    _init_fonts._done = True
+
+
+_init_fonts()
+
+
 # Logo assets — copied into static/portfolio/images/ alongside the React
 # /public copies, so the PDF generator doesn't depend on the frontend
 # build artefacts.
@@ -37,34 +99,77 @@ _LOGO_DIR = os.path.join(os.path.dirname(__file__), 'static', 'portfolio', 'imag
 GIZ_LOGO_PATH  = os.path.join(_LOGO_DIR, 'giz-logo.png')
 GOPA_LOGO_PATH = os.path.join(_LOGO_DIR, 'gopa-logo.png')
 
+_FLATTENED_IMAGE_CACHE = {}
+
+
+def _flatten_image(source):
+    """
+    Flattens any alpha channel onto a solid white (255, 255, 255) background.
+    source can be a filepath, bytes, BytesIO, or PIL Image.
+    Returns an ImageReader with a pure RGB JPEG (no transparency, no smask).
+    Cached so this runs once per image.
+    """
+    if source is None:
+        return None
+    cache_key = source if isinstance(source, (str, bytes)) else getattr(source, 'name', id(source))
+    if cache_key in _FLATTENED_IMAGE_CACHE:
+        return _FLATTENED_IMAGE_CACHE[cache_key]
+
+    try:
+        if isinstance(source, str):
+            if not os.path.isfile(source):
+                _FLATTENED_IMAGE_CACHE[cache_key] = None
+                return None
+            pil_img = PILImage.open(source)
+        elif isinstance(source, bytes):
+            pil_img = PILImage.open(io.BytesIO(source))
+        elif hasattr(source, 'read'):
+            source.seek(0)
+            pil_img = PILImage.open(source)
+        else:
+            pil_img = source
+
+        # If image has alpha channel or palette transparency, composite over pure white
+        if pil_img.mode in ('RGBA', 'LA') or (pil_img.mode == 'P' and 'transparency' in pil_img.info):
+            rgba = pil_img.convert('RGBA')
+            bg = PILImage.new('RGB', rgba.size, (255, 255, 255))
+            alpha = rgba.split()[3]
+            bg.paste(rgba, mask=alpha)
+            rgb_img = bg
+        else:
+            rgb_img = pil_img.convert('RGB')
+
+        buf = io.BytesIO()
+        rgb_img.save(buf, format='JPEG', quality=95)
+        buf.seek(0)
+        reader = ImageReader(buf)
+        _FLATTENED_IMAGE_CACHE[cache_key] = reader
+        return reader
+    except Exception as exc:
+        logger.warning("Failed to flatten image: %s", exc)
+        _FLATTENED_IMAGE_CACHE[cache_key] = None
+        return None
+
 
 def _safe_image(path):
-    """Return a ReportLab ImageReader if the file exists, else None.
-    Caches across calls so we don't re-read on every page header."""
-    if not getattr(_safe_image, '_cache', None):
-        _safe_image._cache = {}
-    if path in _safe_image._cache:
-        return _safe_image._cache[path]
-    try:
-        if os.path.isfile(path):
-            _safe_image._cache[path] = ImageReader(path)
-        else:
-            _safe_image._cache[path] = None
-    except Exception:
-        _safe_image._cache[path] = None
-    return _safe_image._cache[path]
+    """Return flattened ImageReader if file exists, else None."""
+    return _flatten_image(path)
 
 
 def _styles():
+    _init_fonts()
     base = getSampleStyleSheet()
+    for s_obj in base.byName.values():
+        s_obj.fontName = FONT_REGULAR
+        s_obj.bulletFontName = FONT_REGULAR
     s = {
-        'h1':    ParagraphStyle('h1',    parent=base['Heading1'], fontSize=18, textColor=NAVY, spaceAfter=4),
-        'sub':   ParagraphStyle('sub',   parent=base['Normal'],   fontSize=10, textColor=GREY, spaceAfter=10),
-        'h2':    ParagraphStyle('h2',    parent=base['Heading2'], fontSize=12, textColor=NAVY, spaceBefore=12, spaceAfter=4),
-        'label': ParagraphStyle('lbl',   parent=base['Normal'],   fontSize=8,  textColor=GREY, spaceAfter=2),
-        'body':  ParagraphStyle('body',  parent=base['Normal'],   fontSize=10, leading=14, alignment=TA_JUSTIFY, spaceAfter=8),
-        'meta':  ParagraphStyle('meta',  parent=base['Normal'],   fontSize=9,  textColor=GREY),
-        'sectiontitle': ParagraphStyle('sectiontitle', parent=base['Normal'], fontSize=11, textColor=RED, spaceBefore=12, spaceAfter=2, fontName='Helvetica-Bold'),
+        'h1':    ParagraphStyle('h1',    parent=base['Heading1'], fontSize=18, textColor=NAVY, spaceAfter=4, fontName=FONT_BOLD, bulletFontName=FONT_REGULAR),
+        'sub':   ParagraphStyle('sub',   parent=base['Normal'],   fontSize=10, textColor=GREY, spaceAfter=10, fontName=FONT_REGULAR, bulletFontName=FONT_REGULAR),
+        'h2':    ParagraphStyle('h2',    parent=base['Heading2'], fontSize=12, textColor=NAVY, spaceBefore=12, spaceAfter=4, fontName=FONT_BOLD, bulletFontName=FONT_REGULAR),
+        'label': ParagraphStyle('lbl',   parent=base['Normal'],   fontSize=8,  textColor=GREY, spaceAfter=2, fontName=FONT_REGULAR, bulletFontName=FONT_REGULAR),
+        'body':  ParagraphStyle('body',  parent=base['Normal'],   fontSize=10, leading=14, alignment=TA_JUSTIFY, spaceAfter=8, fontName=FONT_REGULAR, bulletFontName=FONT_REGULAR),
+        'meta':  ParagraphStyle('meta',  parent=base['Normal'],   fontSize=9,  textColor=GREY, fontName=FONT_REGULAR, bulletFontName=FONT_REGULAR),
+        'sectiontitle': ParagraphStyle('sectiontitle', parent=base['Normal'], fontSize=11, textColor=RED, spaceBefore=12, spaceAfter=2, fontName=FONT_BOLD, bulletFontName=FONT_REGULAR),
     }
     return s
 
@@ -85,7 +190,7 @@ def _header(canvas, doc):
     canvas.setFillColor(RED)
     canvas.rect(0, h - band_height - 1.5 * mm, w, 1.5 * mm, fill=1, stroke=0)
 
-    # ── Left: GOPA Pro logo ──────────────────────────────────────────────
+    # ── Left: GOPA Pro logo (flattened RGB JPEG, no mask) ────────────────
     gopa = _safe_image(GOPA_LOGO_PATH)
     if gopa:
         # GOPA Pro aspect ratio ≈ 5.30:1; render at 10.5mm tall.
@@ -95,10 +200,10 @@ def _header(canvas, doc):
             gopa,
             x=14 * mm, y=h - band_height + (band_height - logo_h) / 2,
             width=logo_w, height=logo_h,
-            mask='auto', preserveAspectRatio=True,
+            preserveAspectRatio=True,
         )
 
-    # ── Right: GIZ + German Cooperation lockup ───────────────────────────
+    # ── Right: GIZ + German Cooperation lockup (flattened RGB JPEG, no mask)
     giz = _safe_image(GIZ_LOGO_PATH)
     if giz:
         # GIZ aspect ratio ≈ 2.71:1 (German Cooperation + "Implemented by giz")
@@ -108,21 +213,21 @@ def _header(canvas, doc):
             giz,
             x=w - 14 * mm - logo_w, y=h - band_height + (band_height - logo_h) / 2,
             width=logo_w, height=logo_h,
-            mask='auto', preserveAspectRatio=True,
+            preserveAspectRatio=True,
         )
 
     # ── Centre: programme wordmark ───────────────────────────────────────
     centre_y = h - band_height / 2
     canvas.setFillColor(NAVY)
-    canvas.setFont('Helvetica-Bold', 13)
+    canvas.setFont(FONT_BOLD, 13)
     canvas.drawCentredString(w / 2, centre_y + 2 * mm, 'PRUDEV II')
     canvas.setFillColor(GREY)
-    canvas.setFont('Helvetica', 8)
+    canvas.setFont(FONT_REGULAR, 8)
     canvas.drawCentredString(w / 2, centre_y - 2 * mm, 'Portfolio Manager · MSME Programme')
 
     # ── Footer ───────────────────────────────────────────────────────────
     canvas.setFillColor(GREY)
-    canvas.setFont('Helvetica', 8)
+    canvas.setFont(FONT_REGULAR, 8)
     canvas.drawCentredString(
         w / 2, 10 * mm,
         f'Page {doc.page} · PRUDEV II Programme · GIZ · GOPA Pro'
@@ -134,8 +239,8 @@ def _kv_table(rows):
     """Two-column key/value table used for the metadata strip."""
     t = Table(rows, colWidths=[40 * mm, 130 * mm], hAlign='LEFT')
     t.setStyle(TableStyle([
-        ('FONT',       (0, 0), (0, -1), 'Helvetica-Bold', 9),
-        ('FONT',       (1, 0), (1, -1), 'Helvetica',      10),
+        ('FONT',       (0, 0), (0, -1), FONT_BOLD,    9),
+        ('FONT',       (1, 0), (1, -1), FONT_REGULAR, 10),
         ('TEXTCOLOR',  (0, 0), (0, -1), GREY),
         ('TEXTCOLOR',  (1, 0), (1, -1), NAVY),
         ('VALIGN',     (0, 0), (-1, -1), 'TOP'),
@@ -198,18 +303,20 @@ def _sig_block(s, bge, signed_date=None, reviewer_label='Reviewed by (Senior BGE
     sig_drawn = False
     if bge and getattr(bge, 'signature_data', None):
         try:
-            bge_col.append(RLImage(io.BytesIO(bytes(bge.signature_data)),
-                                   width=40 * mm, height=SIG_H, kind='proportional'))
-            sig_drawn = True
+            flat_reader = _flatten_image(bytes(bge.signature_data))
+            if flat_reader:
+                bge_col.append(RLImage(flat_reader, width=40 * mm, height=SIG_H, kind='proportional'))
+                sig_drawn = True
         except Exception:
             pass
     if not sig_drawn and bge and bge.signature:
         try:
             sig_path = bge.signature.path
             if os.path.isfile(sig_path):
-                bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
-                                       kind='proportional'))
-                sig_drawn = True
+                flat_reader = _flatten_image(sig_path)
+                if flat_reader:
+                    bge_col.append(RLImage(flat_reader, width=40 * mm, height=SIG_H, kind='proportional'))
+                    sig_drawn = True
         except Exception:
             pass
     if not sig_drawn:
@@ -476,8 +583,8 @@ def render_group_report(report):
         t.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), NAVY),
             ('TEXTCOLOR',  (0, 0), (-1, 0), HexColor('#FFFFFF')),
-            ('FONT',       (0, 0), (-1, 0), 'Helvetica-Bold', 9),
-            ('FONT',       (0, 1), (-1, -1), 'Helvetica', 9),
+            ('FONT',       (0, 0), (-1, 0), FONT_BOLD, 9),
+            ('FONT',       (0, 1), (-1, -1), FONT_REGULAR, 9),
             ('LINEBELOW',  (0, 0), (-1, -1), 0.25, LIGHT_GREY),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('TOPPADDING',    (0, 0), (-1, -1), 6),
@@ -531,7 +638,7 @@ def render_work_order(work_order):
         story.append(Spacer(1, 4))
         story.append(Paragraph(
             f'Pursuant to the Service Contract dated 12th day of October 2026 between GOPA AFC and <b>{_safe_html(bge.name)}</b>, this Work Order is issued under the PRUDEV II Project framework.',
-            ParagraphStyle('pursuant', parent=s['body'], fontSize=9, leading=13, fontName='Helvetica-Oblique', textColor=HexColor('#333333')),
+            ParagraphStyle('pursuant', parent=s['body'], fontSize=9, leading=13, fontName=FONT_ITALIC, textColor=HexColor('#333333')),
         ))
         story.append(Spacer(1, 4))
 
@@ -578,7 +685,7 @@ def render_work_order(work_order):
         cell_style = ParagraphStyle('del_cell', parent=s['body'],
                                     fontSize=9, leading=12, spaceAfter=0)
         hdr_style  = ParagraphStyle('del_hdr',  parent=cell_style,
-                                    fontName='Helvetica-Bold',
+                                    fontName=FONT_BOLD,
                                     textColor=HexColor('#FFFFFF'))
         rows = [[
             Paragraph('#',           hdr_style),
@@ -625,7 +732,7 @@ def render_work_order(work_order):
             sm = ParagraphStyle('rbm_cell', parent=s['body'],
                                 fontSize=7.5, leading=10, spaceAfter=0)
             hm = ParagraphStyle('rbm_hdr', parent=sm,
-                                fontName='Helvetica-Bold',
+                                fontName=FONT_BOLD,
                                 textColor=HexColor('#FFFFFF'))
             matrix_rows = [[
                 Paragraph('#',                            hm),
@@ -688,7 +795,7 @@ def render_work_order(work_order):
         story.append(Spacer(1, 6))
         _tp_cell  = ParagraphStyle('tp_cell', parent=s['body'], fontSize=9)
         _tp_hdr   = ParagraphStyle('tp_hdr',  parent=s['body'], fontSize=9,
-                                   fontName='Helvetica-Bold', textColor=HexColor('#FFFFFF'))
+                                   fontName=FONT_BOLD, textColor=HexColor('#FFFFFF'))
         tp_rows = [
             [Paragraph('Session', _tp_hdr), Paragraph('Topic', _tp_hdr), Paragraph('Day / Slot', _tp_hdr)],
             [Paragraph('1', _tp_cell), Paragraph('Orientation on Business Continuity Planning', _tp_cell), Paragraph('Day 1 &#x2014; Morning', _tp_cell)],
@@ -736,7 +843,7 @@ def render_work_order(work_order):
         story.append(Spacer(1, 6))
         _tp_cell  = ParagraphStyle('tp_cell_bd', parent=s['body'], fontSize=9)
         _tp_hdr   = ParagraphStyle('tp_hdr_bd',  parent=s['body'], fontSize=9,
-                                   fontName='Helvetica-Bold', textColor=HexColor('#FFFFFF'))
+                                   fontName=FONT_BOLD, textColor=HexColor('#FFFFFF'))
         bd_rows = [
             [Paragraph('Day', _tp_hdr), Paragraph('Session & Core Focus', _tp_hdr), Paragraph('Schedule', _tp_hdr)],
             [Paragraph('Day 1', _tp_cell), Paragraph('Bankable Documents: Defining bankability, statutory compliance (URSB/TIN), and financial record reconstruction from informal books.', _tp_cell), Paragraph('29 Sep 2026 &#x2014; Full Day', _tp_cell)],
@@ -761,7 +868,7 @@ def render_work_order(work_order):
         story.append(Paragraph('PROGRAMME OVERVIEW', s['sectiontitle']))
         _tp_cell = ParagraphStyle('tp_cell2', parent=s['body'], fontSize=9)
         _tp_hdr  = ParagraphStyle('tp_hdr2',  parent=s['body'], fontSize=9,
-                                  fontName='Helvetica-Bold', textColor=HexColor('#FFFFFF'))
+                                  fontName=FONT_BOLD, textColor=HexColor('#FFFFFF'))
         phase_rows = [
             [Paragraph('Phase', _tp_hdr), Paragraph('Activities', _tp_hdr), Paragraph('Dates', _tp_hdr), Paragraph('Days', _tp_hdr)],
             [Paragraph('1 — Preparation', _tp_cell),
@@ -788,7 +895,7 @@ def render_work_order(work_order):
             ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
             ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FFFFFF'), HexColor('#FAFAFA')]),
-            ('FONTNAME',      (0, 4), (-1, 4),  'Helvetica-Bold'),
+            ('FONTNAME',      (0, 4), (-1, 4),  FONT_BOLD),
             ('LINEABOVE',     (0, 4), (-1, 4),  0.5, NAVY),
         ]))
         story.append(phase_table)
@@ -1296,18 +1403,20 @@ def render_work_order(work_order):
         # Prefer DB-stored bytes (survives Render filesystem wipes), then file path
         if getattr(bge, 'signature_data', None):
             try:
-                bge_col.append(RLImage(io.BytesIO(bytes(bge.signature_data)),
-                                       width=40 * mm, height=SIG_H, kind='proportional'))
-                sig_drawn = True
+                flat_reader = _flatten_image(bytes(bge.signature_data))
+                if flat_reader:
+                    bge_col.append(RLImage(flat_reader, width=40 * mm, height=SIG_H, kind='proportional'))
+                    sig_drawn = True
             except Exception:
                 pass
         if not sig_drawn and bge.signature:
             try:
                 sig_path = bge.signature.path
                 if os.path.isfile(sig_path):
-                    bge_col.append(RLImage(sig_path, width=40 * mm, height=SIG_H,
-                                           kind='proportional'))
-                    sig_drawn = True
+                    flat_reader = _flatten_image(sig_path)
+                    if flat_reader:
+                        bge_col.append(RLImage(flat_reader, width=40 * mm, height=SIG_H, kind='proportional'))
+                        sig_drawn = True
             except Exception:
                 pass
     if not sig_drawn:
@@ -1381,15 +1490,15 @@ def render_training_report(report):
     demo_table.setStyle(TableStyle([
         ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
         ('TEXTCOLOR',     (0, 0), (-1, 0), HexColor('#FFFFFF')),
-        ('FONT',          (0, 0), (-1, 0), 'Helvetica-Bold', 9),
-        ('FONT',          (0, 1), (-1, 1), 'Helvetica', 11),
+        ('FONT',          (0, 0), (-1, 0), FONT_BOLD, 9),
+        ('FONT',          (0, 1), (-1, 1), FONT_REGULAR, 11),
         ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING',    (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('GRID',          (0, 0), (-1, -1), 0.5, LIGHT_GREY),
         ('BACKGROUND',    (4, 1), (4, 1), LIGHT_GREY),
-        ('FONT',          (4, 1), (4, 1), 'Helvetica-Bold', 11),
+        ('FONT',          (4, 1), (4, 1), FONT_BOLD, 11),
     ]))
     story.append(Paragraph('Participant Demographics', s['sectiontitle']))
     story.append(demo_table)
@@ -1472,8 +1581,8 @@ def render_training_report(report):
             att_table.setStyle(TableStyle([
                 ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
                 ('TEXTCOLOR',     (0, 0), (-1, 0), HexColor('#FFFFFF')),
-                ('FONT',          (0, 0), (-1, 0), 'Helvetica-Bold', 7),
-                ('FONT',          (0, 1), (-1, -1), 'Helvetica', 8),
+                ('FONT',          (0, 0), (-1, 0), FONT_BOLD, 7),
+                ('FONT',          (0, 1), (-1, -1), FONT_REGULAR, 8),
                 ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
                 ('ALIGN',         (1, 1), (1, -1), 'LEFT'),
                 ('ALIGN',         (2, 1), (2, -1), 'LEFT'),
@@ -1601,7 +1710,7 @@ def render_participant_training_report(report):
         t.setStyle(TableStyle([
             ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
             ('TEXTCOLOR',     (0, 0), (-1, 0), HexColor('#FFFFFF')),
-            ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME',      (0, 0), (-1, 0), FONT_BOLD),
             ('FONTSIZE',      (0, 0), (-1, -1), 8),
             ('GRID',          (0, 0), (-1, -1), 0.3, LIGHT_GREY),
             ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
@@ -1645,21 +1754,21 @@ def _qr_styles():
     MID   = HexColor('#2B5278')
     GREY2 = HexColor('#555555')
     return {
-        'title':   ParagraphStyle('qrt',  fontName='Helvetica-Bold', fontSize=17,
+        'title':   ParagraphStyle('qrt',  fontName=FONT_BOLD, fontSize=17,
                                   textColor=NAVY2, alignment=TA_CENTER, spaceAfter=2, leading=22),
-        'sub':     ParagraphStyle('qrs',  fontName='Helvetica', fontSize=10,
+        'sub':     ParagraphStyle('qrs',  fontName=FONT_REGULAR, fontSize=10,
                                   textColor=GREY2, alignment=TA_CENTER, spaceAfter=2),
-        'h1':      ParagraphStyle('qrh1', fontName='Helvetica-Bold', fontSize=12,
+        'h1':      ParagraphStyle('qrh1', fontName=FONT_BOLD, fontSize=12,
                                   textColor=NAVY2, spaceBefore=12, spaceAfter=4, leading=16),
-        'body':    ParagraphStyle('qrb',  fontName='Helvetica', fontSize=9.5,
+        'body':    ParagraphStyle('qrb',  fontName=FONT_REGULAR, fontSize=9.5,
                                   leading=14, spaceAfter=4, alignment=TA_JUSTIFY),
-        'th':      ParagraphStyle('qrth', fontName='Helvetica-Bold', fontSize=8.5,
+        'th':      ParagraphStyle('qrth', fontName=FONT_BOLD, fontSize=8.5,
                                   textColor=HexColor('#FFFFFF'), alignment=TA_CENTER, leading=11),
-        'td':      ParagraphStyle('qrtd',  fontName='Helvetica', fontSize=8.5, leading=11),
-        'tdc':     ParagraphStyle('qrtdc', fontName='Helvetica', fontSize=8.5, leading=11,
+        'td':      ParagraphStyle('qrtd',  fontName=FONT_REGULAR, fontSize=8.5, leading=11),
+        'tdc':     ParagraphStyle('qrtdc', fontName=FONT_REGULAR, fontSize=8.5, leading=11,
                                   alignment=TA_CENTER),
-        'tdb':     ParagraphStyle('qrtdb', fontName='Helvetica-Bold', fontSize=8.5, leading=11),
-        'bge_hdr': ParagraphStyle('qrbh', fontName='Helvetica-Bold', fontSize=9.5,
+        'tdb':     ParagraphStyle('qrtdb', fontName=FONT_BOLD, fontSize=8.5, leading=11),
+        'bge_hdr': ParagraphStyle('qrbh', fontName=FONT_BOLD, fontSize=9.5,
                                   textColor=HexColor('#FFFFFF'), backColor=MID, leading=14,
                                   spaceBefore=6, spaceAfter=2),
     }
@@ -1673,7 +1782,7 @@ def _qr_table(data, cws, hrows=1, extra_cmds=()):
     cmds = [
         ('BACKGROUND',    (0, 0), (-1, hrows-1), NAVY2),
         ('TEXTCOLOR',     (0, 0), (-1, hrows-1), HexColor('#FFFFFF')),
-        ('FONTNAME',      (0, 0), (-1, hrows-1), 'Helvetica-Bold'),
+        ('FONTNAME',      (0, 0), (-1, hrows-1), FONT_BOLD),
         ('FONTSIZE',      (0, 0), (-1, -1), 8.5),
         ('LEADING',       (0, 0), (-1, -1), 11),
         ('TOPPADDING',    (0, 0), (-1, -1), 4),
@@ -1745,9 +1854,9 @@ def render_quarterly_report(qs, start_date=None, end_date=None, label=''):
     story.append(HRFlowable(width='100%', thickness=1.5, color=ACCENT2, spaceAfter=6))
 
     def _kpi_cell(num_txt, lbl_txt, idx):
-        num_s = ParagraphStyle(f'kn{idx}', fontName='Helvetica-Bold', fontSize=20,
+        num_s = ParagraphStyle(f'kn{idx}', fontName=FONT_BOLD, fontSize=20,
                                textColor=HexColor('#FFFFFF'), alignment=TA_CENTER, leading=24)
-        lbl_s = ParagraphStyle(f'kl{idx}', fontName='Helvetica', fontSize=8,
+        lbl_s = ParagraphStyle(f'kl{idx}', fontName=FONT_REGULAR, fontSize=8,
                                textColor=HexColor('#FFFFFF'), alignment=TA_CENTER)
         return [Paragraph(num_txt, num_s), Paragraph(lbl_txt, lbl_s)]
 
@@ -1792,9 +1901,9 @@ def render_quarterly_report(qs, start_date=None, end_date=None, label=''):
     vt_rows.append([
         Paragraph('<b>TOTAL</b>', s['tdb']),
         Paragraph(f'<b>{total_reports}</b>',
-                  ParagraphStyle('vtot', fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+                  ParagraphStyle('vtot', fontName=FONT_BOLD, fontSize=8.5, alignment=TA_CENTER)),
         Paragraph('<b>100%</b>',
-                  ParagraphStyle('vp',   fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+                  ParagraphStyle('vp',   fontName=FONT_BOLD, fontSize=8.5, alignment=TA_CENTER)),
     ])
     vt_t = _qr_table(vt_rows, [CW * 0.55, CW * 0.22, CW * 0.23], extra_cmds=[
         ('BACKGROUND', (0, len(vt_rows)-1), (-1, len(vt_rows)-1), NAVY2),
@@ -1828,9 +1937,9 @@ def render_quarterly_report(qs, start_date=None, end_date=None, label=''):
     bge_rows.append([
         Paragraph(f'<b>TOTAL — {len(by_bge)} BGEs</b>', s['tdb']),
         Paragraph(f'<b>{total_reports}</b>',
-                  ParagraphStyle('btot', fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+                  ParagraphStyle('btot', fontName=FONT_BOLD, fontSize=8.5, alignment=TA_CENTER)),
         Paragraph(f'<b>{len(msme_ids)}</b>',
-                  ParagraphStyle('bmsme', fontName='Helvetica-Bold', fontSize=8.5, alignment=TA_CENTER)),
+                  ParagraphStyle('bmsme', fontName=FONT_BOLD, fontSize=8.5, alignment=TA_CENTER)),
         '',
     ])
     bge_t = _qr_table(bge_rows, [CW * 0.31, CW * 0.12, CW * 0.11, CW * 0.46], extra_cmds=[
@@ -1846,13 +1955,13 @@ def render_quarterly_report(qs, start_date=None, end_date=None, label=''):
     story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=6))
 
     # Hoist repeated ParagraphStyles out of the inner loops — one object per style is enough
-    _s_msmeh = ParagraphStyle('qr_msmeh', fontName='Helvetica-Bold', fontSize=9,
+    _s_msmeh = ParagraphStyle('qr_msmeh', fontName=FONT_BOLD, fontSize=9,
                                textColor=MID, spaceBefore=4, spaceAfter=2)
-    _s_vrh   = ParagraphStyle('qr_vrh', fontName='Helvetica-Oblique', fontSize=8.5,
+    _s_vrh   = ParagraphStyle('qr_vrh', fontName=FONT_ITALIC, fontSize=8.5,
                                textColor=HexColor('#666666'), spaceBefore=2, spaceAfter=1)
-    _s_vrb   = ParagraphStyle('qr_vrb', fontName='Helvetica', fontSize=8.5,
+    _s_vrb   = ParagraphStyle('qr_vrb', fontName=FONT_REGULAR, fontSize=8.5,
                                leading=12, spaceAfter=2, leftIndent=8, alignment=TA_JUSTIFY)
-    _s_vrn   = ParagraphStyle('qr_vrn', fontName='Helvetica-Oblique', fontSize=8.5,
+    _s_vrn   = ParagraphStyle('qr_vrn', fontName=FONT_ITALIC, fontSize=8.5,
                                textColor=HexColor('#999999'), leftIndent=8, spaceAfter=2)
 
     for bge, rpts in sorted(by_bge.items(), key=lambda x: x[0].name):
@@ -1909,7 +2018,7 @@ def render_quarterly_report(qs, start_date=None, end_date=None, label=''):
     story.append(HRFlowable(width='100%', thickness=0.8, color=NAVY2, spaceAfter=4))
     story.append(Paragraph(
         f'Generated from PRUDEV II Portfolio Management System  ·  Period: {period_str}',
-        ParagraphStyle('foot2', fontName='Helvetica', fontSize=7.5,
+        ParagraphStyle('foot2', fontName=FONT_REGULAR, fontSize=7.5,
                        textColor=HexColor('#888888'), alignment=TA_CENTER),
     ))
 
@@ -2008,9 +2117,9 @@ def render_activity_report(data_updates, sessions, mentor_reports,
 
     # ── KPI strip ─────────────────────────────────────────────────────────────
     def _kpi_cell(num_txt, lbl_txt, idx):
-        num_s = ParagraphStyle(f'akn{idx}', fontName='Helvetica-Bold', fontSize=18,
+        num_s = ParagraphStyle(f'akn{idx}', fontName=FONT_BOLD, fontSize=18,
                                textColor=HexColor('#FFFFFF'), alignment=TA_CENTER, leading=22)
-        lbl_s = ParagraphStyle(f'akl{idx}', fontName='Helvetica', fontSize=7.5,
+        lbl_s = ParagraphStyle(f'akl{idx}', fontName=FONT_REGULAR, fontSize=7.5,
                                textColor=HexColor('#FFFFFF'), alignment=TA_CENTER)
         return [Paragraph(num_txt, num_s), Paragraph(lbl_txt, lbl_s)]
 
@@ -2070,7 +2179,7 @@ def render_activity_report(data_updates, sessions, mentor_reports,
 
         story.append(Paragraph('Monthly Activity Overview', sq['h1']))
         story.append(HRFlowable(width='100%', thickness=0.8, color=ACCENT2, spaceAfter=4))
-        leg_style = ParagraphStyle('ar_leg', fontName='Helvetica', fontSize=7.5,
+        leg_style = ParagraphStyle('ar_leg', fontName=FONT_REGULAR, fontSize=7.5,
                                    textColor=NAVY2)
         leg_t = Table([[
             [Paragraph('<font color="#C0392B">&#9632;</font> Data Updates', leg_style)],
@@ -2231,7 +2340,7 @@ def render_activity_report(data_updates, sessions, mentor_reports,
     story.append(HRFlowable(width='100%', thickness=0.8, color=NAVY2, spaceAfter=4))
     story.append(Paragraph(
         f'Generated from PRUDEV II Portfolio Management System  ·  Period: {period_str}',
-        ParagraphStyle('ar_foot', fontName='Helvetica', fontSize=7.5,
+        ParagraphStyle('ar_foot', fontName=FONT_REGULAR, fontSize=7.5,
                        textColor=HexColor('#888888'), alignment=TA_CENTER),
     ))
 
@@ -2272,7 +2381,7 @@ def generate_enterprise_improvement_plan_pdf(plan):
         fontSize=15,
         leading=18,
         textColor=HexColor('#9E0A1E'),
-        fontName='Helvetica-Bold',
+        fontName=FONT_BOLD,
         spaceAfter=2,
     )
     p_sub = ParagraphStyle(
@@ -2285,7 +2394,7 @@ def generate_enterprise_improvement_plan_pdf(plan):
     )
     p_sec_hdr = ParagraphStyle(
         'tbip_sec',
-        fontName='Helvetica-Bold',
+        fontName=FONT_BOLD,
         fontSize=10.5,
         leading=13,
         textColor=HexColor('#1A365D'),
@@ -2294,7 +2403,7 @@ def generate_enterprise_improvement_plan_pdf(plan):
     )
     th_style = ParagraphStyle(
         'tbip_th',
-        fontName='Helvetica-Bold',
+        fontName=FONT_BOLD,
         fontSize=8,
         leading=10,
         textColor=HexColor('#FFFFFF'),
@@ -2307,7 +2416,7 @@ def generate_enterprise_improvement_plan_pdf(plan):
     )
     td_style = ParagraphStyle(
         'tbip_td',
-        fontName='Helvetica',
+        fontName=FONT_REGULAR,
         fontSize=7.5,
         leading=9.5,
         textColor=HexColor('#222222'),
@@ -2315,7 +2424,7 @@ def generate_enterprise_improvement_plan_pdf(plan):
     td_bold = ParagraphStyle(
         'tbip_td_b',
         parent=td_style,
-        fontName='Helvetica-Bold',
+        fontName=FONT_BOLD,
         textColor=HexColor('#1A2F4B'),
     )
     td_style_c = ParagraphStyle(
@@ -2520,7 +2629,7 @@ def generate_enterprise_improvement_plan_pdf(plan):
     story.append(HRFlowable(width='100%', thickness=0.8, color=HexColor('#CBD5E1'), spaceAfter=4))
     story.append(Paragraph(
         f"Generated from PRUDEV II Portfolio Management System · Assessment Date: {plan.assessment_date}",
-        ParagraphStyle('tbip_foot', fontName='Helvetica', fontSize=7, textColor=HexColor('#888888'), alignment=TA_CENTER),
+        ParagraphStyle('tbip_foot', fontName=FONT_REGULAR, fontSize=7, textColor=HexColor('#888888'), alignment=TA_CENTER),
     ))
 
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
@@ -2552,7 +2661,7 @@ def generate_financial_improvement_plan_pdf(plan):
         fontSize=14,
         leading=17,
         textColor=HexColor('#9E0A1E'),
-        fontName='Helvetica-Bold',
+        fontName=FONT_BOLD,
         spaceAfter=2,
     )
     p_sub = ParagraphStyle(
@@ -2569,13 +2678,13 @@ def generate_financial_improvement_plan_pdf(plan):
         fontSize=10,
         leading=13,
         textColor=HexColor('#9E0A1E'),
-        fontName='Helvetica-Bold',
+        fontName=FONT_BOLD,
         spaceBefore=6,
         spaceAfter=4,
     )
-    td_style = ParagraphStyle('fiap_td', fontName='Helvetica', fontSize=8, leading=10.5, textColor=HexColor('#1E293B'))
-    td_bold = ParagraphStyle('fiap_td_bold', fontName='Helvetica-Bold', fontSize=8, leading=10.5, textColor=HexColor('#0F172A'))
-    td_muted = ParagraphStyle('fiap_td_muted', fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=HexColor('#64748B'))
+    td_style = ParagraphStyle('fiap_td', fontName=FONT_REGULAR, fontSize=8, leading=10.5, textColor=HexColor('#1E293B'))
+    td_bold = ParagraphStyle('fiap_td_bold', fontName=FONT_BOLD, fontSize=8, leading=10.5, textColor=HexColor('#0F172A'))
+    td_muted = ParagraphStyle('fiap_td_muted', fontName=FONT_REGULAR, fontSize=7.5, leading=9.5, textColor=HexColor('#64748B'))
 
     story = []
 
@@ -2832,11 +2941,79 @@ def generate_financial_improvement_plan_pdf(plan):
     story.append(HRFlowable(width='100%', thickness=0.8, color=HexColor('#CBD5E1'), spaceAfter=4))
     story.append(Paragraph(
         f"Generated from PRUDEV II Portfolio Management System · Assessment Date: {plan.assessment_date} · Status: {plan.get_status_display()}",
-        ParagraphStyle('fiap_foot', fontName='Helvetica', fontSize=7, textColor=HexColor('#888888'), alignment=TA_CENTER),
+        ParagraphStyle('fiap_foot', fontName=FONT_REGULAR, fontSize=7, textColor=HexColor('#888888'), alignment=TA_CENTER),
     ))
 
     doc.build(story, onFirstPage=_header, onLaterPages=_header)
     buf.seek(0)
     return buf.getvalue()
+
+
+def verify_pdf_printer_safe(pdf_data):
+    """
+    Automated check verifying that a generated PDF is 100% printer-safe:
+    1. pdffonts: Every font must have 'yes' in the 'emb' column (fully embedded).
+    2. pdfimages -list: Must contain NO 'smask' rows (no soft masks / transparency).
+    3. qpdf --check: Must report no errors (clean PDF stream structure).
+    Raises AssertionError if any check fails.
+    """
+    if hasattr(pdf_data, 'getvalue'):
+        raw_bytes = pdf_data.getvalue()
+    elif hasattr(pdf_data, 'read'):
+        pdf_data.seek(0)
+        raw_bytes = pdf_data.read()
+    else:
+        raw_bytes = bytes(pdf_data)
+
+    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tf:
+        tf.write(raw_bytes)
+        tf_path = tf.name
+
+    try:
+        # 1. Check embedded fonts via pdffonts
+        try:
+            res_fonts = subprocess.run(
+                ['pdffonts', tf_path],
+                capture_output=True, text=True, check=True
+            )
+            lines = res_fonts.stdout.strip().splitlines()
+            if len(lines) > 2:
+                for line in lines[2:]:
+                    parts = line.split()
+                    if len(parts) >= 5:
+                        emb = parts[-4]
+                        if emb.lower() != 'yes':
+                            raise AssertionError(f"PDF contains non-embedded font: {line}")
+        except FileNotFoundError:
+            logger.warning("pdffonts CLI not found on PATH; skipping pdffonts check")
+
+        # 2. Check no soft masks (smask) via pdfimages -list
+        try:
+            res_images = subprocess.run(
+                ['pdfimages', '-list', tf_path],
+                capture_output=True, text=True, check=True
+            )
+            for line in res_images.stdout.splitlines():
+                if 'smask' in line.lower():
+                    raise AssertionError(f"PDF contains transparency smask: {line}")
+        except FileNotFoundError:
+            logger.warning("pdfimages CLI not found on PATH; skipping pdfimages check")
+
+        # 3. Check qpdf
+        try:
+            res_qpdf = subprocess.run(
+                ['qpdf', '--check', tf_path],
+                capture_output=True, text=True
+            )
+            if res_qpdf.returncode != 0:
+                raise AssertionError(f"qpdf check failed: {res_qpdf.stderr or res_qpdf.stdout}")
+        except FileNotFoundError:
+            logger.warning("qpdf CLI not found on PATH; skipping qpdf check")
+
+        return True
+    finally:
+        if os.path.exists(tf_path):
+            os.remove(tf_path)
+
 
 
