@@ -6212,8 +6212,8 @@ export default function Dashboard({ token, currentUser, onLogout }) {
       <Divider sx={{ my: 3 }} />
 
       {(() => {
-        // Source reports: fallback to allReports if available
-        const sourceReports = (allReports.length > 0 && (!reportFilterBge || reports.length === 0)) ? allReports : reports;
+        // Source reports: use allReports if available, else reports
+        const sourceReports = allReports.length > 0 ? allReports : reports;
 
         // BGE report counts computed across all reports
         const bgeReportCounts = {};
@@ -6408,24 +6408,30 @@ export default function Dashboard({ token, currentUser, onLogout }) {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 <Button
                   size="small"
-                  variant={reportViewMode === 'grouped_bge' ? 'contained' : 'outlined'}
+                  variant={(reportViewMode === 'grouped_bge' || (selectedBgeObj && reportBgeSubView === 'by_msme' && reportViewMode !== 'table' && reportViewMode !== 'cards')) ? 'contained' : 'outlined'}
                   startIcon={<GroupWork fontSize="small" />}
-                  onClick={() => setReportViewMode('grouped_bge')}
+                  onClick={() => {
+                    setReportViewMode('grouped_bge');
+                    if (selectedBgeObj) setReportBgeSubView('by_msme');
+                  }}
                   sx={{
                     textTransform: 'none',
                     fontSize: 12,
                     borderRadius: 1.5,
-                    bgcolor: reportViewMode === 'grouped_bge' ? '#162A3A' : undefined,
-                    '&:hover': { bgcolor: reportViewMode === 'grouped_bge' ? '#2B5278' : undefined },
+                    bgcolor: (reportViewMode === 'grouped_bge' || (selectedBgeObj && reportBgeSubView === 'by_msme' && reportViewMode !== 'table' && reportViewMode !== 'cards')) ? '#162A3A' : undefined,
+                    '&:hover': { bgcolor: (reportViewMode === 'grouped_bge' || (selectedBgeObj && reportBgeSubView === 'by_msme' && reportViewMode !== 'table' && reportViewMode !== 'cards')) ? '#2B5278' : undefined },
                   }}
                 >
-                  By BGE (Separated)
+                  {selectedBgeObj ? 'Grouped by MSME' : 'By BGE (Separated)'}
                 </Button>
                 <Button
                   size="small"
-                  variant={reportViewMode === 'table' ? 'contained' : 'outlined'}
+                  variant={(reportViewMode === 'table' || (selectedBgeObj && reportBgeSubView === 'table')) ? 'contained' : 'outlined'}
                   startIcon={<ViewList fontSize="small" />}
-                  onClick={() => setReportViewMode('table')}
+                  onClick={() => {
+                    setReportViewMode('table');
+                    if (selectedBgeObj) setReportBgeSubView('table');
+                  }}
                   sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
                 >
                   Table View
@@ -6434,7 +6440,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   size="small"
                   variant={reportViewMode === 'cards' ? 'contained' : 'outlined'}
                   startIcon={<ViewModule fontSize="small" />}
-                  onClick={() => setReportViewMode('cards')}
+                  onClick={() => {
+                    setReportViewMode('cards');
+                  }}
                   sx={{ textTransform: 'none', fontSize: 12, borderRadius: 1.5 }}
                 >
                   Cards View
@@ -6613,28 +6621,28 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                     <Typography variant="caption" fontWeight={600} color="text.secondary">Organize by:</Typography>
                     <Button
                       size="small"
-                      variant={reportBgeSubView === 'by_msme' ? 'contained' : 'outlined'}
-                      onClick={() => setReportBgeSubView('by_msme')}
+                      variant={reportBgeSubView === 'by_msme' && reportViewMode !== 'table' && reportViewMode !== 'cards' ? 'contained' : 'outlined'}
+                      onClick={() => { setReportBgeSubView('by_msme'); setReportViewMode('grouped_bge'); }}
                       sx={{
                         textTransform: 'none',
                         fontSize: 11,
                         py: 0.25,
                         px: 1,
-                        bgcolor: reportBgeSubView === 'by_msme' ? '#162A3A' : undefined,
+                        bgcolor: reportBgeSubView === 'by_msme' && reportViewMode !== 'table' && reportViewMode !== 'cards' ? '#162A3A' : undefined,
                       }}
                     >
                       Grouped by MSME
                     </Button>
                     <Button
                       size="small"
-                      variant={reportBgeSubView === 'table' ? 'contained' : 'outlined'}
-                      onClick={() => setReportBgeSubView('table')}
+                      variant={reportBgeSubView === 'table' || reportViewMode === 'table' ? 'contained' : 'outlined'}
+                      onClick={() => { setReportBgeSubView('table'); setReportViewMode('table'); }}
                       sx={{
                         textTransform: 'none',
                         fontSize: 11,
                         py: 0.25,
                         px: 1,
-                        bgcolor: reportBgeSubView === 'table' ? '#162A3A' : undefined,
+                        bgcolor: reportBgeSubView === 'table' || reportViewMode === 'table' ? '#162A3A' : undefined,
                       }}
                     >
                       Visit List
@@ -6802,7 +6810,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             </Paper>
 
             {/* If BGE is selected and Sub-view is 'by_msme': render clean enterprise dossier */}
-            {selectedBgeObj && reportBgeSubView === 'by_msme' && (() => {
+            {selectedBgeObj && reportBgeSubView === 'by_msme' && reportViewMode !== 'table' && reportViewMode !== 'cards' && (() => {
               const msmeMap = {};
               sortedReports.forEach(r => {
                 const mid = r.msme || 'unknown';
@@ -6819,7 +6827,12 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 }
                 msmeMap[mid].reports.push(r);
               });
-              const msmeList = Object.values(msmeMap);
+              // Sort enterprise cards by newest visit date first
+              const msmeList = Object.values(msmeMap).sort((a, b) => {
+                const latestA = Math.max(...a.reports.map(r => r.visit_date ? new Date(r.visit_date).getTime() : 0), 0);
+                const latestB = Math.max(...b.reports.map(r => r.visit_date ? new Date(r.visit_date).getTime() : 0), 0);
+                return latestB - latestA;
+              });
 
               if (msmeList.length === 0) {
                 return (
@@ -6838,6 +6851,11 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                   </Box>
                   {msmeList.map(item => {
                     const bge = selectedBgeObj;
+                    const sortedMsmeReports = [...item.reports].sort((a, b) => {
+                      const da = a.visit_date ? new Date(a.visit_date).getTime() : 0;
+                      const db = b.visit_date ? new Date(b.visit_date).getTime() : 0;
+                      return db - da || ((b.id || 0) - (a.id || 0));
+                    });
                     return (
                       <Paper key={item.msmeId} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
                         <Box sx={{ p: 2, bgcolor: '#FAFBFD', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
@@ -6882,7 +6900,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                             </TableRow>
                           </TableHead>
                           <TableBody>
-                            {item.reports.map(r => {
+                            {sortedMsmeReports.map(r => {
                               const msme = (allMsmes.length > 0 ? allMsmes : msmes).find(m => m.id === r.msme) || { business_name: r.msme_name, msme_code: r.msme_code };
                               return (
                                 <TableRow key={r.id} hover>
@@ -7068,7 +7086,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             )}
 
             {/* View Mode 2: Cards View */}
-            {!selectedBgeObj && reportViewMode === 'cards' && (
+            {reportViewMode === 'cards' && (
               <Box>
                 {pagedReports.length === 0 ? (
                   <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
@@ -7400,10 +7418,13 @@ export default function Dashboard({ token, currentUser, onLogout }) {
           const filteredGroupReports = groupReports.filter(g => {
             if (!reportFilterBge) return true;
             const bgeId = Number(reportFilterBge);
-            const bgeName = selectedBgeObj?.name;
-            return g.team_lead === bgeId ||
-                   (g.team_lead_name && g.team_lead_name === bgeName) ||
-                   (Array.isArray(g.contributions) && g.contributions.some(c => c.bge === bgeId));
+            const bgeName = selectedBgeObj?.name?.trim().toLowerCase();
+            const isTeamLead = Number(g.team_lead) === bgeId || (bgeName && g.team_lead_name && g.team_lead_name.trim().toLowerCase() === bgeName);
+            const isAttendee = Array.isArray(g.attendees_detail) && g.attendees_detail.some(a => Number(a.id) === bgeId || (bgeName && a.name && a.name.trim().toLowerCase() === bgeName));
+            const isAttendeeId = Array.isArray(g.attendees) && g.attendees.some(id => Number(id) === bgeId);
+            const isContributor = Array.isArray(g.contributions_detail) && g.contributions_detail.some(c => Number(c.bge_id) === bgeId || (bgeName && c.bge_name && c.bge_name.trim().toLowerCase() === bgeName));
+            const isContributorOld = Array.isArray(g.contributions) && g.contributions.some(c => Number(c.bge) === bgeId);
+            return isTeamLead || isAttendee || isAttendeeId || isContributor || isContributorOld;
           });
 
           return (
@@ -7512,264 +7533,313 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
       {/* ── Training & Mentor Reports ───────────────────────────────────── */}
       <Box sx={{ mt: 4 }}>
-        <SectionHeader
-          title="Training Reports"
-          subtitle={`${adminTrainingReports.length} lead · ${adminMentorReports.length} mentor · ${adminParticipantReports.length} participant`}
-        />
-        <Tabs value={trReportTab} onChange={(_, v) => setTrReportTab(v)}
-          sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Tab label={`Lead Reports (${adminTrainingReports.length})`} />
-          <Tab label={`Mentor Reports (${adminMentorReports.length})`} />
-          <Tab label={`Participant Reports (${adminParticipantReports.length})`} />
-        </Tabs>
+        {(() => {
+          const selectedBgeObj = reportFilterBge ? experts.find(e => String(e.id) === String(reportFilterBge)) : null;
+          const bgeId = reportFilterBge ? Number(reportFilterBge) : null;
+          const bgeName = selectedBgeObj?.name?.trim().toLowerCase();
 
-        {trReportTab === 0 && (
-          adminTrainingReports.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
-              No training reports submitted yet.
-            </Paper>
-          ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                  <TableRow>
-                    <TableCell>Session</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Lead BGE</TableCell>
-                    <TableCell>Participants</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {adminTrainingReports.map(r => (
-                    <TableRow key={r.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={500}>{r.session_title}</Typography>
-                        {r.session_location && (
-                          <Typography variant="caption" color="text.secondary">{r.session_location}</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>{r.session_date || '—'}</TableCell>
-                      <TableCell>{r.bge_name || '—'}</TableCell>
-                      <TableCell>
-                        {r.total_participants > 0 ? (
-                          <Chip label={`${r.total_participants} participants`} size="small" variant="outlined" />
-                        ) : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={r.status} size="small"
-                          color={r.status === 'submitted' ? 'primary' : 'default'} />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="View report">
-                            <IconButton size="small" color="primary" onClick={() => setViewTrReport(r)}>
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Open PDF">
-                            <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'view')}>
-                              <PictureAsPdf fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download PDF">
-                            <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'download')}>
-                              <Download fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {isAdmin && r.status !== 'draft' && (
-                            <Tooltip title="Revert to draft">
-                              <IconButton size="small" color="warning" onClick={() => revertReport('training', r.id)}>
-                                <Undo fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )
-        )}
+          const filteredTrainingReports = adminTrainingReports.filter(r => {
+            if (!reportFilterBge) return true;
+            return Number(r.bge) === bgeId || (bgeName && r.bge_name && r.bge_name.trim().toLowerCase() === bgeName);
+          });
 
-        {trReportTab === 1 && (
-          adminMentorReports.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
-              No mentor reports submitted yet.
-            </Paper>
-          ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                  <TableRow>
-                    <TableCell>Session</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Mentor BGE</TableCell>
-                    <TableCell>Lead BGE</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {adminMentorReports.map(r => (
-                    <TableRow key={r.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={500}>{r.session_title}</Typography>
-                        {r.session_location && (
-                          <Typography variant="caption" color="text.secondary">{r.session_location}</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>{r.session_date || '—'}</TableCell>
-                      <TableCell>{r.bge_name || '—'}</TableCell>
-                      <TableCell>{r.lead_bge_name || '—'}</TableCell>
-                      <TableCell>
-                        <Chip label={r.status} size="small"
-                          color={r.status === 'submitted' ? 'primary' : 'default'} />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="View report">
-                            <IconButton size="small" color="primary" onClick={() => setViewMrReport(r)}>
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Open PDF">
-                            <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'view')}>
-                              <PictureAsPdf fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download PDF">
-                            <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'download')}>
-                              <Download fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {isAdmin && r.status !== 'draft' && (
-                            <Tooltip title="Revert to draft">
-                              <IconButton size="small" color="warning" onClick={() => revertReport('mentor', r.id)}>
-                                <Undo fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )
-        )}
+          const filteredMentorReports = adminMentorReports.filter(r => {
+            if (!reportFilterBge) return true;
+            const isMentor = Number(r.bge) === bgeId || (bgeName && r.bge_name && r.bge_name.trim().toLowerCase() === bgeName);
+            const isLead = bgeName && r.lead_bge_name && r.lead_bge_name.trim().toLowerCase() === bgeName;
+            return isMentor || isLead;
+          });
 
-        {trReportTab === 2 && (
-          adminParticipantReports.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
-              No participant training reports submitted yet.
-            </Paper>
-          ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                  <TableRow>
-                    <TableCell>Training Title</TableCell>
-                    <TableCell>Dates</TableCell>
-                    <TableCell>Venue</TableCell>
-                    <TableCell>BGE</TableCell>
-                    <TableCell>Attendees</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {adminParticipantReports.map(r => (
-                    <TableRow key={r.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={500}>{r.training_title || '—'}</Typography>
-                        {r.facilitator_name && (
-                          <Typography variant="caption" color="text.secondary">Facilitator: {r.facilitator_name}</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>{r.training_dates || '—'}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{r.venue || '—'}</Typography>
-                        {r.district && <Typography variant="caption" color="text.secondary">{r.district}</Typography>}
-                      </TableCell>
-                      <TableCell>{r.bge_name || '—'}</TableCell>
-                      <TableCell>
-                        {(r.attendees || []).length > 0
-                          ? <Chip label={`${r.attendees.length} attendees`} size="small" variant="outlined" />
-                          : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={r.status} size="small"
-                          color={r.status === 'submitted' ? 'primary' : 'default'} />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="View report">
-                            <IconButton size="small" color="primary" onClick={() => setViewPtReport(r)}>
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Open PDF">
-                            <IconButton size="small" onClick={() => openTrainingReportPdf('participant', r.id, 'view')}>
-                              <PictureAsPdf fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download PDF">
-                            <IconButton size="small" onClick={() => openTrainingReportPdf('participant', r.id, 'download')}>
-                              <Download fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {isAdmin && r.status !== 'draft' && (
-                            <Tooltip title="Revert to draft">
-                              <IconButton size="small" color="warning" onClick={() => revertReport('participant', r.id)}>
-                                <Undo fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )
-        )}
+          const filteredParticipantReports = adminParticipantReports.filter(r => {
+            if (!reportFilterBge) return true;
+            return Number(r.bge) === bgeId || (bgeName && r.bge_name && r.bge_name.trim().toLowerCase() === bgeName);
+          });
+
+          const totalAll = adminTrainingReports.length + adminMentorReports.length + adminParticipantReports.length;
+
+          return (
+            <Box>
+              <SectionHeader
+                title="Training Reports"
+                subtitle={
+                  selectedBgeObj
+                    ? `${filteredTrainingReports.length} lead · ${filteredMentorReports.length} mentor · ${filteredParticipantReports.length} participant involving ${selectedBgeObj.name} · ${totalAll} total`
+                    : `${adminTrainingReports.length} lead · ${adminMentorReports.length} mentor · ${adminParticipantReports.length} participant`
+                }
+              />
+              <Tabs value={trReportTab} onChange={(_, v) => setTrReportTab(v)}
+                sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Tab label={`Lead Reports (${filteredTrainingReports.length})`} />
+                <Tab label={`Mentor Reports (${filteredMentorReports.length})`} />
+                <Tab label={`Participant Reports (${filteredParticipantReports.length})`} />
+              </Tabs>
+
+              {trReportTab === 0 && (
+                filteredTrainingReports.length === 0 ? (
+                  <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+                    {selectedBgeObj
+                      ? `No lead training reports involving ${selectedBgeObj.name}.`
+                      : 'No training reports submitted yet.'}
+                  </Paper>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                        <TableRow>
+                          <TableCell>Session</TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell>Lead BGE</TableCell>
+                          <TableCell>Participants</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[...filteredTrainingReports].sort((a, b) => new Date(b.session_date || 0) - new Date(a.session_date || 0) || ((b.id || 0) - (a.id || 0))).map(r => (
+                          <TableRow key={r.id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500}>{r.session_title}</Typography>
+                              {r.session_location && (
+                                <Typography variant="caption" color="text.secondary">{r.session_location}</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>{r.session_date || '—'}</TableCell>
+                            <TableCell>{r.bge_name || '—'}</TableCell>
+                            <TableCell>
+                              {r.total_participants > 0 ? (
+                                <Chip label={`${r.total_participants} participants`} size="small" variant="outlined" />
+                              ) : '—'}
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={r.status} size="small"
+                                color={r.status === 'submitted' ? 'primary' : 'default'} />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Tooltip title="View report">
+                                  <IconButton size="small" color="primary" onClick={() => setViewTrReport(r)}>
+                                    <Visibility fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Open PDF">
+                                  <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'view')}>
+                                    <PictureAsPdf fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download PDF">
+                                  <IconButton size="small" onClick={() => openTrainingReportPdf('lead', r.id, 'download')}>
+                                    <Download fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                {isAdmin && r.status !== 'draft' && (
+                                  <Tooltip title="Revert to draft">
+                                    <IconButton size="small" color="warning" onClick={() => revertReport('training', r.id)}>
+                                      <Undo fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )
+              )}
+
+              {trReportTab === 1 && (
+                filteredMentorReports.length === 0 ? (
+                  <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+                    {selectedBgeObj
+                      ? `No mentor reports involving ${selectedBgeObj.name}.`
+                      : 'No mentor reports submitted yet.'}
+                  </Paper>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                        <TableRow>
+                          <TableCell>Session</TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell>Mentor BGE</TableCell>
+                          <TableCell>Lead BGE</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[...filteredMentorReports].sort((a, b) => new Date(b.session_date || 0) - new Date(a.session_date || 0) || ((b.id || 0) - (a.id || 0))).map(r => (
+                          <TableRow key={r.id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500}>{r.session_title}</Typography>
+                              {r.session_location && (
+                                <Typography variant="caption" color="text.secondary">{r.session_location}</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>{r.session_date || '—'}</TableCell>
+                            <TableCell>{r.bge_name || '—'}</TableCell>
+                            <TableCell>{r.lead_bge_name || '—'}</TableCell>
+                            <TableCell>
+                              <Chip label={r.status} size="small"
+                                color={r.status === 'submitted' ? 'primary' : 'default'} />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Tooltip title="View report">
+                                  <IconButton size="small" color="primary" onClick={() => setViewMrReport(r)}>
+                                    <Visibility fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Open PDF">
+                                  <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'view')}>
+                                    <PictureAsPdf fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download PDF">
+                                  <IconButton size="small" onClick={() => openTrainingReportPdf('mentor', r.id, 'download')}>
+                                    <Download fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                {isAdmin && r.status !== 'draft' && (
+                                  <Tooltip title="Revert to draft">
+                                    <IconButton size="small" color="warning" onClick={() => revertReport('mentor', r.id)}>
+                                      <Undo fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )
+              )}
+
+              {trReportTab === 2 && (
+                filteredParticipantReports.length === 0 ? (
+                  <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+                    {selectedBgeObj
+                      ? `No participant training reports for ${selectedBgeObj.name}.`
+                      : 'No participant training reports submitted yet.'}
+                  </Paper>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                        <TableRow>
+                          <TableCell>Training Title</TableCell>
+                          <TableCell>Dates</TableCell>
+                          <TableCell>Venue</TableCell>
+                          <TableCell>BGE</TableCell>
+                          <TableCell>Attendees</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[...filteredParticipantReports].sort((a, b) => (b.id || 0) - (a.id || 0)).map(r => (
+                          <TableRow key={r.id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500}>{r.training_title || '—'}</Typography>
+                              {r.facilitator_name && (
+                                <Typography variant="caption" color="text.secondary">Facilitator: {r.facilitator_name}</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>{r.training_dates || '—'}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{r.venue || '—'}</Typography>
+                              {r.district && <Typography variant="caption" color="text.secondary">{r.district}</Typography>}
+                            </TableCell>
+                            <TableCell>{r.bge_name || '—'}</TableCell>
+                            <TableCell>
+                              {(r.attendees || []).length > 0
+                                ? <Chip label={`${r.attendees.length} attendees`} size="small" variant="outlined" />
+                                : '—'}
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={r.status} size="small"
+                                color={r.status === 'submitted' ? 'primary' : 'default'} />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Tooltip title="View report">
+                                  <IconButton size="small" color="primary" onClick={() => setViewPtReport(r)}>
+                                    <Visibility fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Open PDF">
+                                  <IconButton size="small" onClick={() => openTrainingReportPdf('participant', r.id, 'view')}>
+                                    <PictureAsPdf fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download PDF">
+                                  <IconButton size="small" onClick={() => openTrainingReportPdf('participant', r.id, 'download')}>
+                                    <Download fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                {isAdmin && r.status !== 'draft' && (
+                                  <Tooltip title="Revert to draft">
+                                    <IconButton size="small" color="warning" onClick={() => revertReport('participant', r.id)}>
+                                      <Undo fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )
+              )}
+            </Box>
+          );
+        })()}
       </Box>
 
       {/* ── Growth Updates (Snapshots) ──────────────────────────────────── */}
       <Box sx={{ mt: 4 }}>
-        <SectionHeader
-          title="Growth Updates"
-          subtitle={`${adminSnapshots.length} submission${adminSnapshots.length === 1 ? '' : 's'} · ${[...new Set(adminSnapshots.map(s => s.msme))].length} MSMEs covered`}
-        >
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>
-              <InputLabel>Filter by BGE</InputLabel>
-              <Select value={snapshotFilterBge} label="Filter by BGE"
-                onChange={e => { setSnapshotFilterBge(e.target.value); setSnapshotPage(0); }}>
-                <MenuItem value="">All BGEs</MenuItem>
-                {experts.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: 0 }}>
-              <InputLabel>Source</InputLabel>
-              <Select value={snapshotFilterSource} label="Source"
-                onChange={e => { setSnapshotFilterSource(e.target.value); setSnapshotPage(0); }}>
-                <MenuItem value="">All Sources</MenuItem>
-                <MenuItem value="diagnostic">Baseline Diagnostic</MenuItem>
-                <MenuItem value="bge_visit">BGE Visit</MenuItem>
-                <MenuItem value="quarterly">Quarterly Review</MenuItem>
-                <MenuItem value="annual">Data Update</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-        </SectionHeader>
+        {(() => {
+          const effectiveSnapshotBge = snapshotFilterBge !== '' ? snapshotFilterBge : (reportFilterBge || '');
+          const selectedSnapBgeObj = effectiveSnapshotBge ? experts.find(e => String(e.id) === String(effectiveSnapshotBge)) : null;
+
+          return (
+            <Box>
+              <SectionHeader
+                title="Growth Updates"
+                subtitle={
+                  selectedSnapBgeObj
+                    ? `${adminSnapshots.filter(s => s.collected_by === Number(effectiveSnapshotBge)).length} submissions collected by ${selectedSnapBgeObj.name} · ${adminSnapshots.length} total`
+                    : `${adminSnapshots.length} submission${adminSnapshots.length === 1 ? '' : 's'} · ${[...new Set(adminSnapshots.map(s => s.msme))].length} MSMEs covered`
+                }
+              >
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <FormControl size="small" sx={{ flex: '1 1 140px', minWidth: 0 }}>
+                    <InputLabel>Filter by BGE</InputLabel>
+                    <Select value={effectiveSnapshotBge} label="Filter by BGE"
+                      onChange={e => { setSnapshotFilterBge(e.target.value); setSnapshotPage(0); }}>
+                      <MenuItem value="">All BGEs</MenuItem>
+                      {experts.map(e => <MenuItem key={e.id} value={String(e.id)}>{e.name}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ flex: '1 1 130px', minWidth: 0 }}>
+                    <InputLabel>Source</InputLabel>
+                    <Select value={snapshotFilterSource} label="Source"
+                      onChange={e => { setSnapshotFilterSource(e.target.value); setSnapshotPage(0); }}>
+                      <MenuItem value="">All Sources</MenuItem>
+                      <MenuItem value="diagnostic">Baseline Diagnostic</MenuItem>
+                      <MenuItem value="bge_visit">BGE Visit</MenuItem>
+                      <MenuItem value="quarterly">Quarterly Review</MenuItem>
+                      <MenuItem value="annual">Data Update</MenuItem>
+                      <MenuItem value="other">Other</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </SectionHeader>
 
         {adminSnapshotsLoading ? (
           <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress /></Box>
@@ -7833,7 +7903,7 @@ export default function Dashboard({ token, currentUser, onLogout }) {
 
           // ── Filtered table ────────────────────────────────────────────
           const filtered = adminSnapshots.filter(s =>
-            (!snapshotFilterBge    || s.collected_by === Number(snapshotFilterBge)) &&
+            (!effectiveSnapshotBge || s.collected_by === Number(effectiveSnapshotBge)) &&
             (!snapshotFilterSource || s.source === snapshotFilterSource)
           );
           const pageSlice = filtered.slice(snapshotPage * ROWS_PER_PAGE, (snapshotPage + 1) * ROWS_PER_PAGE);
@@ -8118,6 +8188,9 @@ export default function Dashboard({ token, currentUser, onLogout }) {
                 </TableContainer>
               )}
             </>
+          );
+        })()}
+            </Box>
           );
         })()}
       </Box>
