@@ -44,6 +44,7 @@ import {
   ExpandLess,
   Public,
   SatelliteAlt,
+  Download,
 } from '@mui/icons-material';
 
 // Center of Northern Uganda (Gulu / Acholi / Lango / West Nile central axis)
@@ -522,6 +523,52 @@ export default function MSMEMap({
     return { totalMsmes, withGpsMsmes, withoutGpsMsmes, totalExperts, withGpsExperts };
   }, [msmes, parsedMsmes, experts, parsedExperts]);
 
+  // Export GPS Coordinates CSV for all currently plotted MSMEs
+  const handleExportGpsCsv = () => {
+    const headers = [
+      'No.',
+      'MSME Code',
+      'Business Name',
+      'Sector',
+      'District',
+      'City / Town',
+      'Physical Address',
+      'Latitude',
+      'Longitude',
+      'Coordinate Source / Accuracy',
+      'Is Centroid Estimate',
+      'Google Maps Link',
+      'Owner / Contact Name',
+      'Phone',
+      'Assigned BGE',
+    ];
+    const rows = plottedMsmes.map((m, idx) => [
+      idx + 1,
+      `"${(m.msme_code || '').replace(/"/g, '""')}"`,
+      `"${(m.business_name || '').replace(/"/g, '""')}"`,
+      `"${(m.sector || '').replace(/"/g, '""')}"`,
+      `"${(m.district || m.diag_district || '').replace(/"/g, '""')}"`,
+      `"${(m.city || '').replace(/"/g, '""')}"`,
+      `"${(m.physical_address || '').replace(/"/g, '""')}"`,
+      m.parsedLat,
+      m.parsedLng,
+      `"${m.locationPlacementLabel || (m.isFallback ? 'District Centroid' : 'Field GPS')}"`,
+      m.isFallback ? 'Yes' : 'No',
+      `"https://maps.google.com/?q=${m.parsedLat},${m.parsedLng}"`,
+      `"${(m.owner_name || m.contact_name || '').replace(/"/g, '""')}"`,
+      `"${(m.phone || '').replace(/"/g, '""')}"`,
+      `"${(m.assigned_bge_name || '').replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `PRUDEV_II_MSME_GPS_Coordinates_${plottedMsmes.length}_MSMEs.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Safe invalidation helper
   const triggerMapInvalidate = useCallback(() => {
     if (mapInstanceRef.current) {
@@ -877,6 +924,22 @@ export default function MSMEMap({
                 onClick={() => setUnplottedDialogOpen(true)}
               />
             )}
+
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<Download />}
+              onClick={handleExportGpsCsv}
+              sx={{
+                textTransform: 'none',
+                fontSize: 12,
+                bgcolor: '#2E7D32',
+                '&:hover': { bgcolor: '#1B5E20' },
+                fontWeight: 600,
+              }}
+            >
+              Export GPS CSV ({plottedMsmes.length})
+            </Button>
 
             <Button size="small" variant="outlined" startIcon={<Navigation />} onClick={focusNorthernUganda} sx={{ textTransform: 'none', fontSize: 12 }}>
               Reset North
