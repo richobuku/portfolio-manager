@@ -8,6 +8,24 @@ import theme, { BRAND } from './theme';
 import API_BASE_URL from './config';
 
 // ── Service Worker & Push Notifications ───────────────────────────────────────
+if (window.location.search.includes('reset_cache=1') || window.location.hash.includes('reset_cache')) {
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      Promise.all(names.map((name) => caches.delete(name))).then(() => {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            Promise.all(registrations.map((r) => r.unregister())).then(() => {
+              window.location.href = window.location.pathname;
+            });
+          });
+        } else {
+          window.location.href = window.location.pathname;
+        }
+      });
+    });
+  }
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
@@ -26,6 +44,12 @@ if ('serviceWorker' in navigator) {
         });
       })
       .catch(() => {});
+  });
+
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'FORCE_RELOAD') {
+      window.location.reload();
+    }
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {

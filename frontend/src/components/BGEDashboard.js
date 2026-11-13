@@ -17,7 +17,7 @@ import {
   Delete, School, People, CloudUpload,
   HelpOutline, Close, TrendingUp, Checkroom, DrawOutlined, MyLocation,
   Place, GpsFixed, GpsNotFixed, CalendarMonth, Search, ExpandMore,
-  AutoAwesome, AccountBalance, EventAvailable,
+  AutoAwesome, AccountBalance, EventAvailable, Sync,
 } from '@mui/icons-material';
 import axios from 'axios';
 import {
@@ -2091,6 +2091,36 @@ export default function BGEDashboard({ token, currentUser, onLogout }) {
           }}
         >
           Help
+        </Button>
+        <Button
+          variant="text"
+          size="small"
+          startIcon={<Sync />}
+          onClick={async () => {
+            if ('caches' in window) {
+              try {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+              } catch (_) {}
+            }
+            if ('serviceWorker' in navigator) {
+              try {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(r => r.unregister()));
+              } catch (_) {}
+            }
+            window.location.href = window.location.pathname + '?reset_cache=1&t=' + Date.now();
+          }}
+          fullWidth
+          sx={{
+            color: 'rgba(255,255,255,0.65)',
+            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' },
+            fontSize: 11,
+            mb: 0.75,
+            textTransform: 'none',
+          }}
+        >
+          Sync & Refresh App
         </Button>
         <Button
           variant="outlined" size="small" startIcon={<Logout />} onClick={onLogout} fullWidth

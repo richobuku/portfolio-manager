@@ -1,12 +1,10 @@
 /* PRUDEV II Portfolio Management System — PWA service worker */
 
-const VERSION = 'prudev2-pwa-v12';
+const VERSION = 'prudev2-pwa-v13';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
 const PRECACHE_ASSETS = [
-  '/',
-  '/index.html',
   '/offline.html',
   '/manifest.json',
   '/logo192.png',
@@ -32,6 +30,13 @@ self.addEventListener('activate', (event) => {
           .map((key) => caches.delete(key))
       ))
       .then(() => self.clients.claim())
+      .then(() => {
+        return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: 'FORCE_RELOAD', version: VERSION });
+          });
+        });
+      })
   );
 });
 

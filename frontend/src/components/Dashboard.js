@@ -15,7 +15,7 @@ import {
   Business, People, School, Assessment, ChevronRight,
   Add, Upload, Visibility, Edit, Delete, DeleteForever, Search, CheckCircle, Check, Warning,
   TrendingUp, LocationOn, EventNote, Group,
-  AccountTree, Menu as MenuIcon, Logout, ManageAccounts,
+  AccountTree, Menu as MenuIcon, Logout, ManageAccounts, Sync,
   LockReset, PersonAdd, LinkOff, Email, PictureAsPdf,
   Assignment, DragHandle, ExpandMore,
   Lock, LockOpen, Star, StarBorder, Download, Undo, AttachFile,
@@ -2068,6 +2068,36 @@ export default function Dashboard({ token, currentUser, onLogout }) {
             )}
           </Box>
         </Box>
+        <Button
+          variant="text"
+          size="small"
+          startIcon={<Sync />}
+          onClick={async () => {
+            if ('caches' in window) {
+              try {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+              } catch (_) {}
+            }
+            if ('serviceWorker' in navigator) {
+              try {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(r => r.unregister()));
+              } catch (_) {}
+            }
+            window.location.href = window.location.pathname + '?reset_cache=1&t=' + Date.now();
+          }}
+          fullWidth
+          sx={{
+            color: 'rgba(255,255,255,0.65)',
+            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' },
+            fontSize: 11,
+            mb: 0.75,
+            textTransform: 'none',
+          }}
+        >
+          Sync & Refresh App
+        </Button>
         <Button
           fullWidth size="small" variant="outlined" startIcon={<Logout />}
           onClick={onLogout}
